@@ -1,0 +1,3 @@
+# Local development only. `setup.sh` sets the real values as Worker secrets.
+MURMUR_SECRET=dev-secret-please-replace-at-least-32-bytes
+MURMUR_LOG=1

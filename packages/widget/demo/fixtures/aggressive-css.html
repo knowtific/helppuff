@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Hostile CSS</title>
+    <style>
+      /* The worst a host page can plausibly do. */
+      * { all: unset; display: revert; box-sizing: content-box !important; }
+      html { font-size: 10px !important; }
+      body { font-size: 28px !important; line-height: 3 !important; letter-spacing: 4px !important;
+             color: #ff00ff !important; direction: rtl !important; text-align: right !important;
+             font-family: "Comic Sans MS", cursive !important; }
+      button, input, textarea, svg { display: none !important; }
+      div, span, p { border: 3px dashed red !important; }
+      :root { --mm-accent: #00ff00; --mm-bg: #ff0000; --mm-text: #ff0000; }
+    </style>
+  </head>
+  <body>
+    <h1>Aggressive CSS</h1>
+    <p class="host-probe">The widget must look identical here.</p>
+    <script type="module" src="/demo/fixtures/_embed.js"></script>
+  </body>
+</html>

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Murmur — component gallery</title>
+    <style>
+      :root {
+        --ink: #14141a;
+        --ink-2: #63636f;
+        --paper: #f6f6f8;
+        --card: #ffffff;
+        --line: rgba(15, 15, 25, 0.1);
+        --brand: #5b5bf7;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 40px 28px 100px;
+        font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        color: var(--ink);
+        background: var(--paper);
+        -webkit-font-smoothing: antialiased;
+      }
+      #root { max-width: 1240px; margin: 0 auto; }
+
+      .head {
+        display: flex; flex-wrap: wrap; gap: 20px;
+        align-items: flex-end; justify-content: space-between;
+        padding-bottom: 20px; margin-bottom: 8px;
+        border-bottom: 1px solid var(--line);
+      }
+      h1 { font-size: 30px; letter-spacing: -0.03em; margin: 0 0 4px; }
+      .head p { margin: 0; color: var(--ink-2); }
+      .controls { display: flex; align-items: center; gap: 16px; font-size: 13px; color: var(--ink-2); }
+      .controls label { display: flex; align-items: center; gap: 6px; }
+      .controls select, .controls input[type="color"] {
+        font: inherit; border: 1px solid var(--line); border-radius: 8px;
+        background: var(--card); color: var(--ink); padding: 5px 8px;
+      }
+      .controls input[type="color"] { padding: 2px; width: 40px; height: 30px; cursor: pointer; }
+      .controls a { color: var(--brand); text-decoration: none; }
+      .swatches { display: flex; gap: 5px; }
+      .swatches button {
+        width: 22px; height: 22px; border-radius: 50%;
+        border: 1px solid rgba(0,0,0,.15); cursor: pointer; padding: 0;
+      }
+
+      h2 {
+        font-size: 12px; text-transform: uppercase; letter-spacing: 0.09em;
+        color: var(--ink-2); font-weight: 600; margin: 44px 0 14px;
+      }
+
+      .grid { display: grid; gap: 20px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+      .grid.wide { grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); }
+
+      .spec { margin: 0; }
+      .spec figcaption { display: flex; flex-direction: column; margin-bottom: 8px; font-size: 13px; }
+      .spec figcaption b { font-weight: 600; }
+      .spec figcaption span { color: var(--ink-2); font-size: 12px; }
+
+      .stage {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        /* A checkerboard makes translucency and shadows readable. */
+        background:
+          linear-gradient(45deg, rgba(0,0,0,.025) 25%, transparent 25%, transparent 75%, rgba(0,0,0,.025) 75%),
+          linear-gradient(45deg, rgba(0,0,0,.025) 25%, transparent 25%, transparent 75%, rgba(0,0,0,.025) 75%),
+          var(--card);
+        background-size: 16px 16px;
+        background-position: 0 0, 8px 8px;
+      }
+      .stage[data-theme="dark"] { background-color: #08080b; border-color: rgba(255,255,255,.12); }
+      .shadow-host { width: 100%; display: flex; align-items: center; justify-content: center; }
+
+      footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--ink-2); font-size: 13px; }
+      code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; background: rgba(0,0,0,.05); padding: 2px 5px; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/demo/gallery.tsx"></script>
+  </body>
+</html>

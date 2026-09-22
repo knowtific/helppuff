@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Prototype patching</title>
+    <script>
+      // The kind of thing old jQuery plugins and polyfills do.
+      Array.prototype.contains = function (x) { return this.indexOf(x) >= 0; };
+      Object.prototype.clone = function () { return this; };
+      String.prototype.trim = String.prototype.trim;
+      const realFetch = window.fetch;
+      window.fetch = function (...args) { window.__fetchCalls = (window.__fetchCalls || 0) + 1; return realFetch.apply(this, args); };
+      const realPush = history.pushState;
+      history.pushState = function (...args) { window.__pushCalls = (window.__pushCalls || 0) + 1; return realPush.apply(this, args); };
+      window.__consoleCalls = 0;
+      const realLog = console.log;
+      console.log = function (...args) { window.__consoleCalls++; return realLog.apply(this, args); };
+    </script>
+  </head>
+  <body>
+    <h1>Prototype patching</h1>
+    <p class="host-probe">Globals here are patched. The widget must not care, and must not add its own.</p>
+    <script type="module" src="/demo/fixtures/_embed.js"></script>
+  </body>
+</html>

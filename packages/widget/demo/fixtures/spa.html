@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8" /><title>SPA navigation</title></head>
+  <body>
+    <h1>Client-side routing</h1>
+    <p class="host-probe" id="route">/</p>
+    <button id="nav-pricing">Go to /pricing</button>
+    <button id="nav-home">Go to /</button>
+    <script>
+      // A framework-style router, using the real history API.
+      function go(path) {
+        history.pushState({}, '', path);
+        document.getElementById('route').textContent = location.pathname;
+      }
+      document.getElementById('nav-pricing').onclick = () => go('/fixtures/pricing');
+      document.getElementById('nav-home').onclick = () => go('/fixtures/spa.html');
+      addEventListener('popstate', () => { document.getElementById('route').textContent = location.pathname; });
+    </script>
+    <script type="module" src="/demo/fixtures/_embed.js"></script>
+  </body>
+</html>

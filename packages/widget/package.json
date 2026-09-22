@@ -1,0 +1,21 @@
+{
+  "name": "@murmur/widget",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "size": "node scripts/build.mjs"
+  },
+  "dependencies": {
+    "preact": "^10.27.0"
+  },
+  "devDependencies": {
+    "@murmur/protocol": "workspace:*",
+    "vite": "^7.1.0",
+    "typescript": "^5.9.2"
+  }
+}

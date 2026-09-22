@@ -1,0 +1,28 @@
+{
+  "name": "@murmur/server",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/lib.ts",
+  "types": "./src/lib.ts",
+  "exports": {
+    ".": "./src/lib.ts",
+    "./worker": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@murmur/connector-echo": "workspace:*",
+    "@murmur/connector-types": "workspace:*",
+    "@murmur/protocol": "workspace:*",
+    "hono": "^4.9.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260922.1",
+    "wrangler": "^4.136.1"
+  }
+}

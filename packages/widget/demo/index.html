@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Murmur — live playground</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --ink: #14141a;
+        --ink-2: #5c5c68;
+        --paper: #fbfbfc;
+        --card: #ffffff;
+        --line: rgba(15, 15, 25, 0.1);
+        --brand: #5b5bf7;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --ink: #f2f2f5;
+          --ink-2: #a0a0ac;
+          --paper: #0c0c10;
+          --card: #15151b;
+          --line: rgba(255, 255, 255, 0.1);
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        color: var(--ink);
+        background: var(--paper);
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap { max-width: 860px; margin: 0 auto; padding: 56px 24px 160px; }
+      h1 { font-size: 34px; letter-spacing: -0.03em; margin: 0 0 6px; }
+      .lede { color: var(--ink-2); margin: 0 0 8px; font-size: 17px; }
+      .nav { margin: 0 0 40px; font-size: 14px; }
+      .nav a { color: var(--brand); }
+      h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-2); margin: 40px 0 12px; font-weight: 600; }
+      .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; }
+      .row { display: flex; flex-wrap: wrap; gap: 8px; }
+      button.demo {
+        font: inherit; font-size: 14px; padding: 9px 15px; border-radius: 10px;
+        border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer;
+        transition: background 120ms, border-color 120ms;
+      }
+      button.demo:hover { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 8%, var(--card)); }
+      code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 2px 6px; border-radius: 5px; }
+      pre { background: color-mix(in srgb, var(--ink) 5%, transparent); padding: 14px 16px; border-radius: 12px; overflow-x: auto; font-size: 13px; }
+      #log { font-family: ui-monospace, monospace; font-size: 12px; max-height: 180px; overflow-y: auto; color: var(--ink-2); }
+      #log div { padding: 2px 0; border-bottom: 1px solid var(--line); }
+      .cmds { columns: 2; column-gap: 24px; font-size: 14px; }
+      .cmds p { margin: 0 0 6px; break-inside: avoid; }
+      .filler { color: var(--ink-2); }
+      .status { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 12px; border: 1px solid var(--line); }
+      .status[data-up="yes"] { color: #17803d; border-color: #17803d55; }
+      .status[data-up="no"] { color: #c0392b; border-color: #c0392b55; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Murmur playground</h1>
+      <p class="lede">The real widget, running against the local Worker with the <code>echo</code> connector.</p>
+      <p class="nav">
+        Server: <span class="status" id="server-status" data-up="no">checking…</span> ·
+        <a href="/gallery.html">Component gallery →</a>
+      </p>
+
+      <h2>Try the echo commands</h2>
+      <div class="card">
+        <p style="margin-top: 0">Open the widget, then send any of these. Each exercises a different part of the protocol.</p>
+        <p style="margin-top: 0"><b>Working now</b></p>
+        <div class="cmds">
+          <p><code>anything</code> — echoed back as markdown</p>
+          <p><code>/notice</code> — a warning notice</p>
+          <p><code>/slow</code> — 3s delay (typing indicator)</p>
+          <p><code>/long</code> — long markdown (scrolling)</p>
+          <p><code>/multipart</code> — two messages at once</p>
+          <p><code>/error</code> — a connector error, handled in place</p>
+        </div>
+
+        <p style="margin: 18px 0 6px"><b>Not rendered yet — milestone 4</b></p>
+        <div class="cmds">
+          <p><code>/options</code> — option chips</p>
+          <p><code>/multi</code> — multi-select</p>
+          <p><code>/card</code> — card with image + actions</p>
+          <p><code>/carousel</code> — three cards</p>
+          <p><code>/links</code> — link list</p>
+          <p><code>/form</code> — inline form</p>
+        </div>
+        <p style="margin-bottom: 0; color: var(--ink-2); font-size: 13px">
+          The server sends these correctly today — you can see the JSON with
+          <code>?mmdebug=1</code> — but the widget has no renderer for them until M4, so
+          <b>nothing appears in the thread</b>. The rest of the widget is unaffected.
+        </p>
+      </div>
+
+      <h2>JavaScript API</h2>
+      <div class="card">
+        <div class="row">
+          <button class="demo" onclick="Murmur.open()">open()</button>
+          <button class="demo" onclick="Murmur.close()">close()</button>
+          <button class="demo" onclick="Murmur.toggle()">toggle()</button>
+          <button class="demo" onclick="Murmur.send('Hello from the host page')">send(…)</button>
+          <button class="demo" onclick="Murmur.send('/card')">send('/card')</button>
+          <button class="demo" onclick="Murmur.identify({ name: 'Ada Lovelace', phone: '0400 000 000' })">identify(…)</button>
+          <button class="demo" onclick="Murmur.reset()">reset()</button>
+          <button class="demo" onclick="console.log(Murmur.debug())">debug() → console</button>
+          <button class="demo" onclick="Murmur.destroy()">destroy()</button>
+        </div>
+      </div>
+
+      <h2>Events</h2>
+      <div class="card">
+        <div id="log"><div class="filler">Events appear here as you use the widget…</div></div>
+      </div>
+
+      <h2>Fail-safe checks (§8.3)</h2>
+      <div class="card">
+        <p style="margin-top: 0">
+          Each of these forces a fatal condition. The widget must vanish without a trace, the console must stay
+          silent, and <code>Murmur.open()</code> must still be callable.
+        </p>
+        <div class="row">
+          <button class="demo" onclick="location.href='?fail=site'">no data-site</button>
+          <button class="demo" onclick="location.href='?fail=config'">/config 404</button>
+          <button class="demo" onclick="location.href='?fail=timeout'">/config timeout</button>
+          <button class="demo" onclick="location.href='?fail=malformed'">/config malformed</button>
+          <button class="demo" onclick="location.href='?fail=app'">app.js blocked</button>
+          <button class="demo" onclick="location.href='/'">reset page</button>
+        </div>
+        <p id="fail-note" style="margin-bottom: 0; color: var(--ink-2); font-size: 13px"></p>
+      </div>
+
+      <h2>Embed snippet</h2>
+      <pre>&lt;script src="https://chat.example.com/loader.js" data-site="demo" async&gt;&lt;/script&gt;</pre>
+
+      <h2 id="scroll">Page content, for scroll behaviour</h2>
+      <div class="card">
+        <p class="filler" id="filler"></p>
+      </div>
+    </div>
+
+    <script type="module">
+      const API = 'http://localhost:8787';
+      const params = new URLSearchParams(location.search);
+      const fail = params.get('fail');
+
+      // Some of the fail-safe checks need to break things before the loader runs.
+      if (fail === 'config' || fail === 'timeout' || fail === 'malformed') {
+        const real = window.fetch.bind(window);
+        window.fetch = async (input, init) => {
+          const url = String(input?.url ?? input);
+          if (url.includes('/config')) {
+            if (fail === 'config') return new Response('{"error":{"code":"not_found","message":"no"}}', { status: 404 });
+            if (fail === 'malformed') return new Response('{"widget":"not-an-object"}', { status: 200 });
+            return new Promise((resolve) => setTimeout(resolve, 60_000)); // never settles
+          }
+          return real(input, init);
+        };
+      }
+
+      document.getElementById('fail-note').textContent = fail
+        ? `Forcing: ${fail}. The page below should look completely untouched.`
+        : '';
+
+      // The queue pattern: calls made before the loader finishes are replayed.
+      window.Murmur = window.Murmur || { q: [] };
+      for (const name of ['open', 'close', 'toggle', 'send', 'identify', 'reset', 'on', 'off', 'destroy', 'debug']) {
+        if (!window.Murmur[name]) window.Murmur[name] = (...args) => window.Murmur.q.push([name, ...args]);
+      }
+
+      window.Murmur.on('open', () => log('open'));
+      window.Murmur.on('close', () => log('close'));
+      window.Murmur.on('lead', (lead) => log('lead ' + JSON.stringify(lead)));
+      window.Murmur.on('message', (m) => log('message ' + JSON.stringify(m)));
+
+      function log(line) {
+        const box = document.getElementById('log');
+        if (box.querySelector('.filler')) box.textContent = '';
+        const row = document.createElement('div');
+        row.textContent = new Date().toLocaleTimeString() + '  ' + line;
+        box.prepend(row);
+      }
+
+      // Health check, so it is obvious when the Worker is not running.
+      fetch(API + '/healthz')
+        .then((r) => r.json())
+        .then(() => {
+          const el = document.getElementById('server-status');
+          el.dataset.up = 'yes';
+          el.textContent = 'worker up on :8787';
+        })
+        .catch(() => {
+          const el = document.getElementById('server-status');
+          el.dataset.up = 'no';
+          el.textContent = 'worker down — run pnpm dev:server';
+        });
+
+      document.getElementById('filler').textContent = Array.from(
+        { length: 14 },
+        (_, i) => `Paragraph ${i + 1}. The widget must never affect this page's layout, scrolling or styles. `,
+      ).join('');
+
+      // Load the widget the way a real site does.
+      const script = document.createElement('script');
+      script.src = fail === 'app' ? '/src/loader.ts?blockapp=1' : '/src/loader.ts';
+      script.type = 'module';
+      if (fail !== 'site') script.dataset.site = 'demo';
+      script.dataset.api = API;
+      document.body.appendChild(script);
+    </script>
+  </body>
+</html>

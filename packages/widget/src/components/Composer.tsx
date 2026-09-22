@@ -1,0 +1,80 @@
+import { useEffect, useRef } from 'preact/hooks';
+import { Icon } from './Icon.js';
+import { isTouch } from '../lib/env.js';
+import type { StringKey } from '../app/strings.js';
+
+const MAX_LENGTH = 1000;
+/** The counter appears only in the last 100 characters (§8.7). */
+const COUNTER_FROM = MAX_LENGTH - 100;
+const MAX_HEIGHT_PX = 120;
+
+export function Composer({
+  value,
+  disabled,
+  offline,
+  placeholder,
+  t,
+  onInput,
+  onSend,
+}: {
+  value: string;
+  disabled: boolean;
+  offline: boolean;
+  placeholder: string;
+  t: (key: StringKey) => string;
+  onInput: (text: string) => void;
+  onSend: () => void;
+}) {
+  const textarea = useRef<HTMLTextAreaElement>(null);
+  const touch = isTouch();
+
+  // Grow to five lines, then scroll.
+  useEffect(() => {
+    const element = textarea.current;
+    if (!element) return;
+    element.style.height = 'auto';
+    element.style.height = `${Math.min(element.scrollHeight, MAX_HEIGHT_PX)}px`;
+  }, [value]);
+
+  const canSend = value.trim().length > 0 && !disabled && !offline;
+
+  const handleKeyDown = (event: KeyboardEvent) => {
+    // On touch devices Enter inserts a newline and the button is primary (§8.7).
+    if (event.key !== 'Enter' || touch || event.shiftKey) return;
+    event.preventDefault();
+    if (canSend) onSend();
+  };
+
+  return (
+    <div class="mm-composer-wrap">
+      <div class="mm-composer">
+        <textarea
+          ref={textarea}
+          rows={1}
+          value={value}
+          disabled={disabled}
+          maxLength={MAX_LENGTH}
+          placeholder={placeholder}
+          aria-label={placeholder}
+          enterkeyhint={touch ? 'enter' : 'send'}
+          onInput={(event) => onInput((event.target as HTMLTextAreaElement).value)}
+          onKeyDown={handleKeyDown}
+        />
+        <button
+          type="button"
+          class="mm-send"
+          disabled={!canSend}
+          aria-label={t('send')}
+          onClick={() => canSend && onSend()}
+        >
+          <Icon name="send" size={17} />
+        </button>
+      </div>
+
+      {value.length >= COUNTER_FROM ? (
+        <div class="mm-counter">{MAX_LENGTH - value.length}</div>
+      ) : null}
+      {offline ? <div class="mm-offline">{t('offline')}</div> : null}
+    </div>
+  );
+}
