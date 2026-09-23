@@ -60,12 +60,17 @@
   <body>
     <div class="wrap">
       <h1>Murmur playground</h1>
-      <p class="lede">The real widget, running against the local Worker with the <code>echo</code> connector.</p>
+      <p class="lede">
+        The real widget, running against the local Worker on site
+        <code id="site-name">demo</code>.
+      </p>
       <p class="nav">
         Server: <span class="status" id="server-status" data-up="no">checking…</span> ·
+        <span id="site-links"></span> ·
         <a href="/gallery.html">Component gallery →</a>
       </p>
 
+      <div id="echo-commands">
       <h2>Try the echo commands</h2>
       <div class="card">
         <p style="margin-top: 0">Open the widget, then send any of these. Each exercises a different part of the protocol.</p>
@@ -88,6 +93,7 @@
           browser — no server call until it finishes — and <b>Book a visit</b> opens a configured
           inline form.
         </p>
+      </div>
       </div>
 
       <h2>JavaScript API</h2>
@@ -140,6 +146,13 @@
       const API = 'http://localhost:8787';
       const params = new URLSearchParams(location.search);
       const fail = params.get('fail');
+      /*
+       * Which configured site to load. Defaults to `demo`, which is always
+       * the echo connector — the e2e suite asserts echo behaviour, so it must
+       * not depend on what the other sites point at. `?site=retell` switches
+       * to the live agent.
+       */
+      const site = params.get('site') || 'demo';
 
       // Some of the fail-safe checks need to break things before the loader runs.
       if (fail === 'config' || fail === 'timeout' || fail === 'malformed') {
@@ -154,6 +167,17 @@
           return real(input, init);
         };
       }
+
+      document.getElementById('site-name').textContent = site;
+      /*
+       * The echo command list below only applies to the echo connector; on a
+       * real agent those strings are just text it will be puzzled by.
+       */
+      document.getElementById('echo-commands').hidden = site !== 'demo';
+      document.getElementById('site-links').innerHTML =
+        site === 'demo'
+          ? '<a href="?site=retell">Switch to the Retell agent →</a>'
+          : '<a href="?site=demo">Back to the echo connector →</a>';
 
       document.getElementById('fail-note').textContent = fail
         ? `Forcing: ${fail}. The page below should look completely untouched.`
@@ -178,29 +202,76 @@
         box.prepend(row);
       }
 
-      // Health check, so it is obvious when the Worker is not running.
-      // Bounded, because a wedged process accepts the connection and then
-      // never answers — unbounded, the badge would sit on "checking…" for
-      // ever, which reads as "still working" rather than "broken".
-      (async () => {
+      /*
+       * Health check, so it is obvious when the Worker is not running.
+       *
+       * Bounded, because a wedged process accepts the connection and then
+       * never answers — unbounded, the badge would sit on "checking…" for
+       * ever, which reads as "still working" rather than "broken".
+       *
+       * And repeated, because you restart the Worker far more often than you
+       * reload this page. A single check on load latches onto whatever was
+       * true during boot and then lies until a refresh; this one keeps up.
+       * It backs off while the Worker is down so a long absence does not mean
+       * a request a second, and re-checks immediately when the tab is focused
+       * again, which is exactly when you have come back from restarting it.
+       */
+      (() => {
         const el = document.getElementById('server-status');
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 4000);
-        try {
-          const response = await fetch(API + '/healthz', { signal: controller.signal });
-          if (!response.ok) throw new Error(String(response.status));
-          await response.json();
-          el.dataset.up = 'yes';
-          el.textContent = 'worker up on :8787';
-        } catch (error) {
-          el.dataset.up = 'no';
-          el.textContent =
-            error.name === 'AbortError'
-              ? 'worker not responding — restart pnpm dev:server'
-              : 'worker down — run pnpm dev:server';
-        } finally {
-          clearTimeout(timer);
+        const OK_EVERY = 15_000;
+        const DOWN_FROM = 1_000;
+        const DOWN_MAX = 8_000;
+        let downDelay = DOWN_FROM;
+        let timer = null;
+
+        async function check() {
+          const controller = new AbortController();
+          const abort = setTimeout(() => controller.abort(), 4000);
+          try {
+            const response = await fetch(API + '/healthz', { signal: controller.signal });
+            if (!response.ok) throw new Error(String(response.status));
+            await response.json();
+            el.dataset.up = 'yes';
+            el.textContent = 'worker up on :8787';
+            downDelay = DOWN_FROM;
+            return OK_EVERY;
+          } catch (error) {
+            el.dataset.up = 'no';
+            el.textContent =
+              error.name === 'AbortError'
+                ? 'worker not responding — restart pnpm dev:server'
+                : 'worker down — run pnpm dev:server';
+            const wait = downDelay;
+            downDelay = Math.min(downDelay * 2, DOWN_MAX);
+            return wait;
+          } finally {
+            clearTimeout(abort);
+          }
         }
+
+        async function loop() {
+          clearTimeout(timer);
+          const next = await check();
+          timer = setTimeout(loop, next);
+        }
+
+        // Coming back to the tab is the usual sign you just restarted it.
+        document.addEventListener('visibilitychange', () => {
+          if (!document.hidden) {
+            downDelay = DOWN_FROM;
+            void loop();
+          }
+        });
+
+        el.style.cursor = 'pointer';
+        el.title = 'Click to re-check now';
+        el.addEventListener('click', () => {
+          downDelay = DOWN_FROM;
+          el.textContent = 'checking…';
+          void loop();
+        });
+
+        void loop();
       })();
 
       document.getElementById('filler').textContent = Array.from(
@@ -212,7 +283,7 @@
       const script = document.createElement('script');
       script.src = fail === 'app' ? '/src/loader.ts?blockapp=1' : '/src/loader.ts';
       script.type = 'module';
-      if (fail !== 'site') script.dataset.site = 'demo';
+      if (fail !== 'site') script.dataset.site = site;
       script.dataset.api = API;
       document.body.appendChild(script);
     </script>

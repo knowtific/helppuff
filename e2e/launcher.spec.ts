@@ -82,6 +82,7 @@ test.describe('the teaser', () => {
     await openWidget(page);
     await page.locator('murmur-widget .mm-btn').first().click();
     await page.locator('murmur-widget #mm-f-name').fill('Ada');
+    await page.locator('murmur-widget #mm-f-email').fill('ada@example.com');
     await page.locator('murmur-widget #mm-f-phone').fill('0400 000 000');
     await page.locator('murmur-widget button[type="submit"]').click();
     await expect(page.locator('murmur-widget .mm-agent').first()).toBeVisible();

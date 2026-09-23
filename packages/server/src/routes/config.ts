@@ -3,9 +3,38 @@ import type { ConfigResponse } from '@murmur/protocol';
 import { resolveSite } from '../config/site.js';
 import { getConnector } from '../core/registry.js';
 import type { HonoEnv } from '../core/request.js';
+import type { SiteConfig } from '../config/schema.js';
+import type { Platform } from '../core/platform.js';
 
 /** Public config is cacheable at the edge for 5 minutes (§5.1). */
 const CACHE_CONTROL = 'public, max-age=60, s-maxage=300';
+
+/**
+ * The widget's captcha block is derived from `security.captcha`, never
+ * configured separately.
+ *
+ * The two used to be independent, which gave the site key two homes and made
+ * both half-configurations silent failures: a server-only captcha rejects
+ * every session with `captcha_failed`, because the widget never renders a
+ * challenge and so never sends a token; a widget-only captcha renders a
+ * challenge nobody verifies, which is theatre. Deriving one from the other
+ * makes the broken states unreachable.
+ */
+function captchaFor(
+  site: SiteConfig,
+  log: Platform['log'],
+  siteId: string,
+): { captcha?: { provider: 'turnstile'; siteKey: string } } {
+  const configured = site.security.captcha;
+  if (configured) {
+    return { captcha: { provider: configured.provider, siteKey: configured.siteKey } };
+  }
+  if (site.widget.captcha) {
+    // Asked for a challenge with nothing verifying it; drop it and say so.
+    log('config.captcha_unverified', { siteId });
+  }
+  return { captcha: undefined };
+}
 
 export const configRoutes = new Hono<HonoEnv>();
 
@@ -17,7 +46,7 @@ configRoutes.get('/v1/sites/:siteId/config', async (c) => {
 
   const body: ConfigResponse = {
     siteId,
-    widget: site.widget,
+    widget: { ...site.widget, ...captchaFor(site, ctx.platform.log, siteId) },
     capabilities: connector.capabilities,
   };
 

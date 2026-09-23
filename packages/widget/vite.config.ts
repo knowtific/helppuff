@@ -14,6 +14,9 @@ function demoRoutes(): Plugin {
     '/': '/demo/index.html',
     '/index.html': '/demo/index.html',
     '/gallery.html': '/demo/gallery.html',
+    // Loads the deployed Worker rather than this dev server, so the bundles,
+    // the connector and the lead sink are all the real ones.
+    '/prod.html': '/demo/prod.html',
   };
   return {
     name: 'murmur-demo-routes',
@@ -44,6 +47,7 @@ export default defineConfig({
       input: {
         index: resolve(__dirname, 'demo/index.html'),
         gallery: resolve(__dirname, 'demo/gallery.html'),
+        prod: resolve(__dirname, 'demo/prod.html'),
       },
     },
   },

@@ -10,7 +10,7 @@ workers_dev = true
 # a [section] belongs to that section, which silently moved this binding into
 # [assets] the first time round.
 kv_namespaces = [
-  { binding = "MURMUR_KV", id = "05c83483cba3457989f1edb9de65e8cd", preview_id = "95e6544e0bfe451999e2823d9f05847f" }
+  { binding = "MURMUR_KV", id = "REPLACE_WITH_KV_ID", preview_id = "REPLACE_WITH_KV_PREVIEW_ID" }
 ]
 
 [vars]

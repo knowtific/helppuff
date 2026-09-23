@@ -9,17 +9,19 @@
     "node": ">=20"
   },
   "scripts": {
+    "bootstrap": "bash scripts/setup.sh",
     "ensure-config": "node scripts/ensure-config.mjs",
     "dev": "pnpm ensure-config && concurrently -n worker,widget -c cyan,magenta \"pnpm dev:server\" \"pnpm dev:widget\"",
     "dev:server": "pnpm --filter @murmur/server dev",
     "dev:widget": "pnpm --filter @murmur/widget dev",
+    "prod:preview": "node scripts/prod-preview.mjs",
     "build": "pnpm ensure-config && pnpm --filter @murmur/widget build",
     "test": "pnpm ensure-config && vitest run",
     "test:watch": "pnpm ensure-config && vitest",
     "e2e": "pnpm ensure-config && playwright test",
     "e2e:ui": "pnpm ensure-config && playwright test --ui",
     "typecheck": "pnpm ensure-config && pnpm -r typecheck",
-    "deploy": "pnpm --filter @murmur/server exec wrangler deploy",
+    "deploy:worker": "bash scripts/deploy.sh",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm e2e",
     "lint": "eslint ."
   },
@@ -30,6 +32,7 @@
     "@testing-library/preact": "^3.2.4",
     "@types/node": "^26.6.2",
     "concurrently": "^10.0.5",
+    "esbuild": "^0.28.2",
     "eslint": "^10.11.0",
     "globals": "^17.12.0",
     "happy-dom": "^20.14.5",

@@ -12,6 +12,7 @@ import { LiveRegion, Thread } from '../components/Thread.js';
 import type { MessageHandlers } from '../components/messages/index.js';
 import { log } from '../lib/env.js';
 import { trapFocus } from '../lib/focus.js';
+import { CaptchaError, getCaptchaToken } from '../lib/turnstile.js';
 import type { Action, Message, MessageBody, Option, Shortcut, WidgetConfig } from '@murmur/protocol';
 import type { Runtime } from '../loader.js';
 import { toWidgetError, type Api } from './api.js';
@@ -128,6 +129,12 @@ export function App({
 
   const panel = useRef<HTMLDivElement>(null);
   const launcher = useRef<HTMLDivElement>(null);
+  /*
+   * Where Turnstile renders. It lives inside the shadow root and takes no
+   * space until a visitor actually has to do something — `interaction-only`
+   * means most never see it.
+   */
+  const captchaMount = useRef<HTMLDivElement>(null);
   const stateRef = useRef<State>(state);
   stateRef.current = state;
   if (state.lead) leadRef.current = { ...(leadRef.current ?? {}), ...state.lead };
@@ -287,11 +294,37 @@ export function App({
 
   const startSession = useCallback(
     async (lead: Record<string, string>, firstMessage?: string) => {
+      /*
+       * Every path into a session comes through here, so this is the one
+       * place a captcha token has to be obtained. It is fetched fresh each
+       * time: siteverify redeems a token exactly once, so a retry after a
+       * failed start needs a new one.
+       */
+      let captchaToken: string | undefined;
+      const captcha = config.captcha;
+      if (captcha && captchaMount.current) {
+        try {
+          captchaToken = await getCaptchaToken(captcha.siteKey, captchaMount.current, {
+            theme: config.brand.theme === 'auto' ? 'auto' : config.brand.theme,
+          });
+        } catch (thrown) {
+          // The server fails closed, so there is nothing to fall back to —
+          // say so plainly rather than sending a request that cannot succeed.
+          log('captcha failed', thrown instanceof CaptchaError ? thrown.reason : thrown);
+          dispatch({
+            type: 'session/failed',
+            error: { code: 'captcha_failed', message: t('captchaFailed'), retryable: true },
+          });
+          return;
+        }
+      }
+
       const result = await api
         .startSession({
           ...(Object.keys(lead).length > 0 ? { lead } : {}),
           context: pageContext(),
           ...(firstMessage ? { firstMessage } : {}),
+          ...(captchaToken ? { captchaToken } : {}),
         })
         .catch((thrown: unknown) => {
           dispatch({ type: 'session/failed', error: toWidgetError(thrown) });
@@ -669,6 +702,8 @@ export function App({
             onBack={() => dispatch({ type: 'screen', screen: 'home' })}
             onClose={close}
           />
+
+          <div class="mm-captcha" ref={captchaMount} data-active="no" />
 
           {state.screen === 'home' ? (
             <Home

@@ -82,6 +82,7 @@ test.describe('the conversation', () => {
     await openWidget(page);
     await page.locator('murmur-widget .mm-btn').first().click();
     await page.locator('murmur-widget #mm-f-name').fill('Ahad');
+    await page.locator('murmur-widget #mm-f-email').fill('ahad@example.com');
     await page.locator('murmur-widget #mm-f-phone').fill('0400 000 000');
     await page.locator('murmur-widget #mm-f-first').fill('a question asked up front');
     await page.locator('murmur-widget button[type="submit"]').click();
@@ -179,6 +180,7 @@ test.describe('the JavaScript API', () => {
     // The site requires a lead, so the form comes first — but the visitor's
     // intent is not discarded (§8.5).
     await page.locator('murmur-widget #mm-f-name').fill('Ada');
+    await page.locator('murmur-widget #mm-f-email').fill('ada@example.com');
     await page.locator('murmur-widget #mm-f-phone').fill('0400 000 000');
     await page.locator('murmur-widget button[type="submit"]').click();
 
@@ -189,6 +191,7 @@ test.describe('the JavaScript API', () => {
     await page.evaluate(() =>
       (window as never as { Murmur: { identify(l: object): void; send(t: string): void } }).Murmur.identify({
         name: 'Grace',
+        email: 'grace@example.com',
         phone: '0400 111 222',
       }),
     );
@@ -203,6 +206,7 @@ test.describe('the JavaScript API', () => {
     await page.evaluate(() =>
       (window as never as { Murmur: { identify(l: object): void } }).Murmur.identify({
         name: 'Grace Hopper',
+        email: 'grace@example.com',
         phone: '0400 111 222',
       }),
     );

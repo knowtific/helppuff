@@ -2,7 +2,7 @@ import { defineConfig } from '@murmur/server';
 
 /**
  * A production example. Copy over `murmur.config.ts`, adjust, then run
- * `pnpm deploy`. Secrets are referenced by environment variable name and set
+ * `pnpm deploy:worker`. Secrets are referenced by environment variable name and set
  * with `wrangler secret put` — never written here.
  */
 /*

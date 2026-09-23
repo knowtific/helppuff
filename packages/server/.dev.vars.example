@@ -37,10 +37,28 @@ MURMUR_LOG=1
 
 # ---------------------------------------------------------------- optional
 
-# Turnstile's server-side secret. The site key is public and goes in the
-# widget config; this one never leaves the Worker.
+# Turnstile's server-side secret. The site key is public and goes in
+# murmur.config.ts under `security.captcha`; this one never leaves the Worker.
+#
+# For local development, pair Cloudflare's always-passing test keys instead of
+# registering localhost on your real widget:
+#   site key  1x00000000000000000000AA
+#   secret    1x0000000000000000000000000000000AA
+# TURNSTILE_TEST_SECRET=1x0000000000000000000000000000000AA
 # TURNSTILE_SECRET=0x4AAA...
 
-# Where leads are forwarded, and the secret that signs the request body.
-# LEAD_WEBHOOK_URL=https://n8n.ahadyekta.com/webhook/2006d671-5415-4699-82d6-7d7d9db38649
-# LEAD_WEBHOOK_SECRET=a-shared-secret
+# Where leads are forwarded. A webhook URL with a GUID in it is a credential —
+# anyone holding it can post leads into your automation — so the real one goes
+# in .dev.vars, never here.
+# LEAD_WEBHOOK_URL=https://automation.example.com/webhook/<your-id>
+
+# Sent as the `api_key` request header so the receiver can tell your Worker
+# apart from anyone who has guessed the URL above. It must match the value in
+# the receiver's own check — in n8n, the Webhook node's Header Auth
+# credential, whose Name must be `api_key` and whose Value is this. A
+# mismatch answers 403 "Authorization data is wrong!" and runs nothing.
+#
+# Referenced from murmur.config.ts as
+# `headers: { api_key: { env: 'LEAD_WEBHOOK_API_KEY' } }`, so the key never
+# enters that file or the deployed Worker bundle.
+# LEAD_WEBHOOK_API_KEY=a-shared-secret

@@ -63,8 +63,12 @@ thing to keep in step.
 
 ```bash
 pnpm build          # widget bundles into packages/widget/dist
-pnpm deploy         # wrangler deploy, which uploads them with the Worker
+pnpm deploy:worker     # wrangler deploy, which uploads them with the Worker
 ```
+
+`pnpm deploy:worker`, not `pnpm deploy`: pnpm has a built-in `deploy` command for
+copying a workspace package into a directory, and it shadows the script —
+failing with `ERR_PNPM_NOTHING_TO_DEPLOY` rather than passing through.
 
 The build must run first — `wrangler deploy` uploads whatever is in `dist`
 at that moment. `scripts/setup.sh` wires up a first deployment end to end.
@@ -168,6 +172,45 @@ to appear everywhere.
 | System prompt | KV, via `{ kv: 'prompt:…' }` | Live |
 | Brand, copy, shortcuts, flows, limits, connector options | KV, via `config:<siteId>` | Live |
 | `origins`, and adding a site | `murmur.config.ts` | A deploy |
+
+---
+
+## Checking a release against the real thing
+
+```bash
+pnpm prod:preview        # then open http://localhost:5173/
+```
+
+This serves one page, `demo/prod.html`, which loads the **deployed** Worker:
+its bundles from the edge, its connector, its lead sink. The only thing
+localhost provides is the page itself — everything else is production.
+
+It binds port 5173 on purpose. If the dev server is running, the bind fails
+and says so rather than starting beside it: with both up you cannot tell from
+the outside whether a request went to the edge or to `localhost:8787`. Serving
+on the dev server's own port also keeps the page's origin at
+`http://localhost:5173`, which is what the development sites' `origins`
+allow — on any other port the Worker would refuse every call, and that 403
+would look like a bug rather than a misconfigured preview.
+
+Nothing else is served. A request for anything but the page returns a 404
+naming what it would have come from, so an accidental import from the dev
+server is impossible to miss.
+
+The page uses whichever site allows localhost. The production site does not,
+by design, so it cannot be driven from here. Override with
+`?worker=https://…&site=…`.
+
+### Every site deploys together
+
+One config, one Worker: a site whose `origins` are all localhost is still
+live on the deployed Worker, and an `Origin` header is trivially forged
+outside a browser. So a development site's rate limits are real limits in
+production.
+
+That is fine for a site on the `echo` connector, which costs nothing. It is
+not fine for one pointing at a paid backend — `pnpm bootstrap`'s config review
+warns about exactly that case.
 
 ---
 

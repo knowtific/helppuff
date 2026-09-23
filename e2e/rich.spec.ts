@@ -279,6 +279,7 @@ test.describe('client-side flows', () => {
 
     // No session yet, so the lead form collects one — the answer is not lost.
     await page.locator('murmur-widget #mm-f-name').fill('Ahad');
+    await page.locator('murmur-widget #mm-f-email').fill('ahad@example.com');
     await page.locator('murmur-widget #mm-f-phone').fill('0400 000 000');
     await page.locator('murmur-widget button[type="submit"]').click();
 

@@ -344,7 +344,7 @@ export default defineConfig({
 });
 ```
 
-The config file is bundled into the Worker at build time. Changing it means redeploying the Worker (`pnpm deploy`), which takes seconds. A KV-backed override (edit config without deploying) is a later milestone and is not required.
+The config file is bundled into the Worker at build time. Changing it means redeploying the Worker (`pnpm deploy:worker`), which takes seconds. A KV-backed override (edit config without deploying) is a later milestone and is not required.
 
 ### 5.1 Public widget config
 

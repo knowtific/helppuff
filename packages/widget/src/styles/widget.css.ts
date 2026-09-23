@@ -9,6 +9,15 @@
 export const WIDGET_CSS = `
 /* ---------------------------------------------------------------- panel */
 
+/*
+ * Turnstile's container. It collapses to nothing until a challenge is actually
+ * rendered, so the common case - 'interaction-only', where the visitor is
+ * never asked anything - costs no layout at all.
+ */
+.mm-captcha { display: none; }
+.mm-captcha[data-active='yes'] { display: block; padding: 8px 16px 0; min-height: 0; }
+.mm-captcha[data-active='yes']:empty { display: none; }
+
 .mm-panel {
   position: fixed;
   bottom: calc(var(--mm-launcher-y, 24px) + 72px);

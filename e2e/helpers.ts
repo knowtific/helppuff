@@ -21,14 +21,30 @@ export async function openWidget(page: Page): Promise<void> {
   await expect(panel(page)).toBeVisible();
 }
 
-/** Home → (lead form) → a live conversation. */
-export async function startConversation(page: Page, lead = { name: 'Ada', phone: '0400 000 000' }): Promise<void> {
+/**
+ * Home → (lead form) → a live conversation.
+ *
+ * The form is filled from what it actually renders rather than from a fixed
+ * list of fields. Hardcoding name and phone meant that adding a required
+ * email to the config broke 87 tests at once, all of them reporting a missing
+ * message rather than a blocked submit — the form is configuration, so the
+ * helper has to read it.
+ */
+export async function startConversation(page: Page, lead: Record<string, string> = {}): Promise<void> {
   await page.locator('murmur-widget .mm-btn').first().click();
 
-  const nameField = page.locator('murmur-widget #mm-f-name');
-  if (await nameField.isVisible().catch(() => false)) {
-    await nameField.fill(lead.name);
-    await page.locator('murmur-widget #mm-f-phone').fill(lead.phone);
+  const fields = page.locator('murmur-widget .mm-form input');
+  if (await fields.first().isVisible().catch(() => false)) {
+    const count = await fields.count();
+    for (let i = 0; i < count; i += 1) {
+      const field = fields.nth(i);
+      const name = (await field.getAttribute('id'))?.replace('mm-f-', '') ?? '';
+      const type = await field.getAttribute('type');
+      const value =
+        lead[name] ??
+        (type === 'email' ? 'ada@example.com' : type === 'tel' ? '0400 000 000' : 'Ada');
+      await field.fill(value);
+    }
     await page.locator('murmur-widget button[type="submit"]').click();
   }
 

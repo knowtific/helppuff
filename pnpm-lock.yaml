@@ -30,6 +30,9 @@ importers:
       concurrently:
         specifier: ^10.0.5
         version: 10.0.5
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
       eslint:
         specifier: ^10.11.0
         version: 10.11.0

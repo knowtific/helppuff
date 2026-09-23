@@ -276,14 +276,23 @@ the provider allows*.
 
 | Command | What it does |
 | --- | --- |
+| `pnpm bootstrap` | First deployment: KV namespace, first deploy, then secrets |
 | `pnpm dev` | Worker + widget dev server, with the `echo` connector |
+| `pnpm prod:preview` | A page that loads the **deployed** Worker, to check a release |
 | `pnpm lint` | ESLint, type-aware |
 | `pnpm test` | Unit and functional tests (Vitest) |
 | `pnpm e2e` | UI, isolation and fail-safe tests (Playwright) |
 | `pnpm build` | Build the widget bundles and check the size budgets |
 | `pnpm typecheck` | Typecheck every package |
 | `pnpm check` | All of the above |
-| `pnpm deploy` | Deploy the Worker |
+| `pnpm deploy:worker` | Deploy the Worker |
+
+> **Script names avoid pnpm's own commands.** `pnpm deploy` and `pnpm setup`
+> are built into pnpm and shadow a script of the same name — `deploy` fails
+> with `ERR_PNPM_NOTHING_TO_DEPLOY`, and `setup` is worse, reporting success
+> while configuring pnpm's home directory instead. Hence `deploy:worker` and
+> `bootstrap`. Check any new script name against `pnpm help -a`, and note
+> that `setup` is not even listed there.
 
 Local development needs `packages/server/.dev.vars` — copy
 `.dev.vars.example` and keep the default secret, which is for local use only.

@@ -17,6 +17,10 @@ export const DEFAULT_STRINGS = {
   dismiss: 'Dismiss',
   newChat: 'Start a new conversation',
   offline: "You're offline",
+  // Shown when the challenge could not run at all — a blocked script, a bad
+  // site key, or a visitor who never solved it. The server fails closed, so
+  // there is nothing to fall back to and saying so is the honest option.
+  captchaFailed: 'We could not verify your browser. Please try again.',
   soundOn: 'Turn sound on',
   soundOff: 'Turn sound off',
   poweredBy: 'Powered by Murmur',
