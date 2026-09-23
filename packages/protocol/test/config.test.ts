@@ -22,6 +22,17 @@ describe('widgetConfigSchema', () => {
     expect(widgetConfigSchema.safeParse({ brand: { accent: 'red; }' } }).success).toBe(false);
   });
 
+  it('accepts a whitelabelled credit, with or without a link', () => {
+    const linked = { text: 'Powered by Knowtific', url: 'https://www.knowtific.com.au/' };
+    expect(widgetConfigSchema.parse({ poweredBy: linked }).poweredBy).toEqual(linked);
+    expect(widgetConfigSchema.parse({ poweredBy: { text: 'Knowtific' } }).poweredBy).toEqual({ text: 'Knowtific' });
+  });
+
+  it('rejects a credit link with an unsafe scheme', () => {
+    const value = { poweredBy: { text: 'Hi', url: 'javascript:alert(1)' } };
+    expect(widgetConfigSchema.safeParse(value).success).toBe(false);
+  });
+
   it('rejects a teaser delay under 2000ms', () => {
     expect(widgetConfigSchema.safeParse({ teaser: { text: 'Hi', delayMs: 500 } }).success).toBe(false);
   });

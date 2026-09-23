@@ -124,6 +124,26 @@ describe('agreement with the protocol Zod schemas', () => {
   });
 });
 
+describe('parseConfig — poweredBy', () => {
+  it('passes a whitelabelled credit through in a shape Zod accepts', () => {
+    const value = { text: 'Powered by Knowtific', url: 'https://www.knowtific.com.au/' };
+    const parsed = parseConfig({ poweredBy: value });
+    expect(parsed?.poweredBy).toEqual(value);
+    expect(widgetConfigSchema.safeParse(parsed).success).toBe(true);
+  });
+
+  it('drops an unsafe link but keeps the text', () => {
+    expect(parseConfig({ poweredBy: { text: 'Knowtific', url: 'javascript:alert(1)' } })?.poweredBy).toEqual({
+      text: 'Knowtific',
+    });
+  });
+
+  it('falls back to the default credit when the object has no usable text', () => {
+    expect(parseConfig({ poweredBy: { url: 'https://a.co' } })?.poweredBy).toBe(true);
+    expect(parseConfig({ poweredBy: 'yes' })?.poweredBy).toBe(true);
+  });
+});
+
 describe('parseConfig — conservative defaults (§8.3)', () => {
   it('makes a fully functional widget from {}', () => {
     const config = parseConfig({});

@@ -170,6 +170,17 @@ export const teaserSchema = z
       : teaser,
   );
 
+/**
+ * The footer credit. `true` shows the Murmur credit, `false` hides it, and an
+ * object whitelabels it: `text` replaces the wording and `url`, when given,
+ * is where it links. Without a `url` the credit is plain text.
+ */
+export const poweredBySchema = z.union([
+  z.boolean(),
+  z.object({ text: z.string().min(1).max(60), url: safeUrl.optional() }),
+]);
+export type PoweredBy = z.infer<typeof poweredBySchema>;
+
 export const widgetConfigSchema = z.object({
   brand: brandSchema.default({}),
   launcher: launcherSchema.default({}),
@@ -190,7 +201,7 @@ export const widgetConfigSchema = z.object({
     .optional(),
   sound: z.object({ enabled: z.boolean() }).optional(),
   captcha: z.object({ provider: z.literal('turnstile'), siteKey: z.string().min(1).max(200) }).optional(),
-  poweredBy: z.boolean().default(true),
+  poweredBy: poweredBySchema.default(true),
   /** UI string overrides (§8.7). Keys are validated by the widget, not here. */
   strings: z.record(z.string().min(1).max(64), z.string().max(300)).optional(),
 });

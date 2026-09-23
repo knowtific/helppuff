@@ -403,7 +403,7 @@ type WidgetConfig = {
 
   sound?: { enabled: boolean };       // default false
   captcha?: { provider: 'turnstile'; siteKey: string };
-  poweredBy?: boolean;                // tiny footer link, default true
+  poweredBy?: boolean | { text: string; url?: string };  // footer credit, default true; object whitelabels it
 };
 
 type Field = {

@@ -766,13 +766,7 @@ export function App({
             </div>
           )}
 
-          {config.poweredBy ? (
-            <div class="mm-powered">
-              <a href="https://github.com/murmur-chat/murmur" target="_blank" rel="noopener noreferrer">
-                {t('poweredBy')}
-              </a>
-            </div>
-          ) : null}
+          {config.poweredBy ? <PoweredBy value={config.poweredBy} t={t} /> : null}
 
           <LiveRegion messages={messages} />
         </div>
@@ -792,6 +786,35 @@ export function App({
       />
     ) : null;
   }
+}
+
+const MURMUR_URL = 'https://github.com/murmur-chat/murmur';
+
+/**
+ * The footer credit. `true` is the Murmur credit (its wording still
+ * overridable through `strings.poweredBy`); an object whitelabels it, and one
+ * without a `url` renders as plain text rather than a link to nowhere.
+ */
+function PoweredBy({
+  value,
+  t,
+}: {
+  value: Exclude<WidgetConfig['poweredBy'], false>;
+  t: ReturnType<typeof makeStrings>;
+}) {
+  const text = value === true ? t('poweredBy') : value.text;
+  const url = value === true ? MURMUR_URL : value.url;
+  return (
+    <div class="mm-powered">
+      {url ? (
+        <a href={url} target="_blank" rel="noopener noreferrer">
+          {text}
+        </a>
+      ) : (
+        text
+      )}
+    </div>
+  );
 }
 
 function leadReady(config: WidgetConfig, lead: Record<string, string>): boolean {

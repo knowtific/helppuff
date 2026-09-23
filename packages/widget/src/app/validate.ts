@@ -421,9 +421,19 @@ export function parseConfig(input: unknown): WidgetConfig | null {
     ...(forms ? { forms } : {}),
     ...(soundIn ? { sound: { enabled: bool(soundIn['enabled']) ?? false } } : {}),
     ...(siteKey ? { captcha: { provider: 'turnstile' as const, siteKey } } : {}),
-    poweredBy: bool(input['poweredBy']) ?? true,
+    poweredBy: parsePoweredBy(input['poweredBy']),
     ...(parseStrings(input['strings']) ?? {}),
   } as WidgetConfig;
+}
+
+function parsePoweredBy(input: unknown): WidgetConfig['poweredBy'] {
+  const flag = bool(input);
+  if (flag !== undefined) return flag;
+  if (!isObject(input)) return true;
+  const text = str(input['text'], 60);
+  if (!text) return true;
+  const url = input['url'];
+  return isSafeUrl(url) && url.length <= 2048 ? { text, url } : { text };
 }
 
 function parseOffset(input: unknown): { offset: { x: number; y: number } } | null {
