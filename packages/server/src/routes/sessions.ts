@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { startSessionRequestSchema, type StartSessionResponse } from '@murmur/protocol';
-import { getSite } from '../config/load.js';
+import { resolveSite } from '../config/site.js';
 import { MurmurError } from '../core/errors.js';
 import { validateLead } from '../core/lead.js';
 import { assertAllowedOrigin } from '../core/origin.js';
@@ -24,7 +24,7 @@ sessionRoutes.post('/v1/sites/:siteId/sessions', async (c) => {
   const siteId = c.req.param('siteId');
 
   // 1. Resolve site.
-  const site = getSite(ctx.config, siteId);
+  const site = await resolveSite(ctx, siteId);
 
   // 2. Origin allowlist.
   assertAllowedOrigin(ctx.origin, site.origins);

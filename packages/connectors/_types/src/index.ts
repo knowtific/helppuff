@@ -8,7 +8,8 @@ export * from './prompt.js';
 
 /** A minimal key/value store with TTL — Workers KV in production (§7.3). */
 export interface KvStore {
-  get(key: string): Promise<string | null>;
+  /** `cacheTtl` is the Workers KV edge cache, in seconds (minimum 60). */
+  get(key: string, options?: { cacheTtl?: number }): Promise<string | null>;
   put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>;
   delete(key: string): Promise<void>;
 }

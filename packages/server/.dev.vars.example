@@ -42,5 +42,5 @@ MURMUR_LOG=1
 # TURNSTILE_SECRET=0x4AAA...
 
 # Where leads are forwarded, and the secret that signs the request body.
-# LEAD_WEBHOOK_URL=https://hooks.example.com/murmur
+# LEAD_WEBHOOK_URL=https://n8n.ahadyekta.com/webhook/2006d671-5415-4699-82d6-7d7d9db38649
 # LEAD_WEBHOOK_SECRET=a-shared-secret

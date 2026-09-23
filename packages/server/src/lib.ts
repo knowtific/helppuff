@@ -1,5 +1,6 @@
 /** Public entry for `murmur.config.ts` and for embedding the app elsewhere. */
 export { defineConfig, getSite, resolveSecrets, collectSecretNames } from './config/load.js';
+export { resolveSite, siteConfigKey, SITE_CONFIG_PREFIX } from './config/site.js';
 export * from './config/schema.js';
 export { createApp } from './app.js';
 export { MurmurError, isMurmurError, toMurmurError } from './core/errors.js';

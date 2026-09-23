@@ -72,6 +72,24 @@ a few past a limit. That is accepted: these bound cost, they do not bill. A
 few messages past 500 is fine; a few thousand is not, and the daily quota
 catches that.
 
+### Config stored in KV
+
+A `config:<siteId>` key overrides the deployed config for that site
+([`deployment.md`](deployment.md)). That makes KV write access a privileged
+position: it can change the connector, the lead destination and the limits.
+Two deliberate bounds keep it from being a complete one:
+
+- **`origins` cannot be set from KV**, so it cannot widen who may embed the
+  widget. The allowlist is fixed at deploy. A stored config carrying
+  `origins` is rejected whole rather than partly applied.
+- **A site must exist in the deployed config**, so KV cannot invent one.
+
+It can still point a real site at a different connector, which is worth
+knowing when deciding who gets a KV-writing API token. Stored config is
+validated against the same schema as the bundled config, so it cannot be used
+to smuggle a shape the server would not otherwise accept, and a config that
+fails validation falls back to the deployed one.
+
 ### Still open
 
 **Session tokens are bearer tokens.** Anyone holding one can continue that

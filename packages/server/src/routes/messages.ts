@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { TOKEN_HEADER, sendRequestSchema, type PollResponse, type SendResponse } from '@murmur/protocol';
-import { getSite } from '../config/load.js';
+import { resolveSite } from '../config/site.js';
 import { MurmurError } from '../core/errors.js';
 import { assertAllowedOrigin } from '../core/origin.js';
 import { requireSecret, type RequestCtx, type HonoEnv } from '../core/request.js';
@@ -28,7 +28,7 @@ async function authenticate(ctx: RequestCtx, authorization: string | undefined):
   if (!token) throw new MurmurError('unauthorized', { detail: 'token_missing' });
 
   const payload = await verifyToken(secret, token, ctx.platform.now());
-  const site = getSite(ctx.config, payload.siteId);
+  const site = await resolveSite(ctx, payload.siteId);
   assertAllowedOrigin(ctx.origin, site.origins);
 
   return { payload, site, prepared: prepareConnector(ctx, site), secret };

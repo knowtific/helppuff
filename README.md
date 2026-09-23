@@ -103,9 +103,17 @@ needs no database.
 
 ## Configuration
 
-One file, [`murmur.config.ts`](murmur.config.ts), typed and validated when the
-Worker is built. Secrets are never written in it — they are referenced by
-environment variable name and set with `wrangler secret put`.
+One file, `murmur.config.ts`, typed and validated when the Worker is built.
+
+**It is gitignored.** The committed files are
+[`murmur.config.demo.ts`](murmur.config.demo.ts), which a fresh clone is
+started from automatically, and
+[`murmur.config.example.ts`](murmur.config.example.ts), which documents a
+production site. Your origins, agent ids and copy never enter the repository,
+which matters once this is published.
+
+Secrets are never written in it either — they are referenced by environment
+variable name and set with `wrangler secret put`.
 
 ```ts
 export default defineConfig({
@@ -122,6 +130,28 @@ export default defineConfig({
 
 See [`murmur.config.example.ts`](murmur.config.example.ts) for a production site
 with Retell, a lead webhook, Turnstile and a multi-step quote flow.
+
+### Changing config without a deploy
+
+The file above is compiled into the Worker, so editing it is a deploy. For
+anything that changes more often than that, store it in KV instead:
+
+```bash
+wrangler kv key put --binding=MURMUR_KV "config:knowtific" --path ./site.json
+```
+
+A `config:<siteId>` key overrides the deployed config for that site on the
+next request — brand, copy, shortcuts, flows, limits, lead destinations and
+connector options, including which connector. Whole sections replace their
+deployed counterpart; anything left out keeps its deployed value. A stored
+config that will not parse is ignored and the site keeps running on what
+shipped.
+
+Two things stay in the deploy on purpose: **`origins`**, because the CORS
+allowlist is built once at startup and write access to KV should not widen
+who may embed your widget, and **adding a new site**, because that is where
+its origins come from. [`docs/deployment.md`](docs/deployment.md) has the
+details.
 
 ---
 

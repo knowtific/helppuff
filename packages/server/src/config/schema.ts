@@ -64,6 +64,29 @@ export const siteConfigSchema = z.object({
 });
 export type SiteConfig = z.infer<typeof siteConfigSchema>;
 
+/**
+ * What may live in KV under `config:<siteId>`, overriding the bundled site.
+ *
+ * `origins` is deliberately not here. The CORS allowlist is built once when
+ * the Worker starts, so an origin added in KV would pass the route check and
+ * still be refused by the browser — a failure that curl cannot see. Keeping
+ * the allowlist in the deploy also means write access to KV cannot widen who
+ * may embed the widget.
+ *
+ * Strict, so a config that *does* carry `origins` is rejected outright rather
+ * than silently ignored: believing you have locked a domain when you have not
+ * is worse than a config that visibly did not take.
+ */
+export const storedSiteConfigSchema = z
+  .object({
+    connector: connectorConfigSchema.optional(),
+    sinks: z.array(sinkConfigSchema).max(10).optional(),
+    security: securitySchema.optional(),
+    widget: widgetConfigSchema.optional(),
+  })
+  .strict();
+export type StoredSiteConfig = z.infer<typeof storedSiteConfigSchema>;
+
 export const murmurConfigSchema = z.object({
   sites: z.record(z.string().min(1).max(64), siteConfigSchema),
 });

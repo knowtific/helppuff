@@ -10,7 +10,10 @@ dist/
 .env
 .env.*
 !.env.example
-murmur.config.local.ts
+
+# Your sites, origins and agent ids. Created from murmur.config.demo.ts on
+# first run; murmur.config.example.ts shows a production site.
+murmur.config.ts
 .DS_Store
 dist-demo/
 test-results/

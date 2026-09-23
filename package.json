@@ -9,15 +9,16 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "concurrently -n worker,widget -c cyan,magenta \"pnpm dev:server\" \"pnpm dev:widget\"",
+    "ensure-config": "node scripts/ensure-config.mjs",
+    "dev": "pnpm ensure-config && concurrently -n worker,widget -c cyan,magenta \"pnpm dev:server\" \"pnpm dev:widget\"",
     "dev:server": "pnpm --filter @murmur/server dev",
     "dev:widget": "pnpm --filter @murmur/widget dev",
-    "build": "pnpm --filter @murmur/widget build",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "e2e": "playwright test",
-    "e2e:ui": "playwright test --ui",
-    "typecheck": "pnpm -r typecheck",
+    "build": "pnpm ensure-config && pnpm --filter @murmur/widget build",
+    "test": "pnpm ensure-config && vitest run",
+    "test:watch": "pnpm ensure-config && vitest",
+    "e2e": "pnpm ensure-config && playwright test",
+    "e2e:ui": "pnpm ensure-config && playwright test --ui",
+    "typecheck": "pnpm ensure-config && pnpm -r typecheck",
     "deploy": "pnpm --filter @murmur/server exec wrangler deploy",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm e2e",
     "lint": "eslint ."

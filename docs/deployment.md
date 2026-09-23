@@ -92,14 +92,84 @@ list. That file is gitignored.
 ### KV
 
 One namespace, bound as `MURMUR_KV`. It holds rate-limit counters,
-per-session message counts and any `{ kv }` prompt overrides — no session
-state and no lead data, so losing it costs nothing but a reset of today's
-counters.
+per-session message counts, `{ kv }` prompt overrides and any stored site
+config — no session state and no lead data, so losing it costs nothing but a
+reset of today's counters and a fall back to the deployed config.
 
 ```bash
 wrangler kv namespace create MURMUR_KV
 # put the returned id into wrangler.toml
 ```
+
+---
+
+## Changing config without a deploy
+
+`murmur.config.ts` is compiled into the Worker, so editing it is a deploy.
+It is also **gitignored** — the committed files are `murmur.config.demo.ts`,
+which a fresh clone is started from, and `murmur.config.example.ts`, which
+documents a production site. Your origins, agent ids and copy never enter
+the repository.
+
+For anything that changes more often than a deploy, put it in KV under
+`config:<siteId>`:
+
+```bash
+cat > site.json <<'JSON'
+{
+  "widget": {
+    "brand": { "name": "Knowtific", "agentName": "Alex", "accent": "#0EA5E9" },
+    "home": { "title": "Hi there", "subtitle": "Ask us anything." }
+  }
+}
+JSON
+
+wrangler kv key put --binding=MURMUR_KV "config:knowtific" --path ./site.json
+```
+
+The next request picks it up. No build, no deploy, nothing committed.
+
+**Whole sections replace their deployed counterpart**; anything you leave out
+keeps its deployed value. So an override containing only `widget` swaps the
+whole widget config — including parts you did not mention, which fall back to
+their schema defaults, not to the deployed widget. Merging field by field
+would make what is actually in force impossible to read off either source
+alone. The four sections are `connector`, `widget`, `security` and `sinks`.
+
+### Two things it deliberately will not do
+
+**`origins` cannot be set from KV.** The CORS allowlist is built once when the
+Worker starts, so an origin added in KV would pass the route check and still
+be refused by the browser — a failure curl cannot show you. It also means
+write access to KV cannot widen who may embed your widget. A stored config
+carrying `origins` is rejected **whole**, not partially applied, and logged as
+`config.kv_invalid`: believing you have locked a domain when you have not is
+worse than an override that visibly did not take.
+
+**A site must already exist in the deployed config**, since that is where its
+origins come from. Adding a site is still a deploy.
+
+### When a stored config is broken
+
+It is ignored, and the site runs on what shipped in the bundle. Unparsable
+JSON logs `config.kv_unparsable`; a shape the schema rejects logs
+`config.kv_invalid` with the offending field paths — never their values, which
+could be anything (§7.2). A bad paste into KV degrades to the last deployed
+config; it never takes a site offline.
+
+Reads are cached at the edge for 60 seconds, so a change takes up to a minute
+to appear everywhere.
+
+### Where each thing belongs
+
+| | Lives in | Changing it is |
+| --- | --- | --- |
+| API keys, `MURMUR_SECRET` | `wrangler secret put` | Live |
+| System prompt | KV, via `{ kv: 'prompt:…' }` | Live |
+| Brand, copy, shortcuts, flows, limits, connector options | KV, via `config:<siteId>` | Live |
+| `origins`, and adding a site | `murmur.config.ts` | A deploy |
+
+---
 
 ### Checklist for a real site
 

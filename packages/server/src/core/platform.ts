@@ -62,9 +62,9 @@ export function resilientKv(kv: KvStore | undefined, log: Platform['log']): KvSt
     };
   }
   return {
-    async get(key) {
+    async get(key, options) {
       try {
-        return await kv.get(key);
+        return await kv.get(key, options);
       } catch {
         log('kv.get_failed');
         return null;

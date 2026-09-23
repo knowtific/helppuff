@@ -1,10 +1,20 @@
 import { defineConfig } from '@murmur/server';
 
 /**
- * The development config: one site on the `echo` connector, which needs no
- * API key and can drive every widget feature. `scripts/setup.sh` rewrites this
- * file for a real deployment — see `murmur.config.example.ts` for the shape of
- * a production site.
+ * The demo config, and the only one in git.
+ *
+ * `murmur.config.ts` — the file the Worker actually loads — is gitignored, so
+ * your sites, origins and agent ids never enter the repository. It is created
+ * from this file the first time you run `pnpm dev`, `pnpm build` or the tests,
+ * which is what lets a fresh clone start with no setup at all.
+ *
+ * So: edit `murmur.config.ts`, not this file. Edit this one only to change
+ * what a fresh clone gets — one site on the `echo` connector, which needs no
+ * API key and drives every widget feature.
+ *
+ * See `murmur.config.example.ts` for the shape of a production site, and
+ * `docs/deployment.md` for putting config in KV so changing it is not a
+ * deploy either.
  */
 export default defineConfig({
   sites: {

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { ConfigResponse } from '@murmur/protocol';
-import { getSite } from '../config/load.js';
+import { resolveSite } from '../config/site.js';
 import { getConnector } from '../core/registry.js';
 import type { HonoEnv } from '../core/request.js';
 
@@ -9,10 +9,10 @@ const CACHE_CONTROL = 'public, max-age=60, s-maxage=300';
 
 export const configRoutes = new Hono<HonoEnv>();
 
-configRoutes.get('/v1/sites/:siteId/config', (c) => {
+configRoutes.get('/v1/sites/:siteId/config', async (c) => {
   const ctx = c.get('mm');
   const siteId = c.req.param('siteId');
-  const site = getSite(ctx.config, siteId);
+  const site = await resolveSite(ctx, siteId);
   const connector = getConnector(site.connector.type);
 
   const body: ConfigResponse = {
