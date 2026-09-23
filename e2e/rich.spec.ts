@@ -281,6 +281,11 @@ test.describe('client-side flows', () => {
     await page.locator('murmur-widget #mm-f-name').fill('Ahad');
     await page.locator('murmur-widget #mm-f-email').fill('ahad@example.com');
     await page.locator('murmur-widget #mm-f-phone').fill('0400 000 000');
+    // The flow's summary is shown in the first-message box, where it can be
+    // edited, rather than riding along unseen.
+    await expect(page.locator('murmur-widget #mm-f-first')).toHaveValue(
+      "I'd like a quote for a blocked drain in Richmond, Today.",
+    );
     await page.locator('murmur-widget button[type="submit"]').click();
 
     await expect(agentMessages(page).last()).toContainText(

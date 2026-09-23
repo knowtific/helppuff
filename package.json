@@ -22,6 +22,8 @@
     "e2e:ui": "pnpm ensure-config && playwright test --ui",
     "typecheck": "pnpm ensure-config && pnpm -r typecheck",
     "deploy:worker": "bash scripts/deploy.sh",
+    "kv:config": "node scripts/kv-config.mjs",
+    "kv:push": "bash scripts/kv-push.sh",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm e2e",
     "lint": "eslint ."
   },

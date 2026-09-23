@@ -128,7 +128,7 @@ cat > site.json <<'JSON'
 }
 JSON
 
-wrangler kv key put --binding=MURMUR_KV "config:knowtific" --path ./site.json
+wrangler kv key put --binding=MURMUR_KV --remote --preview false "config:knowtific" --path ./site.json
 ```
 
 The next request picks it up. No build, no deploy, nothing committed.
@@ -139,8 +139,10 @@ Worker parses KV with:
 
 ```bash
 node scripts/kv-config.mjs knowtific > site.knowtific.json
-wrangler kv key put --binding=MURMUR_KV "config:knowtific" --path ./site.knowtific.json
+wrangler kv key put --binding=MURMUR_KV --remote --preview false "config:knowtific" --path ./site.knowtific.json
 ```
+
+`pnpm kv:push [siteId]` does both in one step (default site: `knowtific`).
 
 **Whole sections replace their deployed counterpart**; anything you leave out
 keeps its deployed value. So an override containing only `widget` swaps the

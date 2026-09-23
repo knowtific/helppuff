@@ -203,6 +203,53 @@ describe('the lead form path', () => {
     expect(api.startSession.mock.calls[0]?.[0]).toMatchObject({ firstMessage: 'qwedae' });
   });
 
+  describe('a message written before the lead form (a finished flow, or send())', () => {
+    const askFirst = {
+      leadForm: { enabled: true, fields: [{ name: 'name', label: 'Name', type: 'text', required: true }], askFirstMessage: true },
+    };
+
+    const writeThenFillLead = async (handle: AppHandleRef, text: string) => {
+      await act(async () => {
+        commands(handle).send(text);
+      });
+      await act(async () => {
+        fireEvent.input(screen.getByLabelText(/Name/), { target: { value: 'Ahad' } });
+      });
+    };
+
+    it('prefills the first-message box and sends it', async () => {
+      const { handle, startSession } = setup({ config: askFirst });
+      await writeThenFillLead(handle, "I'd like a quote for a new website.");
+
+      const box = screen.getByLabelText(/How can we help/) as HTMLTextAreaElement;
+      expect(box.value).toBe("I'd like a quote for a new website.");
+
+      await act(async () => {
+        fireEvent.submit(document.querySelector('form') as HTMLFormElement);
+      });
+      expect(startSession.mock.calls[0]?.[0]).toMatchObject({ firstMessage: "I'd like a quote for a new website." });
+    });
+
+    it('sends the edited text, not the original, when the visitor changes it', async () => {
+      // Regression: typing in the box used to replace a flow's summary
+      // outright, so its answers never reached the agent.
+      const { handle, startSession } = setup({ config: askFirst });
+      await writeThenFillLead(handle, "I'd like a quote for a new website.");
+
+      await act(async () => {
+        fireEvent.input(screen.getByLabelText(/How can we help/), {
+          target: { value: "I'd like a quote for a new website. Budget is flexible." },
+        });
+      });
+      await act(async () => {
+        fireEvent.submit(document.querySelector('form') as HTMLFormElement);
+      });
+      expect(startSession.mock.calls[0]?.[0]).toMatchObject({
+        firstMessage: "I'd like a quote for a new website. Budget is flexible.",
+      });
+    });
+  });
+
   it('will not start a session until the required field is filled', async () => {
     const { handle, startSession } = setup();
     await openPanel(handle);

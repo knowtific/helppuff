@@ -8,12 +8,20 @@ export { validateField };
 export function LeadForm({
   config,
   initial,
+  initialMessage,
   busy,
   t,
   onSubmit,
 }: {
   config: WidgetConfig;
   initial: Record<string, string> | null;
+  /**
+   * A message the visitor already wrote before the form appeared — a finished
+   * flow's summary, or text typed with no session yet. It prefills the
+   * first-message box so they can see and edit what will be sent, instead of
+   * it riding along invisibly or being replaced by whatever they type here.
+   */
+  initialMessage?: string | null;
   busy: boolean;
   t: (key: StringKey) => string;
   onSubmit: (lead: Record<string, string>, firstMessage?: string) => void;
@@ -21,7 +29,7 @@ export function LeadForm({
   const fields = config.leadForm.fields;
   const [values, setValues] = useState<Record<string, string>>(() => ({ ...(initial ?? {}) }));
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [firstMessage, setFirstMessage] = useState('');
+  const [firstMessage, setFirstMessage] = useState(() => initialMessage ?? '');
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   const set = (name: string, value: string) => {

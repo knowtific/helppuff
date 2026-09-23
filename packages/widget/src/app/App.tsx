@@ -400,11 +400,14 @@ export function App({
     (lead: Record<string, string>, firstMessage?: string) => {
       const queued = queuedFirstMessage.current;
       queuedFirstMessage.current = null;
-      const message = firstMessage ?? queued ?? undefined;
+      // With a first-message box, the queued message was prefilled into it,
+      // so the box is the whole truth: an edit is what they meant, and a
+      // cleared box means send nothing. Without one, the queue is all there is.
+      const message = config.leadForm.askFirstMessage ? firstMessage : (queued ?? undefined);
       dispatch({ type: 'lead/submit', lead, ...(message ? { firstMessage: message } : {}) });
       void startSession(lead, message);
     },
-    [startSession],
+    [config, startSession],
   );
 
   /** Append a message the widget produced itself, with no server round trip. */
@@ -719,7 +722,14 @@ export function App({
           ) : state.screen === 'lead_form' ? (
             <div class="mm-screen">
               <div class="mm-scroll">
-    <LeadForm config={config} initial={leadRef.current} busy={busy} t={t} onSubmit={onSubmitLead} />
+                <LeadForm
+                  config={config}
+                  initial={leadRef.current}
+                  initialMessage={queuedFirstMessage.current}
+                  busy={busy}
+                  t={t}
+                  onSubmit={onSubmitLead}
+                />
               </div>
               {state.error ? errorNotice() : null}
             </div>
