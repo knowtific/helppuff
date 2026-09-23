@@ -77,6 +77,15 @@ describe('echo connector', () => {
     expect(result.state).toEqual({ turn: 4 });
   });
 
+  it('acts on an action\'s value, not its label (§4.3)', async () => {
+    const { messages } = await echo.send(
+      ctx(),
+      { turn: 1 },
+      { kind: 'action', actionId: 'a1', value: '/card', label: 'Show a card', clientId: 'c1' },
+    );
+    expect(messages[0]).toMatchObject({ type: 'card' });
+  });
+
   it('echoes the label of an action input', async () => {
     const { messages } = await echo.send(
       ctx(),

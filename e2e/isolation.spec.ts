@@ -41,11 +41,14 @@ test.describe('the widget survives hostile host pages', () => {
       await page.evaluate(() => localStorage.clear());
       await page.reload();
 
-      // The orb is visible and the right size despite `button { display: none }`.
+      // The orb is visible and correctly sized despite `button { display: none }`
+      // and `* { all: unset }`. Its width follows the configured shape, so the
+      // height is what is fixed; the cross-fixture comparison below is what
+      // proves the host page changed nothing.
       await expect(launcher(page)).toBeVisible();
       const style = await widgetStyle(page);
-      expect(style?.width, 'orb width').toBe(56);
       expect(style?.height, 'orb height').toBe(56);
+      expect(style?.width, 'orb width').toBeGreaterThan(55);
       expect(style?.display).toBe('grid');
       expect(style?.fontFamily).not.toMatch(/comic/i);
 

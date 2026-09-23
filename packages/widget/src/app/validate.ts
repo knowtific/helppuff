@@ -1,5 +1,5 @@
 import { isHttpUrl, isSafeUrl } from '@murmur/protocol/url';
-import type { Action, Field, Img, Message, Option, Shortcut, WidgetConfig } from '@murmur/protocol';
+import type { Action, Field, Flow, FlowStep, Img, Message, Option, Shortcut, WidgetConfig } from '@murmur/protocol';
 
 /**
  * Boundary validation for the widget (§8.3): config and every message from the
@@ -230,7 +230,7 @@ const THEME_TOKENS = new Set([
   'ease-spring', 'dur-fast', 'dur', 'dur-slow', 'panel-w', 'panel-h', 'z',
 ]);
 
-const ICONS = new Set([
+export const ICONS = new Set([
   'chat', 'phone', 'mail', 'calendar', 'quote', 'pin', 'clock', 'wrench', 'heart',
   'info', 'book', 'arrow-right', 'arrow-left', 'close', 'send', 'menu', 'sound',
   'sound-off', 'check', 'external',
@@ -261,6 +261,52 @@ function parseShortcut(input: unknown): Shortcut | null {
     ...(icon ? { icon: icon as Shortcut['icon'] } : {}),
     ...(paths.length > 0 ? { paths } : {}),
   };
+}
+
+function parseFlowStep(input: unknown): FlowStep | null {
+  if (!isObject(input)) return null;
+  const field = str(input['field'], 64);
+  const ask = str(input['ask'], 400);
+  const inputKind = oneOf(input['input'], ['text', 'choice', 'phone', 'email'] as const);
+  if (!field || !ask || !inputKind) return null;
+
+  const choices = list(input['choices'], 12, (c) => str(c, 120) ?? null);
+  const required = bool(input['required']);
+  return {
+    field,
+    ask,
+    input: inputKind,
+    ...(choices.length > 0 ? { choices } : {}),
+    ...(required === undefined ? {} : { required }),
+  };
+}
+
+function parseFlow(input: unknown): Flow | null {
+  if (!isObject(input)) return null;
+  const id = str(input['id'], 64);
+  const steps = list(input['steps'], 10, parseFlowStep);
+  const submit = isObject(input['submit']) ? input['submit'] : null;
+  const template = submit && submit['as'] === 'message' ? str(submit['template'], 1000) : undefined;
+  if (!id || steps.length === 0 || !template) return null;
+  return { id, steps, submit: { as: 'message', template } };
+}
+
+function parseForms(input: unknown): WidgetConfig['forms'] | undefined {
+  if (!isObject(input)) return undefined;
+  const out: NonNullable<WidgetConfig['forms']> = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (key.length > 64 || !isObject(value)) continue;
+    const fields = list(value['fields'], 12, parseField);
+    if (fields.length === 0) continue;
+    const title = str(value['title'], 120);
+    const submitLabel = str(value['submitLabel'], 60);
+    out[key] = {
+      fields,
+      ...(title ? { title } : {}),
+      ...(submitLabel ? { submitLabel } : {}),
+    };
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 function parseTokens(input: unknown): Record<string, string> | undefined {
@@ -310,6 +356,8 @@ export function parseConfig(input: unknown): WidgetConfig | null {
 
   const teaser = parseTeaser(input['teaser']);
   const soundIn = isObject(input['sound']) ? input['sound'] : null;
+  const flows = list(input['flows'], 20, parseFlow);
+  const forms = parseForms(input['forms']);
 
   return {
     brand: {
@@ -322,6 +370,10 @@ export function parseConfig(input: unknown): WidgetConfig | null {
     },
     launcher: {
       position: oneOf(launcherIn['position'], ['bottom-right', 'bottom-left'] as const) ?? 'bottom-right',
+      icon: (typeof launcherIn['icon'] === 'string' && ICONS.has(launcherIn['icon'])
+        ? launcherIn['icon']
+        : 'chat') as WidgetConfig['launcher']['icon'],
+      shape: oneOf(launcherIn['shape'], ['orb', 'pill'] as const) ?? 'orb',
       ...(parseOffset(launcherIn['offset']) ?? {}),
       ...(str(launcherIn['label'], 40) ? { label: str(launcherIn['label'], 40) } : {}),
       ...(() => {
@@ -365,6 +417,8 @@ export function parseConfig(input: unknown): WidgetConfig | null {
         : {}),
     },
     ...(teaser ? { teaser } : {}),
+    ...(flows.length > 0 ? { flows } : {}),
+    ...(forms ? { forms } : {}),
     ...(soundIn ? { sound: { enabled: bool(soundIn['enabled']) ?? false } } : {}),
     ...(siteKey ? { captcha: { provider: 'turnstile' as const, siteKey } } : {}),
     poweredBy: bool(input['poweredBy']) ?? true,
@@ -379,15 +433,27 @@ function parseOffset(input: unknown): { offset: { x: number; y: number } } | nul
   return x === undefined || y === undefined ? null : { offset: { x, y } };
 }
 
+/** How long to wait when a teaser configures no trigger of its own. */
+export const DEFAULT_TEASER_DELAY_MS = 8000;
+
 function parseTeaser(input: unknown): WidgetConfig['teaser'] | null {
   if (!isObject(input)) return null;
   const text = str(input['text'], 200);
+  if (!text) return null;
+
   const delayMs = num(input['delayMs'], 2000, 120_000);
-  if (!text || delayMs === undefined) return null;
+  const afterScroll = num(input['afterScroll'], 1, 100);
   const paths = list(input['paths'], 50, (p) => str(p, 200) ?? null);
+
   return {
     text,
-    delayMs,
+    // A teaser with no trigger would never appear, which is never the intent.
+    ...(delayMs === undefined && afterScroll === undefined
+      ? { delayMs: DEFAULT_TEASER_DELAY_MS }
+      : {
+          ...(delayMs === undefined ? {} : { delayMs }),
+          ...(afterScroll === undefined ? {} : { afterScroll }),
+        }),
     oncePerSession: bool(input['oncePerSession']) ?? true,
     ...(paths.length > 0 ? { paths } : {}),
   };

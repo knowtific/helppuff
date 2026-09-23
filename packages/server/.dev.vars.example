@@ -1,3 +1,46 @@
-# Local development only. `setup.sh` sets the real values as Worker secrets.
+# Local development only. Copy to `.dev.vars`, which is gitignored.
+#
+# In production none of these live in a file: each is a Worker secret, set
+# with `wrangler secret put NAME` (and `scripts/setup.sh` prompts for the
+# ones your chosen connector and sinks declare). The names here are the ones
+# `murmur.config.ts` refers to via `{ env: 'NAME' }` — change them there and
+# change them here.
+
+# ---------------------------------------------------------------- required
+
+# Signs session tokens. At least 32 bytes; `setup.sh` generates one.
+#   openssl rand -base64 32
 MURMUR_SECRET=dev-secret-please-replace-at-least-32-bytes
+
+# "1" prints structured, PII-free events to the console. Off in production.
 MURMUR_LOG=1
+
+# ------------------------------------------------- one per connector in use
+
+# Gemini — https://aistudio.google.com/apikey
+# Used by `connector: { type: 'gemini', options: { apiKey: { env: 'GEMINI_API_KEY' } } }`
+# The File Search store name is not a secret and goes in murmur.config.ts.
+# GEMINI_API_KEY=AIza...
+
+# OpenAI — https://platform.openai.com/api-keys
+# OPENAI_API_KEY=sk-...
+
+# Retell — https://dashboard.retellai.com
+# Only the key is a secret. `agentId` is per-site configuration and belongs
+# in murmur.config.ts: one deployment can serve several sites, each talking
+# to a different agent, so it cannot be a single environment variable.
+# RETELL_API_KEY=key_...
+
+# Any OpenAI-compatible provider reuses the `openai` connector with its own
+# `baseUrl`, so give its key whatever name you reference in the config.
+# DEEPSEEK_API_KEY=sk-...
+
+# ---------------------------------------------------------------- optional
+
+# Turnstile's server-side secret. The site key is public and goes in the
+# widget config; this one never leaves the Worker.
+# TURNSTILE_SECRET=0x4AAA...
+
+# Where leads are forwarded, and the secret that signs the request body.
+# LEAD_WEBHOOK_URL=https://hooks.example.com/murmur
+# LEAD_WEBHOOK_SECRET=a-shared-secret

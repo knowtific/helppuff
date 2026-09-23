@@ -69,29 +69,24 @@
       <h2>Try the echo commands</h2>
       <div class="card">
         <p style="margin-top: 0">Open the widget, then send any of these. Each exercises a different part of the protocol.</p>
-        <p style="margin-top: 0"><b>Working now</b></p>
         <div class="cmds">
           <p><code>anything</code> — echoed back as markdown</p>
+          <p><code>/options</code> — option chips</p>
+          <p><code>/multi</code> — multi-select + confirm</p>
+          <p><code>/card</code> — card with image + actions</p>
+          <p><code>/carousel</code> — three scroll-snapped cards</p>
+          <p><code>/links</code> — link list</p>
+          <p><code>/form</code> — inline form</p>
           <p><code>/notice</code> — a warning notice</p>
           <p><code>/slow</code> — 3s delay (typing indicator)</p>
           <p><code>/long</code> — long markdown (scrolling)</p>
           <p><code>/multipart</code> — two messages at once</p>
           <p><code>/error</code> — a connector error, handled in place</p>
         </div>
-
-        <p style="margin: 18px 0 6px"><b>Not rendered yet — milestone 4</b></p>
-        <div class="cmds">
-          <p><code>/options</code> — option chips</p>
-          <p><code>/multi</code> — multi-select</p>
-          <p><code>/card</code> — card with image + actions</p>
-          <p><code>/carousel</code> — three cards</p>
-          <p><code>/links</code> — link list</p>
-          <p><code>/form</code> — inline form</p>
-        </div>
         <p style="margin-bottom: 0; color: var(--ink-2); font-size: 13px">
-          The server sends these correctly today — you can see the JSON with
-          <code>?mmdebug=1</code> — but the widget has no renderer for them until M4, so
-          <b>nothing appears in the thread</b>. The rest of the widget is unaffected.
+          Also try the home-screen tiles: <b>Get a quote</b> runs a three-step flow entirely in the
+          browser — no server call until it finishes — and <b>Book a visit</b> opens a configured
+          inline form.
         </p>
       </div>
 
@@ -184,18 +179,29 @@
       }
 
       // Health check, so it is obvious when the Worker is not running.
-      fetch(API + '/healthz')
-        .then((r) => r.json())
-        .then(() => {
-          const el = document.getElementById('server-status');
+      // Bounded, because a wedged process accepts the connection and then
+      // never answers — unbounded, the badge would sit on "checking…" for
+      // ever, which reads as "still working" rather than "broken".
+      (async () => {
+        const el = document.getElementById('server-status');
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 4000);
+        try {
+          const response = await fetch(API + '/healthz', { signal: controller.signal });
+          if (!response.ok) throw new Error(String(response.status));
+          await response.json();
           el.dataset.up = 'yes';
           el.textContent = 'worker up on :8787';
-        })
-        .catch(() => {
-          const el = document.getElementById('server-status');
+        } catch (error) {
           el.dataset.up = 'no';
-          el.textContent = 'worker down — run pnpm dev:server';
-        });
+          el.textContent =
+            error.name === 'AbortError'
+              ? 'worker not responding — restart pnpm dev:server'
+              : 'worker down — run pnpm dev:server';
+        } finally {
+          clearTimeout(timer);
+        }
+      })();
 
       document.getElementById('filler').textContent = Array.from(
         { length: 14 },

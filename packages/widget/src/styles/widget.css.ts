@@ -117,6 +117,23 @@ export const WIDGET_CSS = `
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  /* A platform scrollbar with stepper arrows is louder than anything else in
+     the panel, so the thread draws a quiet one of its own (§9.1). */
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--mm-text) 22%, transparent) transparent;
+}
+.mm-scroll::-webkit-scrollbar { width: 10px; }
+.mm-scroll::-webkit-scrollbar-track { background: transparent; }
+.mm-scroll::-webkit-scrollbar-button { display: none; height: 0; width: 0; }
+.mm-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--mm-text) 20%, transparent);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+.mm-scroll::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--mm-text) 34%, transparent);
+  background-clip: content-box;
 }
 
 /* ------------------------------------------------------------------ home */
@@ -261,6 +278,218 @@ export const WIDGET_CSS = `
 .mm-typing i:nth-child(3) { animation-delay: .36s; }
 @keyframes mm-blink { 0%,60%,100% { opacity: .3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
 
+/* ------------------------------------------------------- rich messages */
+
+.mm-options { display: flex; flex-direction: column; gap: 10px; }
+.mm-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.mm-chips .mm-chip { animation: mm-chip-in var(--mm-dur) var(--mm-ease-spring) both; }
+@keyframes mm-chip-in {
+  from { opacity: 0; transform: translateY(4px) scale(.96); }
+  to   { opacity: 1; transform: none; }
+}
+.mm-chip[aria-pressed="true"] { background: var(--mm-accent); color: var(--mm-accent-fg); border-color: var(--mm-accent); }
+a.mm-chip { text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+.mm-chip[disabled] { opacity: .45; cursor: default; }
+.mm-chip[disabled]:hover { background: var(--mm-bg); border-color: var(--mm-border); }
+.mm-chip svg { width: 14px; height: 14px; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.mm-confirm { margin-top: 2px; }
+
+.mm-card {
+  background: var(--mm-surface);
+  border-radius: var(--mm-radius-md);
+  overflow: hidden;
+  max-width: 88%;
+}
+.mm-card-img { width: 100%; height: auto; object-fit: cover; display: block; background: var(--mm-surface-2); }
+.mm-card-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.mm-card-title { font-size: var(--mm-text-md); font-weight: 600; letter-spacing: var(--mm-tracking-tight); }
+.mm-card-text { font-size: var(--mm-text-sm); color: var(--mm-text-2); }
+.mm-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+.mm-actions .mm-chip { text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+
+.mm-carousel-wrap { position: relative; }
+
+.mm-carousel {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  /* Bleed to the panel edges so the next card peeks in. */
+  margin-inline: calc(var(--mm-pad) * -1);
+  padding-inline: var(--mm-pad);
+  /* Align the snap port with the padding, so the first card rests at
+     scrollLeft 0 rather than at the padding offset — otherwise the carousel
+     reports itself as already scrolled and the prev arrow starts enabled. */
+  scroll-padding-inline: var(--mm-pad);
+  padding-bottom: 4px;
+}
+.mm-carousel::-webkit-scrollbar { display: none; }
+.mm-carousel-item { flex: 0 0 78%; scroll-snap-align: start; }
+.mm-carousel-item .mm-card { max-width: none; height: 100%; }
+
+/*
+ * The scrollbar is hidden, so these are the only affordance a mouse user
+ * gets. Touch devices swipe instead and never see them (§8.7).
+ */
+.mm-carousel-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  /* §8.7: every target is at least 44x44, overlay controls included. */
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--mm-bg);
+  color: var(--mm-text);
+  box-shadow: 0 2px 10px -2px rgba(15, 15, 30, .28), 0 0 0 1px var(--mm-border);
+  opacity: 0;
+  transition: opacity var(--mm-dur-fast) var(--mm-ease-out), background var(--mm-dur-fast);
+  z-index: 1;
+}
+.mm-carousel-nav[data-dir="prev"] { inset-inline-start: 2px; }
+.mm-carousel-nav[data-dir="next"] { inset-inline-end: 2px; }
+.mm-carousel-nav[data-dir="prev"] svg { transform: rotate(0deg); }
+.mm-carousel-nav:hover { background: var(--mm-surface); }
+.mm-carousel-nav svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.mm-carousel-nav[disabled] { opacity: 0 !important; pointer-events: none; }
+
+/* Revealed on hover, and whenever one is focused by keyboard. */
+.mm-carousel-wrap:hover .mm-carousel-nav,
+.mm-carousel-nav:focus-visible { opacity: 1; }
+
+@media (hover: none) {
+  .mm-carousel-nav { display: none; }
+}
+
+.mm-links { display: flex; flex-direction: column; gap: 2px; max-width: 88%; }
+.mm-links-title { font-size: var(--mm-text-xs); color: var(--mm-text-3); margin-bottom: 4px; }
+.mm-link-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px;
+  min-height: 44px;
+  border-radius: var(--mm-radius-sm);
+  background: var(--mm-surface);
+  text-decoration: none;
+  transition: background var(--mm-dur-fast);
+}
+.mm-link-row:hover { background: var(--mm-surface-2); }
+.mm-link-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.mm-link-label { font-size: var(--mm-text-sm); font-weight: 500; }
+.mm-link-desc { font-size: var(--mm-text-xs); color: var(--mm-text-2); }
+.mm-link-row svg { stroke: var(--mm-text-3); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+.mm-inline-form {
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 16px;
+  border-radius: var(--mm-radius-md);
+  background: var(--mm-surface);
+  max-width: 88%;
+}
+
+/* --------------------------------------------------------- shortcut bar */
+
+.mm-shortcut-wrap { position: relative; }
+
+.mm-shortcut-bar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
+  padding: 0 12px 10px;
+}
+.mm-shortcut-bar::-webkit-scrollbar { display: none; }
+.mm-shortcut-bar .mm-chip { white-space: nowrap; flex: none; }
+
+/*
+ * The row scrolls with its scrollbar hidden, so a fade marks the chips that
+ * are out of view — otherwise a clipped chip looks like a rendering fault
+ * rather than something you can reach.
+ */
+.mm-shortcut-wrap::before,
+.mm-shortcut-wrap::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 10px;
+  width: 36px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--mm-dur-fast) var(--mm-ease-out);
+  z-index: 1;
+}
+.mm-shortcut-wrap::before {
+  inset-inline-start: 0;
+  background: linear-gradient(to right, var(--mm-bg), transparent);
+}
+.mm-shortcut-wrap::after {
+  inset-inline-end: 0;
+  background: linear-gradient(to left, var(--mm-bg), transparent);
+}
+.mm-shortcut-wrap[data-more-start]::before { opacity: 1; }
+.mm-shortcut-wrap[data-more-end]::after { opacity: 1; }
+
+.mm-shortcut-nav {
+  position: absolute;
+  inset-inline-end: 4px;
+  top: calc(50% - 5px);
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--mm-bg);
+  color: var(--mm-text-2);
+  box-shadow: 0 2px 8px -2px rgba(15, 15, 30, .3), 0 0 0 1px var(--mm-border);
+  z-index: 2;
+}
+.mm-shortcut-nav:hover { color: var(--mm-text); }
+.mm-shortcut-nav svg { width: 16px; height: 16px; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+@media (hover: none) { .mm-shortcut-nav { display: none; } }
+
+.mm-flow-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin: 0 var(--mm-pad) 10px;
+  padding: 8px 8px 8px 14px;
+  border-radius: var(--mm-radius-md);
+  background: var(--mm-accent-soft);
+  font-size: var(--mm-text-xs);
+  color: var(--mm-text-2);
+}
+
+/* ------------------------------------------------------- home shortcuts */
+
+.mm-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.mm-tile {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  padding: 14px;
+  min-height: 92px;
+  border-radius: var(--mm-radius-md);
+  background: var(--mm-surface);
+  text-align: start;
+  text-decoration: none;
+  transition: background var(--mm-dur-fast), transform var(--mm-dur-fast) var(--mm-ease-spring);
+}
+.mm-tile:hover { background: var(--mm-surface-2); }
+.mm-tile:active { transform: scale(.985); }
+.mm-tile-icon {
+  width: 30px; height: 30px;
+  border-radius: 9px;
+  display: grid; place-items: center;
+  background: var(--mm-accent-soft);
+  color: var(--mm-accent);
+}
+.mm-tile-icon svg { width: 17px; height: 17px; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.mm-tile-label { font-size: var(--mm-text-sm); font-weight: 500; }
+.mm-tile-desc { font-size: var(--mm-text-xs); color: var(--mm-text-2); }
+
+.mm-home-links { margin-top: 16px; }
+
 /* -------------------------------------------------------------- composer */
 
 .mm-composer-wrap { flex: none; padding: 12px; border-top: 1px solid var(--mm-border); background: var(--mm-bg); }
@@ -281,9 +510,14 @@ export const WIDGET_CSS = `
   font-size: 16px;
   line-height: 1.4;
   resize: none;
-  overflow-y: auto;
+  /* The box grows to fit its content, so a scrollbar is only ever correct
+     once it has hit max-height. Left on auto, a one-pixel difference in font
+     metrics is enough to show a stepper scrollbar on some platforms. */
+  overflow-y: hidden;
+  scrollbar-width: thin;
   background: none;
 }
+.mm-composer textarea[data-scrolls] { overflow-y: auto; }
 .mm-composer textarea::placeholder { color: var(--mm-text-3); }
 
 .mm-send {

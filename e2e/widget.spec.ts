@@ -53,6 +53,43 @@ test.describe('the conversation', () => {
     await expect(page.locator('murmur-widget .mm-typing')).toBeHidden();
   });
 
+  test('the composer shows no scrollbar until it stops growing', async ({ page }) => {
+    await openWidget(page);
+    await startConversation(page);
+
+    const box = composer(page);
+    const state = () =>
+      box.evaluate((el) => ({
+        overflowY: getComputedStyle(el).overflowY,
+        height: (el as HTMLElement).offsetHeight,
+      }));
+
+    // Regression: `overflow-y: auto` on a box that exactly fits its content
+    // shows a stepper scrollbar on some platforms.
+    expect(await state()).toMatchObject({ overflowY: 'hidden' });
+
+    await box.fill('one');
+    expect((await state()).overflowY).toBe('hidden');
+
+    // Past five lines it stops growing, and only then may it scroll.
+    await box.fill('one\ntwo\nthree\nfour\nfive\nsix\nseven');
+    const grown = await state();
+    expect(grown.overflowY).toBe('auto');
+    expect(grown.height).toBeLessThanOrEqual(120);
+  });
+
+  test("the lead form's first message appears in the thread", async ({ page }) => {
+    await openWidget(page);
+    await page.locator('murmur-widget .mm-btn').first().click();
+    await page.locator('murmur-widget #mm-f-name').fill('Ahad');
+    await page.locator('murmur-widget #mm-f-phone').fill('0400 000 000');
+    await page.locator('murmur-widget #mm-f-first').fill('a question asked up front');
+    await page.locator('murmur-widget button[type="submit"]').click();
+
+    await expect(userMessages(page)).toHaveText(['a question asked up front']);
+    await expect(agentMessages(page).last()).toContainText('a question asked up front');
+  });
+
   test('markdown renders as formatted text, not as source', async ({ page }) => {
     await openWidget(page);
     await startConversation(page);
@@ -86,8 +123,9 @@ test.describe('the conversation', () => {
     // The widget stays; the message comes back to the composer.
     await expect(panel(page)).toBeVisible();
     await expect(composer(page)).toHaveValue('/error');
-    // The fallback contact is offered.
-    await expect(page.locator('murmur-widget a[href^="tel:"]')).toBeVisible();
+    // The fallback contact is offered inside the notice itself — the
+    // shortcut bar may carry its own `tel:` chip.
+    await expect(alert.locator('a[href^="tel:"]')).toBeVisible();
   });
 
   test('the conversation survives a page reload', async ({ page }) => {

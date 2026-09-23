@@ -7,6 +7,7 @@ import { requireSecret, type RequestCtx, type HonoEnv } from '../core/request.js
 import { connectorContext, prepareConnector, runConnector, type PreparedConnector } from '../core/run.js';
 import { sanitizeConnectorMessages } from '../core/sanitize.js';
 import { issueToken, verifyToken, type SessionTokenPayload } from '../core/token.js';
+import { hitDaily, hitTotal, hitWindow, rateLimited, quotaExceeded, sessionMessageKey } from '../core/ratelimit.js';
 import type { SiteConfig } from '../config/schema.js';
 import { readJsonBody } from './sessions.js';
 
@@ -63,14 +64,52 @@ messageRoutes.post('/v1/sessions/messages', async (c) => {
     });
   }
 
-  // 4. Per-session cap. IP and site-wide limits land in M3.
-  const count = payload.count + 1;
-  if (count > site.security.limits.messagesPerSession) {
-    throw new MurmurError('quota_exceeded', {
-      message: 'This conversation has reached its limit. Start a new one to keep going.',
-      detail: 'messages_per_session',
-    });
+  // 4. Limits, cheapest first.
+  const limits = site.security.limits;
+  const ipKey = await ctx.ipKey();
+
+  // Scoped by site, as with sessions.
+  const perIp = await hitWindow(
+    ctx.platform.kv,
+    'msg',
+    `${payload.siteId}:${ipKey}`,
+    limits.messagesPerIpPerMinute,
+    60,
+  );
+  if (!perIp.allowed) {
+    ctx.platform.log('limit.messages_per_ip', { siteId: payload.siteId });
+    throw rateLimited(perIp, 'messages_per_ip_per_minute');
   }
+
+  /*
+   * The per-session cap is counted in KV, not from the token.
+   *
+   * The token's `count` is chosen by the client: replaying an older token
+   * rewinds it, so a token-held counter never trips. The token still carries
+   * one, for the widget's own bookkeeping, but this is the number enforced.
+   */
+  const ttlSeconds = Math.max(60, Math.ceil((payload.exp - ctx.platform.now()) / 1000));
+  const perSession = await hitTotal(
+    ctx.platform.kv,
+    sessionMessageKey(payload.sessionId),
+    limits.messagesPerSession,
+    ttlSeconds,
+  );
+  if (!perSession.allowed) {
+    ctx.platform.log('limit.messages_per_session', { siteId: payload.siteId });
+    throw quotaExceeded(
+      'messages_per_session',
+      'This conversation has reached its limit. Start a new one to keep going.',
+    );
+  }
+
+  const daily = await hitDaily(ctx.platform.kv, payload.siteId, limits.messagesPerSitePerDay);
+  if (!daily.allowed) {
+    ctx.platform.log('limit.site_daily', { siteId: payload.siteId });
+    throw quotaExceeded('messages_per_site_per_day', 'Chat is unavailable right now.');
+  }
+
+  const count = perSession.count;
 
   // 5. Connector.
   const cctx = connectorContext(ctx, session.prepared, payload.siteId, payload.sessionId);

@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { actionSchema, messageSchema, widgetConfigSchema } from '@murmur/protocol';
 import { invalidMessages, validMessages } from '../../protocol/test/fixtures.js';
-import { DEFAULT_LEAD_FIELDS, parseAction, parseConfig, parseMessage, parseMessages } from '../src/app/validate.js';
+import {
+  DEFAULT_LEAD_FIELDS,
+  DEFAULT_TEASER_DELAY_MS,
+  parseAction,
+  parseConfig,
+  parseMessage,
+  parseMessages,
+} from '../src/app/validate.js';
 
 /**
  * The widget cannot ship Zod, so `validate.ts` reimplements the schemas by
@@ -185,9 +192,62 @@ describe('parseConfig — conservative defaults (§8.3)', () => {
     expect(config?.brand.tokens).toEqual({ 'radius-md': '8px' });
   });
 
-  it('drops a teaser whose delay is under the 2s floor', () => {
-    expect(parseConfig({ teaser: { text: 'Hi', delayMs: 500 } })?.teaser).toBeUndefined();
+  it('keeps a valid teaser delay', () => {
     expect(parseConfig({ teaser: { text: 'Hi', delayMs: 3000 } })?.teaser).toMatchObject({ delayMs: 3000 });
+  });
+
+  it('falls back to the default delay when the configured one is unusable', () => {
+    // §8.3: a field of the wrong type is treated as absent and its default
+    // applied — dropping the whole teaser would hide a configured feature.
+    expect(parseConfig({ teaser: { text: 'Hi', delayMs: 500 } })?.teaser).toMatchObject({
+      delayMs: DEFAULT_TEASER_DELAY_MS,
+    });
+    expect(parseConfig({ teaser: { text: 'Hi', delayMs: 'soon' } })?.teaser).toMatchObject({
+      delayMs: DEFAULT_TEASER_DELAY_MS,
+    });
+  });
+
+  it('drops a teaser with no text, since there is nothing to show', () => {
+    expect(parseConfig({ teaser: { delayMs: 3000 } })?.teaser).toBeUndefined();
+  });
+
+  it('accepts a scroll trigger on its own, with no delay', () => {
+    const teaser = parseConfig({ teaser: { text: 'Hi', afterScroll: 40 } })?.teaser;
+    expect(teaser).toMatchObject({ afterScroll: 40 });
+    expect(teaser?.delayMs).toBeUndefined();
+  });
+
+  it('accepts both triggers together', () => {
+    expect(parseConfig({ teaser: { text: 'Hi', delayMs: 5000, afterScroll: 25 } })?.teaser).toMatchObject({
+      delayMs: 5000,
+      afterScroll: 25,
+    });
+  });
+
+  it('ignores a scroll trigger outside 1-100', () => {
+    expect(parseConfig({ teaser: { text: 'Hi', afterScroll: 0 } })?.teaser?.afterScroll).toBeUndefined();
+    expect(parseConfig({ teaser: { text: 'Hi', afterScroll: 150 } })?.teaser?.afterScroll).toBeUndefined();
+  });
+
+  it('accepts any built-in icon on the launcher', () => {
+    // Regression: the list was once trimmed to eight to save bytes in the
+    // loader, which excluded obvious choices like a wrench for a trade.
+    for (const icon of ['wrench', 'pin', 'clock', 'heart', 'phone', 'book']) {
+      expect(parseConfig({ launcher: { icon } })?.launcher.icon, icon).toBe(icon);
+    }
+  });
+
+  it('defaults the launcher icon and shape, and rejects unknown ones', () => {
+    const base = parseConfig({})?.launcher;
+    expect(base).toMatchObject({ icon: 'chat', shape: 'orb' });
+    expect(parseConfig({ launcher: { icon: 'heart', shape: 'pill' } })?.launcher).toMatchObject({
+      icon: 'heart',
+      shape: 'pill',
+    });
+    expect(parseConfig({ launcher: { icon: 'skull', shape: 'hexagon' } })?.launcher).toMatchObject({
+      icon: 'chat',
+      shape: 'orb',
+    });
   });
 
   it('drops a shortcut whose action is unusable', () => {

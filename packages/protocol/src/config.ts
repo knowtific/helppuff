@@ -47,6 +47,15 @@ export const iconNames = [
 ] as const;
 export type IconName = (typeof iconNames)[number];
 
+/**
+ * Any built-in icon may sit on the launcher. The list was briefly trimmed to
+ * save bytes in the loader, which excluded `wrench`, `pin` and `clock` —
+ * obvious choices for a trade business — for about 330 bytes gzipped. That
+ * was the wrong trade: the whole set costs a few milliseconds on a slow
+ * connection, on a script that is already off the critical path.
+ */
+export type LauncherIconName = IconName;
+
 export const shortcutSchema = z.object({
   id: z.string().min(1).max(64),
   label: z.string().min(1).max(80),
@@ -86,7 +95,18 @@ export type Brand = z.infer<typeof brandSchema>;
 export const launcherSchema = z.object({
   position: z.enum(['bottom-right', 'bottom-left']).default('bottom-right'),
   offset: z.object({ x: z.number().min(0).max(200), y: z.number().min(0).max(200) }).optional(),
+  /**
+   * Text beside the orb, or inside it when `shape` is `pill`.
+   * For example "Chat with us".
+   */
   label: z.string().max(40).optional(),
+  /** Which of the built-in icons (§9.6) the launcher shows. */
+  icon: z.enum(iconNames).default('chat'),
+  /**
+   * `orb` is the signature circle (§9.2). `pill` widens it to sit the label
+   * inside the button, which reads as a clearer invitation on a busy page.
+   */
+  shape: z.enum(['orb', 'pill']).default('orb'),
   hideOnPaths: z.array(pathGlob).max(50).optional(),
 });
 
@@ -126,12 +146,29 @@ export const chatSchema = z.object({
     .optional(),
 });
 
-export const teaserSchema = z.object({
-  text: z.string().min(1).max(200),
-  delayMs: z.number().int().min(2000).max(120000),
-  paths: z.array(pathGlob).max(50).optional(),
-  oncePerSession: z.boolean().default(true),
-});
+/** How long to wait before the teaser appears, when no trigger is configured. */
+export const DEFAULT_TEASER_DELAY_MS = 8000;
+
+export const teaserSchema = z
+  .object({
+    text: z.string().min(1).max(200),
+    /** Time on the page. Omit to rely on `afterScroll` alone. */
+    delayMs: z.number().int().min(2000).max(120000).optional(),
+    /**
+     * Percentage of the page scrolled, 1–100. Whichever trigger fires first
+     * shows the teaser; a visitor who reads rather than waits still sees it.
+     */
+    afterScroll: z.number().int().min(1).max(100).optional(),
+    paths: z.array(pathGlob).max(50).optional(),
+    oncePerSession: z.boolean().default(true),
+  })
+  // A teaser with no trigger at all would never appear, which is never what
+  // was meant — fall back to the default delay.
+  .transform((teaser) =>
+    teaser.delayMs === undefined && teaser.afterScroll === undefined
+      ? { ...teaser, delayMs: DEFAULT_TEASER_DELAY_MS }
+      : teaser,
+  );
 
 export const widgetConfigSchema = z.object({
   brand: brandSchema.default({}),

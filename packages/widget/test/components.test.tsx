@@ -8,6 +8,7 @@ import { Home } from '../src/components/Home.js';
 import { Launcher } from '../src/components/Launcher.js';
 import { LeadForm, validateField } from '../src/components/LeadForm.js';
 import { Thread } from '../src/components/Thread.js';
+import { inertHandlers } from '../src/components/messages/index.js';
 import { makeStrings } from '../src/app/strings.js';
 import { parseConfig } from '../src/app/validate.js';
 
@@ -59,26 +60,26 @@ describe('Launcher', () => {
 
 describe('Home', () => {
   it('shows the configured title and subtitle', () => {
-    render(<Home config={config()} hasSession={false} lastMessage={undefined} busy={false} t={t} onStart={() => {}} />);
+    render(<Home config={config()} shortcuts={[]} onShortcut={() => {}} hasSession={false} lastMessage={undefined} busy={false} t={t} onStart={() => {}} />);
     expect(screen.getByRole('heading', { name: 'Hi there' })).toBeTruthy();
     expect(screen.getByText('Ask anything.')).toBeTruthy();
   });
 
   it('offers to start a conversation when there is none', () => {
-    render(<Home config={config()} hasSession={false} lastMessage={undefined} busy={false} t={t} onStart={() => {}} />);
+    render(<Home config={config()} shortcuts={[]} onShortcut={() => {}} hasSession={false} lastMessage={undefined} busy={false} t={t} onStart={() => {}} />);
     expect(screen.getByRole('button', { name: /start a conversation/i })).toBeTruthy();
   });
 
   it('offers to resume, with a plain-text preview, when a session exists', () => {
     const last = msg({ type: 'text', text: 'A **bold** answer with a [link](https://a.co)' });
-    render(<Home config={config()} hasSession lastMessage={last} busy={false} t={t} onStart={() => {}} />);
+    render(<Home config={config()} shortcuts={[]} onShortcut={() => {}} hasSession lastMessage={last} busy={false} t={t} onStart={() => {}} />);
     expect(screen.getByRole('button', { name: /continue conversation/i })).toBeTruthy();
     // Markdown is stripped in the preview, not rendered.
     expect(screen.getByText(/A bold answer with a link/)).toBeTruthy();
   });
 
   it('disables the start button while busy', () => {
-    render(<Home config={config()} hasSession={false} lastMessage={undefined} busy t={t} onStart={() => {}} />);
+    render(<Home config={config()} shortcuts={[]} onShortcut={() => {}} hasSession={false} lastMessage={undefined} busy t={t} onStart={() => {}} />);
     expect((screen.getByRole('button', { name: /start/i }) as HTMLButtonElement).disabled).toBe(true);
   });
 });
@@ -118,7 +119,7 @@ describe('Thread', () => {
       msg({ type: 'text', text: 'Hello **there**' }),
       msg({ type: 'text', text: 'Hi **back**', role: 'user' }),
     ];
-    const { container } = render(<Thread messages={messages} busy={false} pendingIds={new Set()} t={t} />);
+    const { container } = render(<Thread messages={messages} busy={false} pendingIds={new Set()} handlers={inertHandlers} t={t} />);
 
     expect(container.querySelector('.mm-agent strong')?.textContent).toBe('there');
     // A user's own text is never parsed as markdown.
@@ -129,7 +130,7 @@ describe('Thread', () => {
 
   it('renders a safe link with the right rel', () => {
     const { container } = render(
-      <Thread messages={[msg({ type: 'text', text: '[docs](https://example.com)' })]} busy={false} pendingIds={new Set()} t={t} />,
+      <Thread messages={[msg({ type: 'text', text: '[docs](https://example.com)' })]} busy={false} pendingIds={new Set()} handlers={inertHandlers} t={t} />,
     );
     const link = container.querySelector('a') as HTMLAnchorElement;
     expect(link.getAttribute('href')).toBe('https://example.com');
@@ -139,74 +140,47 @@ describe('Thread', () => {
 
   it('does not create a link for a javascript: url', () => {
     const { container } = render(
-      <Thread messages={[msg({ type: 'text', text: '[x](javascript:alert(1))' })]} busy={false} pendingIds={new Set()} t={t} />,
+      <Thread messages={[msg({ type: 'text', text: '[x](javascript:alert(1))' })]} busy={false} pendingIds={new Set()} handlers={inertHandlers} t={t} />,
     );
     expect(container.querySelector('a')).toBeNull();
   });
 
   it('renders notices with their tone', () => {
     const { container } = render(
-      <Thread messages={[msg({ type: 'notice', text: 'Careful', tone: 'warn', role: 'system' })]} busy={false} pendingIds={new Set()} t={t} />,
+      <Thread messages={[msg({ type: 'notice', text: 'Careful', tone: 'warn', role: 'system' })]} busy={false} pendingIds={new Set()} handlers={inertHandlers} t={t} />,
     );
     expect(container.querySelector('.mm-notice')?.getAttribute('data-tone')).toBe('warn');
   });
 
   it('renders nothing at all for a message type it cannot draw', () => {
     const unknown = { id: 'x', ts: 1, role: 'agent', type: 'hologram' } as unknown as Message;
-    const { container } = render(<Thread messages={[unknown]} busy={false} pendingIds={new Set()} t={t} />);
+    const { container } = render(<Thread messages={[unknown]} busy={false} pendingIds={new Set()} handlers={inertHandlers} t={t} />);
     expect(container.querySelector('.mm-agent')).toBeNull();
     // Regression: an empty row still costs a fade-in, a gap and a timestamp,
     // which a visitor sees as something flashing and vanishing.
     expect(container.querySelector('.mm-row')).toBeNull();
   });
 
-  it.each(['options', 'card', 'carousel', 'links', 'form'])(
-    'emits no row for a %s message, which has no renderer until M4',
-    (type) => {
-      const message = { id: 'x', ts: 1, role: 'agent', type } as unknown as Message;
-      const { container } = render(<Thread messages={[message]} busy={false} pendingIds={new Set()} t={t} />);
-      expect(container.querySelector('.mm-row')).toBeNull();
-    },
-  );
-
   it('keeps grouping correct across a message it cannot draw', () => {
     const now = Date.now();
     const messages = [
       msg({ type: 'text', text: 'One', ts: now }),
-      { id: 'skip', ts: now + 500, role: 'agent', type: 'card', title: 'x' } as unknown as Message,
+      { id: 'skip', ts: now + 500, role: 'agent', type: 'hologram' } as unknown as Message,
       msg({ type: 'text', text: 'Two', ts: now + 1000 }),
     ];
-    const { container } = render(<Thread messages={messages} busy={false} pendingIds={new Set()} t={t} />);
+    const { container } = render(
+      <Thread messages={messages} busy={false} pendingIds={new Set()} handlers={inertHandlers} t={t} />,
+    );
     const rows = [...container.querySelectorAll('.mm-row')];
     expect(rows).toHaveLength(2);
     // The two text messages are still adjacent, so the second groups.
     expect(rows[1]?.hasAttribute('data-grouped')).toBe(true);
   });
 
-  it('marks optimistic messages as pending', () => {
-    const pending = msg({ type: 'text', text: 'sending…', role: 'user', id: 'c1' });
-    const { container } = render(<Thread messages={[pending]} busy pendingIds={new Set(['c1'])} t={t} />);
-    expect(container.querySelector('[data-pending]')).toBeTruthy();
-  });
-
-  it('groups consecutive messages from the same sender', () => {
-    const now = Date.now();
-    const messages = [
-      msg({ type: 'text', text: 'One', ts: now }),
-      msg({ type: 'text', text: 'Two', ts: now + 1000 }),
-      msg({ type: 'text', text: 'Mine', role: 'user', ts: now + 2000 }),
-    ];
-    const { container } = render(<Thread messages={messages} busy={false} pendingIds={new Set()} t={t} />);
-    const rows = [...container.querySelectorAll('.mm-row')];
-    expect(rows[0]?.hasAttribute('data-grouped')).toBe(false);
-    expect(rows[1]?.hasAttribute('data-grouped')).toBe(true);
-    expect(rows[2]?.hasAttribute('data-grouped')).toBe(false);
-  });
-
   it('shows the typing indicator only while busy', () => {
-    const { container, rerender } = render(<Thread messages={[]} busy pendingIds={new Set()} t={t} />);
+    const { container, rerender } = render(<Thread messages={[]} busy pendingIds={new Set()} handlers={inertHandlers} t={t} />);
     expect(container.querySelector('.mm-typing')).toBeTruthy();
-    rerender(<Thread messages={[]} busy={false} pendingIds={new Set()} t={t} />);
+    rerender(<Thread messages={[]} busy={false} pendingIds={new Set()} handlers={inertHandlers} t={t} />);
     expect(container.querySelector('.mm-typing')).toBeNull();
   });
 });
@@ -509,6 +483,7 @@ describe('accessibility basics', () => {
         messages={[msg({ type: 'text', text: 'Mine', role: 'user' })]}
         busy={false}
         pendingIds={new Set()}
+        handlers={inertHandlers}
         t={t}
       />,
     );

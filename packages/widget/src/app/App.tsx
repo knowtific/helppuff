@@ -7,15 +7,26 @@ import { Home } from '../components/Home.js';
 import { Launcher } from '../components/Launcher.js';
 import { LeadForm } from '../components/LeadForm.js';
 import { Teaser } from '../components/Teaser.js';
+import { ShortcutBar } from '../components/Shortcuts.js';
 import { LiveRegion, Thread } from '../components/Thread.js';
+import type { MessageHandlers } from '../components/messages/index.js';
 import { log } from '../lib/env.js';
 import { trapFocus } from '../lib/focus.js';
-import type { WidgetConfig } from '@murmur/protocol';
+import type { Action, Message, MessageBody, Option, Shortcut, WidgetConfig } from '@murmur/protocol';
 import type { Runtime } from '../loader.js';
 import { toWidgetError, type Api } from './api.js';
 import { clientId, pageContext, pathAllowed, currentPath } from './context.js';
 import { clear as clearStorage, load as loadStored, save as saveStored } from './persist.js';
 import { makeStrings } from './strings.js';
+import {
+  findFlow,
+  isComplete,
+  isFlowMessage,
+  renderTemplate,
+  stepAt,
+  stepMessage,
+  validateAnswer,
+} from '../flows/runner.js';
 import {
   initialState,
   isBusy,
@@ -102,6 +113,7 @@ export function App({
   const [closing, setClosing] = useState(false);
   const [offline, setOffline] = useState(() => navigator.onLine === false);
   const [showTeaser, setShowTeaser] = useState(false);
+  const [shortcutsExpanded, setShortcutsExpanded] = useState(false);
   /** A message typed before the lead form, replayed once it is submitted. */
   const queuedFirstMessage = useRef<string | null>(null);
   /**
@@ -110,6 +122,8 @@ export function App({
    * dispatch is not visible to the next command until the next render.
    */
   const leadRef = useRef<Record<string, string> | null>(null);
+  /** Filled in below; lets `handlers` start a flow without a circular dep. */
+  const startFlowRef = useRef<(flowId: string) => void>(() => {});
   const [path, setPath] = useState(() => currentPath());
 
   const panel = useRef<HTMLDivElement>(null);
@@ -213,13 +227,44 @@ export function App({
     };
   }, [state.open, runtime.host]);
 
-  // Teaser (§8.7): after the delay, on matching paths, never once opened.
+  /**
+   * Teaser (§8.7): on matching paths, never once opened or dismissed, and
+   * never during a live conversation.
+   *
+   * Two triggers, whichever comes first — time on the page, and how far down
+   * it the visitor has read. Someone who scrolls straight to the pricing
+   * table should not have to wait out a timer to be offered help.
+   */
   useEffect(() => {
     const teaser = config.teaser;
     if (!teaser || state.teaserDismissed || state.open || state.session) return;
     if (!pathAllowed(teaser.paths, path)) return;
-    const id = setTimeout(() => setShowTeaser(true), teaser.delayMs);
-    return () => clearTimeout(id);
+
+    const show = () => setShowTeaser(true);
+    const cleanups: Array<() => void> = [];
+
+    if (teaser.delayMs !== undefined) {
+      const id = setTimeout(show, teaser.delayMs);
+      cleanups.push(() => clearTimeout(id));
+    }
+
+    if (teaser.afterScroll !== undefined) {
+      const target = teaser.afterScroll;
+      const check = () => {
+        const doc = document.documentElement;
+        const scrollable = doc.scrollHeight - doc.clientHeight;
+        // A page too short to scroll has, in effect, been read to the end.
+        const percent = scrollable <= 0 ? 100 : (window.scrollY / scrollable) * 100;
+        if (percent >= target) show();
+      };
+      window.addEventListener('scroll', check, { passive: true });
+      cleanups.push(() => window.removeEventListener('scroll', check));
+      check();
+    }
+
+    return () => {
+      for (const cleanup of cleanups) cleanup();
+    };
   }, [config, state.teaserDismissed, state.open, state.session, path]);
 
   // ---------------------------------------------------------------- actions
@@ -254,7 +299,23 @@ export function App({
         });
 
       if (!result) return;
-      dispatch({ type: 'session/started', session: result.session, messages: result.messages });
+      dispatch({
+        type: 'session/started',
+        session: result.session,
+        messages: result.messages,
+        // Show what the visitor asked, not just the answer to it.
+        ...(firstMessage
+          ? {
+              userMessage: {
+                id: clientId(),
+                ts: Date.now(),
+                role: 'user' as const,
+                type: 'text' as const,
+                text: firstMessage,
+              },
+            }
+          : {}),
+      });
       runtime.emit('lead', lead);
     },
     [api, runtime],
@@ -313,10 +374,202 @@ export function App({
     [startSession],
   );
 
+  /** Append a message the widget produced itself, with no server round trip. */
+  const addLocal = useCallback((message: Message) => {
+    dispatch({ type: 'message/local', message });
+  }, []);
+
+  const localMessage = useCallback(
+    (body: MessageBody): Message => ({ id: clientId(), ts: Date.now(), role: 'agent', ...body }) as Message,
+    [],
+  );
+
+  /**
+   * Deliver a message, collecting a lead first if the site requires one.
+   *
+   * Every producer of a message ends up here — the composer, `Murmur.send`,
+   * a `reply` shortcut and a finished flow — so none of them can quietly
+   * drop the visitor's words for want of a session (§8.5).
+   */
+  const sendText = useCallback(
+    (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      const current = stateRef.current;
+      if (current.session) {
+        void doSend({ kind: 'text', text: trimmed });
+        return;
+      }
+      if (leadReady(config, leadRef.current ?? {})) {
+        void startSession(leadRef.current ?? {}, trimmed);
+        return;
+      }
+      queuedFirstMessage.current = trimmed;
+      dispatch({ type: 'screen', screen: 'lead_form' });
+    },
+    [config, doSend, startSession],
+  );
+
+  /**
+   * Flows run entirely in the browser (§8.7): each step is a local message,
+   * and nothing reaches the server until the template is rendered from the
+   * collected answers.
+   */
+  const askStep = useCallback(
+    (flowId: string, step: number) => {
+      const flow = findFlow(config, flowId);
+      if (!flow) return;
+      const message = stepMessage(flow, step);
+      if (message) addLocal(message);
+    },
+    [config, addLocal],
+  );
+
+  const startFlow = useCallback(
+    (flowId: string) => {
+      const flow = findFlow(config, flowId);
+      // A shortcut pointing at a flow that no longer exists does nothing
+      // rather than wedging the widget (§8.3).
+      if (!flow) return;
+      dispatch({ type: 'flow/start', id: flowId });
+      askStep(flowId, 0);
+    },
+    [config, askStep],
+  );
+
+  const cancelFlow = useCallback(() => {
+    dispatch({ type: 'flow/end' });
+  }, []);
+
+  /** Record one answer and either ask the next step or submit the whole flow. */
+  const answerFlow = useCallback(
+    (raw: string): boolean => {
+      const current = stateRef.current.flow;
+      if (!current) return false;
+
+      const flow = findFlow(config, current.id);
+      const step = flow ? stepAt(flow, current.step) : null;
+      if (!flow || !step) {
+        dispatch({ type: 'flow/end' });
+        return false;
+      }
+
+      const problem = validateAnswer(step, raw);
+      if (problem) {
+        dispatch({ type: 'session/failed', error: { code: 'bad_request', message: problem, retryable: false } });
+        return true;
+      }
+
+      const value = raw.trim();
+      addLocal({ id: clientId(), ts: Date.now(), role: 'user', type: 'text', text: value });
+      dispatch({ type: 'flow/answer', field: step.field, value });
+
+      const nextStep = current.step + 1;
+      if (isComplete(flow, nextStep)) {
+        dispatch({ type: 'flow/end' });
+        const answers = { ...current.answers, [step.field]: value };
+        sendText(renderTemplate(flow.submit.template, answers));
+      } else {
+        askStep(flow.id, nextStep);
+      }
+      return true;
+    },
+    [config, addLocal, askStep, sendText],
+  );
+
+  startFlowRef.current = startFlow;
+
+  /**
+   * What a card, chip or inline form does when it is used (§4.5). `url`,
+   * `tel` and `email` are plain anchors, so they never reach here.
+   */
+  const handlers: MessageHandlers = useMemo(
+    () => ({
+      onPick: (message: Message, options: Option[]) => {
+        if (options.length === 0) return;
+        dispatch({ type: 'action/consumed', id: message.id });
+        if (isFlowMessage(message.id)) {
+          answerFlowRef.current(options.map((option) => option.label).join(', '));
+          return;
+        }
+        void doSend({
+          kind: 'action',
+          actionId: message.id,
+          value: options.map((option) => option.value).join(', '),
+          label: options.map((option) => option.label).join(', '),
+        });
+      },
+
+      onAction: (message: Message, action: Action) => {
+        if (action.kind === 'reply') {
+          dispatch({ type: 'action/consumed', id: message.id });
+          void doSend({ kind: 'action', actionId: action.id, value: action.value, label: action.label });
+          return;
+        }
+        if (action.kind === 'form') {
+          const form = config.forms?.[action.formId];
+          if (!form) return;
+          addLocal(
+            localMessage({
+              type: 'form',
+              fields: form.fields,
+              ...(form.title ? { title: form.title } : {}),
+              ...(form.submitLabel ? { submitLabel: form.submitLabel } : {}),
+            }),
+          );
+          return;
+        }
+        if (action.kind === 'flow') startFlowRef.current(action.flowId);
+      },
+
+      onFormSubmit: (message: Message, value: string, label: string) => {
+        dispatch({ type: 'action/consumed', id: message.id });
+        void doSend({ kind: 'action', actionId: message.id, value, label });
+      },
+
+      isConsumed: (message: Message) => state.consumedActions.includes(message.id),
+    }),
+    [config, doSend, addLocal, localMessage, state.consumedActions],
+  );
+
+  const answerFlowRef = useRef<(value: string) => boolean>(() => false);
+  answerFlowRef.current = answerFlow;
+
+  /**
+   * A shortcut behaves like the action it carries. A `reply` goes through
+   * the lead form first if one is required, so the visitor's intent is not
+   * lost (§8.5).
+   */
+  const onShortcut = useCallback(
+    (shortcut: Shortcut) => {
+      const action = shortcut.action;
+      if (action.kind === 'flow') {
+        startFlow(action.flowId);
+        return;
+      }
+      if (action.kind === 'form') {
+        handlers.onAction({ id: `shortcut_${shortcut.id}` } as Message, action);
+        return;
+      }
+      if (action.kind !== 'reply') return;
+
+      if (stateRef.current.session) {
+        void doSend({ kind: 'action', actionId: action.id, value: action.value, label: action.label });
+        return;
+      }
+      sendText(action.value);
+    },
+    [doSend, sendText, startFlow, handlers],
+  );
+
   const onComposerSend = useCallback(() => {
     const text = stateRef.current.draft.trim();
-    if (text) void doSend({ kind: 'text', text });
-  }, [doSend]);
+    if (!text) return;
+    dispatch({ type: 'draft', text: '' });
+    // While a flow is running the composer answers it instead.
+    if (answerFlowRef.current(text)) return;
+    sendText(text);
+  }, [sendText]);
 
   const onRetry = useCallback(() => {
     const current = stateRef.current;
@@ -346,18 +599,7 @@ export function App({
     send: (text: string) => {
       // §8.1: send() opens the panel as well as delivering the message.
       open();
-      const current = stateRef.current;
-      if (current.session) {
-        void doSend({ kind: 'text', text });
-        return;
-      }
-      if (leadReady(config, leadRef.current ?? {})) {
-        void startSession(leadRef.current ?? {}, text);
-        return;
-      }
-      // The form has to come first, but the message is not lost (§8.5).
-      queuedFirstMessage.current = text;
-      dispatch({ type: 'screen', screen: 'lead_form' });
+      sendText(text);
     },
     identify: (lead: Record<string, string>) => {
       leadRef.current = { ...(leadRef.current ?? {}), ...lead };
@@ -372,6 +614,14 @@ export function App({
   const busy = isBusy(state);
   const messages = visibleMessages(state);
   const pendingIds = useMemo(() => new Set(state.pending.map((p) => p.clientId)), [state.pending]);
+  const visibleShortcuts = useCallback(
+    (shortcuts: Shortcut[] | undefined) =>
+      (shortcuts ?? []).filter((shortcut) => pathAllowed(shortcut.paths, path)),
+    [path],
+  );
+  const homeShortcuts = useMemo(() => visibleShortcuts(config.home.shortcuts), [config, visibleShortcuts]);
+  const chatShortcuts = useMemo(() => visibleShortcuts(config.chat.shortcuts), [config, visibleShortcuts]);
+
   const hideOn = config.launcher.hideOnPaths;
   const launcherHidden = Boolean(hideOn?.length) && pathAllowed(hideOn, path);
 
@@ -423,6 +673,8 @@ export function App({
           {state.screen === 'home' ? (
             <Home
               config={config}
+              shortcuts={homeShortcuts}
+              onShortcut={onShortcut}
               hasSession={Boolean(state.session)}
               lastMessage={state.messages[state.messages.length - 1]}
               busy={busy}
@@ -438,11 +690,38 @@ export function App({
             </div>
           ) : (
             <div class="mm-screen">
-              <Thread messages={messages} busy={busy} pendingIds={pendingIds} t={t} />
+              <Thread
+                messages={messages}
+                busy={busy}
+                pendingIds={pendingIds}
+                handlers={handlers}
+                t={t}
+              />
               {state.error ? errorNotice() : null}
+
+              {state.flow ? (
+                <div class="mm-flow-bar">
+                  <span>{t('flowRunning')}</span>
+                  <button type="button" class="mm-chip" onClick={cancelFlow}>
+                    {t('cancel')}
+                  </button>
+                </div>
+              ) : (
+                <ShortcutBar
+                  shortcuts={chatShortcuts}
+                  collapsed={messages.length > 6}
+                  expanded={shortcutsExpanded}
+                  onPick={onShortcut}
+                  onExpand={() => setShortcutsExpanded(true)}
+                />
+              )}
+
               <Composer
                 value={state.draft}
-                disabled={state.status === 'sending' || state.status === 'ended' || !state.session}
+                // A flow answers in the composer before any session exists (§8.7).
+                disabled={
+                  state.status === 'sending' || state.status === 'ended' || (!state.session && !state.flow)
+                }
                 offline={offline}
                 placeholder={config.chat.placeholder ?? t('placeholder')}
                 t={t}

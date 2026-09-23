@@ -16,8 +16,13 @@
   },
   "dependencies": {
     "@murmur/connector-echo": "workspace:*",
+    "@murmur/connector-gemini": "workspace:*",
+    "@murmur/connector-openai": "workspace:*",
+    "@murmur/connector-retell": "workspace:*",
     "@murmur/connector-types": "workspace:*",
     "@murmur/protocol": "workspace:*",
+    "@murmur/sink-types": "workspace:*",
+    "@murmur/sink-webhook": "workspace:*",
     "hono": "^4.9.0",
     "zod": "^3.25.76"
   },

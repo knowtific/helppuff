@@ -3,8 +3,12 @@ main = "src/index.ts"
 compatibility_date = "2025-01-01"
 workers_dev = true
 
-# `setup.sh` fills in the real id. KV holds rate-limit counters only — no
-# session state and no lead data.
+# `setup.sh` fills in the real id. KV holds rate-limit counters, per-session
+# message counts and prompt overrides — no session state and no lead data.
+#
+# Keep every top-level key above the [tables] below: in TOML a bare key after
+# a [section] belongs to that section, which silently moved this binding into
+# [assets] the first time round.
 kv_namespaces = [
   { binding = "MURMUR_KV", id = "REPLACE_WITH_KV_ID", preview_id = "REPLACE_WITH_KV_PREVIEW_ID" }
 ]
@@ -12,5 +16,17 @@ kv_namespaces = [
 [vars]
 MURMUR_LOG = "0"
 
-# MURMUR_SECRET and any connector/sink secrets are set with:
-#   wrangler secret put MURMUR_SECRET
+# One Worker serves both halves (§7.3): the widget bundles as static assets,
+# and the protocol at /v1/*. A request matching a built file is served from
+# Cloudflare's edge without invoking the Worker; everything else falls
+# through to it.
+#
+# That is why the embed snippet needs no second host — `loader.js` and the
+# API share an origin. `data-api` exists for splitting them; see
+# docs/deployment.md.
+[assets]
+directory = "../widget/dist"
+not_found_handling = "none"
+
+# Secrets are set with `wrangler secret put`, never written here.
+# See packages/server/.dev.vars.example for the full list.

@@ -3,6 +3,8 @@ import type { Capabilities, Message, SendRequest, StartSessionRequest } from '@m
 
 export * from './errors.js';
 export * from './helpers.js';
+export * from './rich.js';
+export * from './prompt.js';
 
 /** A minimal key/value store with TTL — Workers KV in production (§7.3). */
 export interface KvStore {

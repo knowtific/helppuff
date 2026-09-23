@@ -38,6 +38,25 @@ test.describe('the playground', () => {
   test('reports the worker as up', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('#server-status')).toHaveAttribute('data-up', 'yes');
+    await expect(page.locator('#server-status')).toContainText('worker up');
+  });
+
+  test('reports a worker that refuses connections', async ({ page }) => {
+    await page.route('**/healthz', (route) => route.abort());
+    await page.goto('/');
+    await expect(page.locator('#server-status')).toHaveAttribute('data-up', 'no');
+    await expect(page.locator('#server-status')).toContainText('worker down');
+  });
+
+  test('reports a worker that accepts but never answers', async ({ page }) => {
+    // Regression: unbounded, the badge sat on "checking…" for ever, which
+    // reads as "still working" rather than "broken".
+    await page.route('**/healthz', () => {
+      /* hang, exactly as a wedged workerd does */
+    });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('#server-status')).toHaveAttribute('data-up', 'no', { timeout: 10_000 });
+    await expect(page.locator('#server-status')).toContainText('not responding');
   });
 });
 

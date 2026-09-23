@@ -33,7 +33,10 @@ export function Composer({
     const element = textarea.current;
     if (!element) return;
     element.style.height = 'auto';
-    element.style.height = `${Math.min(element.scrollHeight, MAX_HEIGHT_PX)}px`;
+    const wanted = element.scrollHeight;
+    element.style.height = `${Math.min(wanted, MAX_HEIGHT_PX)}px`;
+    // Only once it can grow no further does a scrollbar belong here.
+    element.toggleAttribute('data-scrolls', wanted > MAX_HEIGHT_PX);
   }, [value]);
 
   const canSend = value.trim().length > 0 && !disabled && !offline;

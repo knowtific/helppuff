@@ -23,6 +23,8 @@ export const DEFAULT_STRINGS = {
   callUs: 'Call us',
   emailUs: 'Email us',
   agentSaid: 'Assistant said',
+  flowRunning: 'Answer the questions above, or',
+  cancel: 'Cancel',
 } as const;
 
 export type StringKey = keyof typeof DEFAULT_STRINGS;

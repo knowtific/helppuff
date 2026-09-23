@@ -1,3 +1,4 @@
+import { launcherIconSvg } from './lib/icons.js';
 import type { LauncherHints } from './loader-config.js';
 
 /**
@@ -93,6 +94,19 @@ svg { display: block; fill: none; }
   box-shadow: var(--mm-shadow-orb);
   transition: transform var(--mm-dur) var(--mm-ease-spring);
 }
+/* A pill widens the button to sit the label inside it. */
+.mm-orb[data-shape="pill"] {
+  width: auto;
+  min-width: 0;
+  border-radius: 999px;
+  grid-auto-flow: column;
+  gap: 9px;
+  padding: 0 22px 0 18px;
+  /* Same height as the orb, so the shape choice does not move the launcher. */
+  height: 56px;
+}
+.mm-orb-label { font-size: 15px; font-weight: 500; white-space: nowrap; }
+
 .mm-orb:hover { transform: scale(1.06); }
 .mm-orb:active { transform: scale(.98); }
 .mm-orb svg { width: 24px; height: 24px; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
@@ -142,9 +156,6 @@ svg { display: block; fill: none; }
 }
 `;
 
-export const CHAT_ICON =
-  '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 0 1-8 8H6.5L4 22v-4.2A8 8 0 1 1 20 12Z"/></svg>';
-
 function escapeAttr(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -157,11 +168,18 @@ export function accentCss(hints: LauncherHints): string {
 
 export function launcherMarkup(hints: LauncherHints): string {
   const aria = escapeAttr(hints.label || `Chat with ${hints.name}`);
+  const pill = hints.shape === 'pill' && hints.label;
+  const icon = launcherIconSvg(hints.icon, 24);
+
   return (
     `<div class="mm-root">` +
     `<div class="mm-launcher" data-position="${hints.position}">` +
-    `<button type="button" class="mm-orb" aria-label="${aria}" aria-expanded="false" aria-haspopup="dialog">${CHAT_ICON}</button>` +
-    (hints.label ? `<span class="mm-label">${escapeAttr(hints.label)}</span>` : '') +
+    `<button type="button" class="mm-orb"${pill ? ' data-shape="pill"' : ''}` +
+    ` aria-label="${aria}" aria-expanded="false" aria-haspopup="dialog">` +
+    icon +
+    (pill ? `<span class="mm-orb-label">${escapeAttr(hints.label)}</span>` : '') +
+    `</button>` +
+    (hints.label && !pill ? `<span class="mm-label">${escapeAttr(hints.label)}</span>` : '') +
     `</div></div>`
   );
 }

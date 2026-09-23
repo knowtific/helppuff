@@ -253,6 +253,27 @@ describe('sending', () => {
 });
 
 describe('errors', () => {
+  it('places the visitor\'s first message ahead of the server\'s reply', () => {
+    const userMessage: Message = { id: 'u1', ts: 1, role: 'user', type: 'text', text: 'qwedae' };
+    const state = reducer(withConfig(), {
+      type: 'session/started',
+      session: { token: 't', id: 's', expiresAt: 9e15 },
+      messages: [agentMessage('greet', 'Hi there'), agentMessage('reply', 'You said: qwedae')],
+      userMessage,
+    });
+    expect(state.messages.map((m) => m.role)).toEqual(['user', 'agent', 'agent']);
+    expect(state.messages[0]).toBe(userMessage);
+  });
+
+  it('adds nothing extra when no first message was sent', () => {
+    const state = reducer(withConfig(), {
+      type: 'session/started',
+      session: { token: 't', id: 's', expiresAt: 9e15 },
+      messages: [agentMessage('greet')],
+    });
+    expect(state.messages.map((m) => m.role)).toEqual(['agent']);
+  });
+
   it('records a failed session start without leaving the screen', () => {
     const starting = reducer(withConfig(), { type: 'lead/submit', lead: { name: 'Ada' } });
     const state = reducer(starting, {

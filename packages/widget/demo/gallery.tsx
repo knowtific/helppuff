@@ -10,6 +10,7 @@ import { Launcher } from '../src/components/Launcher.js';
 import { LeadForm } from '../src/components/LeadForm.js';
 import { Teaser } from '../src/components/Teaser.js';
 import { Thread, Typing } from '../src/components/Thread.js';
+import { inertHandlers } from '../src/components/messages/index.js';
 import { LOADER_CSS } from '../src/launcher-shell.js';
 import { parseConfig } from '../src/app/validate.js';
 import { makeStrings } from '../src/app/strings.js';
@@ -243,7 +244,7 @@ function Gallery() {
           {shell(
             <>
               <Header config={CONFIG} thinking={false} showBack={false} t={t} onBack={() => {}} onClose={() => {}} />
-              <Home config={CONFIG} hasSession={false} lastMessage={undefined} busy={false} t={t} onStart={() => {}} />
+              <Home config={CONFIG} shortcuts={[]} onShortcut={() => {}} hasSession={false} lastMessage={undefined} busy={false} t={t} onStart={() => {}} />
             </>,
           )}
         </Specimen>
@@ -252,7 +253,7 @@ function Gallery() {
           {shell(
             <>
               <Header config={CONFIG} thinking={false} showBack={false} t={t} onBack={() => {}} onClose={() => {}} />
-              <Home config={CONFIG} hasSession lastMessage={CONVERSATION[2]} busy={false} t={t} onStart={() => {}} />
+              <Home config={CONFIG} shortcuts={[]} onShortcut={() => {}} hasSession lastMessage={CONVERSATION[2]} busy={false} t={t} onStart={() => {}} />
             </>,
           )}
         </Specimen>
@@ -275,7 +276,7 @@ function Gallery() {
             <>
               <Header config={CONFIG} thinking={false} showBack={false} t={t} onBack={() => {}} onClose={() => {}} />
               <div class="mm-screen">
-                <Thread messages={CONVERSATION} busy={false} pendingIds={new Set()} t={t} />
+                <Thread messages={CONVERSATION} busy={false} pendingIds={new Set()} handlers={inertHandlers} t={t} />
                 <Composer value="" disabled={false} offline={false} placeholder="Type a message…" t={t} onInput={() => {}} onSend={() => {}} />
               </div>
             </>,
@@ -291,6 +292,7 @@ function Gallery() {
                   messages={[...CONVERSATION.slice(0, 2)]}
                   busy
                   pendingIds={new Set(['m1'])}
+                  handlers={inertHandlers}
                   t={t}
                 />
                 <Composer value="" disabled offline={false} placeholder="Type a message…" t={t} onInput={() => {}} onSend={() => {}} />
@@ -303,10 +305,10 @@ function Gallery() {
       <h2>Messages</h2>
       <div class="grid wide">
         <Specimen title="Markdown subset" note="§4.4 — and the XSS cases, neutralised" {...spec} height={430}>
-          {shell(<Thread messages={MARKDOWN} busy={false} pendingIds={new Set()} t={t} />)}
+          {shell(<Thread messages={MARKDOWN} busy={false} pendingIds={new Set()} handlers={inertHandlers} t={t} />)}
         </Specimen>
         <Specimen title="Notices" note="info and warn" {...spec} height={180}>
-          {shell(<Thread messages={NOTICES} busy={false} pendingIds={new Set()} t={t} />)}
+          {shell(<Thread messages={NOTICES} busy={false} pendingIds={new Set()} handlers={inertHandlers} t={t} />)}
         </Specimen>
       </div>
 
@@ -394,7 +396,7 @@ function MobileFrame() {
         <div class="mm-panel">
           <Header config={CONFIG} thinking={false} showBack={false} t={t} onBack={() => {}} onClose={() => {}} />
           <div class="mm-screen">
-            <Thread messages={CONVERSATION} busy={false} pendingIds={new Set()} t={t} />
+            <Thread messages={CONVERSATION} busy={false} pendingIds={new Set()} handlers={inertHandlers} t={t} />
             <Composer value="" disabled={false} offline={false} placeholder="Type a message…" t={t} onInput={() => {}} onSend={() => {}} />
           </div>
         </div>

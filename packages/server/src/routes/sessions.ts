@@ -8,6 +8,10 @@ import { requireSecret, type HonoEnv } from '../core/request.js';
 import { connectorContext, prepareConnector, runConnector } from '../core/run.js';
 import { sanitizeConnectorMessages } from '../core/sanitize.js';
 import { issueToken, newSessionId } from '../core/token.js';
+import { hitDaily, hitWindow, rateLimited, quotaExceeded } from '../core/ratelimit.js';
+import { assertTurnstile } from '../core/turnstile.js';
+import { resolveSecrets } from '../config/load.js';
+import { dispatchLead } from '../core/sinks.js';
 
 export const sessionRoutes = new Hono<HonoEnv>();
 
@@ -44,7 +48,31 @@ sessionRoutes.post('/v1/sites/:siteId/sessions', async (c) => {
     });
   }
 
-  // 5-6. Rate limits and captcha are added in M3, before the connector call.
+  // 5. Rate limits, before anything that costs money.
+  const limits = site.security.limits;
+  const ipKey = await ctx.ipKey();
+
+  // Scoped by site: each site configures its own limit and its own budget,
+  // so one site's traffic must not consume another's.
+  const perIp = await hitWindow(ctx.platform.kv, 'sess', `${siteId}:${ipKey}`, limits.sessionsPerIpPerHour, 3600);
+  if (!perIp.allowed) {
+    ctx.platform.log('limit.sessions_per_ip', { siteId });
+    throw rateLimited(perIp, 'sessions_per_ip_per_hour');
+  }
+
+  // The cost backstop. When this trips the widget shows the fallback contact.
+  const daily = await hitDaily(ctx.platform.kv, siteId, limits.messagesPerSitePerDay);
+  if (!daily.allowed) {
+    ctx.platform.log('limit.site_daily', { siteId });
+    throw quotaExceeded('messages_per_site_per_day', 'Chat is unavailable right now.');
+  }
+
+  // 6. Captcha, last before the connector — it costs a round trip.
+  const captcha = site.security.captcha;
+  if (captcha) {
+    const secretValue = resolveSecrets(captcha.secret, ctx.env);
+    await assertTurnstile(String(secretValue), input.captchaToken, ctx.platform);
+  }
 
   // 7. Connector.
   const secret = requireSecret(ctx);
@@ -69,7 +97,13 @@ sessionRoutes.post('/v1/sites/:siteId/sessions', async (c) => {
 
   ctx.platform.log('session.started', { siteId, sessionId, messages: messages.length });
 
-  // 9. Sinks run via waitUntil once they exist (M3) — never blocking here.
+  // 9. Lead destinations, after the response is decided and never blocking it.
+  dispatchLead(ctx, site, siteId, {
+    sessionId,
+    lead,
+    context: input.context,
+    ...(input.firstMessage ? { firstMessage: input.firstMessage } : {}),
+  });
 
   const body: StartSessionResponse = {
     sessionToken: token,

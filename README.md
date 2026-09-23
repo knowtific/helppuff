@@ -6,11 +6,19 @@ The widget speaks one small REST protocol. A thin server on Cloudflare Workers
 translates that protocol to any AI backend through **connectors**. No database,
 no session store, free to run on the Workers free tier.
 
-> **Status: milestones 1 and 2 done.** The protocol, the reference server, the
-> `echo` connector and the widget core are built, tested and green in CI.
-> Still to come: the rich message types (options, cards, carousels, links,
-> inline forms) in M4, the Retell and OpenAI connectors, and lead sinks. See
-> [`murmur-build-plan.md`](murmur-build-plan.md) for the full plan.
+> **Status: milestones 1 to 4 done.** The protocol, the reference server, the
+> widget core, the full rich-interaction layer (option chips, cards,
+> carousels, link lists, inline forms, shortcuts and client-side flows), the
+> security layer (origin allowlist, signed tokens, rate limits, Turnstile,
+> lead sinks) and the Retell, OpenAI and Gemini connectors are built, tested
+> and green in CI.
+>
+> The connectors are written against each provider's documented wire shapes
+> and the tests assert those shapes, but they have not yet been run against
+> the live APIs — that needs keys. Still to come: `scripts/setup.sh`, M5
+> polish and M6 open-source readiness. See
+> [`murmur-build-plan.md`](murmur-build-plan.md) for the full plan, and
+> [`docs/security.md`](docs/security.md) for the current threat model.
 
 ---
 
@@ -62,10 +70,16 @@ for every widget feature, with no paid backend and no API key.
 ```
 Widget (browser)  ──── Murmur protocol ────▶  Server (CF Worker)
                                                ├── connectors/echo
-                                               ├── connectors/retell      (M3)
-                                               ├── connectors/http        (M6)
-                                               └── connectors/openai      (M6)
+                                               ├── connectors/retell
+                                               ├── connectors/openai
+                                               ├── connectors/gemini
+                                               └── connectors/http        (M6)
 ```
+
+Both halves are the **same Worker**: Cloudflare serves `/loader.js` and the
+app chunk as static assets straight from the edge, and everything else falls
+through to the API. One deployment, one hostname, one thing to keep in step —
+see [`docs/deployment.md`](docs/deployment.md) if you want them split.
 
 Three separable pieces:
 
@@ -75,6 +89,10 @@ Three separable pieces:
 | [`@murmur/server`](packages/server) | Reference server: routes, origin allowlist, signed session tokens, connector registry. |
 | [`@murmur/connector-types`](packages/connectors/_types) | The `Connector` interface and shared helpers. |
 | [`@murmur/connector-echo`](packages/connectors/echo) | A deterministic connector for development and tests. |
+| [`@murmur/connector-retell`](packages/connectors/retell) | Retell chat agents. |
+| [`@murmur/connector-openai`](packages/connectors/openai) | OpenAI Responses API, or any compatible endpoint. |
+| [`@murmur/connector-gemini`](packages/connectors/gemini) | Gemini + File Search, for RAG. |
+| [`@murmur/sink-webhook`](packages/sinks/webhook) | Forwards leads to any URL. |
 
 **Sessions are stateless.** The server stores nothing. On session start it
 returns an HMAC-signed token carrying the site id, session id and a small opaque
@@ -104,6 +122,123 @@ export default defineConfig({
 
 See [`murmur.config.example.ts`](murmur.config.example.ts) for a production site
 with Retell, a lead webhook, Turnstile and a multi-step quote flow.
+
+---
+
+## Connecting a real backend
+
+### Where the keys go
+
+There are exactly two places, and neither is a file you commit:
+
+```bash
+# Local — packages/server/.dev.vars, which is gitignored.
+cp packages/server/.dev.vars.example packages/server/.dev.vars
+
+# Production — a Worker secret, never on disk.
+wrangler secret put GEMINI_API_KEY
+```
+
+[`.dev.vars.example`](packages/server/.dev.vars.example) lists every name the
+project knows about. The config refers to each **by name**, so the same
+`murmur.config.ts` is safe to publish:
+
+```ts
+connector: { type: 'gemini', options: { apiKey: { env: 'GEMINI_API_KEY' } } }
+```
+
+| Variable | Needed for | Where to get it |
+| --- | --- | --- |
+| `MURMUR_SECRET` | Always — it signs session tokens | `openssl rand -base64 32` |
+| `GEMINI_API_KEY` | `gemini` | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
+| `OPENAI_API_KEY` | `openai` | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
+| `RETELL_API_KEY` | `retell` | [dashboard.retellai.com](https://dashboard.retellai.com) |
+| `TURNSTILE_SECRET` | Bot protection | Cloudflare dashboard — the *secret*, not the site key |
+| `LEAD_WEBHOOK_URL` / `_SECRET` | Forwarding leads | Your CRM or automation tool |
+
+A name is only a convention: an OpenAI-compatible provider like DeepSeek
+reuses the `openai` connector with its own `baseUrl`, so call its key
+whatever you reference in the config.
+
+### Setting up Gemini with File Search
+
+File Search is Google's hosted RAG — you upload documents once, Google chunks
+and embeds them, and the connector queries them on every message. Nothing
+about your knowledge base lives in this repository.
+
+**1. Create a store.** Once, outside the app:
+
+```bash
+export GEMINI_API_KEY=AIza...
+
+curl -s -X POST \
+  "https://generativelanguage.googleapis.com/v1beta/fileSearchStores" \
+  -H "x-goog-api-key: $GEMINI_API_KEY" -H 'Content-Type: application/json' \
+  -d '{"displayName":"knowtific-kb","embeddingModel":"models/gemini-embedding-2"}'
+```
+
+The response carries a `name` like `fileSearchStores/knowtific-kb-a1b2c3`.
+
+**2. Upload your documents** to that store — pricing sheets, FAQs, service
+areas, whatever the assistant should be able to answer from:
+
+```bash
+curl -s -X POST \
+  "https://generativelanguage.googleapis.com/upload/v1beta/fileSearchStores/knowtific-kb-a1b2c3:uploadToFileSearchStore" \
+  -H "x-goog-api-key: $GEMINI_API_KEY" \
+  -H 'X-Goog-Upload-Protocol: resumable' -H 'X-Goog-Upload-Command: start' \
+  -H 'Content-Type: application/json' \
+  -d '{"displayName":"pricing-2026.pdf"}'
+```
+
+Name files the way you would want them cited — `displayName` is what a
+visitor sees under an answer. Embeddings persist; the raw files are deleted
+after 48 hours, and retrieval keeps working.
+
+**3. Point the connector at the store**, in `murmur.config.ts`:
+
+```ts
+connector: {
+  type: 'gemini',
+  options: {
+    apiKey: { env: 'GEMINI_API_KEY' },
+    model: 'gemini-3-flash',
+    fileSearchStores: ['fileSearchStores/knowtific-kb-a1b2c3'],
+    systemInstruction: { kv: 'prompt:knowtific' },
+  },
+},
+```
+
+**4. Set the prompt.** Gemini has no stored-prompt object, so `{ kv }` keeps
+it out of git and editable without a deploy:
+
+```bash
+wrangler kv key put --binding=MURMUR_KV "prompt:knowtific" --path ./prompt.txt
+```
+
+Full options, citation behaviour and the trade behind `store: true` are in
+[`packages/connectors/gemini/README.md`](packages/connectors/gemini/README.md).
+
+### The other two, briefly
+
+```ts
+// Retell — the prompt is the agent, edited in Retell's dashboard.
+connector: { type: 'retell', options: { apiKey: { env: 'RETELL_API_KEY' }, agentId: 'agent_xxx' } }
+
+// OpenAI — a stored, versioned prompt referenced by id.
+connector: {
+  type: 'openai',
+  options: {
+    apiKey: { env: 'OPENAI_API_KEY' },
+    model: 'gpt-5',
+    promptRef: { id: 'pmpt_abc123', version: '4' },
+  },
+}
+```
+
+Whichever you pick, [`docs/prompts.md`](docs/prompts.md) covers where the
+prompt itself belongs — the short version is *as far from this repository as
+the provider allows*.
 
 ---
 
@@ -146,16 +281,25 @@ All of it runs on every push and pull request
 
 ### Bundle sizes
 
-| Bundle | gzipped | Budget |
+| Bundle | gzipped | Guard |
 | --- | --- | --- |
-| `loader.js` | 5.1 kb | 5.5 kb |
-| `app-*.js` | 24.2 kb | 35.0 kb |
+| `loader.js` | 6.1 kb | 8.0 kb |
+| `app-*.js` | 29.4 kb | 35.0 kb |
 
-The plan sets the loader at 4 kb. Reaching that meant giving up specified
-behaviour — the animated orb gradient, runtime contrast correction for the
-accent, or evaluating `hideOnPaths` before the app loads — so the ceiling was
-raised rather than the features quietly dropped. Together the two bundles are
-under 30 kb, against the plan's 35 kb for the whole widget.
+The plan sets the loader at 4 kb. Holding that line started costing real
+things — first the orb's gradient and runtime contrast correction for the
+accent, then which icons a site could put on its launcher — so the guard was
+moved instead.
+
+A kilobyte gzipped is about 20ms on Chrome's Slow 3G throttle and under a
+millisecond on broadband, on a script that loads `async` and sits off the
+critical path: it cannot affect LCP, and being `position: fixed` it cannot
+affect CLS either (there is a test asserting CLS < 0.01). The TLS handshake
+that fetches the loader costs an order of magnitude more than its whole body.
+
+The guards exist to catch the mistakes that do matter — pulling Preact into
+the loader, or Zod, or reaching the app's module graph by accident. The app's
+35 kb is the number that tracks real payload.
 
 ---
 
@@ -163,6 +307,14 @@ under 30 kb, against the plan's 35 kb for the whole widget.
 
 - [`docs/protocol.md`](docs/protocol.md) — the full wire contract, and what it
   takes to implement your own server.
+- [`docs/connectors.md`](docs/connectors.md) — the connector interface, and
+  verified API references for Retell, OpenAI and Gemini.
+- [`docs/prompts.md`](docs/prompts.md) — where system prompts and content
+  belong, and how to keep them out of this repository.
+- [`docs/security.md`](docs/security.md) — the threat model, what each layer
+  actually buys, and the holes that are still open.
+- [`docs/deployment.md`](docs/deployment.md) — one Worker or two, caching,
+  secrets, KV, and the checklist before a real site.
 
 ---
 

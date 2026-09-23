@@ -159,7 +159,17 @@ async function respond(command: string, raw: string, delayMs: number): Promise<M
   }
 }
 
-function inputToText(input: SendRequest): string {
+/**
+ * §4.3: an action carries both a `value` (what the backend acts on) and a
+ * `label` (what the transcript shows). Echo dispatches on the value so a
+ * shortcut like `{ label: 'Show a card', value: '/card' }` works, and echoes
+ * the label so the reply reads the way the visitor expects.
+ */
+function inputToCommand(input: SendRequest): string {
+  return input.kind === 'text' ? input.text : input.value;
+}
+
+function inputToDisplay(input: SendRequest): string {
   return input.kind === 'text' ? input.text : input.label;
 }
 
@@ -177,9 +187,8 @@ const echo: Connector<EchoOptions, EchoState> = {
   },
 
   async send(ctx, state, input) {
-    const raw = inputToText(input);
-    const command = raw.trim().toLowerCase();
-    const messages = await respond(command, raw, ctx.options.delayMs);
+    const command = inputToCommand(input).trim().toLowerCase();
+    const messages = await respond(command, inputToDisplay(input), ctx.options.delayMs);
     return { state: { turn: state.turn + 1 }, messages };
   },
 

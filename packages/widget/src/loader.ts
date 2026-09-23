@@ -363,13 +363,27 @@ class Loader {
     this.shell = shell;
   }
 
-  /** Last resort: load while the page is idle, so the first click is instant. */
+  /**
+   * Load while the page is idle, so the first click is instant (§8.4).
+   *
+   * A teaser is drawn by the app, so the chunk has to be in place before its
+   * trigger fires — otherwise a 2s teaser would not appear until 6s. Scroll
+   * counts as intent too, and is what a scroll-triggered teaser waits on.
+   */
   private scheduleIdleLoad(): void {
     const idle = (window as { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback;
+    const teaserAt = this.hints?.teaserAt;
+    const when = teaserAt === null || teaserAt === undefined ? 6000 : Math.min(6000, Math.max(0, teaserAt - 1200));
+
     this.disposer.timeout(() => {
       if (typeof idle === 'function') idle(() => void this.ensureApp());
       else void this.ensureApp();
-    }, 6000);
+    }, when);
+
+    if (this.hints?.teaserOnScroll) {
+      const onScroll = () => void this.ensureApp();
+      this.disposer.listen(window, 'scroll', onScroll);
+    }
   }
 
   // ------------------------------------------------------------ app handoff

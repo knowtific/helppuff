@@ -169,6 +169,40 @@ describe('the lead form path', () => {
     );
   });
 
+  it("shows the visitor's own first message, not just the reply to it", async () => {
+    const api = fakeApi();
+    api.startSession.mockResolvedValue({
+      session: { token: 'tok-1', id: 'sid-1', expiresAt: Date.now() + 3600_000 },
+      messages: [agentText('Hi — how can I help?', 'greet'), agentText('You said: qwedae', 'reply')],
+    });
+
+    const { handle } = setup({
+      config: { leadForm: { enabled: true, fields: [{ name: 'name', label: 'Name', type: 'text', required: true }], askFirstMessage: true } },
+      api,
+    });
+    await openPanel(handle);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /start a conversation/i }));
+    });
+
+    await act(async () => {
+      fireEvent.input(screen.getByLabelText(/Name/), { target: { value: 'Ahad' } });
+      fireEvent.input(screen.getByLabelText(/How can we help/), { target: { value: 'qwedae' } });
+    });
+    await act(async () => {
+      fireEvent.submit(document.querySelector('form') as HTMLFormElement);
+    });
+
+    await seeMessage('You said: qwedae');
+    // Regression: the first message rides along with the session, so nothing
+    // else would put it in the thread — the visitor saw an answer to a
+    // question that was never shown.
+    const rows = [...document.querySelectorAll('.mm-row')];
+    expect(rows[0]?.hasAttribute('data-user'), 'the visitor spoke first').toBe(true);
+    expect(rows[0]?.textContent).toContain('qwedae');
+    expect(api.startSession.mock.calls[0]?.[0]).toMatchObject({ firstMessage: 'qwedae' });
+  });
+
   it('will not start a session until the required field is filled', async () => {
     const { handle, startSession } = setup();
     await openPanel(handle);

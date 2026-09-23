@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { Message } from '@murmur/protocol';
-import { canRender, isGrouped, MessageView } from './messages/index.js';
+import { canRender, isGrouped, MessageView, type MessageHandlers } from './messages/index.js';
 import { stripMarkdown } from '../lib/markdown.js';
 import type { StringKey } from '../app/strings.js';
 
@@ -31,11 +31,13 @@ export function Thread({
   messages,
   busy,
   pendingIds,
+  handlers,
   t,
 }: {
   messages: Message[];
   busy: boolean;
   pendingIds: Set<string>;
+  handlers: MessageHandlers;
   t: (key: StringKey) => string;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
@@ -78,7 +80,7 @@ export function Thread({
               {...(isUser ? { 'data-user': '' } : {})}
               {...(pendingIds.has(message.id) ? { 'data-pending': '' } : {})}
             >
-              <MessageView message={message} />
+              <MessageView message={message} handlers={handlers} />
               <span class="mm-time">{relativeTime(message.ts, now)}</span>
             </div>
           );

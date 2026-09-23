@@ -5,6 +5,46 @@ import { defineConfig } from '@murmur/server';
  * `pnpm deploy`. Secrets are referenced by environment variable name and set
  * with `wrangler secret put` — never written here.
  */
+/*
+ * Swapping backends is a change to `connector` and nothing else — the widget
+ * never learns which one is behind it.
+ *
+ *   // Gemini with File Search, as the RAG layer:
+ *   connector: {
+ *     type: 'gemini',
+ *     options: {
+ *       apiKey: { env: 'GEMINI_API_KEY' },
+ *       model: 'gemini-3-flash',
+ *       fileSearchStores: ['fileSearchStores/knowtific-kb'],
+ *       // Edited live in KV, so changing it is not a deploy.
+ *       systemInstruction: { kv: 'prompt:knowtific' },
+ *     },
+ *   },
+ *
+ *   // OpenAI, with the prompt stored and versioned on their side:
+ *   connector: {
+ *     type: 'openai',
+ *     options: {
+ *       apiKey: { env: 'OPENAI_API_KEY' },
+ *       model: 'gpt-5',
+ *       promptRef: { id: 'pmpt_abc123', version: '4' },
+ *     },
+ *   },
+ *
+ *   // DeepSeek, or anything else speaking the OpenAI wire format:
+ *   connector: {
+ *     type: 'openai',
+ *     options: {
+ *       apiKey: { env: 'DEEPSEEK_API_KEY' },
+ *       baseUrl: 'https://api.deepseek.com/v1',
+ *       model: 'deepseek-chat',
+ *       instructions: { url: 'https://cms.example.com/prompt.txt' },
+ *     },
+ *   },
+ *
+ * See docs/prompts.md for where a prompt belongs, and docs/connectors.md for
+ * the verified API references behind each of these.
+ */
 export default defineConfig({
   sites: {
     knowtific: {

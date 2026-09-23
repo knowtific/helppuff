@@ -34,6 +34,9 @@ export type SendInput =
   | { kind: 'text'; text: string }
   | { kind: 'action'; actionId: string; value: string; label: string };
 
+/** An in-progress client-side flow (§8.7). */
+export type FlowState = { id: string; step: number; answers: Record<string, string> };
+
 export type State = {
   open: boolean;
   screen: Screen;
@@ -51,6 +54,7 @@ export type State = {
   unread: number;
   teaserDismissed: boolean;
   sound: boolean;
+  flow: FlowState | null;
 };
 
 export const initialState: State = {
@@ -68,6 +72,7 @@ export const initialState: State = {
   unread: 0,
   teaserDismissed: false,
   sound: false,
+  flow: null,
 };
 
 export type Action =
@@ -83,12 +88,27 @@ export type Action =
   | { type: 'sound/toggle' }
   | { type: 'start'; firstMessage?: string }
   | { type: 'lead/submit'; lead: Record<string, string>; firstMessage?: string }
-  | { type: 'session/started'; session: Session; messages: Message[] }
+  | {
+      type: 'session/started';
+      session: Session;
+      messages: Message[];
+      /**
+       * The visitor's own first message, when one was sent with the session.
+       * It rides along with `start` rather than through `send`, so nothing
+       * else would put it in the thread.
+       */
+      userMessage?: Message;
+    }
   | { type: 'session/failed'; error: WidgetError }
   | { type: 'send'; pending: Pending }
   | { type: 'send/ok'; clientId: string; messages: Message[]; token?: string }
   | { type: 'send/failed'; clientId: string; error: WidgetError }
   | { type: 'action/consumed'; id: string }
+  /** A message the widget produced itself — an opened form, or a flow step. */
+  | { type: 'message/local'; message: Message }
+  | { type: 'flow/start'; id: string }
+  | { type: 'flow/answer'; field: string; value: string }
+  | { type: 'flow/end' }
   | { type: 'error/dismiss' }
   | { type: 'expired' }
   | { type: 'reset' };
@@ -180,7 +200,11 @@ export function reducer(state: State, action: Action): State {
         session: action.session,
         screen: 'chat',
         status: 'idle',
-        messages: capMessages([...state.messages, ...action.messages]),
+        messages: capMessages([
+          ...state.messages,
+          ...(action.userMessage ? [action.userMessage] : []),
+          ...action.messages,
+        ]),
         error: null,
         unread: state.open ? 0 : state.unread + action.messages.length,
       };
@@ -230,6 +254,32 @@ export function reducer(state: State, action: Action): State {
         draft: failed?.input.kind === 'text' && !state.draft ? failed.input.text : state.draft,
       };
     }
+
+    case 'message/local':
+      return {
+        ...state,
+        screen: 'chat',
+        messages: capMessages([...state.messages, action.message]),
+        unread: state.open ? 0 : state.unread + 1,
+      };
+
+    case 'flow/start':
+      return { ...state, screen: 'chat', flow: { id: action.id, step: 0, answers: {} }, error: null };
+
+    case 'flow/answer': {
+      if (!state.flow) return state;
+      return {
+        ...state,
+        flow: {
+          ...state.flow,
+          step: state.flow.step + 1,
+          answers: { ...state.flow.answers, [action.field]: action.value },
+        },
+      };
+    }
+
+    case 'flow/end':
+      return { ...state, flow: null };
 
     case 'action/consumed':
       return state.consumedActions.includes(action.id)

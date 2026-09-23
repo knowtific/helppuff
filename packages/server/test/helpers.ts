@@ -41,9 +41,14 @@ export function harness(
   config = testConfig(),
   env: Bindings = testEnv(),
   defaultOrigin: string | null = ORIGIN,
+  /** Collect `waitUntil` work, so a test can await the fire-and-forget parts. */
+  onWaitUntil: (promise: Promise<unknown>) => void = () => {},
 ): Harness {
   const app = createApp(config);
-  const executionCtx = { waitUntil: () => {}, passThroughOnException: () => {} };
+  const executionCtx = {
+    waitUntil: (promise: Promise<unknown>) => onWaitUntil(promise),
+    passThroughOnException: () => {},
+  };
 
   const call = async (path: string, init: RequestInit = {}): Promise<Response> => {
     const headers = new Headers(init.headers);

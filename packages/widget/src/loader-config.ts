@@ -1,3 +1,5 @@
+import type { LauncherIconName } from '@murmur/protocol';
+import { ICON_PATHS } from './lib/icons.js';
 import { fetchWithTimeout } from './lib/safe.js';
 
 /**
@@ -22,8 +24,18 @@ export type LauncherHints = {
   theme: 'light' | 'dark' | 'auto';
   position: 'bottom-right' | 'bottom-left';
   label: string;
+  icon: LauncherIconName;
+  shape: 'orb' | 'pill';
   offset: { x: number; y: number } | null;
   hideOnPaths: string[];
+  /**
+   * The earliest the app could need to be mounted — a teaser is drawn by the
+   * app, so it cannot appear before the chunk has loaded. Null when the site
+   * configures no teaser.
+   */
+  teaserAt: number | null;
+  /** Whether a teaser is waiting on a scroll position rather than a timer. */
+  teaserOnScroll: boolean;
 };
 
 export type RawConfig = { widget: unknown; capabilities: { poll: boolean; end: boolean } };
@@ -66,6 +78,11 @@ export function launcherHints(widget: unknown): LauncherHints {
   const x = offset && typeof offset['x'] === 'number' ? offset['x'] : null;
   const y = offset && typeof offset['y'] === 'number' ? offset['y'] : null;
 
+  const icon = launcher['icon'];
+  const shape = launcher['shape'];
+  const teaser = isObject(root['teaser']) ? root['teaser'] : null;
+  const delay = teaser && typeof teaser['delayMs'] === 'number' ? teaser['delayMs'] : null;
+
   return {
     name: typeof brand['name'] === 'string' && brand['name'] ? brand['name'].slice(0, 60) : 'Chat',
     accent,
@@ -73,10 +90,14 @@ export function launcherHints(widget: unknown): LauncherHints {
     theme: theme === 'light' || theme === 'dark' ? theme : 'auto',
     position: position === 'bottom-left' ? 'bottom-left' : 'bottom-right',
     label: typeof launcher['label'] === 'string' ? launcher['label'].slice(0, 40) : '',
+    icon: typeof icon === 'string' && icon in ICON_PATHS ? (icon as LauncherIconName) : 'chat',
+    shape: shape === 'pill' ? 'pill' : 'orb',
     offset: x !== null && y !== null ? { x, y } : null,
     hideOnPaths: Array.isArray(launcher['hideOnPaths'])
       ? launcher['hideOnPaths'].filter((p): p is string => typeof p === 'string').slice(0, 50)
       : [],
+    teaserAt: teaser ? (delay ?? 8000) : null,
+    teaserOnScroll: Boolean(teaser && typeof teaser['afterScroll'] === 'number'),
   };
 }
 

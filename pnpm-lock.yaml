@@ -70,6 +70,42 @@ importers:
         specifier: ^3.25.76
         version: 3.25.76
 
+  packages/connectors/gemini:
+    dependencies:
+      '@murmur/connector-types':
+        specifier: workspace:*
+        version: link:../_types
+      '@murmur/protocol':
+        specifier: workspace:*
+        version: link:../../protocol
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
+
+  packages/connectors/openai:
+    dependencies:
+      '@murmur/connector-types':
+        specifier: workspace:*
+        version: link:../_types
+      '@murmur/protocol':
+        specifier: workspace:*
+        version: link:../../protocol
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
+
+  packages/connectors/retell:
+    dependencies:
+      '@murmur/connector-types':
+        specifier: workspace:*
+        version: link:../_types
+      '@murmur/protocol':
+        specifier: workspace:*
+        version: link:../../protocol
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
+
   packages/protocol:
     dependencies:
       zod:
@@ -81,12 +117,27 @@ importers:
       '@murmur/connector-echo':
         specifier: workspace:*
         version: link:../connectors/echo
+      '@murmur/connector-gemini':
+        specifier: workspace:*
+        version: link:../connectors/gemini
+      '@murmur/connector-openai':
+        specifier: workspace:*
+        version: link:../connectors/openai
+      '@murmur/connector-retell':
+        specifier: workspace:*
+        version: link:../connectors/retell
       '@murmur/connector-types':
         specifier: workspace:*
         version: link:../connectors/_types
       '@murmur/protocol':
         specifier: workspace:*
         version: link:../protocol
+      '@murmur/sink-types':
+        specifier: workspace:*
+        version: link:../sinks/_types
+      '@murmur/sink-webhook':
+        specifier: workspace:*
+        version: link:../sinks/webhook
       hono:
         specifier: ^4.9.0
         version: 4.13.8
@@ -100,6 +151,27 @@ importers:
       wrangler:
         specifier: ^4.136.1
         version: 4.136.1(@cloudflare/workers-types@5.20260922.1)(@types/node@26.6.2)
+
+  packages/sinks/_types:
+    dependencies:
+      '@murmur/protocol':
+        specifier: workspace:*
+        version: link:../../protocol
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
+
+  packages/sinks/webhook:
+    dependencies:
+      '@murmur/protocol':
+        specifier: workspace:*
+        version: link:../../protocol
+      '@murmur/sink-types':
+        specifier: workspace:*
+        version: link:../_types
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
 
   packages/widget:
     dependencies:

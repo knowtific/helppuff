@@ -1,5 +1,10 @@
 import type { ErasedConnector } from '@murmur/connector-types';
+import type { ErasedSink } from '@murmur/sink-types';
 import echoConnector from '@murmur/connector-echo';
+import retellConnector from '@murmur/connector-retell';
+import openaiConnector from '@murmur/connector-openai';
+import geminiConnector from '@murmur/connector-gemini';
+import webhookSink from '@murmur/sink-webhook';
 import { MurmurError } from './errors.js';
 
 /**
@@ -8,6 +13,9 @@ import { MurmurError } from './errors.js';
  */
 export const connectors: Readonly<Record<string, ErasedConnector>> = {
   echo: echoConnector,
+  retell: retellConnector,
+  openai: openaiConnector,
+  gemini: geminiConnector,
 };
 
 export function getConnector(type: string): ErasedConnector {
@@ -18,5 +26,13 @@ export function getConnector(type: string): ErasedConnector {
   return connector;
 }
 
-/** Sinks are registered the same way; none ship in M1. */
-export const sinks: Readonly<Record<string, never>> = {};
+/** Sinks are registered the same way (§6.6). */
+export const sinks: Readonly<Record<string, ErasedSink>> = {
+  webhook: webhookSink,
+};
+
+export function getSink(type: string): ErasedSink {
+  const sink = sinks[type];
+  if (!sink) throw new MurmurError('internal', { detail: `unknown_sink:${type}` });
+  return sink;
+}
