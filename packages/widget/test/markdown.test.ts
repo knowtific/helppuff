@@ -51,6 +51,62 @@ describe('renderMarkdown — the supported subset', () => {
   });
 });
 
+describe('renderMarkdown — autolinking', () => {
+  const hrefs = (html: string) => [...html.matchAll(/<a href="([^"]*)"[^>]*>([^<]*)<\/a>/g)].map((m) => [m[1], m[2]]);
+
+  it.each([
+    ['an https url', 'See https://www.knowtific.com.au/pricing/ for plans.', ['https://www.knowtific.com.au/pricing/', 'https://www.knowtific.com.au/pricing/']],
+    ['a www url', 'Go to www.knowtific.com.au today', ['https://www.knowtific.com.au', 'www.knowtific.com.au']],
+    ['a bare domain with a path', 'Visit knowtific.com.au/start-free to book.', ['https://knowtific.com.au/start-free', 'knowtific.com.au/start-free']],
+    ['an email', 'Email support@knowtific.com.', ['mailto:support@knowtific.com', 'support@knowtific.com']],
+    ['a landline in brackets', 'Call (03) 8204 6263 now', ['tel:0382046263', '(03) 8204 6263']],
+    ['an international number', 'Call +61 3 8204 6263.', ['tel:+61382046263', '+61 3 8204 6263']],
+    ['a mobile', 'Text 0400 123 456', ['tel:0400123456', '0400 123 456']],
+    ['a 1300 number', 'Ring 1300 123 456', ['tel:1300123456', '1300 123 456']],
+  ])('links %s', (_name, input, expected) => {
+    expect(hrefs(renderMarkdown(input))).toEqual([expected]);
+  });
+
+  it('leaves sentence punctuation outside the link', () => {
+    const html = renderMarkdown('Is it https://a.co/x? Or (https://a.co/y), maybe.');
+    expect(hrefs(html).map(([href]) => href)).toEqual(['https://a.co/x', 'https://a.co/y']);
+    expect(html).toContain('</a>? Or (');
+    expect(html).toContain('</a>), maybe.');
+  });
+
+  it('keeps a closing paren the url itself opened', () => {
+    expect(hrefs(renderMarkdown('https://en.wikipedia.org/wiki/Foo_(bar)'))[0]?.[0]).toBe('https://en.wikipedia.org/wiki/Foo_(bar)');
+  });
+
+  it('keeps query strings intact, escaped once', () => {
+    expect(hrefs(renderMarkdown('https://a.co/?a=1&b=2'))[0]?.[0]).toBe('https://a.co/?a=1&amp;b=2');
+  });
+
+  it('stops at an angle bracket around the url', () => {
+    expect(hrefs(renderMarkdown('<https://a.co>'))[0]?.[0]).toBe('https://a.co');
+  });
+
+  it('does not link a markdown link, code, or the domain in an email twice', () => {
+    expect(hrefs(renderMarkdown('[our pricing](https://a.co/pricing)'))).toEqual([['https://a.co/pricing', 'our pricing']]);
+    expect(renderMarkdown('`https://a.co`')).toBe('<p><code>https://a.co</code></p>');
+    expect(hrefs(renderMarkdown('me@knowtific.com.au'))).toHaveLength(1);
+  });
+
+  it('is not fooled by ordinary prose', () => {
+    for (const text of ['Built with Node.js, e.g. for APIs.', 'Plans from $90/month.', 'Open 9:00am – 5:30pm', 'In 2026 we did 1,200 sites', 'Call ext. 1234']) {
+      expect(renderMarkdown(text), text).not.toContain('<a ');
+    }
+  });
+
+  it('does not let emphasis reach inside a url', () => {
+    expect(hrefs(renderMarkdown('https://a.co/*x*/y'))[0]?.[0]).toBe('https://a.co/*x*/y');
+  });
+
+  it('still renders emphasis inside a markdown link label', () => {
+    expect(renderMarkdown('[**Pricing**](https://a.co)')).toContain('<strong>Pricing</strong></a>');
+  });
+});
+
 describe('renderMarkdown — XSS', () => {
   const ALLOWED_TAGS = new Set(['p', 'br', 'strong', 'em', 'code', 'ul', 'li', 'a']);
 
