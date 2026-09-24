@@ -12,6 +12,8 @@ export interface Connector<Opts = unknown, State = unknown> {
   type: string;
   optionsSchema: z.ZodType<Opts, z.ZodTypeDef, unknown>;
   capabilities: { poll: boolean; end: boolean };
+  /** Whether these options turn streaming on. Omit if the connector cannot stream. */
+  streams?(options: Opts): boolean;
 
   start(ctx: ConnectorContext<Opts>, input: StartSessionRequest):
     Promise<{ state: State; messages: Message[] }>;
@@ -42,6 +44,19 @@ types so the registry can hold connectors of differing shapes.
   names, ids, counts and latencies only.
 - Use `ctx.fetch`, not the global — tests inject a mock through it.
 
+### Streaming
+
+A connector that can stream implements `streams(options)`, usually by
+returning a `stream` option. When the server is streaming a request,
+`ctx.onText` is set: call it with each piece of reply text as the backend
+produces it, and still return the complete messages at the end — those are
+what the visitor is left with. `readJsonEvents` reads a backend's SSE stream
+with an idle timeout.
+
+Only forward text meant for the visitor. Reasoning, thought summaries and
+tool-call arguments must never reach `onText`; rich messages are returned at
+the end like any other. See [protocol.md](protocol.md#streamed-replies).
+
 ## `echo`
 
 Built first, for development and tests. Needs no API key and drives every
@@ -61,6 +76,9 @@ widget feature:
 | `/slow` | a reply after 3s, for the typing indicator |
 | `/long` | a 12-paragraph markdown reply, for scrolling |
 | `/error` | throws a `ConnectorError` |
+
+With `stream: true`, echo streams its text replies a word at a time, so the
+whole streaming path can be exercised with no API key. The demo site has it on.
 
 ---
 

@@ -18,7 +18,7 @@ describe('GET /v1/sites/:siteId/config', () => {
     expect(parsed.success).toBe(true);
     if (parsed.success) {
       expect(parsed.data.siteId).toBe('demo');
-      expect(parsed.data.capabilities).toEqual({ poll: false, end: true });
+      expect(parsed.data.capabilities).toEqual({ poll: false, end: true, stream: false });
     }
   });
 

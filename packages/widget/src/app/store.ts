@@ -51,6 +51,11 @@ export type State = {
   error: WidgetError | null;
   /** Kept out of the reducer's message list so a failed send never loses it. */
   draft: string;
+  /**
+   * A streamed reply as it is being written. Display only: never persisted,
+   * never announced, and replaced by the real messages when the reply ends.
+   */
+  preview: string;
   unread: number;
   teaserDismissed: boolean;
   sound: boolean;
@@ -69,6 +74,7 @@ export const initialState: State = {
   consumedActions: [],
   error: null,
   draft: '',
+  preview: '',
   unread: 0,
   teaserDismissed: false,
   sound: false,
@@ -103,6 +109,7 @@ export type Action =
   | { type: 'send'; pending: Pending }
   | { type: 'send/ok'; clientId: string; messages: Message[]; token?: string }
   | { type: 'send/failed'; clientId: string; error: WidgetError }
+  | { type: 'stream/text'; text: string }
   | { type: 'action/consumed'; id: string }
   /** A message the widget produced itself — an opened form, or a flow step. */
   | { type: 'message/local'; message: Message }
@@ -149,6 +156,7 @@ export function reducer(state: State, action: Action): State {
         // Never restore a transient failure or an in-flight send.
         error: null,
         pending: [],
+        preview: '',
       };
     }
 
@@ -205,13 +213,20 @@ export function reducer(state: State, action: Action): State {
           ...(action.userMessage ? [action.userMessage] : []),
           ...action.messages,
         ]),
+        preview: '',
         error: null,
         unread: state.open ? 0 : state.unread + action.messages.length,
       };
 
     case 'session/failed':
       // Stay on the screen the visitor is on; the error renders inline (§8.3).
-      return { ...state, status: 'idle', error: action.error };
+      return { ...state, status: 'idle', error: action.error, preview: '' };
+
+    case 'stream/text':
+      // Text that arrives after its reply has ended is stale; drop it.
+      return state.status === 'starting' || state.status === 'sending'
+        ? { ...state, preview: state.preview + action.text }
+        : state;
 
     case 'send':
       return {
@@ -220,6 +235,7 @@ export function reducer(state: State, action: Action): State {
         screen: 'chat',
         pending: [...state.pending, action.pending],
         draft: '',
+        preview: '',
         error: null,
       };
 
@@ -236,6 +252,7 @@ export function reducer(state: State, action: Action): State {
         pending,
         messages,
         status: pending.length > 0 ? 'sending' : 'idle',
+        preview: '',
         session: action.token && state.session ? { ...state.session, token: action.token } : state.session,
         error: null,
         unread: state.open ? 0 : state.unread + action.messages.length,
@@ -249,6 +266,7 @@ export function reducer(state: State, action: Action): State {
         ...state,
         pending,
         status: pending.length > 0 ? 'sending' : 'idle',
+        preview: '',
         error: action.error,
         // Hand a failed text message back to the composer rather than losing it (§8.3).
         draft: failed?.input.kind === 'text' && !state.draft ? failed.input.text : state.draft,
@@ -295,6 +313,7 @@ export function reducer(state: State, action: Action): State {
         status: 'ended',
         session: null,
         pending: [],
+        preview: '',
         error: {
           code: 'session_expired',
           message: 'This conversation has expired.',

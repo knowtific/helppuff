@@ -315,3 +315,24 @@ test.describe('client-side flows', () => {
     await expect(thread(page)).toContainText('What do you need done?');
   });
 });
+
+test.describe('streamed replies', () => {
+  test('a reply is shown as it is written, then replaced by the real message', async ({ page }) => {
+    await openWidget(page);
+    await startConversation(page);
+
+    await composer(page).fill('/long');
+    await page.locator('murmur-widget .mm-send').click();
+
+    // The demo's echo connector streams: the preview appears and grows…
+    const preview = page.locator('murmur-widget [data-streaming] .mm-agent');
+    await expect(preview).toBeVisible();
+    await expect(preview).toContainText('Paragraph 1.');
+    const early = (await preview.textContent())?.length ?? 0;
+    await expect.poll(async () => (await preview.textContent())?.length ?? 0).toBeGreaterThan(early);
+
+    // …and is replaced by the message itself when the reply is complete.
+    await expect(page.locator('murmur-widget [data-streaming]')).toHaveCount(0, { timeout: 10_000 });
+    await expect(agentMessages(page).last()).toContainText('Paragraph 12.');
+  });
+});

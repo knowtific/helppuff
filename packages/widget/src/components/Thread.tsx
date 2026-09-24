@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { Message } from '@murmur/protocol';
 import { canRender, isGrouped, MessageView, type MessageHandlers } from './messages/index.js';
 import { stripMarkdown } from '../lib/markdown.js';
+import { TextMessage } from './messages/Text.js';
 import type { StringKey } from '../app/strings.js';
 
 /** How close to the bottom still counts as "at the bottom" (§8.7). */
@@ -30,12 +31,15 @@ function relativeTime(ts: number, now: number): string {
 export function Thread({
   messages,
   busy,
+  preview = '',
   pendingIds,
   handlers,
   t,
 }: {
   messages: Message[];
   busy: boolean;
+  /** A streamed reply as it is written; the typing dots stand in until it starts. */
+  preview?: string;
   pendingIds: Set<string>;
   handlers: MessageHandlers;
   t: (key: StringKey) => string;
@@ -53,7 +57,7 @@ export function Thread({
     const element = scroller.current;
     if (!element || !stuck) return;
     element.scrollTop = element.scrollHeight;
-  }, [drawable.length, busy, stuck]);
+  }, [drawable.length, busy, preview.length, stuck]);
 
   useEffect(() => {
     const element = scroller.current;
@@ -86,7 +90,11 @@ export function Thread({
           );
         })}
 
-        {busy ? (
+        {busy && preview ? (
+          <div class="mm-row" data-streaming="">
+            <TextMessage text={preview} />
+          </div>
+        ) : busy ? (
           <div class="mm-row">
             <Typing />
             <span class="mm-sr">{t('thinking')}</span>

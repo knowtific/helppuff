@@ -28,6 +28,13 @@ export type ConnectorContext<Opts> = {
   log: (event: string, data?: object) => void;
   /** Schedule work that must not block the response. */
   waitUntil: (promise: Promise<unknown>) => void;
+  /**
+   * Present only when this request is being streamed to the visitor. A
+   * connector that streams calls it with each piece of reply text as its
+   * backend produces it — never reasoning or "thinking" output — and still
+   * returns the complete messages at the end, which replace the preview.
+   */
+  onText?: (delta: string) => void;
 };
 
 export interface Connector<Opts = unknown, State = unknown> {
@@ -35,6 +42,11 @@ export interface Connector<Opts = unknown, State = unknown> {
   /** Options arrive untyped from the config file, so the input side is `unknown`. */
   optionsSchema: z.ZodType<Opts, z.ZodTypeDef, unknown>;
   capabilities: Capabilities;
+  /**
+   * Whether this site's options turn streaming on. Only a connector that
+   * honours `ctx.onText` implements it; absent means never.
+   */
+  streams?(options: Opts): boolean;
 
   start(
     ctx: ConnectorContext<Opts>,
@@ -67,6 +79,8 @@ export interface ErasedConnector {
   readonly capabilities: Capabilities;
   /** Validate raw options from the config file. Throws `ZodError` if invalid. */
   parseOptions(input: unknown): unknown;
+  /** Whether replies stream for these (already parsed) options. */
+  streams(options: unknown): boolean;
   start(
     ctx: ConnectorContext<unknown>,
     input: StartSessionRequest,
@@ -97,6 +111,7 @@ export function defineConnector<Opts, State>(connector: Connector<Opts, State>):
     type: connector.type,
     capabilities: connector.capabilities,
     parseOptions: (input) => connector.optionsSchema.parse(input),
+    streams: (options) => connector.streams?.(options as Opts) ?? false,
     start: (ctx, input) => connector.start(asOpts(ctx), input),
     send: (ctx, state, input) => connector.send(asOpts(ctx), asState(state), input),
   };

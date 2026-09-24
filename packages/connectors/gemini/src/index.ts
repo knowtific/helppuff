@@ -8,6 +8,7 @@ import {
   message,
   promptSourceSchema,
   readJson,
+  readJsonEvents,
   resolvePrompt,
   textMessage,
   toolCallToMessage,
@@ -61,6 +62,12 @@ export const geminiOptionsSchema = z.object({
   showCitations: z.boolean().default(true),
   maxOutputTokens: z.number().int().min(16).max(32_000).default(800),
   store: z.boolean().default(true),
+  /**
+   * Stream replies to the visitor as they are written. Only the answer text
+   * streams: thinking is never shown, and the typing indicator stays up until
+   * the answer begins. Citations still arrive, once the answer is complete.
+   */
+  stream: z.boolean().default(false),
   baseUrl: z.string().url().default(BASE_URL),
 });
 
@@ -193,6 +200,118 @@ function citationMessage(names: string[]): Message | null {
   );
 }
 
+type InteractionBody = { id?: unknown; status?: unknown; steps?: unknown };
+
+type StreamedStep = { type: unknown; name?: unknown; arguments?: unknown; text: string; args: string };
+
+/**
+ * Read a streamed interaction, forwarding the answer text as it arrives.
+ *
+ * Steps stream as `step.start`, `step.delta` and `step.stop`, keyed by
+ * `index`. Text is forwarded only from a `model_output` step: `thought`
+ * steps and `thought_summary` deltas are the model thinking, and never reach
+ * the visitor. Function-call arguments arrive in pieces and are reassembled.
+ *
+ * `interaction.completed` carries no steps, so they are rebuilt here into the
+ * non-streamed shape and mapped exactly as a non-streamed reply would be.
+ */
+export async function readGeminiStream(response: Response, onText: (delta: string) => void): Promise<InteractionBody> {
+  const steps: StreamedStep[] = [];
+  let id: unknown;
+  let status: unknown;
+  let completed = false;
+  let lastIndex: number | null = null;
+
+  await readJsonEvents(response, (event, name) => {
+    const index = typeof event['index'] === 'number' ? event['index'] : -1;
+    const kind = event['event_type'] ?? event['type'] ?? name;
+    switch (kind) {
+      case 'interaction.created':
+      case 'interaction.completed': {
+        const interaction = asRecord(event['interaction']);
+        if (interaction?.['id'] !== undefined) id = interaction['id'];
+        if (interaction?.['status'] !== undefined) status = interaction['status'];
+        if (kind === 'interaction.completed') completed = true;
+        return;
+      }
+      case 'step.start': {
+        const step = asRecord(event['step']);
+        if (step && index >= 0) {
+          steps[index] = { type: step['type'], name: step['name'], arguments: step['arguments'], text: '', args: '' };
+        }
+        return;
+      }
+      case 'step.delta': {
+        const step = steps[index];
+        const delta = asRecord(event['delta']);
+        if (!step || !delta) return;
+        if (delta['type'] === 'text' && step.type === 'model_output' && typeof delta['text'] === 'string') {
+          if (!delta['text']) return;
+          // A second output step becomes a second message; keep them apart.
+          if (lastIndex !== null && lastIndex !== index) onText('\n\n');
+          lastIndex = index;
+          step.text += delta['text'];
+          onText(delta['text']);
+        } else if (delta['type'] === 'arguments_delta' && typeof delta['arguments'] === 'string') {
+          step.args += delta['arguments'];
+        }
+        // Anything else — thought summaries, signatures, images — is not shown.
+        return;
+      }
+      case 'error': {
+        const error = asRecord(event['error']);
+        throw new ConnectorError('The assistant could not answer that. Please try again.', {
+          retryable: true,
+          detail: `gemini_stream_error:${String(error?.['code'] ?? 'unknown')}`,
+        });
+      }
+      default:
+        return;
+    }
+  });
+
+  if (!completed) {
+    throw new ConnectorError('The assistant stopped before finishing. Please try again.', {
+      retryable: true,
+      detail: 'gemini_stream_truncated',
+    });
+  }
+
+  return {
+    id,
+    status,
+    steps: steps
+      .filter((step): step is StreamedStep => step !== undefined)
+      .map((step) =>
+        step.type === 'model_output'
+          ? { type: 'model_output', content: [{ type: 'text', text: step.text }] }
+          : step.type === 'function_call'
+            ? { type: 'function_call', name: step.name, arguments: step.args || step.arguments }
+            : { type: step.type },
+      ),
+  };
+}
+
+/**
+ * The full steps of a stored interaction, for its citations. Best effort: a
+ * missing source list is not worth failing an answer the visitor already has.
+ */
+async function storedSteps(ctx: ConnectorContext<GeminiOptions>, id: string): Promise<unknown> {
+  try {
+    const response = await fetchWithTimeout(
+      ctx.fetch,
+      `${ctx.options.baseUrl}/interactions/${encodeURIComponent(id)}`,
+      { method: 'GET', headers: { 'x-goog-api-key': apiKey(ctx.options) } },
+    );
+    if (!response.ok) return [];
+    const body = await readJson<InteractionBody>(response);
+    return body.steps;
+  } catch {
+    ctx.log('gemini.citations_unavailable');
+    return [];
+  }
+}
+
 function toolsFor(options: GeminiOptions): unknown[] | undefined {
   const tools: unknown[] = [];
 
@@ -241,11 +360,14 @@ async function interact(
       })(),
       generation_config: { max_output_tokens: options.maxOutputTokens },
       store: options.store,
+      ...(ctx.onText ? { stream: true } : {}),
     }),
   });
   if (!response.ok) await fail(response, 'interactions');
 
-  const body = await readJson<{ id?: unknown; status?: unknown; steps?: unknown }>(response);
+  const body = ctx.onText
+    ? await readGeminiStream(response, ctx.onText)
+    : await readJson<InteractionBody>(response);
 
   if (body.status === 'failed') {
     throw new ConnectorError('The assistant could not answer that. Please try again.', {
@@ -256,7 +378,12 @@ async function interact(
 
   const messages = mapGeminiSteps(body.steps);
   if (options.showCitations) {
-    const citations = citationMessage(collectCitations(body.steps));
+    // Annotations are not part of a stream; a stored interaction has them.
+    const steps =
+      ctx.onText && options.fileSearchStores.length > 0 && options.store && typeof body.id === 'string'
+        ? await storedSteps(ctx, body.id)
+        : body.steps;
+    const citations = citationMessage(collectCitations(steps));
     if (citations) messages.push(citations);
   }
 
@@ -271,6 +398,7 @@ const gemini: Connector<GeminiOptions, GeminiState> = {
   type: 'gemini',
   optionsSchema: geminiOptionsSchema,
   capabilities: { poll: false, end: false },
+  streams: (options) => options.stream,
 
   async start(ctx, input) {
     if (!input.firstMessage) return { state: { interactionId: null }, messages: [] };

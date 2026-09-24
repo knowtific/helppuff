@@ -6,6 +6,7 @@ import {
   defineConnector,
   fetchWithTimeout,
   promptSourceSchema,
+  readJsonEvents,
   promptVariables,
   readJson,
   resolvePrompt,
@@ -68,6 +69,12 @@ export const openaiOptionsSchema = z.object({
   temperature: z.number().min(0).max(2).optional(),
   /** Off means OpenAI retains nothing — and the model forgets each turn. */
   store: z.boolean().default(true),
+  /**
+   * Stream replies to the visitor as they are written, instead of all at
+   * once. Only the answer text streams: a reasoning model's thinking is never
+   * shown, and the typing indicator stays up until the answer begins.
+   */
+  stream: z.boolean().default(false),
   /** Any OpenAI-compatible endpoint: Azure, OpenRouter, a local model. */
   baseUrl: z.string().url().default(BASE_URL),
 });
@@ -138,6 +145,62 @@ export function mapOpenAiOutput(raw: unknown): Message[] {
   return out;
 }
 
+type ResponseBody = { id?: unknown; status?: unknown; error?: unknown; output?: unknown };
+
+/**
+ * Read a streamed response, forwarding the answer text as it arrives.
+ *
+ * Only `response.output_text.delta` reaches the visitor. Reasoning summaries,
+ * refusals and tool-call arguments stream too, and are ignored — a card
+ * arrives whole, with the final response. That final event
+ * (`response.completed`, or `.incomplete` / `.failed`) carries the entire
+ * response, which is then mapped exactly as a non-streamed one would be, so
+ * what the visitor is left with never depends on the deltas.
+ */
+export async function readOpenAiStream(response: Response, onText: (delta: string) => void): Promise<ResponseBody> {
+  let final: ResponseBody | null = null;
+  let lastItem: unknown = null;
+  let wrote = false;
+
+  await readJsonEvents(response, (event) => {
+    switch (event['type']) {
+      case 'response.output_text.delta': {
+        const delta = event['delta'];
+        if (typeof delta !== 'string' || !delta) return;
+        // A second message item becomes a second message; keep them apart.
+        if (wrote && event['item_id'] !== lastItem) onText('\n\n');
+        lastItem = event['item_id'];
+        wrote = true;
+        onText(delta);
+        return;
+      }
+      case 'response.completed':
+      case 'response.incomplete':
+      case 'response.failed': {
+        const body = event['response'];
+        if (typeof body === 'object' && body !== null) final = body as ResponseBody;
+        return;
+      }
+      case 'error':
+        throw new ConnectorError('The assistant could not answer that. Please try again.', {
+          retryable: true,
+          detail: `openai_stream_error:${String(event['code'] ?? 'unknown')}`,
+        });
+      default:
+        // Reasoning, tool arguments, lifecycle events: nothing for the visitor.
+        return;
+    }
+  });
+
+  if (!final) {
+    throw new ConnectorError('The assistant stopped before finishing. Please try again.', {
+      retryable: true,
+      detail: 'openai_stream_truncated',
+    });
+  }
+  return final;
+}
+
 function toolsFor(options: OpenAiOptions): unknown[] | undefined {
   const tools: unknown[] = [];
   if (options.richMessages) {
@@ -196,13 +259,14 @@ async function respond(
       max_output_tokens: options.maxOutputTokens,
       ...(options.temperature === undefined ? {} : { temperature: options.temperature }),
       store: options.store,
+      ...(ctx.onText ? { stream: true } : {}),
     }),
   });
   if (!response.ok) await fail(response, 'responses');
 
-  const body = await readJson<{ id?: unknown; status?: unknown; error?: unknown; output?: unknown }>(
-    response,
-  );
+  const body = ctx.onText
+    ? await readOpenAiStream(response, ctx.onText)
+    : await readJson<ResponseBody>(response);
 
   // A 200 can still carry a failure, and an incomplete response can carry
   // partial output worth showing.
@@ -227,6 +291,7 @@ const openai: Connector<OpenAiOptions, OpenAiState> = {
   type: 'openai',
   optionsSchema: openaiOptionsSchema,
   capabilities: { poll: false, end: false },
+  streams: (options) => options.stream,
 
   async start(ctx, input) {
     if (!input.firstMessage) {

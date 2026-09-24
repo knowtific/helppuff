@@ -1,4 +1,5 @@
 import type { Message, VisitorContext } from '@murmur/protocol';
+import { STREAM_MEDIA_TYPE, SseIdleTimeout, readSse } from '@murmur/protocol/sse';
 import { fetchWithTimeout } from '../lib/safe.js';
 import { parseConfig, parseMessages } from './validate.js';
 import type { SendInput, Session, WidgetError } from './store.js';
@@ -10,10 +11,15 @@ export const SEND_TIMEOUT_MS = 30_000;
 
 const TOKEN_HEADER = 'x-murmur-token';
 
+export type Capabilities = { poll: boolean; end: boolean; stream: boolean };
+
 export type ConfigResult = {
   config: WidgetConfig;
-  capabilities: { poll: boolean; end: boolean };
+  capabilities: Capabilities;
 };
+
+/** Called with each piece of reply text while a streamed reply is written. */
+export type OnText = (delta: string) => void;
 
 export class ApiError extends Error {
   readonly widgetError: WidgetError;
@@ -67,6 +73,62 @@ async function toError(response: Response): Promise<ApiError> {
   return new ApiError({ code, message, retryable, ...(retryAfter === undefined ? {} : { retryAfter }) });
 }
 
+/** An `error` event: the same envelope an error response carries, arriving mid-stream. */
+function streamError(data: Record<string, unknown>): ApiError {
+  const code = typeof data['code'] === 'string' ? (data['code'] as WidgetError['code']) : 'unknown';
+  const message = typeof data['message'] === 'string' && data['message'] ? data['message'] : GENERIC.message;
+  const retryAfter = typeof data['retryAfter'] === 'number' ? data['retryAfter'] : undefined;
+  const retryable = code === 'rate_limited' || code === 'connector_error' || code === 'internal' || code === 'unknown';
+  return new ApiError({ code, message, retryable, ...(retryAfter === undefined ? {} : { retryAfter }) });
+}
+
+/**
+ * The body of a response, streamed or not. The server streams only when
+ * asked and able, so either can come back from the same request; a streamed
+ * one previews its text through `onText` and resolves with its `done`
+ * event, which carries exactly what the JSON body would have.
+ *
+ * The request timeout stops at the headers, so a stream is bounded by the
+ * gap between chunks instead — the server's own connector timeout is
+ * shorter, so it reports a stall before this fires.
+ */
+async function readBody(response: Response, onText?: OnText): Promise<Record<string, unknown>> {
+  if (!response.headers.get('content-type')?.includes(STREAM_MEDIA_TYPE) || !response.body) {
+    return (await response.json()) as Record<string, unknown>;
+  }
+
+  let done: Record<string, unknown> | null = null;
+  let failed: ApiError | null = null;
+  try {
+    await readSse(
+      response.body,
+      ({ event, data }) => {
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(data);
+        } catch {
+          return;
+        }
+        if (typeof parsed !== 'object' || parsed === null) return;
+        const body = parsed as Record<string, unknown>;
+        if (event === 'delta' && typeof body['text'] === 'string') onText?.(body['text']);
+        else if (event === 'done') done = body;
+        else if (event === 'error') failed = streamError(body);
+      },
+      SEND_TIMEOUT_MS,
+    );
+  } catch (thrown) {
+    throw thrown instanceof SseIdleTimeout
+      ? new ApiError({ code: 'unknown', message: 'That took too long. Please try again.', retryable: true })
+      : new ApiError({ ...GENERIC });
+  }
+
+  if (failed) throw failed;
+  // A stream cut off before `done` — a dropped connection — is retryable.
+  if (!done) throw new ApiError({ ...GENERIC });
+  return done;
+}
+
 function offlineError(): ApiError {
   return new ApiError({
     code: 'offline',
@@ -102,19 +164,27 @@ export class Api {
     const widget = parseConfig((body as { widget?: unknown } | null)?.widget);
     if (!widget) throw new ApiError({ code: 'internal', message: 'Bad config', retryable: false });
 
-    const raw = (body as { capabilities?: { poll?: unknown; end?: unknown } } | null)?.capabilities;
+    const raw = (body as { capabilities?: { poll?: unknown; end?: unknown; stream?: unknown } } | null)
+      ?.capabilities;
     return {
       config: widget,
-      capabilities: { poll: raw?.poll === true, end: raw?.end === true },
+      capabilities: { poll: raw?.poll === true, end: raw?.end === true, stream: raw?.stream === true },
     };
   }
 
-  async startSession(input: {
-    lead?: Record<string, string>;
-    context: VisitorContext;
-    firstMessage?: string;
-    captchaToken?: string;
-  }): Promise<{ session: Session; messages: Message[] }> {
+  /**
+   * `onText`, when given, asks for the reply to be streamed. Pass it only when
+   * the site's capabilities say it streams; the result is the same either way.
+   */
+  async startSession(
+    input: {
+      lead?: Record<string, string>;
+      context: VisitorContext;
+      firstMessage?: string;
+      captchaToken?: string;
+    },
+    onText?: OnText,
+  ): Promise<{ session: Session; messages: Message[] }> {
     if (navigator.onLine === false) throw offlineError();
 
     const response = await fetchWithTimeout(
@@ -123,7 +193,7 @@ export class Api {
         method: 'POST',
         credentials: 'omit',
         mode: 'cors',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(onText ? { Accept: STREAM_MEDIA_TYPE } : {}) },
         body: JSON.stringify(input),
       },
       SEND_TIMEOUT_MS,
@@ -131,7 +201,7 @@ export class Api {
 
     if (!response.ok) throw await toError(response);
 
-    const body = (await response.json()) as Record<string, unknown>;
+    const body = await readBody(response, onText);
     const token = typeof body['sessionToken'] === 'string' ? body['sessionToken'] : '';
     const id = typeof body['sessionId'] === 'string' ? body['sessionId'] : '';
     const expiresAt = typeof body['expiresAt'] === 'number' ? body['expiresAt'] : 0;
@@ -146,6 +216,7 @@ export class Api {
   async send(
     token: string,
     input: SendInput & { clientId: string },
+    onText?: OnText,
   ): Promise<{ messages: Message[]; token?: string }> {
     if (navigator.onLine === false) throw offlineError();
 
@@ -155,7 +226,11 @@ export class Api {
         method: 'POST',
         credentials: 'omit',
         mode: 'cors',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          ...(onText ? { Accept: STREAM_MEDIA_TYPE } : {}),
+        },
         body: JSON.stringify(input),
       },
       SEND_TIMEOUT_MS,
@@ -163,8 +238,9 @@ export class Api {
 
     if (!response.ok) throw await toError(response);
 
-    const refreshed = response.headers.get(TOKEN_HEADER);
-    const body = (await response.json()) as Record<string, unknown>;
+    const body = await readBody(response, onText);
+    // A streamed reply carries its token in `done`; the headers left too early.
+    const refreshed = response.headers.get(TOKEN_HEADER) ?? (typeof body['token'] === 'string' ? body['token'] : null);
 
     return {
       messages: parseMessages(body['messages']),

@@ -25,6 +25,8 @@ export default defineConfig({
         type: 'echo',
         options: {
           greeting: 'Hi — this is the echo connector. Try /options, /card, /carousel, /links, /form, /slow, /long or /error.',
+          // Replies stream a word at a time, the way a model's would.
+          stream: true,
         },
       },
 

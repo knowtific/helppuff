@@ -1,10 +1,17 @@
 import { Hono } from 'hono';
-import { TOKEN_HEADER, sendRequestSchema, type PollResponse, type SendResponse } from '@murmur/protocol';
+import {
+  TOKEN_HEADER,
+  sendRequestSchema,
+  type PollResponse,
+  type SendResponse,
+  type StreamedSendDone,
+} from '@murmur/protocol';
 import { resolveSite } from '../config/site.js';
 import { MurmurError } from '../core/errors.js';
 import { assertAllowedOrigin } from '../core/origin.js';
 import { requireSecret, type RequestCtx, type HonoEnv } from '../core/request.js';
 import { connectorContext, prepareConnector, runConnector, type PreparedConnector } from '../core/run.js';
+import { streamResponse, wantsStream } from '../core/stream.js';
 import { sanitizeConnectorMessages } from '../core/sanitize.js';
 import { issueToken, verifyToken, type SessionTokenPayload } from '../core/token.js';
 import { hitDaily, hitTotal, hitWindow, rateLimited, quotaExceeded, sessionMessageKey } from '../core/ratelimit.js';
@@ -111,21 +118,36 @@ messageRoutes.post('/v1/sessions/messages', async (c) => {
 
   const count = perSession.count;
 
-  // 5. Connector.
-  const cctx = connectorContext(ctx, session.prepared, payload.siteId, payload.sessionId);
-  const result = await runConnector(ctx, 'send', () =>
-    session.prepared.connector.send(cctx, payload.state, input),
-  );
+  // Steps 5-7, shared by the JSON and the streamed response.
+  const finish = async (onText?: (delta: string) => void) => {
+    // 5. Connector.
+    const cctx = connectorContext(ctx, session.prepared, payload.siteId, payload.sessionId, onText);
+    const result = await runConnector(ctx, 'send', () =>
+      session.prepared.connector.send(cctx, payload.state, input),
+    );
 
-  // 6. Sanitize.
-  const messages = sanitizeConnectorMessages(result.messages, ctx.platform);
+    // 6. Sanitize.
+    const messages = sanitizeConnectorMessages(result.messages, ctx.platform);
 
-  // 7. Refresh the token whenever state or the message count changed.
-  const state = result.state === undefined ? payload.state : result.state;
-  c.header(TOKEN_HEADER, await refreshToken(ctx, session, state, count));
+    // 7. Refresh the token whenever state or the message count changed.
+    const state = result.state === undefined ? payload.state : result.state;
+    const token = await refreshToken(ctx, session, state, count);
 
-  ctx.platform.log('message.sent', { siteId: payload.siteId, sessionId: payload.sessionId, count });
+    ctx.platform.log('message.sent', { siteId: payload.siteId, sessionId: payload.sessionId, count });
+    return { messages, token };
+  };
 
+  if (wantsStream(c.req.header('Accept'), session.prepared)) {
+    // The headers are gone before the new state exists, so the token rides in `done`.
+    return streamResponse(ctx, c.req.path, async (onText) => {
+      const { messages, token } = await finish(onText);
+      const done: StreamedSendDone = { messages, token };
+      return done;
+    });
+  }
+
+  const { messages, token } = await finish();
+  c.header(TOKEN_HEADER, token);
   const body: SendResponse = { messages };
   return c.json(body);
 });

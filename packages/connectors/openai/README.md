@@ -60,6 +60,7 @@ elsewhere — use a `PromptSource`.
 | `maxOutputTokens` | `800` | |
 | `temperature` | — | |
 | `store` | `true` | Required for multi-turn; off means each turn is independent |
+| `stream` | `false` | Show replies as they are written. Reasoning is never shown; the typing indicator stays up until the answer starts |
 | `baseUrl` | OpenAI's | Any compatible endpoint |
 
 ## Two details worth knowing

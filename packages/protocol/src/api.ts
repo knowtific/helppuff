@@ -74,7 +74,17 @@ export const startSessionRequestSchema = z.object({
 });
 export type StartSessionRequest = z.infer<typeof startSessionRequestSchema>;
 
-export const capabilitiesSchema = z.object({ poll: z.boolean(), end: z.boolean() });
+export const capabilitiesSchema = z.object({
+  poll: z.boolean(),
+  end: z.boolean(),
+  /**
+   * Whether replies can be streamed: the connector supports it and the site
+   * turned it on. Absent means no — a client asks with `Accept:
+   * text/event-stream` only when this is true, and the server answers with
+   * plain JSON whenever it will not stream, so asking is always safe.
+   */
+  stream: z.boolean().optional(),
+});
 export type Capabilities = z.infer<typeof capabilitiesSchema>;
 
 export const startSessionResponseSchema = z.object({
@@ -104,6 +114,14 @@ export type SendRequest = z.infer<typeof sendRequestSchema>;
 
 export const sendResponseSchema = z.object({ messages: z.array(messageSchema) });
 export type SendResponse = z.infer<typeof sendResponseSchema>;
+
+/**
+ * The `done` event of a streamed send. A streamed response has already sent
+ * its headers by the time the connector returns new state, so the refreshed
+ * token rides in the body instead of `X-Murmur-Token`.
+ */
+export const streamedSendDoneSchema = sendResponseSchema.extend({ token: z.string().min(1).optional() });
+export type StreamedSendDone = z.infer<typeof streamedSendDoneSchema>;
 
 export const pollResponseSchema = z.object({ messages: z.array(messageSchema) });
 export type PollResponse = z.infer<typeof pollResponseSchema>;

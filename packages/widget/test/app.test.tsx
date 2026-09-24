@@ -55,7 +55,9 @@ function fakeApi(overrides: { startSession?: AnyFn; send?: AnyFn } = {}): FakeAp
   return { api: { startSession, send, end } as unknown as Api, startSession, send, end };
 }
 
-function setup(options: { config?: Record<string, unknown>; api?: FakeApi; siteId?: string } = {}) {
+function setup(
+  options: { config?: Record<string, unknown>; api?: FakeApi; siteId?: string; stream?: boolean } = {},
+) {
   const host = document.createElement('murmur-widget');
   document.body.appendChild(host);
 
@@ -67,7 +69,7 @@ function setup(options: { config?: Record<string, unknown>; api?: FakeApi; siteI
     apiBase: 'https://api.test',
     siteId: options.siteId ?? 'demo',
     rawConfig: {},
-    capabilities: { poll: false, end: true },
+    capabilities: { poll: false, end: true, stream: options.stream ?? false },
     disposer: new Disposer(),
     version: 'test',
     hide,
@@ -166,6 +168,8 @@ describe('the lead form path', () => {
     await seeMessage('Hi — how can I help?');
     expect(startSession).toHaveBeenCalledWith(
       expect.objectContaining({ lead: { name: 'Ada' }, context: expect.objectContaining({ pageUrl: expect.any(String) }) }),
+      // No streaming on this site, so no preview callback.
+      undefined,
     );
   });
 
@@ -584,6 +588,66 @@ describe('persistence across a reload (§8.6)', () => {
     } finally {
       if (original) Object.defineProperty(window, 'localStorage', original);
     }
+  });
+});
+
+describe('streamed replies', () => {
+  it('shows the typing dots until text arrives, then the reply as it is written, then the real message', async () => {
+    let release: (value: { messages: Message[] }) => void = () => {};
+    let write: (text: string) => void = () => {};
+    const api = fakeApi({
+      send: (_token: string, _input: unknown, onText?: (text: string) => void) => {
+        write = onText ?? (() => {});
+        return new Promise((resolve) => {
+          release = resolve;
+        });
+      },
+    } as never);
+    const { handle } = setup({ config: { leadForm: { enabled: false } }, api, stream: true });
+
+    await openPanel(handle);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /start a conversation/i }));
+    });
+    await seeMessage('Hi — how can I help?');
+
+    await act(async () => {
+      commands(handle).send('How much?');
+    });
+    // Nothing written yet — a reasoning model is still thinking.
+    await waitFor(() => expect(document.querySelector('.mm-typing')).not.toBeNull());
+    expect(api.send.mock.calls[0]?.[2]).toBeTypeOf('function');
+
+    await act(async () => {
+      write('Plans start ');
+      write('from **$90**');
+    });
+    const streaming = document.querySelector('[data-streaming]');
+    expect(streaming?.textContent).toBe('Plans start from $90');
+    expect(streaming?.querySelector('strong')).not.toBeNull();
+    expect(document.querySelector('.mm-typing')).toBeNull();
+
+    await act(async () => {
+      release({ messages: [agentText('Plans start from **$90/month**.', 'final')] });
+    });
+    await waitFor(() => expect(document.querySelector('[data-streaming]')).toBeNull());
+    // The preview is display only: the transcript holds the real message.
+    expect(document.querySelector('.mm-thread')?.textContent).toContain('Plans start from $90/month.');
+    expect(document.querySelector('.mm-thread')?.textContent).not.toContain('from $90Plans');
+  });
+
+  it('does not ask for a stream on a site that does not stream', async () => {
+    const { handle, send } = setup({ config: { leadForm: { enabled: false } } });
+    await openPanel(handle);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /start a conversation/i }));
+    });
+    await seeMessage('Hi — how can I help?');
+    await act(async () => {
+      commands(handle).send('Hello');
+    });
+    await waitFor(() => expect(send).toHaveBeenCalledOnce());
+    expect(send.mock.calls[0]?.[2]).toBeUndefined();
   });
 });
 

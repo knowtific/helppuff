@@ -1,4 +1,5 @@
 import { isConnectorError, type ConnectorContext, type ErasedConnector } from '@murmur/connector-types';
+import type { Capabilities } from '@murmur/protocol';
 import type { SiteConfig } from '../config/schema.js';
 import { resolveSecrets } from '../config/load.js';
 import { MurmurError, toMurmurError } from './errors.js';
@@ -23,13 +24,20 @@ export function prepareConnector(ctx: RequestCtx, site: SiteConfig): PreparedCon
   }
 }
 
+/** What the widget is told the connector can do, streaming included. */
+export function capabilitiesOf(prepared: PreparedConnector): Capabilities {
+  return { ...prepared.connector.capabilities, stream: prepared.connector.streams(prepared.options) };
+}
+
 export function connectorContext(
   ctx: RequestCtx,
   prepared: PreparedConnector,
   siteId: string,
   sessionId: string,
+  onText?: (delta: string) => void,
 ): ConnectorContext<unknown> {
   return {
+    ...(onText ? { onText } : {}),
     options: prepared.options,
     siteId,
     sessionId,

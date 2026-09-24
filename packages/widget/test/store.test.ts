@@ -406,3 +406,21 @@ describe('miscellaneous', () => {
     expect(JSON.stringify(initialState)).toBe(before);
   });
 });
+
+describe('streamed text', () => {
+  it('previews only while a reply is in flight, and never outlives it', () => {
+    const idle = reducer(initialState, { type: 'stream/text', text: 'late' });
+    expect(idle.preview).toBe('');
+
+    const sending = { ...initialState, status: 'sending' as const };
+    const written = reducer(reducer(sending, { type: 'stream/text', text: 'Hel' }), { type: 'stream/text', text: 'lo' });
+    expect(written.preview).toBe('Hello');
+
+    const failed = reducer(written, {
+      type: 'send/failed',
+      clientId: 'x',
+      error: { code: 'unknown', message: 'no', retryable: true },
+    });
+    expect(failed.preview).toBe('');
+  });
+});

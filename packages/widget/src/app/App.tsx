@@ -292,6 +292,15 @@ export function App({
     }, 180);
   }, [runtime]);
 
+  /**
+   * Streamed replies are previewed as they are written — only where the site
+   * streams, so every other site sends exactly the request it always did.
+   */
+  const onText = useMemo(
+    () => (runtime.capabilities.stream ? (text: string) => dispatch({ type: 'stream/text', text }) : undefined),
+    [runtime],
+  );
+
   const startSession = useCallback(
     async (lead: Record<string, string>, firstMessage?: string) => {
       /*
@@ -320,12 +329,15 @@ export function App({
       }
 
       const result = await api
-        .startSession({
-          ...(Object.keys(lead).length > 0 ? { lead } : {}),
-          context: pageContext(),
-          ...(firstMessage ? { firstMessage } : {}),
-          ...(captchaToken ? { captchaToken } : {}),
-        })
+        .startSession(
+          {
+            ...(Object.keys(lead).length > 0 ? { lead } : {}),
+            context: pageContext(),
+            ...(firstMessage ? { firstMessage } : {}),
+            ...(captchaToken ? { captchaToken } : {}),
+          },
+          onText,
+        )
         .catch((thrown: unknown) => {
           dispatch({ type: 'session/failed', error: toWidgetError(thrown) });
           return null;
@@ -351,7 +363,7 @@ export function App({
       });
       runtime.emit('lead', lead);
     },
-    [api, runtime],
+    [api, runtime, onText],
   );
 
   const doSend = useCallback(
@@ -369,7 +381,7 @@ export function App({
 
       dispatch({ type: 'send', pending });
 
-      const result = await api.send(session.token, { ...input, clientId: id }).catch((thrown: unknown) => {
+      const result = await api.send(session.token, { ...input, clientId: id }, onText).catch((thrown: unknown) => {
         dispatch({ type: 'send/failed', clientId: id, error: toWidgetError(thrown) });
         return null;
       });
@@ -383,7 +395,7 @@ export function App({
       });
       runtime.emit('message', { role: 'agent', count: result.messages.length });
     },
-    [api, runtime],
+    [api, runtime, onText],
   );
 
   const onStart = useCallback(() => {
@@ -738,6 +750,7 @@ export function App({
               <Thread
                 messages={messages}
                 busy={busy}
+                preview={state.preview}
                 pendingIds={pendingIds}
                 handlers={handlers}
                 t={t}

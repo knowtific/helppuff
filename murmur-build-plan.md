@@ -25,7 +25,7 @@ This document is the complete spec. Build it in the milestone order at the end. 
 
 - An operator inbox or dashboard
 - Human live handoff (the protocol leaves room for it — see §4.6)
-- Streaming responses (connectors may add it later; v1 is request/response)
+- ~~Streaming responses~~ — since added, per site, for connectors that support it (see `docs/protocol.md`)
 - Email, WhatsApp, social channels
 - A visual flow builder or admin UI — config is a file
 - Multi-tenant SaaS signup

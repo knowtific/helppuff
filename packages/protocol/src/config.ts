@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { actionSchema } from './actions.js';
+import { capabilitiesSchema } from './api.js';
 import { fieldSchema, linkItemSchema } from './messages.js';
 import { httpUrl, safeUrl } from './url-schema.js';
 
@@ -212,6 +213,6 @@ export type WidgetConfig = z.infer<typeof widgetConfigSchema>;
 export const configResponseSchema = z.object({
   siteId: z.string().min(1).max(64),
   widget: widgetConfigSchema,
-  capabilities: z.object({ poll: z.boolean(), end: z.boolean() }),
+  capabilities: capabilitiesSchema,
 });
 export type ConfigResponse = z.infer<typeof configResponseSchema>;

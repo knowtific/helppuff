@@ -65,7 +65,7 @@ to read.
 type ConfigResponse = {
   siteId: string;
   widget: WidgetConfig;           // see packages/protocol/src/config.ts
-  capabilities: { poll: boolean; end: boolean };
+  capabilities: { poll: boolean; end: boolean; stream?: boolean };
 };
 ```
 
@@ -99,7 +99,7 @@ type StartSessionResponse = {
   sessionId: string;
   expiresAt: number;               // epoch ms
   messages: Message[];             // greeting, and the reply to firstMessage
-  capabilities: { poll: boolean; end: boolean };
+  capabilities: { poll: boolean; end: boolean; stream?: boolean };
 };
 ```
 
@@ -140,6 +140,42 @@ header is listed in `Access-Control-Expose-Headers` so a browser can read it.
 
 A refreshed token keeps the original expiry: a conversation cannot extend itself
 indefinitely.
+
+---
+
+## Streamed replies
+
+When `capabilities.stream` is true, a client may ask for either `POST
+…/sessions` or `POST /v1/sessions/messages` to be streamed by sending
+`Accept: text/event-stream`. Streaming is a per-site setting on connectors
+that support it (the `stream` option on `openai`, `gemini` and `echo`).
+
+The server streams only when it was asked **and** the site streams. Otherwise
+it answers with the usual JSON, so asking is always safe; a client reads
+either by the response's `Content-Type`.
+
+Everything that can fail cheaply — the origin, the body, rate limits, the
+captcha — is checked before the stream starts and fails with the usual status
+code and envelope. Only the connector call is streamed, as server-sent
+events:
+
+| Event | `data` | |
+| --- | --- | --- |
+| `delta` | `{ text: string }` | Reply text as it is written. A preview: never stored, superseded by `done` |
+| `done` | the endpoint's JSON body | The sanitized messages. For a send, it also carries `token`, the refreshed session token, since the headers left before it existed |
+| `error` | the envelope's `error` | A failure after the `200` was sent |
+
+`done` is authoritative. A client shows the deltas while they arrive, then
+replaces them with `done`'s messages — which are sanitized; the deltas are
+not rich messages and may differ in detail, such as a trailing space. A card,
+an options list or a link list arrives only in `done`.
+
+**Reasoning is never streamed.** Connectors forward only the text meant for the
+visitor; a model's thinking produces no deltas, so the client keeps showing
+its typing indicator until the answer begins.
+
+A stream that ends without `done` or `error` was cut off, and should be
+treated as a retryable failure.
 
 ---
 

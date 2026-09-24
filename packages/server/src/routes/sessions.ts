@@ -5,7 +5,8 @@ import { MurmurError } from '../core/errors.js';
 import { validateLead } from '../core/lead.js';
 import { assertAllowedOrigin } from '../core/origin.js';
 import { requireSecret, type HonoEnv } from '../core/request.js';
-import { connectorContext, prepareConnector, runConnector } from '../core/run.js';
+import { capabilitiesOf, connectorContext, prepareConnector, runConnector } from '../core/run.js';
+import { streamResponse, wantsStream } from '../core/stream.js';
 import { sanitizeConnectorMessages } from '../core/sanitize.js';
 import { issueToken, newSessionId } from '../core/token.js';
 import { hitDaily, hitWindow, rateLimited, quotaExceeded } from '../core/ratelimit.js';
@@ -78,41 +79,40 @@ sessionRoutes.post('/v1/sites/:siteId/sessions', async (c) => {
   const secret = requireSecret(ctx);
   const sessionId = newSessionId();
   const prepared = prepareConnector(ctx, site);
-  const cctx = connectorContext(ctx, prepared, siteId, sessionId);
 
-  const started = await runConnector(ctx, 'start', () =>
-    prepared.connector.start(cctx, { ...input, lead }),
-  );
+  // Steps 7-9, shared by the JSON and the streamed response.
+  const finish = async (onText?: (delta: string) => void): Promise<StartSessionResponse> => {
+    const cctx = connectorContext(ctx, prepared, siteId, sessionId, onText);
+    const started = await runConnector(ctx, 'start', () =>
+      prepared.connector.start(cctx, { ...input, lead }),
+    );
 
-  const messages = sanitizeConnectorMessages(started.messages, ctx.platform, { allowEmpty: true });
+    const messages = sanitizeConnectorMessages(started.messages, ctx.platform, { allowEmpty: true });
 
-  // 8. Sign and respond.
-  const { token, expiresAt } = await issueToken(secret, {
-    siteId,
-    sessionId,
-    state: started.state,
-    count: 0,
-    ttlMs: site.security.sessionTtlHours * 3600_000,
-  });
+    // 8. Sign and respond.
+    const { token, expiresAt } = await issueToken(secret, {
+      siteId,
+      sessionId,
+      state: started.state,
+      count: 0,
+      ttlMs: site.security.sessionTtlHours * 3600_000,
+    });
 
-  ctx.platform.log('session.started', { siteId, sessionId, messages: messages.length });
+    ctx.platform.log('session.started', { siteId, sessionId, messages: messages.length });
 
-  // 9. Lead destinations, after the response is decided and never blocking it.
-  dispatchLead(ctx, site, siteId, {
-    sessionId,
-    lead,
-    context: input.context,
-    ...(input.firstMessage ? { firstMessage: input.firstMessage } : {}),
-  });
+    // 9. Lead destinations, after the response is decided and never blocking it.
+    dispatchLead(ctx, site, siteId, {
+      sessionId,
+      lead,
+      context: input.context,
+      ...(input.firstMessage ? { firstMessage: input.firstMessage } : {}),
+    });
 
-  const body: StartSessionResponse = {
-    sessionToken: token,
-    sessionId,
-    expiresAt,
-    messages,
-    capabilities: prepared.connector.capabilities,
+    return { sessionToken: token, sessionId, expiresAt, messages, capabilities: capabilitiesOf(prepared) };
   };
-  return c.json(body);
+
+  if (wantsStream(c.req.header('Accept'), prepared)) return streamResponse(ctx, c.req.path, finish);
+  return c.json(await finish());
 });
 
 export async function readJsonBody(request: Request): Promise<unknown> {

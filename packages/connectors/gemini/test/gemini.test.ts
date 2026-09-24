@@ -204,3 +204,124 @@ describe('failures', () => {
     ).rejects.toSatisfy((e: unknown) => isConnectorError(e) && !e.message.includes('12345'));
   });
 });
+
+describe('streaming', () => {
+  /** SSE the way the Interactions API frames it: the kind is `event_type` in the data. */
+  const sse = (events: Array<Record<string, unknown>>) =>
+    new Response(events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join(''), {
+      headers: { 'Content-Type': 'text/event-stream' },
+    });
+
+  const created = { event_type: 'interaction.created', interaction: { id: 'int_1', status: 'in_progress' } };
+  const completed = { event_type: 'interaction.completed', interaction: { id: 'int_1', status: 'completed' } };
+  const text = (index: number, value: string) => ({ event_type: 'step.delta', index, delta: { type: 'text', text: value } });
+
+  const streamingCtx = (responses: unknown[], options: Record<string, unknown> = {}) => {
+    const made = ctx({ stream: true, ...options }, responses);
+    const deltas: string[] = [];
+    made.ctx.onText = (delta) => deltas.push(delta);
+    return { ...made, deltas };
+  };
+
+  it('is off unless configured', () => {
+    expect(gemini.streams(gemini.parseOptions({ apiKey: 'k' }))).toBe(false);
+    expect(gemini.streams(gemini.parseOptions({ apiKey: 'k', stream: true }))).toBe(true);
+  });
+
+  it('forwards model output as it arrives, and rebuilds the steps for the final messages', async () => {
+    const { ctx: c, calls, deltas } = streamingCtx([
+      sse([
+        created,
+        { event_type: 'step.start', index: 0, step: { type: 'model_output' } },
+        text(0, 'Hi '),
+        text(0, 'there'),
+        { event_type: 'step.stop', index: 0 },
+        completed,
+      ]),
+    ]);
+
+    const started = await gemini.start(c, { context: { pageUrl: 'https://a.co' }, firstMessage: 'hi' });
+
+    expect(body(calls[0]!).stream).toBe(true);
+    expect(deltas.join('')).toBe('Hi there');
+    expect(started.state).toEqual({ interactionId: 'int_1' });
+    expect(started.messages).toMatchObject([{ type: 'text', text: 'Hi there' }]);
+  });
+
+  it('never forwards thinking — neither a thought step nor a thought summary', async () => {
+    const { ctx: c, deltas } = streamingCtx([
+      sse([
+        created,
+        { event_type: 'step.start', index: 0, step: { type: 'thought' } },
+        { event_type: 'step.delta', index: 0, delta: { type: 'thought_summary', content: { type: 'text', text: 'Considering…' } } },
+        // Even plain text inside a thought step is thinking, not an answer.
+        text(0, 'internal monologue'),
+        { event_type: 'step.stop', index: 0 },
+        { event_type: 'step.start', index: 1, step: { type: 'model_output' } },
+        text(1, 'The answer.'),
+        completed,
+      ]),
+    ]);
+
+    const result = await gemini.send(c, { interactionId: null }, { kind: 'text', text: 'q', clientId: 'c1' });
+    expect(deltas).toEqual(['The answer.']);
+    expect(result.messages).toMatchObject([{ type: 'text', text: 'The answer.' }]);
+  });
+
+  it('reassembles function-call arguments into a rich message', async () => {
+    const { ctx: c, deltas } = streamingCtx([
+      sse([
+        created,
+        { event_type: 'step.start', index: 0, step: { type: 'function_call', id: 'f1', name: 'show_options', arguments: {} } },
+        { event_type: 'step.delta', index: 0, delta: { type: 'arguments_delta', arguments: '{"prompt":"Pick one","options":[' } },
+        { event_type: 'step.delta', index: 0, delta: { type: 'arguments_delta', arguments: '"Web design","SEO"]}' } },
+        completed,
+      ]),
+    ]);
+
+    const result = await gemini.send(c, { interactionId: null }, { kind: 'text', text: 'q', clientId: 'c1' });
+    expect(deltas).toEqual([]);
+    expect(result.messages[0]?.type).toBe('options');
+  });
+
+  it('fetches the stored interaction for citations, which a stream does not carry', async () => {
+    const stored = reply('ok', {
+      steps: [
+        {
+          type: 'model_output',
+          content: [{ type: 'text', text: 'ok', annotations: [{ type: 'file_citation', file_name: 'pricing.pdf' }] }],
+        },
+      ],
+    });
+    const { ctx: c, calls } = streamingCtx(
+      [sse([created, { event_type: 'step.start', index: 0, step: { type: 'model_output' } }, text(0, 'ok'), completed]), stored],
+      { fileSearchStores: ['fileSearchStores/s1'] },
+    );
+
+    const result = await gemini.send(c, { interactionId: null }, { kind: 'text', text: 'q', clientId: 'c1' });
+    expect(calls[1]?.url).toBe('https://generativelanguage.googleapis.com/v1beta/interactions/int_1');
+    expect(result.messages.at(-1)).toMatchObject({ type: 'notice', text: 'Based on: pricing.pdf' });
+  });
+
+  it('still answers when the citations cannot be fetched', async () => {
+    const { ctx: c } = streamingCtx(
+      [
+        sse([created, { event_type: 'step.start', index: 0, step: { type: 'model_output' } }, text(0, 'ok'), completed]),
+        new Response('nope', { status: 500 }),
+      ],
+      { fileSearchStores: ['fileSearchStores/s1'] },
+    );
+    const result = await gemini.send(c, { interactionId: null }, { kind: 'text', text: 'q', clientId: 'c1' });
+    expect(result.messages).toMatchObject([{ type: 'text', text: 'ok' }]);
+  });
+
+  it('fails cleanly on an error event, and on a stream that never completes', async () => {
+    const errored = streamingCtx([sse([created, { event_type: 'error', error: { code: 'gateway_timeout', message: 'Deadline expired' } }])]);
+    const e1 = await gemini.send(errored.ctx, { interactionId: null }, { kind: 'text', text: 'q', clientId: 'c1' }).catch((e: unknown) => e);
+    expect(isConnectorError(e1) && e1.detail).toBe('gemini_stream_error:gateway_timeout');
+
+    const cut = streamingCtx([sse([created, { event_type: 'step.start', index: 0, step: { type: 'model_output' } }, text(0, 'Hal')])]);
+    const e2 = await gemini.send(cut.ctx, { interactionId: null }, { kind: 'text', text: 'q', clientId: 'c1' }).catch((e: unknown) => e);
+    expect(isConnectorError(e2) && e2.detail).toBe('gemini_stream_truncated');
+  });
+});

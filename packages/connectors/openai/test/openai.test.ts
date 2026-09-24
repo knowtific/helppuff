@@ -214,3 +214,103 @@ describe('start with no first message', () => {
     expect(result).toEqual({ state: { responseId: null }, messages: [] });
   });
 });
+
+describe('streaming', () => {
+  /** An SSE body the way the Responses API frames it: `event:` plus JSON `data:`. */
+  const sse = (events: Array<Record<string, unknown>>) =>
+    new Response(events.map((e) => `event: ${String(e['type'])}\ndata: ${JSON.stringify(e)}\n\n`).join(''), {
+      headers: { 'Content-Type': 'text/event-stream' },
+    });
+
+  const completed = (text: string) => ({ type: 'response.completed', response: reply(text) });
+
+  const streamingCtx = (responses: unknown[]) => {
+    const made = ctx({ stream: true }, responses);
+    const deltas: string[] = [];
+    made.ctx.onText = (delta) => deltas.push(delta);
+    return { ...made, deltas };
+  };
+
+  it('is off unless configured', () => {
+    expect(openai.streams(openai.parseOptions({ apiKey: 'k' }))).toBe(false);
+    expect(openai.streams(openai.parseOptions({ apiKey: 'k', stream: true }))).toBe(true);
+  });
+
+  it('asks for a stream only when the server is streaming this request', async () => {
+    const { ctx: c, calls } = ctx({ stream: true }, [reply('hi')]);
+    await openai.start(c, { context: { pageUrl: 'https://a.co' }, firstMessage: 'hi' });
+    expect(body(calls[0]!).stream).toBeUndefined();
+  });
+
+  it('forwards answer text as it arrives, and returns the final response mapped as usual', async () => {
+    const { ctx: c, calls, deltas } = streamingCtx([
+      sse([
+        { type: 'response.created', response: { id: 'resp_1', status: 'in_progress' } },
+        { type: 'response.output_text.delta', item_id: 'm1', delta: 'Hi ' },
+        { type: 'response.output_text.delta', item_id: 'm1', delta: 'there' },
+        completed('Hi there'),
+      ]),
+    ]);
+
+    const started = await openai.start(c, { context: { pageUrl: 'https://a.co' }, firstMessage: 'hi' });
+
+    expect(body(calls[0]!).stream).toBe(true);
+    expect(deltas.join('')).toBe('Hi there');
+    expect(started.state).toEqual({ responseId: 'resp_1' });
+    expect(started.messages).toMatchObject([{ type: 'text', text: 'Hi there' }]);
+  });
+
+  it('never forwards reasoning, however it is streamed', async () => {
+    const { ctx: c, deltas } = streamingCtx([
+      sse([
+        { type: 'response.reasoning_summary_text.delta', item_id: 'rs1', delta: 'Let me think about pricing…' },
+        { type: 'response.reasoning_text.delta', item_id: 'rs1', delta: 'The user wants…' },
+        { type: 'response.function_call_arguments.delta', item_id: 'fc1', delta: '{"opt' },
+        { type: 'response.output_text.delta', item_id: 'm1', delta: 'From $90/month.' },
+        completed('From $90/month.'),
+      ]),
+    ]);
+
+    await openai.send(c, { responseId: null }, { kind: 'text', text: 'price?', clientId: 'c1' });
+    expect(deltas).toEqual(['From $90/month.']);
+  });
+
+  it('keeps two message items apart in the preview', async () => {
+    const { ctx: c, deltas } = streamingCtx([
+      sse([
+        { type: 'response.output_text.delta', item_id: 'm1', delta: 'One.' },
+        { type: 'response.output_text.delta', item_id: 'm2', delta: 'Two.' },
+        completed('One.'),
+      ]),
+    ]);
+    await openai.send(c, { responseId: null }, { kind: 'text', text: 'x', clientId: 'c1' });
+    expect(deltas.join('')).toBe('One.\n\nTwo.');
+  });
+
+  it('fails cleanly on a stream error event, without the backend’s words', async () => {
+    const { ctx: c } = streamingCtx([
+      sse([{ type: 'error', code: 'server_error', message: 'internal details here' }]),
+    ]);
+    const thrown = await openai
+      .send(c, { responseId: null }, { kind: 'text', text: 'x', clientId: 'c1' })
+      .catch((e: unknown) => e);
+    expect(isConnectorError(thrown)).toBe(true);
+    expect(String((thrown as Error).message)).not.toContain('internal details');
+  });
+
+  it('fails a stream that ends before the response completes', async () => {
+    const { ctx: c } = streamingCtx([sse([{ type: 'response.output_text.delta', item_id: 'm1', delta: 'Hal' }])]);
+    const thrown = await openai
+      .send(c, { responseId: null }, { kind: 'text', text: 'x', clientId: 'c1' })
+      .catch((e: unknown) => e);
+    expect(isConnectorError(thrown) && thrown.detail).toBe('openai_stream_truncated');
+  });
+
+  it('treats a streamed failed response as an error', async () => {
+    const { ctx: c } = streamingCtx([sse([{ type: 'response.failed', response: { id: 'r', status: 'failed' } }])]);
+    const thrown = await openai
+      .send(c, { responseId: null }, { kind: 'text', text: 'x', clientId: 'c1' })
+      .catch((e: unknown) => e);
+    expect(isConnectorError(thrown)).toBe(true);
+  });
+});

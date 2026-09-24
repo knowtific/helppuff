@@ -165,6 +165,32 @@ async function respond(command: string, raw: string, delayMs: number): Promise<M
  * shortcut like `{ label: 'Show a card', value: '/card' }` works, and echoes
  * the label so the reply reads the way the visitor expects.
  */
+/** How long echo waits between streamed words — slow enough to watch. */
+const STREAM_WORD_MS = 25;
+/** …but a long reply still finishes streaming in about this long. */
+const STREAM_MAX_MS = 1500;
+
+/**
+ * Stream the text of a reply the way a model would: word by word, with a
+ * paragraph break between messages. The messages themselves are returned
+ * unchanged afterwards and replace the preview.
+ */
+async function streamText(onText: ((delta: string) => void) | undefined, messages: Message[]): Promise<void> {
+  if (!onText) return;
+  let first = true;
+  for (const item of messages) {
+    if (item.type !== 'text') continue;
+    if (!first) onText('\n\n');
+    first = false;
+    const words = item.text.split(/(?<=\s)/);
+    const pause = Math.min(STREAM_WORD_MS, STREAM_MAX_MS / words.length);
+    for (const word of words) {
+      onText(word);
+      await sleep(pause);
+    }
+  }
+}
+
 function inputToCommand(input: SendRequest): string {
   return input.kind === 'text' ? input.text : input.value;
 }
@@ -177,11 +203,14 @@ const echo: Connector<EchoOptions, EchoState> = {
   type: 'echo',
   optionsSchema: echoOptionsSchema,
   capabilities: { poll: false, end: true },
+  streams: (options) => options.stream,
 
   async start(ctx, input) {
     const messages: Message[] = [text(ctx.options.greeting)];
     if (input.firstMessage) {
-      messages.push(...(await respond(input.firstMessage.trim().toLowerCase(), input.firstMessage, ctx.options.delayMs)));
+      const reply = await respond(input.firstMessage.trim().toLowerCase(), input.firstMessage, ctx.options.delayMs);
+      await streamText(ctx.onText, reply);
+      messages.push(...reply);
     }
     return { state: { turn: messages.length }, messages };
   },
@@ -189,6 +218,7 @@ const echo: Connector<EchoOptions, EchoState> = {
   async send(ctx, state, input) {
     const command = inputToCommand(input).trim().toLowerCase();
     const messages = await respond(command, inputToDisplay(input), ctx.options.delayMs);
+    await streamText(ctx.onText, messages);
     return { state: { turn: state.turn + 1 }, messages };
   },
 

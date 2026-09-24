@@ -38,7 +38,7 @@ export type LauncherHints = {
   teaserOnScroll: boolean;
 };
 
-export type RawConfig = { widget: unknown; capabilities: { poll: boolean; end: boolean } };
+export type RawConfig = { widget: unknown; capabilities: { poll: boolean; end: boolean; stream: boolean } };
 
 const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -61,7 +61,11 @@ export async function fetchConfig(base: string, siteId: string): Promise<RawConf
   const capabilities = isObject(body['capabilities']) ? body['capabilities'] : {};
   return {
     widget: body['widget'],
-    capabilities: { poll: capabilities['poll'] === true, end: capabilities['end'] === true },
+    capabilities: {
+      poll: capabilities['poll'] === true,
+      end: capabilities['end'] === true,
+      stream: capabilities['stream'] === true,
+    },
   };
 }
 

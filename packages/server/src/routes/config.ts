@@ -2,7 +2,8 @@ import { Hono } from 'hono';
 import type { ConfigResponse } from '@murmur/protocol';
 import { resolveSite } from '../config/site.js';
 import { getConnector } from '../core/registry.js';
-import type { HonoEnv } from '../core/request.js';
+import { capabilitiesOf, prepareConnector } from '../core/run.js';
+import type { HonoEnv, RequestCtx } from '../core/request.js';
 import type { SiteConfig } from '../config/schema.js';
 import type { Platform } from '../core/platform.js';
 
@@ -36,18 +37,30 @@ function captchaFor(
   return { captcha: undefined };
 }
 
+/**
+ * Streaming depends on the connector's options, so they are parsed here too.
+ * Options that do not parse are reported when a session starts, where the
+ * visitor can be told; the config itself still loads, just without streaming.
+ */
+function capabilitiesFor(ctx: RequestCtx, site: SiteConfig): ConfigResponse['capabilities'] {
+  try {
+    return capabilitiesOf(prepareConnector(ctx, site));
+  } catch {
+    return { ...getConnector(site.connector.type).capabilities, stream: false };
+  }
+}
+
 export const configRoutes = new Hono<HonoEnv>();
 
 configRoutes.get('/v1/sites/:siteId/config', async (c) => {
   const ctx = c.get('mm');
   const siteId = c.req.param('siteId');
   const site = await resolveSite(ctx, siteId);
-  const connector = getConnector(site.connector.type);
 
   const body: ConfigResponse = {
     siteId,
     widget: { ...site.widget, ...captchaFor(site, ctx.platform.log, siteId) },
-    capabilities: connector.capabilities,
+    capabilities: capabilitiesFor(ctx, site),
   };
 
   ctx.platform.log('config.served', { siteId });

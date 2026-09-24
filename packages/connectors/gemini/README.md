@@ -123,6 +123,7 @@ wrangler kv key put --binding=MURMUR_KV "prompt:knowtific" --path ./prompt.txt
 | `showCitations` | `true` | Renders the documents an answer came from |
 | `maxOutputTokens` | `800` | |
 | `store` | `true` | Required for multi-turn; off means each turn is independent |
+| `stream` | `false` | Show replies as they are written. Thinking is never shown; the typing indicator stays up until the answer starts |
 | `baseUrl` | Google's | |
 
 ## Citations
@@ -135,6 +136,11 @@ answer. The connector collapses repeats by document and appends:
   a filename is worth naming but is not somewhere to send anyone.
 
 Set `showCitations: false` to keep answers bare.
+
+A stream does not carry citations, so with `stream: true` the connector reads
+them from the stored interaction once the answer is complete — one extra
+request, and only when File Search is configured. If that request fails, the
+answer is still shown, without its sources.
 
 ## Conversation state
 

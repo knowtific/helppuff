@@ -1,4 +1,4 @@
-import type { Message, MessageBody, Option, Role } from '@murmur/protocol';
+import { readSse, SseIdleTimeout, type Message, type MessageBody, type Option, type Role } from '@murmur/protocol';
 import { ConnectorError } from './errors.js';
 
 /** Outbound calls from a connector time out at 25s (§6.1). */
@@ -85,4 +85,49 @@ export function renderTemplate(template: string, scope: Record<string, unknown>)
     }, scope);
     return value === undefined || value === null ? '' : String(value);
   });
+}
+
+/**
+ * Read a backend's event stream, one parsed JSON event at a time.
+ *
+ * The request's own timeout stops at the response headers, so a stream is
+ * bounded here instead, by the gap between chunks: a long answer that keeps
+ * arriving is fine, one that stalls is abandoned. Events whose data is not
+ * JSON (a `[DONE]` sentinel, say) are skipped.
+ */
+export async function readJsonEvents(
+  response: Response,
+  onEvent: (data: Record<string, unknown>, event: string) => void,
+  idleMs = CONNECTOR_TIMEOUT_MS,
+): Promise<void> {
+  if (!response.body) {
+    throw new ConnectorError('The assistant sent an unexpected response.', {
+      retryable: true,
+      detail: 'stream_no_body',
+    });
+  }
+  try {
+    await readSse(
+      response.body,
+      ({ event, data }) => {
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(data);
+        } catch {
+          return;
+        }
+        if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+          onEvent(parsed as Record<string, unknown>, event);
+        }
+      },
+      idleMs,
+    );
+  } catch (thrown) {
+    if (thrown instanceof ConnectorError) throw thrown;
+    const idle = thrown instanceof SseIdleTimeout;
+    throw new ConnectorError(
+      idle ? 'That took too long. Please try again.' : 'We lost the connection to the assistant. Please try again.',
+      { retryable: true, detail: idle ? 'stream_idle_timeout' : 'stream_read_failed' },
+    );
+  }
 }
