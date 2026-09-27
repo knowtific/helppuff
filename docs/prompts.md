@@ -9,6 +9,15 @@ what the assistant says.** Everything below follows from that.
 
 ---
 
+## Set up with the CLI?
+
+Then the prompt is `prompt.md`, next to `murmur.json`, and the owner can also
+edit it in the dashboard. Both publish numbered versions into one history, and
+neither can overwrite a version it has not seen: `murmur deploy` stops and
+asks you to `murmur prompt pull` first. See
+[the CLI docs](cli.md#the-prompt-and-its-versions). The rest of this page is
+about `murmur.config.ts`, for running this repository directly.
+
 ## The short answer
 
 | You want to… | Put the prompt in |

@@ -15,8 +15,11 @@
     "deploy": "wrangler deploy"
   },
   "dependencies": {
+    "@murmur/connector-anthropic": "workspace:*",
+    "@murmur/connector-cloudflare": "workspace:*",
     "@murmur/connector-echo": "workspace:*",
     "@murmur/connector-gemini": "workspace:*",
+    "@murmur/connector-http": "workspace:*",
     "@murmur/connector-openai": "workspace:*",
     "@murmur/connector-retell": "workspace:*",
     "@murmur/connector-types": "workspace:*",

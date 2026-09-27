@@ -63,6 +63,11 @@ export const openaiOptionsSchema = z.object({
    * return chips, cards and link lists instead of prose (§6.3).
    */
   richMessages: z.boolean().default(true),
+  /**
+   * OpenAI vector stores to answer from, through the hosted `file_search`
+   * tool. `murmur knowledge sync` creates and fills one.
+   */
+  vectorStoreIds: z.array(z.string().min(1)).max(2).default([]),
   /** Extra function tools, forwarded verbatim. */
   tools: z.array(z.record(z.string(), z.unknown())).max(16).optional(),
   maxOutputTokens: z.number().int().min(16).max(32_000).default(800),
@@ -215,6 +220,9 @@ function toolsFor(options: OpenAiOptions): unknown[] | undefined {
       });
     }
   }
+  if (options.vectorStoreIds.length > 0) {
+    tools.push({ type: 'file_search', vector_store_ids: options.vectorStoreIds });
+  }
   if (options.tools) tools.push(...options.tools);
   return tools.length > 0 ? tools : undefined;
 }
@@ -292,6 +300,8 @@ const openai: Connector<OpenAiOptions, OpenAiState> = {
   optionsSchema: openaiOptionsSchema,
   capabilities: { poll: false, end: false },
   streams: (options) => options.stream,
+  // A stored prompt is versioned in OpenAI's dashboard, not here.
+  promptOption: (options) => (options.promptRef ? null : 'instructions'),
 
   async start(ctx, input) {
     if (!input.firstMessage) {

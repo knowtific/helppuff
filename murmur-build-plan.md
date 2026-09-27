@@ -1062,6 +1062,18 @@ Build strictly in order. Each milestone ends in a working, demoable state.
 - CONTRIBUTING, issue templates, MIT licence, changeset-based versioning, npm publish for `@murmur/protocol` and the widget.
 - ✅ Done when: a developer who has never seen the project can go from clone to a working widget on their own site in under 15 minutes following the README.
 
+### M7 — Agent-native setup, native backends and the dashboard
+- `@knowtific/murmur` (`npx @knowtific/murmur`): `init` (wizard for people; flags, `--json` and a `needs_input` question loop for agents), `deploy`, `dev`, `chat`, `status`, `doctor`, `knowledge sync`, `secret`, `config`, `users`, `dashboard`, `mcp`. Help text written for agents.
+- One declarative `murmur.json` with a published JSON Schema; secrets only in `.env` and Worker secrets. `init` learns name, colour, contacts and key pages from the website.
+- Cloudflare-first: reuses `wrangler login` or an API token; creates KV, D1, AI Search and the Worker; reuses an existing AI Search instance that already crawls the site.
+- New connectors: `cloudflare` (AI Search, binding or public endpoint), `anthropic` (official SDK, optional AI Search knowledge), `http` (Murmur backend protocol or OpenAI-compatible, JSON or SSE). OpenAI gains vector-store file search.
+- Knowledge sync to AI Search, OpenAI vector stores and Gemini File Search stores.
+- CRM dashboard at `/admin`: conversations, leads pipeline, analytics, Workers AI summaries; D1 storage; PBKDF2 sign-in; `murmur users`.
+- `AGENTS.md` and a Claude Code skill written into every project; MCP server over stdio.
+- Published as `@knowtific/murmur`; every Cloudflare resource is named `knowtific-murmur-<site>`. AI Search crawls zones on the account itself; knowledge never blocks going live; the wizard tailors the prompt while indexing runs.
+- Agent distribution: a Claude Code plugin (`plugin/`, marketplace in `.claude-plugin/`) with the `website-chatbot` skill and the MCP server; `murmur skill install [--codex]`. Verified with fresh headless Claude Code sessions: with no Cloudflare access it asks for `wrangler login` or a self-stored token; with access it went from one request to a live, tested, embedded assistant in under two minutes.
+- ✅ Done: verified with real public deploys on 2026-09-25 — myt-pty-ltd.com (single page, `discover` crawl, plus PDF / Word / Markdown files whose facts appear nowhere on the site) and knowtific.com.au (43 pages, `sitemap` crawl, via the terminal wizard). File-only questions, deep-page questions and an owner rule ("never promise delivery dates") all answered correctly; conversations, summaries and sign-in verified on the live dashboards.
+
 ---
 
 ## 13. Instructions for Claude Code

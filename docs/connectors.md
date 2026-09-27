@@ -90,10 +90,16 @@ whole streaming path can be exercised with no API key. The demo site has it on.
 | `retell` | Retell chat agents | `{ chatId }` | The Retell agent |
 | `openai` | OpenAI Responses API, or any compatible endpoint | `{ responseId }` | A stored prompt, or a `PromptSource` |
 | `gemini` | Gemini Interactions API + File Search (RAG) | `{ interactionId }` | A `PromptSource` |
+| `cloudflare` | Cloudflare AI Search chat completions (retrieval + Workers AI) | `{ turns }`, history in KV | A `PromptSource` |
+| `anthropic` | Claude via the Messages API (official SDK), optional AI Search retrieval | `{ turns }`, history in KV | A `PromptSource` |
+| `http` | Your own API: Murmur backend protocol, or any OpenAI-compatible `/chat/completions` | your backend's, or history in KV | Yours, or a `PromptSource` |
 
-All three real backends keep the conversation on their own side and hand back
-an id, so connector state stays far under the 1 kb token budget and no
-transcript is kept in KV. See [`prompts.md`](prompts.md) for where the prompt
+Retell, OpenAI and Gemini keep the conversation on their own side and hand
+back an id, so connector state stays far under the 1 kb token budget. The
+stateless APIs (`cloudflare`, `anthropic`, `http` in `openai` mode) keep the
+transcript in KV under `hist:<site>:<session>` instead, trimmed to the last 24
+turns and expiring with the session — see `history.ts` in
+`@murmur/connector-types`. See [`prompts.md`](prompts.md) for where the prompt
 itself belongs.
 
 ### Rich messages
@@ -116,6 +122,20 @@ a malformed call produces no rich message rather than a broken thread.
 Retell agents that cannot be given tools can use the inline-marker fallback
 instead — set `inlineMarkers: true` and have the agent end a reply with
 `[[options: Today | Tomorrow]]` or `[[link: Pricing | https://…]]`.
+
+### Cloudflare AI Search, Anthropic and `http`
+
+- **`cloudflare`** calls `chatCompletions` on an `[[ai_search]]` binding, or on
+  a public endpoint when `endpoint` is set; both are covered by
+  `aiSearchClient` in `@murmur/connector-types`. Chat completions take no tool
+  definitions, so rich messages use inline markers, which the connector
+  teaches the model in the system prompt and hides from the streamed preview.
+- **`anthropic`** uses `@anthropic-ai/sdk` with the connector's `fetch`. The
+  three rich tools are declared as Claude tools and are rendered, never
+  executed, so no `tool_result` is ever sent; the next turn replays a
+  plain-text summary instead. Opus 5 and Fable 5.1 run with server-side
+  refusal fallbacks. The Worker needs the `nodejs_compat` flag for the SDK.
+- **`http`** is documented from the backend's side in [cli.md](cli.md#your-own-backend-http).
 
 ---
 
@@ -218,3 +238,30 @@ curl -X POST \
 
 Put the returned store name in `fileSearchStores`. Google chunks, embeds and
 retrieves; embeddings persist, and the raw files are deleted after 48 hours.
+
+### Cloudflare AI Search — [developers.cloudflare.com/ai-search](https://developers.cloudflare.com/ai-search/)
+
+Read on 2026-09-24, and exercised against a live instance the same day.
+
+| Operation | Shape |
+| --- | --- |
+| Binding | `[[ai_search]] binding = "AI_SEARCH", instance_name = "…"` (instance must exist at deploy) |
+| Chat | `env.AI_SEARCH.chatCompletions({ messages, model?, stream?, ai_search_options: { retrieval: { max_num_results }, query_rewrite: { enabled } } })` |
+| Stream | SSE: one `event: chunks` frame, then `data: {choices:[{delta:{content}}]}`, then `data: [DONE]` |
+| Public endpoint | `POST {endpoint}/chat/completions` (same body, plain JSON) and `POST {endpoint}/search` (wrapped in `{ success, result }`) |
+| REST (setup) | `/accounts/{id}/ai-search/namespaces/default/instances[/{id}[/items\|/stats]]`; items upload is multipart `file` |
+
+Behaviour observed on live instances on 2026-09-25, and handled by the CLI:
+
+- Item listing caps `per_page` at 50 (100 is rejected).
+- A new `web-crawler` instance's **first** sync drops files uploaded to
+  built-in storage while it runs; later scheduled or manual syncs keep them.
+  `murmur` waits for the first job to end, then uploads and verifies.
+- A 43-page site (sitemap mode) indexed in about 15 minutes; a single-page
+  site (discover mode) in about 2.
+- `web-crawler` sources must be a zone on the same account; `discover` needs
+  a verified zone.
+
+Instances are free during the beta within their limits (100 instances and
+500 crawled pages a day on Workers Free); Workers AI generation is billed
+separately.

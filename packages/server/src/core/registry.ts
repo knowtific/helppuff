@@ -4,6 +4,9 @@ import echoConnector from '@murmur/connector-echo';
 import retellConnector from '@murmur/connector-retell';
 import openaiConnector from '@murmur/connector-openai';
 import geminiConnector from '@murmur/connector-gemini';
+import cloudflareConnector from '@murmur/connector-cloudflare';
+import anthropicConnector from '@murmur/connector-anthropic';
+import httpConnector from '@murmur/connector-http';
 import webhookSink from '@murmur/sink-webhook';
 import { MurmurError } from './errors.js';
 
@@ -16,6 +19,9 @@ export const connectors: Readonly<Record<string, ErasedConnector>> = {
   retell: retellConnector,
   openai: openaiConnector,
   gemini: geminiConnector,
+  cloudflare: cloudflareConnector,
+  anthropic: anthropicConnector,
+  http: httpConnector,
 };
 
 export function getConnector(type: string): ErasedConnector {

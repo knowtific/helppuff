@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { widgetConfigSchema, type Message, type WidgetConfig } from '@murmur/protocol';
 import {
   MAX_STORED_MESSAGES,
+  fillName,
   initialState,
   isBusy,
   leadIsComplete,
@@ -422,5 +423,45 @@ describe('streamed text', () => {
       error: { code: 'unknown', message: 'no', retryable: true },
     });
     expect(failed.preview).toBe('');
+  });
+});
+
+describe('the greeting', () => {
+  const greetConfig = (chat: Record<string, unknown> = {}, leadForm = false, strings?: Record<string, string>) =>
+    widgetConfigSchema.parse({ leadForm: { enabled: leadForm }, chat, ...(strings ? { strings } : {}) });
+
+  it('opens an empty thread with the default greeting when there is no pre-chat form', () => {
+    const state = reducer({ ...initialState, config: greetConfig() }, { type: 'start' });
+    expect(state.messages.map((m) => (m as { text: string }).text)).toEqual(['Hi! How can we help you today?']);
+    expect(state.messages[0]).toMatchObject({ role: 'agent', type: 'text' });
+  });
+
+  it("uses the site's own opening lines and the visitor's first name from the form", () => {
+    const withForm = { ...initialState, config: greetConfig({ initialMessages: ['Hi {{name}}! I am Kai.', 'What can I help with?'] }, true) };
+    const state = reducer(withForm, { type: 'lead/submit', lead: { name: 'Jo Bloggs', email: 'jo@x.com' } });
+    expect(state.messages.map((m) => (m as { text: string }).text)).toEqual(['Hi Jo! I am Kai.', 'What can I help with?']);
+  });
+
+  it('is replaced by a greeting from the backend, and kept when the backend is silent', () => {
+    const started = reducer({ ...initialState, config: greetConfig() }, { type: 'start' });
+    const session = { token: 't', sessionId: 's', expiresAt: Date.now() + 1000, capabilities: { poll: false, end: false } } as never;
+    const silent = reducer(started, { type: 'session/started', session, messages: [] });
+    expect(silent.messages).toHaveLength(1);
+    const own = reducer(started, {
+      type: 'session/started',
+      session,
+      messages: [{ id: 'b1', ts: 1, role: 'agent', type: 'text', text: 'Hello from the backend' }],
+    });
+    expect(own.messages.map((m) => (m as { text: string }).text)).toEqual(['Hello from the backend']);
+  });
+
+  it('can be turned off with an empty string', () => {
+    const state = reducer({ ...initialState, config: greetConfig({}, false, { greeting: '' }) }, { type: 'start' });
+    expect(state.messages).toEqual([]);
+  });
+
+  it('fills or drops the name cleanly', () => {
+    expect(fillName('Hi {name}! How can we help?', 'Jo')).toBe('Hi Jo! How can we help?');
+    expect(fillName('Hi {name}! How can we help?', undefined)).toBe('Hi! How can we help?');
   });
 });

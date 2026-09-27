@@ -3,10 +3,49 @@
 An open-source, serverless AI chat widget for websites.
 
 The widget speaks one small REST protocol. A thin server on Cloudflare Workers
-translates that protocol to any AI backend through **connectors**. No database,
-no session store, free to run on the Workers free tier.
+translates that protocol to any AI backend through **connectors**. No session
+store, free to run on the Workers free tier.
 
-> **Status: milestones 1 to 4 done.** The protocol, the reference server, the
+## Set one up in two minutes
+
+```bash
+npx @knowtific/murmur init
+```
+
+Give it your website and pick a backend. It works out the name, brand colour,
+contact details and key pages from the site. It then deploys the widget, the
+server, the knowledge base and a leads dashboard to **your own Cloudflare
+account**, and prints the embed snippet. The default backend, Cloudflare AI
+Search, needs nothing but a Cloudflare login.
+
+Or ask your coding agent. With the Claude Code plugin (or `npx -y
+@knowtific/murmur skill install`), "add an AI chatbot to my website" is
+enough: it sets up, deploys, tests and embeds the assistant itself, and asks
+you only for what it cannot know.
+
+It is built to be driven by AI agents as well as people: `murmur --help` is
+written for them, every command speaks `--json`, missing answers come back as
+a `needs_input` list of questions, and `murmur mcp` serves the same engine as
+MCP tools. See **[docs/cli.md](docs/cli.md)**.
+
+| Backend | Knowledge | Needs |
+| --- | --- | --- |
+| Cloudflare AI Search *(default)* | your site and files, or an existing AI Search instance | a Cloudflare login |
+| OpenAI | vector store + file search | `OPENAI_API_KEY` |
+| Gemini | File Search | `GEMINI_API_KEY` |
+| Anthropic Claude | via Cloudflare AI Search | `ANTHROPIC_API_KEY` |
+| Your own API | yours: Murmur protocol or OpenAI-compatible, JSON or streaming | a URL |
+| Retell | yours, in Retell | `RETELL_API_KEY` |
+
+Every deploy includes a CRM dashboard at `/admin`: conversations with
+transcripts, a leads pipeline, analytics and AI summaries, stored in D1 on
+your account.
+
+The rest of this README is about working **on** Murmur itself.
+
+---
+
+> **Status: milestones 1 to 4 done, plus M7 (agent-native setup).** The protocol, the reference server, the
 > widget core, the full rich-interaction layer (option chips, cards,
 > carousels, link lists, inline forms, shortcuts and client-side flows), the
 > security layer (origin allowlist, signed tokens, rate limits, Turnstile,
@@ -344,10 +383,13 @@ the loader, or Zod, or reaching the app's module graph by accident. The app's
 
 ## Docs
 
+- [`docs/cli.md`](docs/cli.md) — `npx @knowtific/murmur`: setup, backends, the
+  dashboard, and the contract for driving it from an AI agent.
 - [`docs/protocol.md`](docs/protocol.md) — the full wire contract, and what it
   takes to implement your own server.
 - [`docs/connectors.md`](docs/connectors.md) — the connector interface, and
-  verified API references for Retell, OpenAI and Gemini.
+  verified API references for Retell, OpenAI, Gemini, Cloudflare AI Search,
+  Anthropic and the `http` connector.
 - [`docs/prompts.md`](docs/prompts.md) — where system prompts and content
   belong, and how to keep them out of this repository.
 - [`docs/security.md`](docs/security.md) — the threat model, what each layer

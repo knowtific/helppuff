@@ -44,8 +44,9 @@ async function send(h: Harness, token: string, text: string, stream = true) {
 
 describe('capabilities', () => {
   it('advertise streaming only when the connector has it turned on', async () => {
-    const on = await (await streaming().fetch('/v1/sites/demo/config')).json();
-    const off = await (await harness().fetch('/v1/sites/demo/config')).json();
+    type Config = { capabilities: { stream: boolean } };
+    const on = (await (await streaming().fetch('/v1/sites/demo/config')).json()) as Config;
+    const off = (await (await harness().fetch('/v1/sites/demo/config')).json()) as Config;
     expect(on.capabilities.stream).toBe(true);
     expect(off.capabilities.stream).toBe(false);
   });

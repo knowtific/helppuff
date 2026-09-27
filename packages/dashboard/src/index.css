@@ -1,0 +1,107 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Tokens in the shadcn shape: every colour the UI uses is a role, defined
+ * once per theme. Neutral zinc surfaces, one accent, hairline borders — the
+ * quiet, dense look of Notion / Twenty rather than a "dashboard template".
+ */
+:root {
+  --background: #ffffff;
+  --foreground: #18181b;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --subtle: #fafafa;
+  --border: #e4e4e7;
+  --ring: #a1a1aa;
+  --primary: #18181b;
+  --primary-foreground: #fafafa;
+  --card: #ffffff;
+  --popover: #ffffff;
+  --sidebar: #fafafa;
+  --danger: #dc2626;
+  /* Chart series — validated (dataviz) against #ffffff: all checks pass. */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --grid: #f0f0f1;
+  /* Prompt diffs: a tint behind the line, the text stays foreground. */
+  --added: #dcfce7;
+  --removed: #fee2e2;
+  color-scheme: light;
+}
+
+.dark {
+  --background: #09090b;
+  --foreground: #fafafa;
+  --muted: #1c1c1f;
+  --muted-foreground: #a1a1aa;
+  --subtle: #111113;
+  --border: #27272a;
+  --ring: #52525b;
+  --primary: #fafafa;
+  --primary-foreground: #18181b;
+  --card: #0f0f11;
+  --popover: #18181b;
+  --sidebar: #0c0c0e;
+  --danger: #f87171;
+  /* Stepped for the dark surface, validated against #18181b. */
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --grid: #1f1f23;
+  --added: #14532d66;
+  --removed: #7f1d1d66;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-subtle: var(--subtle);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-card: var(--card);
+  --color-popover: var(--popover);
+  --color-sidebar: var(--sidebar);
+  --color-danger: var(--danger);
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
+  --color-added: var(--added);
+  --color-removed: var(--removed);
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--series-1) 25%, transparent);
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}

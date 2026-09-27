@@ -27,7 +27,22 @@ export type RequestCtx = {
   origin: string | null;
   /** SHA-256 of the visitor IP with a secret salt — never the raw IP (§7.2). */
   ipKey: () => Promise<string>;
+  /**
+   * The site owner testing from the CLI (`murmur chat`), proven by a header
+   * derived from MURMUR_SECRET. Exempt from the per-IP limits, which exist to
+   * stop one visitor hammering the site — never from the per-session or
+   * daily caps, which bound cost.
+   */
+  isOwner: () => Promise<boolean>;
 };
+
+export const OWNER_HEADER = 'X-Murmur-Owner';
+
+/** The owner header's value: hex SHA-256 of `<MURMUR_SECRET>:owner-test`. */
+export async function ownerToken(secret: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${secret}:owner-test`));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
 
 /** Cloudflare's own header. Other platforms set their own in an adapter. */
 function extractIp(c: Context<HonoEnv>): string | null {
@@ -58,6 +73,8 @@ export function buildRequestCtx(c: Context<HonoEnv>, config: MurmurConfig): Requ
   };
 
   let cachedIpKey: Promise<string> | null = null;
+  let cachedOwner: Promise<boolean> | null = null;
+  const presented = c.req.header(OWNER_HEADER);
 
   return {
     config,
@@ -68,6 +85,10 @@ export function buildRequestCtx(c: Context<HonoEnv>, config: MurmurConfig): Requ
     ipKey: () => {
       cachedIpKey ??= hashIp(platform.ip, secret || 'unsalted');
       return cachedIpKey;
+    },
+    isOwner: () => {
+      cachedOwner ??= presented && secret.length >= 32 ? ownerToken(secret).then((t) => t === presented) : Promise.resolve(false);
+      return cachedOwner;
     },
   };
 }

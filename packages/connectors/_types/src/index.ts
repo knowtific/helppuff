@@ -5,6 +5,8 @@ export * from './errors.js';
 export * from './helpers.js';
 export * from './rich.js';
 export * from './prompt.js';
+export * from './history.js';
+export * from './ai-search.js';
 
 /** A minimal key/value store with TTL — Workers KV in production (§7.3). */
 export interface KvStore {
@@ -47,6 +49,13 @@ export interface Connector<Opts = unknown, State = unknown> {
    * honours `ctx.onText` implements it; absent means never.
    */
   streams?(options: Opts): boolean;
+  /**
+   * The option that carries this site's system prompt, so a new prompt
+   * version can replace it. `null` (or absent) when the prompt lives
+   * somewhere Murmur does not own — a Retell agent, an OpenAI stored prompt,
+   * the owner's own API.
+   */
+  promptOption?(options: Opts): string | null;
 
   start(
     ctx: ConnectorContext<Opts>,
@@ -81,6 +90,8 @@ export interface ErasedConnector {
   parseOptions(input: unknown): unknown;
   /** Whether replies stream for these (already parsed) options. */
   streams(options: unknown): boolean;
+  /** Which option holds the prompt for these (already parsed) options, if Murmur owns it. */
+  promptOption(options: unknown): string | null;
   start(
     ctx: ConnectorContext<unknown>,
     input: StartSessionRequest,
@@ -112,6 +123,7 @@ export function defineConnector<Opts, State>(connector: Connector<Opts, State>):
     capabilities: connector.capabilities,
     parseOptions: (input) => connector.optionsSchema.parse(input),
     streams: (options) => connector.streams?.(options as Opts) ?? false,
+    promptOption: (options) => connector.promptOption?.(options as Opts) ?? null,
     start: (ctx, input) => connector.start(asOpts(ctx), input),
     send: (ctx, state, input) => connector.send(asOpts(ctx), asState(state), input),
   };

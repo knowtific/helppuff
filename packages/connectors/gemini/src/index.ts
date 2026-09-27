@@ -399,6 +399,7 @@ const gemini: Connector<GeminiOptions, GeminiState> = {
   optionsSchema: geminiOptionsSchema,
   capabilities: { poll: false, end: false },
   streams: (options) => options.stream,
+  promptOption: () => 'systemInstruction',
 
   async start(ctx, input) {
     if (!input.firstMessage) return { state: { interactionId: null }, messages: [] };

@@ -1,6 +1,8 @@
 name = "murmur"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
+# The Anthropic connector's SDK imports Node built-ins.
+compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
 # `setup.sh` fills in the real id. KV holds rate-limit counters, per-session

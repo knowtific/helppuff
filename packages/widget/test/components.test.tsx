@@ -537,3 +537,11 @@ describe('stylesheet assembly', () => {
     expect(after).not.toMatch(/--mm-accent\s*:/);
   });
 });
+
+describe('the wait before retrying', () => {
+  it('reads as seconds when short and minutes when long', async () => {
+    const { formatWait } = await import('../src/components/ErrorNotice.js');
+    expect(formatWait(45)).toBe('45s');
+    expect(formatWait(1329)).toBe('about 23 min');
+  });
+});

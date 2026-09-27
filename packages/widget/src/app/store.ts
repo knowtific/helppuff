@@ -1,4 +1,5 @@
 import type { ErrorCode, Message, WidgetConfig } from '@murmur/protocol';
+import { makeStrings } from './strings.js';
 
 /**
  * §8.5's diagram, encoded as three orthogonal fields rather than one enum.
@@ -136,6 +137,31 @@ export function leadIsComplete(config: WidgetConfig | null, lead: Record<string,
 }
 
 /** Where `start` should land: straight into the session, or via the form. */
+/** Fill `{name}` / `{{name}}` with a first name, or drop it cleanly: "Hi {name}!" → "Hi Jo!" / "Hi!". */
+export function fillName(text: string, name: string | undefined): string {
+  return text.replace(/\s*\{\{?\s*name\s*\}?\}/g, name ? ` ${name}` : '').trim();
+}
+
+/**
+ * The opening message for an empty thread — the site's `chat.initialMessages`,
+ * or the default greeting. Shown the moment the conversation opens, so a
+ * visitor never faces a blank thread while the session starts; a greeting
+ * from the backend itself replaces it (see `session/started`).
+ */
+export function greetingMessages(config: WidgetConfig | null, lead: Record<string, string> | null, now = Date.now()): Message[] {
+  if (!config) return [];
+  const first = lead?.['name']?.trim().split(/\s+/)[0];
+  const configured = config.chat.initialMessages;
+  const texts = configured?.length ? configured : [makeStrings(config.strings)('greeting')];
+  return texts
+    .map((text) => fillName(text, first))
+    .filter(Boolean)
+    .map((text, index) => ({ id: `${GREETING_PREFIX}${index}`, ts: now + index, role: 'agent' as const, type: 'text' as const, text }));
+}
+
+export const GREETING_PREFIX = 'greeting-';
+const isGreeting = (message: Message) => message.id.startsWith(GREETING_PREFIX);
+
 function screenAfterStart(state: State): Screen {
   return leadIsComplete(state.config, state.lead) ? 'chat' : 'lead_form';
 }
@@ -193,6 +219,11 @@ export function reducer(state: State, action: Action): State {
       return {
         ...state,
         screen,
+        // Straight into chat: greet now. The form path greets on submit, with the name.
+        // A visitor who has already asked something does not need to be asked what they need.
+        ...(screen === 'chat' && state.messages.length === 0 && !action.firstMessage
+          ? { messages: greetingMessages(state.config, state.lead) }
+          : {}),
         // Only the direct path opens a session here; the form path waits for submit.
         status: screen === 'chat' ? 'starting' : 'idle',
         error: null,
@@ -200,7 +231,14 @@ export function reducer(state: State, action: Action): State {
     }
 
     case 'lead/submit':
-      return { ...state, lead: action.lead, screen: 'chat', status: 'starting', error: null };
+      return {
+        ...state,
+        lead: action.lead,
+        screen: 'chat',
+        status: 'starting',
+        error: null,
+        ...(state.messages.length === 0 && !action.firstMessage ? { messages: greetingMessages(state.config, action.lead) } : {}),
+      };
 
     case 'session/started':
       return {
@@ -209,7 +247,8 @@ export function reducer(state: State, action: Action): State {
         screen: 'chat',
         status: 'idle',
         messages: capMessages([
-          ...state.messages,
+          // The backend greeted on its own (Retell, say): its words, not ours.
+          ...(action.userMessage || action.messages.length === 0 ? state.messages : state.messages.filter((m) => !isGreeting(m))),
           ...(action.userMessage ? [action.userMessage] : []),
           ...action.messages,
         ]),

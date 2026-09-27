@@ -130,6 +130,50 @@ daily quota are the layers that carry the weight.
 
 ---
 
+## The dashboard: what is stored, and who can read it
+
+With the dashboard on (the default for projects created by `murmur init`),
+the Worker **does** store data: every conversation, every message both ways,
+and leads — names, emails, phone numbers — in a D1 database on the site
+owner's own Cloudflare account. Without a `MURMUR_DB` binding nothing is
+written and everything above about "no lead data at rest" still holds.
+
+- **Writes never touch the reply path.** Recording runs in `waitUntil` and
+  swallows its own errors; a failing database cannot delay or break a visitor's
+  chat.
+- **No raw IPs.** A conversation keeps the page, referrer, UTM tags, locale and
+  Cloudflare's two-letter country — never the address.
+- **Sign-in** is email and password. Passwords are PBKDF2-SHA256 (100k
+  iterations, the Workers maximum) hashed on the owner's machine by the CLI;
+  the owner's hash is a Worker secret, teammates' hashes are in D1. A miss on
+  an unknown email still runs a hash, so timing does not reveal which emails
+  exist. Ten attempts per IP per 15 minutes.
+- **Sessions** are a stateless HMAC-signed cookie (keyed from MURMUR_SECRET),
+  `HttpOnly; Secure; SameSite=Strict; Path=/admin`, seven days. A removed
+  teammate is refused on their next request, not when the cookie expires.
+- **Mutations** (sign-in, summaries, lead edits) must come from the dashboard's
+  own origin; every API response is `no-store` and `X-Frame-Options: DENY`.
+- **CSV export** prefixes cells that start with `= + - @`, so a lead who types a
+  formula cannot run it in the owner's spreadsheet.
+- **AI summaries** only attach contact details that literally appear in the
+  transcript — a model inventing an email cannot create a lead.
+
+Rotating MURMUR_SECRET signs everyone out of the dashboard as well as ending
+live chats.
+
+## The owner's test header
+
+`murmur chat` and `murmur users reset` send `X-Murmur-Owner: <hex SHA-256 of
+"<MURMUR_SECRET>:owner-test">`. A request carrying the right value skips the
+**per-IP** limits (sessions per hour, messages per minute, dashboard
+sign-ins) — the ones that stop a single visitor hammering the site — so the
+owner and their agent can test freely. It never skips the per-conversation
+or daily caps, which bound cost. Deriving the value needs MURMUR_SECRET,
+which never leaves `.env` and the Worker; a wrong value is ignored, not
+rejected, so probing it tells an attacker nothing.
+
+---
+
 ## If you want a stronger guarantee than "bounded cost"
 
 The only way to genuinely restrict the API to known callers is to stop it

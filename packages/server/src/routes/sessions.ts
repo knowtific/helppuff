@@ -13,6 +13,7 @@ import { hitDaily, hitWindow, rateLimited, quotaExceeded } from '../core/ratelim
 import { assertTurnstile } from '../core/turnstile.js';
 import { resolveSecrets } from '../config/load.js';
 import { dispatchLead } from '../core/sinks.js';
+import { recordStart } from '../admin/record.js';
 
 export const sessionRoutes = new Hono<HonoEnv>();
 
@@ -55,7 +56,9 @@ sessionRoutes.post('/v1/sites/:siteId/sessions', async (c) => {
 
   // Scoped by site: each site configures its own limit and its own budget,
   // so one site's traffic must not consume another's.
-  const perIp = await hitWindow(ctx.platform.kv, 'sess', `${siteId}:${ipKey}`, limits.sessionsPerIpPerHour, 3600);
+  const perIp = (await ctx.isOwner())
+    ? { allowed: true, count: 0 }
+    : await hitWindow(ctx.platform.kv, 'sess', `${siteId}:${ipKey}`, limits.sessionsPerIpPerHour, 3600);
   if (!perIp.allowed) {
     ctx.platform.log('limit.sessions_per_ip', { siteId });
     throw rateLimited(perIp, 'sessions_per_ip_per_hour');
@@ -100,7 +103,18 @@ sessionRoutes.post('/v1/sites/:siteId/sessions', async (c) => {
 
     ctx.platform.log('session.started', { siteId, sessionId, messages: messages.length });
 
-    // 9. Lead destinations, after the response is decided and never blocking it.
+    // 9. The dashboard's copy, when a database is bound — also never blocking.
+    recordStart(ctx, {
+      siteId,
+      sessionId,
+      lead,
+      context: input.context,
+      firstMessage: input.firstMessage,
+      messages,
+      country: c.req.header('CF-IPCountry') ?? null,
+    });
+
+    // 10. Lead destinations, after the response is decided and never blocking it.
     dispatchLead(ctx, site, siteId, {
       sessionId,
       lead,

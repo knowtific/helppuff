@@ -17,6 +17,7 @@ import { issueToken, verifyToken, type SessionTokenPayload } from '../core/token
 import { hitDaily, hitTotal, hitWindow, rateLimited, quotaExceeded, sessionMessageKey } from '../core/ratelimit.js';
 import type { SiteConfig } from '../config/schema.js';
 import { readJsonBody } from './sessions.js';
+import { recordTurn } from '../admin/record.js';
 
 export const messageRoutes = new Hono<HonoEnv>();
 
@@ -76,13 +77,9 @@ messageRoutes.post('/v1/sessions/messages', async (c) => {
   const ipKey = await ctx.ipKey();
 
   // Scoped by site, as with sessions.
-  const perIp = await hitWindow(
-    ctx.platform.kv,
-    'msg',
-    `${payload.siteId}:${ipKey}`,
-    limits.messagesPerIpPerMinute,
-    60,
-  );
+  const perIp = (await ctx.isOwner())
+    ? { allowed: true, count: 0 }
+    : await hitWindow(ctx.platform.kv, 'msg', `${payload.siteId}:${ipKey}`, limits.messagesPerIpPerMinute, 60);
   if (!perIp.allowed) {
     ctx.platform.log('limit.messages_per_ip', { siteId: payload.siteId });
     throw rateLimited(perIp, 'messages_per_ip_per_minute');
@@ -134,6 +131,7 @@ messageRoutes.post('/v1/sessions/messages', async (c) => {
     const token = await refreshToken(ctx, session, state, count);
 
     ctx.platform.log('message.sent', { siteId: payload.siteId, sessionId: payload.sessionId, count });
+    recordTurn(ctx, { siteId: payload.siteId, sessionId: payload.sessionId, request: input, messages });
     return { messages, token };
   };
 

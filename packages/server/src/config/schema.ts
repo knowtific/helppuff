@@ -77,12 +77,30 @@ export type SiteConfig = z.infer<typeof siteConfigSchema>;
  * than silently ignored: believing you have locked a domain when you have not
  * is worse than a config that visibly did not take.
  */
+/**
+ * Which prompt version the stored connector options carry. Written by
+ * `murmur deploy` and by the dashboard whenever either publishes a prompt,
+ * so each can tell whether the other has moved on since it last looked.
+ * The text itself stays in the connector's own option; history is in D1.
+ */
+export const promptMetaSchema = z
+  .object({
+    version: z.number().int().min(1),
+    hash: z.string().min(1).max(64),
+    at: z.number().int().nonnegative(),
+    by: z.string().max(200).nullable().default(null),
+    source: z.enum(['cli', 'dashboard', 'restore']),
+  })
+  .strict();
+export type PromptMeta = z.infer<typeof promptMetaSchema>;
+
 export const storedSiteConfigSchema = z
   .object({
     connector: connectorConfigSchema.optional(),
     sinks: z.array(sinkConfigSchema).max(10).optional(),
     security: securitySchema.optional(),
     widget: widgetConfigSchema.optional(),
+    prompt: promptMetaSchema.optional(),
   })
   .strict();
 export type StoredSiteConfig = z.infer<typeof storedSiteConfigSchema>;

@@ -39,6 +39,10 @@ jobs:
       - name: Build the widget
         run: pnpm build
 
+      # The CLI bundles the widget, the dashboard and the Worker runtime.
+      - name: Build the CLI
+        run: pnpm build:cli
+
       - name: Install Playwright's browser
         run: pnpm exec playwright install --with-deps chromium
 

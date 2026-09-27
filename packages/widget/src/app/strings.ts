@@ -13,6 +13,10 @@ export const DEFAULT_STRINGS = {
   required: 'required',
   submit: 'Start chat',
   firstMessage: 'How can we help?',
+  // The assistant's opening line when a conversation starts with an empty
+  // thread. `{name}` becomes the visitor's first name when the lead form
+  // asked for it, and disappears when it did not. Set to "" to turn it off.
+  greeting: 'Hi {name}! How can we help you today?',
   retry: 'Try again',
   dismiss: 'Dismiss',
   newChat: 'Start a new conversation',

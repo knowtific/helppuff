@@ -7,6 +7,7 @@ import { allConfiguredOrigins, buildRequestCtx, type HonoEnv } from './core/requ
 import { configRoutes } from './routes/config.js';
 import { messageRoutes } from './routes/messages.js';
 import { sessionRoutes } from './routes/sessions.js';
+import { adminRoutes } from './admin/routes.js';
 
 export function createApp(config: MurmurConfig): Hono<HonoEnv> {
   const app = new Hono<HonoEnv>();
@@ -35,6 +36,7 @@ export function createApp(config: MurmurConfig): Hono<HonoEnv> {
   app.route('/', configRoutes);
   app.route('/', sessionRoutes);
   app.route('/', messageRoutes);
+  app.route('/', adminRoutes);
 
   app.notFound(() => {
     throw new MurmurError('not_found', { detail: 'no_route' });
