@@ -191,8 +191,12 @@ Then register it in `packages/server/src/core/registry.ts`, add it to
 The rules:
 
 - **State is small.** It rides in the signed session token: under 1 KB. Keep
-  history in the provider (an id), or in KV (`history.ts` in
-  `@murmur/connector-types`).
+  history in the provider (an id), or use `loadHistory` / `appendHistory`
+  (`history.ts` in `@murmur/connector-types`): they read the server's record
+  of the conversation when there is one, and KV otherwise.
+- **Never make the visitor wait for a write.** Hand it to `ctx.waitUntil`;
+  `appendHistory` and `saveScope` already do. Start reads early and await
+  them together.
 - **Throw `ConnectorError` with a visitor-safe message.** Put diagnostics in
   `detail`, which is logged and never shown. Anything else becomes a generic error.
 - **Time out outbound calls** (25 s; `fetchWithTimeout` does it) and use

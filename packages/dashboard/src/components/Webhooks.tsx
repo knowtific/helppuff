@@ -17,7 +17,7 @@ type Webhook = {
   events: string[];
   enabled: boolean;
   secret: string;
-  lastStatus: 'ok' | 'failed' | null;
+  lastStatus: 'ok' | 'failed' | 'retrying' | null;
   lastError: string | null;
   lastAt: number | null;
 };
@@ -238,8 +238,13 @@ function WebhookCard({ hook, events, onChanged }: { hook: Webhook; events: Event
         <span className="flex items-center gap-1.5 text-muted-foreground" role="status">
           {hook.lastAt ? (
             <>
-              <span className={cn('size-1.5 rounded-full', hook.lastStatus === 'ok' ? 'bg-[#16a34a]' : 'bg-danger')} aria-hidden />
-              {hook.lastStatus === 'ok' ? 'Delivered' : `Failed${hook.lastError ? `: ${hook.lastError}` : ''}`} {fmtRelative(hook.lastAt)}
+              <span className={cn('size-1.5 rounded-full', hook.lastStatus === 'ok' ? 'bg-[#16a34a]' : hook.lastStatus === 'retrying' ? 'bg-[#f59e0b]' : 'bg-danger')} aria-hidden />
+              {hook.lastStatus === 'ok'
+                ? 'Delivered'
+                : hook.lastStatus === 'retrying'
+                  ? `Failed${hook.lastError ? ` (${hook.lastError})` : ''}, trying again later`
+                  : `Failed${hook.lastError ? `: ${hook.lastError}` : ''}`}{' '}
+              {fmtRelative(hook.lastAt)}
             </>
           ) : (
             'Nothing sent yet'

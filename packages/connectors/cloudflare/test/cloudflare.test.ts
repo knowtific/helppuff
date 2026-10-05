@@ -81,6 +81,18 @@ describe('requests', () => {
     expect(calls[1]!.messages[2]!.content).toBe('One.');
   });
 
+  it("reads history from the server's record when there is one, and keeps no copy in KV", async () => {
+    const { ctx, calls, kv } = harness({}, [completion('Two.')]);
+    ctx.history = async () => [
+      { role: 'user', content: 'first' },
+      { role: 'assistant', content: 'One.' },
+    ];
+    await cloudflare.send(ctx, { turns: 1 }, { kind: 'text', text: 'second', clientId: 'c2' });
+
+    expect(calls[0]!.messages.map((m) => m.content).slice(1)).toEqual(['first', 'One.', 'second']);
+    expect([...kv.keys()].filter((k) => !k.endsWith(':scope'))).toEqual([]);
+  });
+
   it('passes the model and retrieval options through', async () => {
     const { ctx, calls } = harness({ model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', maxResults: 4 }, [
       completion('ok'),

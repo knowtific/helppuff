@@ -27,11 +27,20 @@ leads only; see [[Leads]].
 | `callback.requested` | The visitor asked to be called back | `conversationId`, `name`, `email`, `phone`, `message` |
 | `lead.updated` | A lead's status, notes or name changed in the dashboard | `leadId`, `conversationId`, `changed`, `lead` |
 | `feedback.received` | A visitor rated a reply | `conversationId`, `messageId`, `rating` (`up`, `down`, `cleared`) |
-| `conversation.summarized` | The dashboard summarised a chat | `conversationId`, `summary`, `intent`, `sentiment`, `followUp` |
-| `conversation.ended` | The visitor ended the chat | `conversationId` |
+| `conversation.completed` | A conversation went quiet: **5 minutes after its last message**. Sent once (again if the visitor comes back later) | `conversationId`, `startedAt`, `lastMessageAt`, `messageCount`, `page`, `country`, `summary`, `labels` `{intent, sentiment, leadQuality, outcome, topics}`, `unanswered` (questions it could not answer), `followUp`, `lead`, `transcript` `[{role, text, at}]` |
+| `conversation.summarized` | Someone pressed **Summarise** in the dashboard | `conversationId`, `summary`, `intent`, `sentiment`, `leadQuality`, `outcome`, `topics`, `unanswered`, `followUp` |
+| `conversation.ended` | The visitor started a new chat, or the page called `Murmur.reset()`. Most visitors just leave, so prefer `conversation.completed` | `conversationId` |
+| `budget.warning` | Today's AI budget is 80% used; answers are kept shorter. Once a day | `day`, `neuronsUsed`, `dailyBudget`, `resetsAt` |
+| `budget.exhausted` | Today's AI budget is used up; visitors get your contact details and a callback form until `resetsAt`. Once a day | `day`, `neuronsUsed`, `dailyBudget`, `resetsAt` |
 | `knowledge.crawl.finished` | Learning the website finished | `runId`, `status`, `trigger`, `pages` `{learned,failed}`, `passages` |
 | `knowledge.file.processed` | An uploaded file was learned, or failed | `fileId`, `name`, `status` (`indexed` or `error`), `passages`, `truncated`, `error` |
 | `test.ping` | **Send test** in the dashboard, or `murmur webhooks test` | `message` |
+
+**Which to pick.** For a CRM, a spreadsheet or a team chat, three cover most
+needs: `conversation.started` (who, from which page, the pre-chat form),
+`callback.requested` (act now) and `conversation.completed` (the summary,
+labels and transcript, once the chat is over). The per-message events are
+high-volume and mainly for mirroring chats live.
 
 A lead is a person keyed by email: `lead.captured` can arrive more than once
 for the same person (the form, then a phone number typed later). Upsert on
@@ -65,11 +74,14 @@ X-Murmur-Signature: sha256=9a1b…
 }
 ```
 
-Answer with any 2xx. A timeout (8 seconds), 429 or 5xx is retried once after a
-second and a half; anything else is not. The dashboard keeps the last 50
-deliveries of each endpoint (**Recent deliveries**), with the status and how
-long it took. Nothing about a delivery ever reaches the visitor: events are
-sent after their reply.
+Answer with any 2xx within 8 seconds. A delivery that fails in a way a retry
+could fix (a timeout, a network error, 429 or 5xx) is tried again in the
+background, after 1 minute, 5 minutes, 30 minutes, 2 hours and 6 hours, so an
+endpoint that is down for a while still gets everything. A 4xx is taken as
+the endpoint saying no, and is not retried. The dashboard keeps the last 50
+deliveries of each endpoint (**Recent deliveries**: every try, with its status
+and timing) and shows "trying again later" while a retry is pending. Nothing
+about a delivery ever reaches the visitor: events are sent after their reply.
 
 ## Checking a delivery came from us
 

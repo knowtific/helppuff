@@ -2,7 +2,15 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { VERSION } from './version.js';
-import { collectSecretNames, murmurConfigSchema, normalizePrompt, storedSiteConfigSchema, getConnector } from '@murmur/server';
+import {
+  IP_LIMITER_BINDING,
+  IP_LIMIT_VAR,
+  collectSecretNames,
+  murmurConfigSchema,
+  normalizePrompt,
+  storedSiteConfigSchema,
+  getConnector,
+} from '@murmur/server';
 import { CliError } from '../errors.js';
 import {
   BACKENDS_WITH_PROMPT,
@@ -229,6 +237,12 @@ export function compile(
     throw new CliError('invalid_config', `The KV config is invalid: ${parsedStored.error.message}`);
   }
 
+  // Messages per visitor a minute: counted by Cloudflare's Rate Limiting
+  // binding, in memory where the visitor is (no KV write, no wait). The
+  // limit is fixed at deploy; the server checks it matches the live one.
+  const ipLimit = parsedServer.data.sites[project.site]!.security.limits.messagesPerIpPerMinute;
+  const ipLimiterNamespace = String(parseInt(createHash('sha256').update(workerName).digest('hex').slice(0, 7), 16) + 1000);
+
   const dashboard = dashboardEnabled(project);
   const owner = dashboard && Boolean(project.dashboard.adminEmail);
   const database = needsDatabase(project);
@@ -248,6 +262,7 @@ export function compile(
     compatibility_flags: ['nodejs_compat'],
     workers_dev: true,
     kv_namespaces: [{ binding: KV_BINDING, id: options.kvNamespaceId ?? 'murmur-local' }],
+    ratelimits: [{ name: IP_LIMITER_BINDING, namespace_id: ipLimiterNamespace, simple: { limit: ipLimit, period: 60 } }],
     ...(aiSearchInstance
       ? { ai_search: [{ binding: AI_SEARCH_BINDING, instance_name: aiSearchInstance, ...(options.dev ? { remote: true } : {}) }] }
       : {}),
@@ -258,12 +273,13 @@ export function compile(
           ],
           // Workers AI: answers and embeddings (workers-ai), conversation summaries (dashboard).
           ai: { binding: 'AI' },
+          // Background jobs: crawls and files (workers-ai), the end of each conversation, webhook retries.
+          workflows: [{ name: `${workerName}-crawl`.slice(0, 64), binding: WORKFLOW_BINDING, class_name: 'CrawlWorkflow' }],
         }
       : {}),
     ...(ownKnowledge
       ? {
           vectorize: [{ binding: VECTORS_BINDING, index_name: vectorizeIndexFor(project), ...(options.dev ? { remote: true } : {}) }],
-          workflows: [{ name: `${workerName}-crawl`.slice(0, 64), binding: WORKFLOW_BINDING, class_name: 'CrawlWorkflow' }],
           triggers: { crons: [CRAWL_CRON] },
           ...(knowledge?.renderJs === 'never' ? {} : { browser: { binding: BROWSER_BINDING, ...(options.dev ? { remote: true } : {}) } }),
         }
@@ -273,6 +289,7 @@ export function compile(
       MURMUR_LOG: options.dev ? '1' : '0',
       // What `murmur upgrade` and the dashboard compare against the latest release.
       MURMUR_VERSION: VERSION,
+      [IP_LIMIT_VAR]: String(ipLimit),
       ...(owner ? { ADMIN_EMAIL: project.dashboard.adminEmail!.toLowerCase() } : {}),
       ...(dashboard && project.dashboard.summaryModel ? { MURMUR_SUMMARY_MODEL: project.dashboard.summaryModel } : {}),
     },

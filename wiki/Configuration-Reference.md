@@ -212,7 +212,7 @@ Written by `murmur deploy`. Safe to commit; holds no secrets.
 | `cloudflare.accountId` | string |  | The Cloudflare account deployed to. |
 | `cloudflare.workerName` | string |  | The Worker's name. Default: knowtific-murmur-<site>. |
 | `cloudflare.url` | string |  | Where the Worker answers. · URL |
-| `cloudflare.kvNamespaceId` | string |  | The KV namespace (rate limits, live config). |
+| `cloudflare.kvNamespaceId` | string |  | The KV namespace (live config, new-conversation counters). |
 | `cloudflare.d1DatabaseId` | string |  | The D1 database (conversations, leads, knowledge). |
 | `cloudflare.vectorizeIndex` | string |  | The Vectorize index (knowledge vectors). |
 

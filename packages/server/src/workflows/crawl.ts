@@ -1,31 +1,57 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from 'cloudflare:workers';
 import { runCrawlPart, runFileJob, type CrawlParams, type FileParams, type Notify, type StepLike } from '@murmur/rag';
+import { runConversationJob, type ConversationParams } from '../conversations/complete.js';
+import type { AiRunner } from '../conversations/summary.js';
+import { dbFrom } from '../db/d1.js';
 import { requireKnowledgeEnv } from '../knowledge/env.js';
-import { emitTo } from '../webhooks/deliver.js';
+import { emitTo, runWebhookRetry, workflowRetry, type WebhookRetryParams } from '../webhooks/deliver.js';
 
 /**
- * The background work of the knowledge base: a Cloudflare Workflow,
- * so it survives the person who started it closing the page, and each step
- * is retried on its own. Two jobs share the one binding:
+ * The Worker's background jobs: one Cloudflare Workflow, so each job survives
+ * the request that started it, and each step is retried on its own. Four
+ * kinds share the one binding (`CRAWL_WORKFLOW`; the class keeps its first
+ * name so existing deployments update in place):
  *
- *  - a crawl part (`runCrawlPart`), which chains the next instance when its
- *    batch is done;
- *  - an uploaded file (`runFileJob`, params `kind: 'file'`).
+ *  - a crawl part (`runCrawlPart`), which chains the next instance;
+ *  - an uploaded file (`runFileJob`, `kind: 'file'`);
+ *  - a conversation's end (`runConversationJob`, `kind: 'conversation'`):
+ *    summary, labels and `conversation.completed`;
+ *  - a webhook delivery that failed (`runWebhookRetry`, `kind: 'webhook'`),
+ *    retried over hours.
  *
- * The logic lives in `@murmur/rag`; this class only adapts the Workflows API.
- * Imported only by the Worker entry: `cloudflare:workers` exists nowhere else.
+ * The logic lives elsewhere and is tested against a fake step API; this
+ * class only adapts the Workflows API. Imported only by the Worker entry:
+ * `cloudflare:workers` exists nowhere else.
  */
-export class CrawlWorkflow extends WorkflowEntrypoint<Record<string, unknown>, CrawlParams | FileParams> {
-  override async run(event: Readonly<WorkflowEvent<CrawlParams | FileParams>>, step: WorkflowStep): Promise<unknown> {
-    const env = requireKnowledgeEnv(this.env);
+
+type Job = CrawlParams | FileParams | ConversationParams | WebhookRetryParams;
+
+export class CrawlWorkflow extends WorkflowEntrypoint<Record<string, unknown>, Job> {
+  override async run(event: Readonly<WorkflowEvent<Job>>, step: WorkflowStep): Promise<unknown> {
     const steps: StepLike = {
       do: (name, run) =>
         step.do(name, { retries: { limit: 2, delay: '10 seconds', backoff: 'exponential' }, timeout: '3 minutes' }, run as () => Promise<never>),
       sleep: (name, ms) => step.sleep(name, ms),
     };
     const payload = event.payload;
+    const fetcher = globalThis.fetch.bind(globalThis);
+
+    // Jobs that need only the database: they run for every backend with a dashboard.
+    if ('kind' in payload && (payload.kind === 'conversation' || payload.kind === 'webhook')) {
+      const db = dbFrom(this.env);
+      if (!db) throw new Error('No D1 binding.');
+      if (payload.kind === 'webhook') return runWebhookRetry(steps, { db, fetch: fetcher }, payload);
+      const ai = this.env['AI'] as Partial<AiRunner> | undefined;
+      return runConversationJob(
+        steps,
+        { db, fetch: fetcher, retry: workflowRetry(this.env), ...(ai && typeof ai.run === 'function' ? { ai: ai as AiRunner } : {}) },
+        payload,
+      );
+    }
+
+    const env = requireKnowledgeEnv(this.env);
     // The site's webhooks hear when learning finishes; a failing endpoint never fails the job.
-    const notify: Notify = (type, data) => emitTo({ db: env.db, fetch: globalThis.fetch.bind(globalThis) }, payload.siteId, type, data).catch(() => {});
+    const notify: Notify = (type, data) => emitTo({ db: env.db, fetch: fetcher, retry: workflowRetry(this.env) }, payload.siteId, type, data).catch(() => {});
     if ('kind' in payload && payload.kind === 'file') {
       if (!env.uploads) throw new Error('No KV binding to read the upload from.');
       return runFileJob(steps, { db: env.db, ai: env.ai, vectors: env.vectors, uploads: env.uploads, toMarkdown: env.toMarkdown, notify }, payload);
@@ -36,10 +62,10 @@ export class CrawlWorkflow extends WorkflowEntrypoint<Record<string, unknown>, C
       ai: env.ai,
       vectors: env.vectors,
       browser: env.browser,
+      notify,
       startNext: async (params) => {
         await env.workflow?.create({ id: `${params.runId}-${params.part}`, params });
       },
-      notify,
       startFile: async (params) => {
         await env.workflow?.create({ id: `file-${params.fileId}-${Date.now().toString(36)}`, params });
       },

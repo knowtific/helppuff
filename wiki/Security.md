@@ -52,8 +52,9 @@ limits blast radius.
 **The per-session cap is no longer bypassable.** It used to be counted from
 `count` inside the session token, and the client chooses which token it
 sends — so replaying the original reset the count on every request and the
-cap never tripped. It is now a KV counter keyed by session id, which the
-client cannot rewind. There is a test that replays the first token forever
+cap never tripped. It is now counted server-side by session id (from the
+recorded conversation, or a KV counter without a database), which the client
+cannot rewind. There is a test that replays the first token forever
 and asserts the cap still trips.
 
 **Rate limits are enforced.** `messagesPerIpPerMinute`, `sessionsPerIpPerHour`

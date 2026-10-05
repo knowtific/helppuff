@@ -60,7 +60,7 @@ const CACHE_PREFIX = 'prompt:cache:';
  * answers nothing. The miss is logged so it is visible to the operator.
  */
 export async function resolvePrompt(
-  ctx: Pick<ConnectorContext<unknown>, 'kv' | 'env' | 'fetch' | 'log'>,
+  ctx: Pick<ConnectorContext<unknown>, 'kv' | 'env' | 'fetch' | 'log'> & Partial<Pick<ConnectorContext<unknown>, 'waitUntil'>>,
   source: PromptSource | undefined,
   scope: PromptScope,
 ): Promise<string | undefined> {
@@ -74,7 +74,7 @@ export async function resolvePrompt(
 }
 
 async function readSource(
-  ctx: Pick<ConnectorContext<unknown>, 'kv' | 'env' | 'fetch' | 'log'>,
+  ctx: Pick<ConnectorContext<unknown>, 'kv' | 'env' | 'fetch' | 'log'> & Partial<Pick<ConnectorContext<unknown>, 'waitUntil'>>,
   source: PromptSource,
 ): Promise<string | null> {
   if (typeof source === 'string') return source;
@@ -102,7 +102,7 @@ async function readSource(
  * miss — a CMS being briefly down must not change how the assistant behaves.
  */
 async function fetchPrompt(
-  ctx: Pick<ConnectorContext<unknown>, 'kv' | 'fetch' | 'log'>,
+  ctx: Pick<ConnectorContext<unknown>, 'kv' | 'fetch' | 'log'> & Partial<Pick<ConnectorContext<unknown>, 'waitUntil'>>,
   url: string,
   ttlSeconds: number,
 ): Promise<string | null> {
@@ -119,7 +119,10 @@ async function fetchPrompt(
       return null;
     }
     const text = (await response.text()).slice(0, 16_000);
-    await ctx.kv.put(key, text, { expirationTtl: ttlSeconds });
+    // Cached after the response when the platform allows it: the reply needs only the text.
+    const cache = ctx.kv.put(key, text, { expirationTtl: ttlSeconds });
+    if (ctx.waitUntil) ctx.waitUntil(cache.catch(() => {}));
+    else await cache;
     return text;
   } catch {
     ctx.log('prompt.fetch_failed');

@@ -14,10 +14,13 @@ answers a day:
 
 - **Workers AI** is usually the first to run out. A typical answer is about
   30 neurons, so about 300 answers a day fit.
-- **KV writes** come close: each message writes about four counters (rate
-  limits, the conversation's history). Past 1,000 writes in a day, chats keep
-  working, but the per-visitor rate limits stop counting until the next UTC
-  day. The AI budget is counted in D1, so it still holds.
+- **KV writes** are not a limit: a message writes nothing to KV. The
+  per-visitor limit is counted by Cloudflare's Rate Limiting binding, and the
+  per-conversation and daily limits and the conversation's history are read
+  from the database, which records every turn anyway.
+
+Nothing a visitor waits for is a write: everything Murmur records about a
+message (the dashboard, usage, webhooks) happens after the reply.
 
 [Workers Paid](https://developers.cloudflare.com/workers/platform/pricing/)
 ($5 a month) removes the daily caps on everything except Workers AI, which
@@ -35,12 +38,17 @@ UTC day) and steps down gracefully instead of failing:
 | 80–100% | shorter answers from fewer passages |
 | 100% | no AI: a short note with your phone number and the callback form. Leads still come in |
 
+[[Webhooks]] can tell you as it happens: `budget.warning` at 80% and
+`budget.exhausted` at 100%, each once a day.
+
 It resets at 00:00 UTC. The dashboard's Knowledge page and `murmur knowledge
 status` show today's use. On Workers Paid, raise
 `backend.budget.dailyNeurons` to whatever you are happy to spend.
 
 Learning your site costs a few neurons per page, once: unchanged pages are
-never embedded again. Uploaded files cost the same per page of text.
+never embedded again. Uploaded files cost the same per page of text. Each
+conversation's automatic summary costs about 15–30 neurons, counted in the
+same budget, and is skipped once the budget is spent.
 
 ## Limits that protect you
 

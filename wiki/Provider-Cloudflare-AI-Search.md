@@ -58,7 +58,7 @@ while it runs; then it checks every file is listed.
 - AI Search's chat completions take no tool definitions, so rich messages
   (option chips, links) use inline markers, which Murmur teaches the model and
   turns into real chips.
-- Conversation history is kept in KV per session (the last 24 turns),
-  expiring with the session.
+- Conversation history (the last 24 turns) is read from Murmur's record of
+  the conversation in D1, or kept in KV per session without a database.
 - Limits during the beta: 100 instances and 500 crawled pages a day on Workers
   Free. Workers AI generation is billed as usual.

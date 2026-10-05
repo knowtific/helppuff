@@ -652,11 +652,14 @@ export function App({
   }, [doSend, startSession]);
 
   const onNewChat = useCallback(() => {
+    // The one moment a visitor really ends a conversation: tell the server (conversation.ended).
+    const ending = stateRef.current.session;
+    if (ending) api.end(ending.token);
     leadRef.current = null;
     queuedFirstMessage.current = null;
     clearStorage(siteId);
     dispatch({ type: 'reset' });
-  }, [siteId]);
+  }, [siteId, api]);
 
   /**
    * The handle the loader drives `window.Murmur` through.

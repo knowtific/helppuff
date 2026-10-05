@@ -220,7 +220,7 @@ export const projectSchema = z
         accountId: z.string().regex(/^[0-9a-f]{32}$/).optional().describe('The Cloudflare account deployed to.'),
         workerName: z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/).optional().describe('The Worker\'s name. Default: knowtific-murmur-<site>.'),
         url: z.string().url().optional().describe('Where the Worker answers.'),
-        kvNamespaceId: z.string().optional().describe('The KV namespace (rate limits, live config).'),
+        kvNamespaceId: z.string().optional().describe('The KV namespace (live config, new-conversation counters).'),
         d1DatabaseId: z.string().optional().describe('The D1 database (conversations, leads, knowledge).'),
         vectorizeIndex: z.string().optional().describe('The Vectorize index (knowledge vectors).'),
       })

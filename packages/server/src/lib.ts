@@ -10,6 +10,7 @@ export { connectors, sinks, getConnector } from './core/registry.js';
 export { issueToken, verifyToken, newSessionId, type SessionTokenPayload } from './core/token.js';
 export { isAllowedOrigin, normalizeOrigin, corsHeaders } from './core/origin.js';
 export { validateLead } from './core/lead.js';
+export { IP_LIMITER_BINDING, IP_LIMIT_VAR } from './core/ratelimit.js';
 export { sanitizeConnectorMessages, FALLBACK_NOTICE_TEXT } from './core/sanitize.js';
 export type { Bindings, HonoEnv, RequestCtx } from './core/request.js';
 export { OWNER_HEADER, ownerToken } from './core/request.js';

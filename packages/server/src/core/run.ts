@@ -5,6 +5,9 @@ import { resolveSecrets } from '../config/load.js';
 import { MurmurError, toMurmurError } from './errors.js';
 import { getConnector } from './registry.js';
 import type { RequestCtx } from './request.js';
+import { recordedHistory } from '../conversations/history.js';
+import { dbFrom } from '../db/d1.js';
+import { emit } from '../webhooks/deliver.js';
 
 export type PreparedConnector = { connector: ErasedConnector; options: unknown };
 
@@ -41,10 +44,14 @@ export function connectorContext(
   onText?: (delta: string) => void,
   reportLead?: (lead: Record<string, string>) => void,
 ): ConnectorContext<unknown> {
+  // Turns are recorded in the database after each response: a stateless backend reads its history from there.
+  const db = dbFrom(ctx.env);
   return {
+    ...(db ? { history: () => recordedHistory(db, sessionId) } : {}),
     ...(onText ? { onText } : {}),
     ...(reportLead ? { reportLead } : {}),
     time: (stage, ms) => ctx.timing.add(stage, ms),
+    notify: (type, data) => emit(ctx, siteId, type, data),
     options: prepared.options,
     siteId,
     sessionId,

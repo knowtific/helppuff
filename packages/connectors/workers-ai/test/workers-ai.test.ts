@@ -166,7 +166,8 @@ describe('workers-ai connector', () => {
     await w.send('Do you service Mooroolbark?');
     const row = w.db.raw.prepare('SELECT day, neurons_est, messages FROM usage_daily').get() as { day: string; neurons_est: number; messages: number };
     expect(row.day).toBe(usageDay(Date.now()));
-    expect(row.messages).toBe(1);
+    // Messages are counted by the server as it records the turn, for every backend.
+    expect(row.messages).toBe(0);
     expect(row.neurons_est).toBeGreaterThan(5);
   });
 
@@ -274,5 +275,35 @@ describe('older configs', () => {
         business: {},
       }),
     ).not.toThrow();
+  });
+});
+
+describe('budget alerts', () => {
+  it('sends budget.warning at 80% and budget.exhausted at 100%, each once a day', async () => {
+    const { budgetAlerts } = await import('../src/index.js');
+    const db = sqliteD1();
+    const sent: { type: string; data: Record<string, unknown> }[] = [];
+    const ctx = {
+      siteId: 'acme',
+      options: { budget: { dailyNeurons: 1000, maxInputTokens: 6000 } } as never,
+      notify: (type: string, data: Record<string, unknown>) => void sent.push({ type, data }),
+    };
+    const now = Date.parse('2026-10-05T10:00:00Z');
+    const use = (n: number) =>
+      db.raw.prepare("INSERT INTO usage_daily (day, site_id, neurons_est) VALUES ('2026-10-05', 'acme', ?) ON CONFLICT (day, site_id) DO UPDATE SET neurons_est = ?").run(n, n);
+
+    use(500);
+    await budgetAlerts(ctx, db, now);
+    expect(sent).toEqual([]);
+
+    use(850);
+    await budgetAlerts(ctx, db, now);
+    await budgetAlerts(ctx, db, now);
+    expect(sent).toEqual([{ type: 'budget.warning', data: { day: '2026-10-05', neuronsUsed: 850, dailyBudget: 1000, resetsAt: '2026-10-06T00:00:00.000Z' } }]);
+
+    use(1000);
+    await budgetAlerts(ctx, db, now);
+    await budgetAlerts(ctx, db, now);
+    expect(sent.map((s) => s.type)).toEqual(['budget.warning', 'budget.exhausted']);
   });
 });

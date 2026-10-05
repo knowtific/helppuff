@@ -9,11 +9,13 @@ import type { PromptScope } from './prompt.js';
  * thread on their side and hand back an id, which fits in the session token.
  * Anthropic's Messages API, Cloudflare AI Search and any OpenAI-compatible
  * chat endpoint are stateless: every request carries the whole
- * conversation. That does not fit in a 1 kb token, so it lives in KV, keyed
- * by session, and expires with it.
+ * conversation. That does not fit in a 1 kb token. With a database the
+ * server already records every turn, and `ctx.history` reads it back;
+ * without one it lives in KV, keyed by session, and expires with it.
  *
- * Losing it is survivable — the assistant forgets the earlier turns, and
- * the visitor's next message still gets an answer — so every read and write
+ * Writes never hold up a reply: they are handed to `waitUntil`. Losing
+ * history is survivable — the assistant forgets the earlier turns, and the
+ * visitor's next message still gets an answer — so every read and write
  * here degrades rather than throws.
  */
 
@@ -25,13 +27,21 @@ export const HISTORY_MAX_CHARS = 24_000;
 /** Matches the longest session a site may configure. */
 const HISTORY_TTL_SECONDS = 72 * 3600;
 
-type HistoryCtx = Pick<ConnectorContext<unknown>, 'kv' | 'siteId' | 'sessionId' | 'log'>;
+type HistoryCtx = Pick<ConnectorContext<unknown>, 'kv' | 'siteId' | 'sessionId' | 'log' | 'waitUntil' | 'history'>;
 
 export function historyKey(ctx: Pick<ConnectorContext<unknown>, 'siteId' | 'sessionId'>): string {
   return `hist:${ctx.siteId}:${ctx.sessionId}`;
 }
 
-export async function loadHistory(ctx: HistoryCtx): Promise<Turn[]> {
+export async function loadHistory(ctx: Omit<HistoryCtx, 'waitUntil'>): Promise<Turn[]> {
+  if (ctx.history) {
+    try {
+      return trimHistory(await ctx.history());
+    } catch {
+      ctx.log('history.unreadable');
+      return [];
+    }
+  }
   const raw = await ctx.kv.get(historyKey(ctx));
   if (!raw) return [];
   try {
@@ -50,31 +60,41 @@ export async function loadHistory(ctx: HistoryCtx): Promise<Turn[]> {
   }
 }
 
-/**
- * Append a user turn and the reply to it, then trim from the front. The
- * result always starts with a user turn, which every chat API requires.
- */
-export async function appendHistory(ctx: HistoryCtx, previous: Turn[], added: Turn[]): Promise<void> {
-  let turns = [...previous, ...added.filter((turn) => turn.content.trim())];
-
+/** Keep the most recent turns within the bounds, starting with a user turn, which every chat API requires. */
+export function trimHistory(history: Turn[]): Turn[] {
+  let turns = history.filter((turn) => turn.content.trim());
   while (turns.length > HISTORY_MAX_TURNS || totalChars(turns) > HISTORY_MAX_CHARS) {
     turns = turns.slice(1);
   }
   while (turns.length > 0 && turns[0]?.role !== 'user') turns = turns.slice(1);
+  return turns;
+}
 
-  await ctx.kv.put(historyKey(ctx), JSON.stringify(turns), { expirationTtl: HISTORY_TTL_SECONDS });
+/**
+ * Append a user turn and the reply to it, after the response. Nothing to do
+ * when the server keeps the record (`ctx.history`).
+ */
+export function appendHistory(ctx: HistoryCtx, previous: Turn[], added: Turn[]): void {
+  if (ctx.history) return;
+  const turns = trimHistory([...previous, ...added]);
+  ctx.waitUntil(
+    ctx.kv.put(historyKey(ctx), JSON.stringify(turns), { expirationTtl: HISTORY_TTL_SECONDS }).catch(() => ctx.log('history.write_failed')),
+  );
 }
 
 /**
  * The lead and page a conversation started with. A stateless backend
  * rebuilds its system prompt every turn, so `{{lead.name}}` has to survive
- * past the first one.
+ * past the first one. Written after the response, once per conversation.
  */
-export async function saveScope(ctx: HistoryCtx, scope: PromptScope): Promise<void> {
-  await ctx.kv.put(`${historyKey(ctx)}:scope`, JSON.stringify(scope), { expirationTtl: HISTORY_TTL_SECONDS });
+export function saveScope(ctx: HistoryCtx, scope: PromptScope): void {
+  ctx.waitUntil(
+    ctx.kv.put(`${historyKey(ctx)}:scope`, JSON.stringify(scope), { expirationTtl: HISTORY_TTL_SECONDS }).catch(() => ctx.log('scope.write_failed')),
+  );
 }
 
-export async function loadScope(ctx: HistoryCtx): Promise<PromptScope> {
+/** Start this as early as possible and await it with the other reads: it is a KV round trip. */
+export async function loadScope(ctx: Pick<HistoryCtx, 'kv' | 'siteId' | 'sessionId'>): Promise<PromptScope> {
   const fallback: PromptScope = { site: { id: ctx.siteId } };
   const raw = await ctx.kv.get(`${historyKey(ctx)}:scope`);
   if (!raw) return fallback;
@@ -84,6 +104,24 @@ export async function loadScope(ctx: HistoryCtx): Promise<PromptScope> {
   } catch {
     return fallback;
   }
+}
+
+/**
+ * What the visitor "said" with an action, as the model reads it: a chip's
+ * value, or a submitted inline form (JSON) as `Label: field: value, …`.
+ */
+export function actionContent(label: string, value: string): string {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return `${label}: ${Object.entries(parsed as Record<string, unknown>)
+        .map(([k, v]) => `${k}: ${String(v)}`)
+        .join(', ')}`;
+    }
+  } catch {
+    // Not JSON: a chip's value.
+  }
+  return value;
 }
 
 function totalChars(turns: Turn[]): number {

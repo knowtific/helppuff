@@ -28,7 +28,14 @@ export type WebhookRow = {
   updated_at: number;
 };
 
-export type Delivery = { ok: boolean; status: number | null; error: string | null; attempts: number; durationMs: number };
+export type Delivery = { ok: boolean; status: number | null; error: string | null; attempts: number; durationMs: number; retryable: boolean };
+
+/** A delivery handed to the Workflow after its first attempt failed in a way worth retrying. */
+export type WebhookRetryParams = { kind: 'webhook'; siteId: string; hookId: string; event: WebhookEnvelope };
+/** When the Workflow tries again after a failure: 1 min, 5 min, 30 min, 2 h, 6 h. */
+export const RETRY_SCHEDULE_MS = [60_000, 300_000, 1_800_000, 7_200_000, 21_600_000];
+
+type Retry = (params: WebhookRetryParams) => Promise<void>;
 
 const TIMEOUT_MS = 8000;
 const RETRY_AFTER_MS = 1500;
@@ -78,14 +85,18 @@ export async function signDelivery(secret: string, timestamp: number, body: stri
 
 const retryable = (status: number) => status === 429 || status >= 500;
 
-/** POST one envelope to one endpoint, retrying once; record the outcome. Never throws. */
-export async function deliver(db: D1Like, hook: WebhookRow, event: WebhookEnvelope, doFetch: typeof fetch, now: () => number): Promise<Delivery> {
+/**
+ * POST one envelope to one endpoint, up to `tries` times a moment apart, and
+ * record the outcome. Never throws. `retryable` says whether trying later
+ * could help (a timeout, a network error, 429 or 5xx).
+ */
+export async function deliver(db: D1Like, hook: WebhookRow, event: WebhookEnvelope, doFetch: typeof fetch, now: () => number, tries = 2, status_ = 'failed'): Promise<Delivery> {
   const body = JSON.stringify(event);
   const started = now();
   let status: number | null = null;
   let error: string | null = null;
   let attempts = 0;
-  while (attempts < 2) {
+  while (attempts < tries) {
     attempts++;
     const timestamp = Math.floor(now() / 1000);
     const controller = new AbortController();
@@ -116,16 +127,16 @@ export async function deliver(db: D1Like, hook: WebhookRow, event: WebhookEnvelo
     } finally {
       clearTimeout(timer);
     }
-    if (attempts < 2) await new Promise((resolve) => setTimeout(resolve, RETRY_AFTER_MS));
+    if (attempts < tries) await new Promise((resolve) => setTimeout(resolve, RETRY_AFTER_MS));
   }
-  const result: Delivery = { ok: error === null, status, error, attempts, durationMs: now() - started };
+  const result: Delivery = { ok: error === null, status, error, attempts, durationMs: now() - started, retryable: error !== null && (status === null || retryable(status)) };
   const at = now();
   await db
     .batch([
       db
         .prepare('INSERT INTO webhook_deliveries (id, webhook_id, event_id, event, ok, http_status, error, attempts, duration_ms, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
         .bind(crypto.randomUUID(), hook.id, event.id, event.type, result.ok ? 1 : 0, status, error, attempts, result.durationMs, at),
-      db.prepare('UPDATE webhooks SET last_status = ?, last_error = ?, last_at = ? WHERE id = ?').bind(result.ok ? 'ok' : 'failed', error, at, hook.id),
+      db.prepare('UPDATE webhooks SET last_status = ?, last_error = ?, last_at = ? WHERE id = ?').bind(result.ok ? 'ok' : status_, error, at, hook.id),
       db
         .prepare(
           `DELETE FROM webhook_deliveries WHERE webhook_id = ? AND id NOT IN (
@@ -137,9 +148,16 @@ export async function deliver(db: D1Like, hook: WebhookRow, event: WebhookEnvelo
   return result;
 }
 
-/** Send an event to every endpoint of the site that wants it, and wait. For the Workflow. */
+/**
+ * Send an event to every endpoint of the site that wants it, and wait.
+ *
+ * With `retry` (a Workflow binding), each endpoint gets one attempt now and a
+ * failure worth retrying is handed to the Workflow, which tries again over
+ * the next hours (RETRY_SCHEDULE_MS): an endpoint that is down for a while
+ * still gets everything. Without it, a second attempt follows a moment later.
+ */
 export async function emitTo(
-  deps: { db: D1Like; fetch: typeof fetch; now?: () => number; log?: (event: string, data?: object) => void },
+  deps: { db: D1Like; fetch: typeof fetch; now?: () => number; log?: (event: string, data?: object) => void; retry?: Retry | undefined },
   siteId: string,
   type: WebhookEventType,
   data: Record<string, unknown>,
@@ -148,9 +166,60 @@ export async function emitTo(
   const hooks = (await enabledHooks(deps.db, siteId, now())).filter((hook) => wants(hook, type));
   if (!hooks.length) return;
   const event = envelope(siteId, type, data, now());
-  const results = await Promise.all(hooks.map((hook) => deliver(deps.db, hook, event, deps.fetch, now)));
-  // The type and status only: never the payload.
-  for (const result of results) if (!result.ok) deps.log?.('webhook.failed', { type, status: result.status });
+  await Promise.all(
+    hooks.map(async (hook) => {
+      const result = await deliver(deps.db, hook, event, deps.fetch, now, deps.retry ? 1 : 2, deps.retry ? 'retrying' : 'failed');
+      if (result.ok) return;
+      // The type and status only: never the payload.
+      deps.log?.('webhook.failed', { type, status: result.status });
+      if (result.retryable && deps.retry) {
+        await deps.retry({ kind: 'webhook', siteId, hookId: hook.id, event }).catch(async () => {
+          await deps.db.prepare("UPDATE webhooks SET last_status = 'failed' WHERE id = ?").bind(hook.id).run().catch(() => null);
+        });
+      } else if (deps.retry) {
+        await deps.db.prepare("UPDATE webhooks SET last_status = 'failed' WHERE id = ?").bind(hook.id).run().catch(() => null);
+      }
+    }),
+  );
+}
+
+/**
+ * A failed delivery, retried by the Workflow on RETRY_SCHEDULE_MS. Stops at
+ * the first success, at an answer that retrying cannot fix (a 4xx), or when
+ * the endpoint is removed or turned off meanwhile. Each try is in the
+ * delivery log; the endpoint shows `retrying` until it settles.
+ */
+export async function runWebhookRetry(
+  step: { do<T>(name: string, run: () => Promise<T>): Promise<T>; sleep(name: string, ms: number): Promise<void> },
+  deps: { db: D1Like; fetch: typeof fetch; now?: () => number },
+  params: WebhookRetryParams,
+): Promise<{ delivered: boolean; tries: number }> {
+  const now = deps.now ?? Date.now;
+  for (const [i, wait] of RETRY_SCHEDULE_MS.entries()) {
+    await step.sleep(`wait:${i}`, wait);
+    const last = i === RETRY_SCHEDULE_MS.length - 1;
+    const outcome = await step.do(`try:${i + 2}`, async () => {
+      const hook = await deps.db.prepare('SELECT * FROM webhooks WHERE id = ? AND site_id = ? AND enabled = 1').bind(params.hookId, params.siteId).first<WebhookRow>();
+      if (!hook) return 'gone' as const;
+      const result = await deliver(deps.db, hook, params.event, deps.fetch, now, 1, last ? 'failed' : 'retrying');
+      if (result.ok) return 'ok' as const;
+      if (!result.retryable && !last) {
+        await deps.db.prepare("UPDATE webhooks SET last_status = 'failed' WHERE id = ?").bind(hook.id).run();
+      }
+      return result.retryable ? ('again' as const) : ('stop' as const);
+    });
+    if (outcome !== 'again') return { delivered: outcome === 'ok', tries: i + 2 };
+  }
+  return { delivered: false, tries: RETRY_SCHEDULE_MS.length + 1 };
+}
+
+/** The Worker's Workflow, as a retry hand-off; undefined without the binding. */
+export function workflowRetry(env: Record<string, unknown>): Retry | undefined {
+  const workflow = env['CRAWL_WORKFLOW'] as { create?: (options: { id?: string; params: unknown }) => Promise<unknown> } | undefined;
+  if (!workflow || typeof workflow.create !== 'function') return undefined;
+  return async (params) => {
+    await workflow.create!({ id: `wh-${params.event.id}-${params.hookId}`.slice(0, 100), params });
+  };
 }
 
 /** Send an event after the response, never blocking or failing it. */
@@ -158,7 +227,12 @@ export function emit(ctx: RequestCtx, siteId: string, type: WebhookEventType, da
   const db = dbFrom(ctx.env);
   if (!db) return;
   ctx.platform.waitUntil(
-    emitTo({ db, fetch: globalThis.fetch.bind(globalThis), now: () => ctx.platform.now(), log: (name, extra) => ctx.platform.log(name, extra) }, siteId, type, data).catch(() => {
+    emitTo(
+      { db, fetch: globalThis.fetch.bind(globalThis), now: () => ctx.platform.now(), log: (name, extra) => ctx.platform.log(name, extra), retry: workflowRetry(ctx.env) },
+      siteId,
+      type,
+      data,
+    ).catch(() => {
       ctx.platform.log('webhook.emit_failed', { type });
     }),
   );

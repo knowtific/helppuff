@@ -75,7 +75,17 @@ export type ConversationRow = {
   leadStatus: LeadStatus | null;
 };
 
-export type Summary = { summary: string; intent: string | null; sentiment: string | null; followUp: string | null };
+/** A conversation's AI summary and labels: written when it goes quiet (or by the Summarise button). */
+export type Summary = {
+  summary: string;
+  intent: string | null;
+  sentiment: string | null;
+  followUp: string | null;
+  leadQuality?: 'hot' | 'warm' | 'cold' | 'none' | null;
+  outcome?: 'answered' | 'callback_requested' | 'lead_captured' | 'unanswered' | 'abandoned' | null;
+  topics?: string[];
+  unanswered?: string[];
+};
 
 export type StoredMessage = {
   id: string;

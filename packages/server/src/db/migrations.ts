@@ -302,6 +302,18 @@ export const MIGRATIONS: readonly Migration[] = [
       'CREATE INDEX IF NOT EXISTS webhook_deliveries_hook ON webhook_deliveries (webhook_id, at DESC)',
     ],
   },
+  {
+    id: 6,
+    name: 'background jobs',
+    // `completed_at`: the conversation's end-of-chat job ran (summary, labels,
+    // conversation.completed); a new message clears it. The usage marks make
+    // the budget webhooks fire once a day.
+    statements: [
+      'ALTER TABLE conversations ADD COLUMN completed_at INTEGER',
+      'ALTER TABLE usage_daily ADD COLUMN warned_at INTEGER',
+      'ALTER TABLE usage_daily ADD COLUMN exhausted_at INTEGER',
+    ],
+  },
 ];
 
 export const LATEST_MIGRATION = MIGRATIONS[MIGRATIONS.length - 1]!.id;

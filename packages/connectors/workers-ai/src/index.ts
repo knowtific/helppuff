@@ -1,6 +1,7 @@
 import {
   ConnectorError,
   MARKER_INSTRUCTIONS,
+  actionContent,
   appendHistory,
   defineConnector,
   loadHistory,
@@ -263,7 +264,12 @@ function visitorBlock(contact: Contact, lead: Record<string, string> | undefined
   return parts.length ? `## The visitor\nAlready given: ${parts.join(', ')}. Use it; do not ask for any of it again.` : '';
 }
 
-async function respond(ctx: ConnectorContext<WorkersAiOptions>, input: string, scope: PromptScope, firstTurn = false): Promise<Message[]> {
+async function respond(
+  ctx: ConnectorContext<WorkersAiOptions>,
+  input: string,
+  scopeRead: PromptScope | Promise<PromptScope>,
+  firstTurn = false,
+): Promise<Message[]> {
   const options = ctx.options;
   const now = Date.now();
   const { ai, vectors, db } = bindings(ctx);
@@ -276,30 +282,40 @@ async function respond(ctx: ConnectorContext<WorkersAiOptions>, input: string, s
       : undefined;
   early?.embedding.catch(() => {});
   const loaded = Date.now();
-  // The first message of a conversation has no history and no stored contact:
-  // skip those reads (each a KV miss, slow from far away).
-  const [history, used, business, persona, known] = await Promise.all([
-    firstTurn ? Promise.resolve([] as Turn[]) : loadHistory(ctx),
-    usedToday(db, ctx.siteId, now),
+  // What only the prompt needs (the persona, business details, the visitor's
+  // page and details: KV reads, slow when not yet cached where the visitor
+  // is) loads while the search runs; the search needs only the history and
+  // today's spend. The first message has no stored contact: skip that read.
+  const scopeReady = Promise.resolve(scopeRead);
+  const forPrompt = Promise.all([
     businessFor(ctx, db),
-    resolvePrompt(ctx, options.instructions, scope),
-    firstTurn ? contactFor(ctx, scope, false) : contactFor(ctx, scope),
+    scopeReady.then((scope) => resolvePrompt(ctx, options.instructions, scope)),
+    scopeReady.then((scope) => contactFor(ctx, scope, !firstTurn)),
+    scopeReady,
   ]);
+  forPrompt.catch(() => {});
+  const [history, used] = await Promise.all([firstTurn ? Promise.resolve([] as Turn[]) : loadHistory(ctx), usedToday(db, ctx.siteId, now)]);
   time('context', loaded);
   // A submitted callback form carries the details: keep them for the rest of the conversation.
   const submitted = formContact(input);
-  const contact = { ...known, ...submitted };
   // Written after the reply (a KV write is slow from far away); the next message reads it.
   const remember = async (next: Contact) => {
     ctx.waitUntil(ctx.kv.put(contactKey(ctx), JSON.stringify(next), { expirationTtl: 72 * 3600 }).catch(() => {}));
   };
-  if (Object.keys(submitted).length) await remember(contact);
-  const env: ToolEnv = { ctx, business, contact, now, remember };
+  const promptReady = async () => {
+    const waited = Date.now();
+    const [business, persona, known, scope] = await forPrompt;
+    time('prompt_wait', waited);
+    const contact = { ...known, ...submitted };
+    if (Object.keys(submitted).length) await remember(contact);
+    const env: ToolEnv = { ctx, business, contact, now, remember };
+    return { business, persona, scope, contact, env };
+  };
 
   const budget = options.budget.dailyNeurons;
   if (budget > 0 && used >= budget) {
     ctx.log('budget.exhausted');
-    return budgetFallback(env);
+    return budgetFallback((await promptReady()).env);
   }
   // Past 80%: fewer passages, less history, shorter answers — the same help for less.
   const tight = budget > 0 && used >= budget * 0.8;
@@ -351,6 +367,7 @@ async function respond(ctx: ConnectorContext<WorkersAiOptions>, input: string, s
   }
 
   // 3. The prompt, within the input budget: rules and facts first, then passages, then history.
+  const { business, persona, scope, contact, env } = await promptReady();
   const tools = toolDefinitions(options);
   const head = [
     persona?.trim() || `You are the website assistant${business.name ? ` for ${business.name}` : ''}.`,
@@ -455,12 +472,10 @@ async function respond(ctx: ConnectorContext<WorkersAiOptions>, input: string, s
 
   recordSpend(ctx, db, spent, false);
   // After the reply: the visitor waits for nothing but the answer.
-  ctx.waitUntil(
-    appendHistory(ctx, history, [
-      { role: 'user', content: input },
-      { role: 'assistant', content: summarizeReply(reply) },
-    ]).catch(() => ctx.log('history.write_failed')),
-  );
+  appendHistory(ctx, history, [
+    { role: 'user', content: input },
+    { role: 'assistant', content: summarizeReply(reply) },
+  ]);
   return reply;
 }
 
@@ -469,7 +484,8 @@ function recordSpend(ctx: ConnectorContext<WorkersAiOptions>, db: D1Like | null,
   ctx.waitUntil(
     (async () => {
       try {
-        await addUsage({ db }, ctx.siteId, spent, 1);
+        // Messages are counted by the server as it records each turn.
+        await addUsage({ db }, ctx.siteId, spent);
         if (exhausted) {
           // Workers AI said no: mark today as spent so the next visitor gets the fallback without a failed call.
           await db
@@ -477,11 +493,41 @@ function recordSpend(ctx: ConnectorContext<WorkersAiOptions>, db: D1Like | null,
             .bind(ctx.options.budget.dailyNeurons, usageDay(Date.now()), ctx.siteId)
             .run();
         }
+        await budgetAlerts(ctx, db);
       } catch {
         ctx.log('usage.record_failed');
       }
     })(),
   );
+}
+
+/**
+ * `budget.warning` at 80% of the day's budget and `budget.exhausted` at 100%,
+ * each once a day: the first request to cross a line claims it in D1
+ * (`usage_daily.warned_at` / `exhausted_at`), so racing requests send one.
+ */
+export async function budgetAlerts(ctx: Pick<ConnectorContext<WorkersAiOptions>, 'options' | 'siteId' | 'notify'>, db: D1Like, now = Date.now()): Promise<void> {
+  const budget = ctx.options.budget.dailyNeurons;
+  if (budget <= 0 || !ctx.notify) return;
+  const day = usageDay(now);
+  const row = await db
+    .prepare('SELECT neurons_est AS used, warned_at, exhausted_at FROM usage_daily WHERE day = ? AND site_id = ?')
+    .bind(day, ctx.siteId)
+    .first<{ used: number; warned_at: number | null; exhausted_at: number | null }>();
+  if (!row) return;
+  const claim = async (column: 'warned_at' | 'exhausted_at') => {
+    const result = (await db
+      .prepare(`UPDATE usage_daily SET ${column} = ? WHERE day = ? AND site_id = ? AND ${column} IS NULL`)
+      .bind(now, day, ctx.siteId)
+      .run()) as { meta?: { changes?: number }; changes?: number } | undefined;
+    return (result?.meta?.changes ?? result?.changes ?? 0) > 0;
+  };
+  const data = { day, neuronsUsed: Math.round(row.used), dailyBudget: budget, resetsAt: new Date(Date.parse(day) + 86_400_000).toISOString() };
+  if (row.used >= budget && !row.exhausted_at && (await claim('exhausted_at'))) {
+    ctx.notify('budget.exhausted', data);
+  } else if (row.used >= budget * 0.8 && row.used < budget && !row.warned_at && (await claim('warned_at'))) {
+    ctx.notify('budget.warning', data);
+  }
 }
 
 /** Contact details in a submitted form, as the connector reads it (`Label: key: value, …`). */
@@ -498,19 +544,7 @@ function formContact(input: string): Contact {
 }
 
 function contentFor(input: SendRequest): string {
-  if (input.kind === 'text') return input.text;
-  // A submitted inline form arrives as JSON; the model reads it as what the visitor typed.
-  try {
-    const value = JSON.parse(input.value) as unknown;
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      return `${input.label}: ${Object.entries(value as Record<string, unknown>)
-        .map(([k, v]) => `${k}: ${String(v)}`)
-        .join(', ')}`;
-    }
-  } catch {
-    // Not JSON: a chip's value.
-  }
-  return input.value;
+  return input.kind === 'text' ? input.text : actionContent(input.label, input.value);
 }
 
 const workersAi: Connector<WorkersAiOptions, WorkersAiState> = {
@@ -523,14 +557,14 @@ const workersAi: Connector<WorkersAiOptions, WorkersAiState> = {
 
   async start(ctx, input) {
     const scope: PromptScope = { lead: input.lead, context: input.context, site: { id: ctx.siteId } };
-    ctx.waitUntil(saveScope(ctx, scope).catch(() => {}));
+    saveScope(ctx, scope);
     if (!input.firstMessage) return { state: { turns: 0 }, messages: [] };
     return { state: { turns: 1 }, messages: await respond(ctx, input.firstMessage, scope, true) };
   },
 
   async send(ctx, state, input) {
     // A session that started without a message is on its first turn now: nothing to load yet.
-    const messages = await respond(ctx, contentFor(input), await loadScope(ctx), state.turns === 0);
+    const messages = await respond(ctx, contentFor(input), loadScope(ctx), state.turns === 0);
     return { state: { turns: state.turns + 1 }, messages };
   },
 };

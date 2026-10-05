@@ -21,9 +21,12 @@ link (the way back in if you lose your password). Teammates:
 ## Conversations
 
 Every chat, with the full transcript, the page it started on, country,
-ratings on replies, and the lead it produced. **Summarise** writes a short AI
-summary (intent, sentiment, next step) and picks up contact details that
-appear in the transcript. Filter by leads, unsummarised, or search.
+ratings on replies, and the lead it produced. Five minutes after a chat goes
+quiet, it is **summarised and labelled automatically**: what the visitor
+wanted, intent, sentiment, lead quality (hot, warm, cold), outcome, topics,
+the next step, and any questions the assistant could not answer (with a link
+to add the answer). **Summarise** does it on demand. Filter by leads,
+unsummarised, or search.
 
 ## Leads
 

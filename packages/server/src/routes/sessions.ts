@@ -10,7 +10,7 @@ import { capabilitiesOf, connectorContext, prepareConnector, runConnector } from
 import { streamResponse, textRelay, wantsStream } from '../core/stream.js';
 import { sanitizeConnectorMessages } from '../core/sanitize.js';
 import { issueToken, newSessionId } from '../core/token.js';
-import { hitDaily, hitWindow, rateLimited, quotaExceeded } from '../core/ratelimit.js';
+import { hitDaily, hitWindow, rateLimited, quotaExceeded, recordedCaps } from '../core/ratelimit.js';
 import { assertTurnstile } from '../core/turnstile.js';
 import { resolveSecrets } from '../config/load.js';
 import { dispatchLead } from '../core/sinks.js';
@@ -57,6 +57,9 @@ sessionRoutes.post('/v1/sites/:siteId/sessions', async (c) => {
   // Scoped by site: each site configures its own limit and its own budget,
   // so one site's traffic must not consume another's.
   // Read together; the counter writes happen after the response (see messages.ts).
+  // The daily count comes from the database when there is one (no KV write);
+  // sessions an hour stay in KV, a window longer than the Rate Limiting binding's.
+  const db = dbFrom(ctx.env);
   // Limits and the captcha make one verdict; a gated connector overlaps its
   // cheap preparation with it and waits for it before the model.
   const defer = ctx.platform.waitUntil;
@@ -67,7 +70,9 @@ sessionRoutes.post('/v1/sites/:siteId/sessions', async (c) => {
         owner
           ? Promise.resolve({ allowed: true, count: 0 })
           : hitWindow(ctx.platform.kv, 'sess', `${siteId}:${ipKey}`, limits.sessionsPerIpPerHour, 3600, undefined, defer),
-        hitDaily(ctx.platform.kv, siteId, limits.messagesPerSitePerDay, undefined, defer),
+        db
+          ? recordedCaps(db, siteId, null, { perSession: limits.messagesPerSession, perDay: limits.messagesPerSitePerDay }).then((caps) => caps.daily)
+          : hitDaily(ctx.platform.kv, siteId, limits.messagesPerSitePerDay, undefined, defer),
       ]),
     );
     if (!perIp.allowed) {

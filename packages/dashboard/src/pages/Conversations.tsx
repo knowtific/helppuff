@@ -5,6 +5,15 @@ import { Avatar, Badge, Button, Card, Empty, ErrorNote, Input, Segmented, Skelet
 import { api, parseSummary, type ConversationDetail, type ConversationRow, type Me, type StoredMessage, type Summary } from '../lib/api';
 import { cn, flag, fmtDateTime, fmtRelative, fmtTime, href, pathOf, useData, useDebounced } from '../lib/utils';
 
+const QUALITY_DOT = { hot: '#dc2626', warm: '#f59e0b', cold: '#3b82f6', none: '#a1a1aa' } as const;
+const OUTCOME_LABEL = {
+  answered: 'answered',
+  callback_requested: 'callback requested',
+  lead_captured: 'details left',
+  unanswered: 'not answered',
+  abandoned: 'left early',
+} as const;
+
 type Filter = 'all' | 'leads' | 'unsummarized';
 
 function Row({ row, active }: { row: ConversationRow; active: boolean }) {
@@ -25,6 +34,7 @@ function Row({ row, active }: { row: ConversationRow; active: boolean }) {
         <p className="mt-0.5 line-clamp-2 text-[13px] text-muted-foreground">{summary?.summary ?? row.firstMessage ?? 'No messages'}</p>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           {row.intent && <Badge>{row.intent}</Badge>}
+          {summary?.leadQuality === 'hot' && <Badge dot={QUALITY_DOT.hot}>hot lead</Badge>}
           {row.leadStatus && <StatusBadge status={row.leadStatus} />}
           <span className="text-[11px] text-muted-foreground">
             {row.messageCount} msgs{row.country ? ` · ${flag(row.country)} ${row.country}` : ''}
@@ -119,8 +129,24 @@ function SummaryCard({ id, stored, enabled, onDone }: { id: string; stored: Summ
               <p className="text-[13px] leading-relaxed">{stored.summary}</p>
               <div className="flex flex-wrap gap-1.5">
                 {stored.intent && <Badge>{stored.intent}</Badge>}
+                {stored.leadQuality && stored.leadQuality !== 'none' && <Badge dot={QUALITY_DOT[stored.leadQuality]}>{stored.leadQuality} lead</Badge>}
+                {stored.outcome && <Badge>{OUTCOME_LABEL[stored.outcome]}</Badge>}
                 {stored.sentiment && <Badge>{stored.sentiment}</Badge>}
+                {stored.topics?.map((topic) => (
+                  <Badge key={topic} className="font-normal">
+                    {topic}
+                  </Badge>
+                ))}
               </div>
+              {stored.unanswered && stored.unanswered.length > 0 && (
+                <div className="text-[13px]">
+                  <span className="text-muted-foreground">It could not answer: </span>
+                  {stored.unanswered.map((q) => `“${q}”`).join(', ')}{' '}
+                  <a href={href({ page: 'knowledge' })} className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
+                    Add an answer
+                  </a>
+                </div>
+              )}
               {stored.followUp && (
                 <p className="text-[13px]">
                   <span className="text-muted-foreground">Next step: </span>

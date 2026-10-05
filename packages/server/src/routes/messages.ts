@@ -16,7 +16,7 @@ import { connectorContext, prepareConnector, runConnector, type PreparedConnecto
 import { streamResponse, textRelay, wantsStream } from '../core/stream.js';
 import { sanitizeConnectorMessages } from '../core/sanitize.js';
 import { issueToken, verifyToken, type SessionTokenPayload } from '../core/token.js';
-import { hitDaily, hitTotal, hitWindow, rateLimited, quotaExceeded, sessionMessageKey } from '../core/ratelimit.js';
+import { hitDaily, hitLimiter, hitTotal, hitWindow, ipLimiter, rateLimited, quotaExceeded, recordedCaps, sessionMessageKey } from '../core/ratelimit.js';
 import type { SiteConfig } from '../config/schema.js';
 import { readJsonBody } from './sessions.js';
 import { formLead, recordFeedback, recordLead, recordTurn } from '../admin/record.js';
@@ -82,23 +82,35 @@ messageRoutes.post('/v1/sessions/messages', async (c) => {
   const ipKey = await ctx.ipKey();
 
   /*
-   * The three counters are read together and their writes happen after the
-   * response (`waitUntil`): a KV write goes to the central store, which from
-   * far away is hundreds of milliseconds each, and the verdicts need only the
-   * reads. The per-session cap is counted in KV, not from the token — a
-   * client chooses which token to send, so a token-held count can be rewound.
+   * The three limits are read together, and nothing here writes before the
+   * response (see core/ratelimit.ts): per visitor by the Rate Limiting
+   * binding, per conversation and per day from the database's record of the
+   * turns, else KV counters written with `waitUntil`. The per-session cap is
+   * counted server-side, not from the token — a client chooses which token to
+   * send, so a token-held count can be rewound.
    */
   const ttlSeconds = Math.max(60, Math.ceil((payload.exp - ctx.platform.now()) / 1000));
   const defer = ctx.platform.waitUntil;
+  const db = dbFrom(ctx.env);
+  const limiter = ipLimiter(ctx.env, limits.messagesPerIpPerMinute);
+  const ipBucket = `${payload.siteId}:${ipKey}`;
   const checkLimits = async (): Promise<number> => {
     const owner = await ctx.isOwner();
-    const [perIp, perSession, daily] = await ctx.timing.span('limits', () =>
+    const [perIp, [perSession, daily]] = await ctx.timing.span('limits', () =>
       Promise.all([
         owner
           ? Promise.resolve({ allowed: true, count: 0 })
-          : hitWindow(ctx.platform.kv, 'msg', `${payload.siteId}:${ipKey}`, limits.messagesPerIpPerMinute, 60, undefined, defer),
-        hitTotal(ctx.platform.kv, sessionMessageKey(payload.sessionId), limits.messagesPerSession, ttlSeconds, defer),
-        hitDaily(ctx.platform.kv, payload.siteId, limits.messagesPerSitePerDay, undefined, defer),
+          : limiter
+            ? hitLimiter(limiter, ipBucket)
+            : hitWindow(ctx.platform.kv, 'msg', ipBucket, limits.messagesPerIpPerMinute, 60, undefined, defer),
+        db
+          ? recordedCaps(db, payload.siteId, payload.sessionId, { perSession: limits.messagesPerSession, perDay: limits.messagesPerSitePerDay }).then(
+              (caps) => [caps.session, caps.daily] as const,
+            )
+          : Promise.all([
+              hitTotal(ctx.platform.kv, sessionMessageKey(payload.sessionId), limits.messagesPerSession, ttlSeconds, defer),
+              hitDaily(ctx.platform.kv, payload.siteId, limits.messagesPerSitePerDay, undefined, defer),
+            ]),
       ]),
     );
     // Scoped by site, as with sessions.

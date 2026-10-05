@@ -13,10 +13,11 @@ your account and never mistaken for anything else.
 | Resource | Holds | For |
 | --- | --- | --- |
 | **Worker** `knowtific-murmur-<site>` | the widget files, the chat API, the dashboard | everything |
-| **KV namespace** | rate-limit counters, the live config (settings, prompt), chat history for some backends | everything |
-| **D1 database** | conversations, leads, dashboard accounts, webhooks, the knowledge base's text and full-text index | the dashboard and `workers-ai` |
+| **KV namespace** | the live config (settings, prompt), new-conversation counters | everything |
+| **Rate limiter** (binding, no resource) | messages per visitor a minute, counted where the visitor is | everything |
+| **D1 database** | conversations (also the source of the chat limits and the model's history), leads, dashboard accounts, webhooks, the knowledge base's text and full-text index | the dashboard and `workers-ai` |
 | **Vectorize index** (1024 dimensions, cosine) | one vector per knowledge passage | `workers-ai` and `"retrieval": "murmur"` |
-| **Workflow** `knowtific-murmur-<site>-crawl` | background crawls and file processing | the same |
+| **Workflow** `knowtific-murmur-<site>-crawl` | background jobs: crawls, file processing, each conversation's summary and `conversation.completed`, webhook retries | every assistant with a dashboard |
 | **Workers AI**, **Browser Rendering** | bindings, no resource | answers, embeddings; pages drawn by JavaScript |
 | **AI Search instance** | the provider's index | the `cloudflare` and `anthropic` backends |
 

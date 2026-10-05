@@ -137,11 +137,11 @@ export async function readCompletionStream(raw: unknown, onText: (delta: string)
 async function respond(
   ctx: ConnectorContext<CloudflareOptions>,
   input: string,
-  scope: PromptScope,
+  scope: PromptScope | Promise<PromptScope>,
 ): Promise<Message[]> {
   const options = ctx.options;
   const instance = aiSearchClient(ctx, options);
-  const [history, system] = await Promise.all([loadHistory(ctx), systemPrompt(ctx, scope)]);
+  const [history, system] = await Promise.all([loadHistory(ctx), Promise.resolve(scope).then((s) => systemPrompt(ctx, s))]);
 
   const messages: AiSearchMessage[] = [
     ...(system ? [{ role: 'system' as const, content: system }] : []),
@@ -180,7 +180,7 @@ async function respond(
     { role: 'user', content: input },
     { role: 'assistant', content: summarizeReply(reply) },
   ];
-  await appendHistory(ctx, history, turns);
+  appendHistory(ctx, history, turns);
   return reply;
 }
 
@@ -197,7 +197,7 @@ const cloudflare: Connector<CloudflareOptions, CloudflareState> = {
 
   async start(ctx, input) {
     const scope: PromptScope = { lead: input.lead, context: input.context, site: { id: ctx.siteId } };
-    await saveScope(ctx, scope);
+    saveScope(ctx, scope);
     if (!input.firstMessage) return { state: { turns: 0 }, messages: [] };
     const messages = await respond(ctx, input.firstMessage, scope);
     ctx.log('cloudflare.started');
@@ -205,7 +205,7 @@ const cloudflare: Connector<CloudflareOptions, CloudflareState> = {
   },
 
   async send(ctx, state, input) {
-    const messages = await respond(ctx, contentFor(input), await loadScope(ctx));
+    const messages = await respond(ctx, contentFor(input), loadScope(ctx));
     return { state: { turns: state.turns + 1 }, messages };
   },
 };

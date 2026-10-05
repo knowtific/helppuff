@@ -29,8 +29,9 @@ Cloudflare-first defaults, ask as few questions as possible.
 | `packages/server/src/config` | | `schema.ts` (server config), `load.ts` (`defineConfig`, secret refs), `site.ts` (KV `config:<siteId>` overrides) |
 | `packages/server/src/admin` | | Dashboard API under `/admin/api/*`: `guard.ts` (cookie session or `Bearer ADMIN_API_KEY`), `auth.ts`, `record.ts` (conversations, leads keyed by email, ratings), `routes.ts`, `knowledge.ts` (pages, files, facts, search), `settings.ts` (the flat settings object ↔ site config), `setup.ts` (one-time setup/sign-in links), `prompts.ts`, `webhooks.ts`, `version.ts` (running vs latest release) |
 | `packages/server/src/webhooks` | | `deliver.ts` (signed delivery, retry, delivery log, `emit`/`emitTo`), `events.ts` (conversation → events). Endpoints live in D1 `webhooks`, managed by `admin/webhooks.ts`; event names and envelope in `protocol/src/webhooks.ts` |
+| `packages/server/src/conversations` | | `summary.ts` (AI summary + labels, shared by the dashboard button and the job), `complete.ts` (`runConversationJob`: sleeps until 5 min after the last message, then summarises and sends `conversation.completed`) |
 | `packages/server/src/db` | | `migrations.ts` (numbered, append-only D1 schema; applied by deploy and per isolate), `d1.ts` (binding helpers) |
-| `packages/server/src/knowledge`, `src/workflows/crawl.ts` | | Crawl control (`startCrawl`, cron re-crawls) and the `CrawlWorkflow` class (only `index.ts`/`runtime.ts` import it — `cloudflare:workers`) |
+| `packages/server/src/knowledge`, `src/workflows/crawl.ts` | | Crawl control (`startCrawl`, cron re-crawls) and the `CrawlWorkflow` class: the Worker's one background-job runner (crawl parts, files, conversation ends, webhook retries — dispatched on `payload.kind`). Only `index.ts`/`runtime.ts` import it (`cloudflare:workers`). New background work becomes a new `kind` with a step function testable on a fake `StepLike`, not a new Workflow |
 | `packages/rag` | `@murmur/rag` | The knowledge base, Workers-free logic: `discover`, `robots`, `sitemap`, `categorise`, `extract` (HTML→Markdown + facts), `boilerplate`, `chunk` (`chunkPage`), `ai` (embed/rerank), `store` (D1 + Vectorize), `retrieve` (hybrid + RRF + rerank), `crawl` (`runCrawlPart` on a `StepLike`), `files` (uploads: read → distill → learn, `runFileJob`), `pricing` (neurons) |
 | `packages/connectors/_types` | `@murmur/connector-types` | `Connector` interface + `defineConnector`, helpers, rich messages, prompt, history, shared `ai-search.ts` |
 | `packages/connectors/*` | `@murmur/connector-<name>` | `workers-ai` (default: Workers AI + `@murmur/rag`, tools, budget), `echo` (dev/test, no key), `cloudflare` (AI Search), `openai`, `gemini`, `anthropic` (via AI Search), `http` (own API), `retell` |
@@ -53,8 +54,11 @@ Widget → `POST /v1/sites/:siteId/sessions` (returns signed `sessionToken`) →
 `GET /v1/sites/:siteId/config` serves public widget config. `/healthz`.
 Static widget files (`loader.js`, `app-*.js`) are served by the same Worker as
 assets. **Sessions are stateless**: no session store; connector state rides in
-the HMAC token. KV = rate limits, counters, prompt/config overrides, chat
-history. D1 = the dashboard and the knowledge base's text (pages, chunks +
+the HMAC token. KV = prompt/config overrides, the sessions-per-IP counter
+(and, without D1, the message counters and chat history). The per-IP message
+limit is the `MURMUR_IP_LIMITER` Rate Limiting binding; the per-session and
+daily caps and stateless backends' history are read from D1's record of each
+turn (`core/ratelimit.ts`, `conversations/history.ts`). D1 = the dashboard and the knowledge base's text (pages, chunks +
 FTS5, facts, crawl runs, daily usage). Vectorize = chunk vectors. The crawl is
 a Workflow chained in batches of 15 pages (Workers Free subrequest limits);
 see `wiki/Knowledge-Base.md`.
@@ -133,6 +137,10 @@ pnpm check          # lint + typecheck + test + build + e2e (what CI runs)
   working widget or a silent `hide()`, never an exception on the host page.
   Prefer a missing feature (apply the default) over throwing. Empty `catch` is
   intentional there.
+- **The visitor waits for no write.** On the chat path every KV/D1 write goes
+  through `waitUntil` (recording, usage, history, counters, webhooks); only
+  reads are awaited, started early and together. A test in
+  `server/test/admin.test.ts` makes every write hang and expects replies.
 - Server errors always leave via `app.onError` as the JSON envelope — throw
   `MurmurError`, never return HTML.
 - Accessibility wins over visual design.

@@ -6,6 +6,7 @@ import { contactIn } from '../src/admin/record.js';
 import { forgetWebhooks, signDelivery } from '../src/webhooks/deliver.js';
 import { extractJson as extractJsonForTest } from '../src/admin/routes.js';
 import { memoryKv } from '../src/core/platform.js';
+import { recordedHistory } from '../src/conversations/history.js';
 import { harness, ORIGIN, startBody, startSession, testConfig, testEnv, type Harness } from './helpers.js';
 
 /**
@@ -514,5 +515,245 @@ describe('versions', () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe('background jobs', () => {
+  type Created = { id?: string; params: Record<string, unknown> };
+  let received: { type: string; data: Record<string, unknown> }[];
+  let answers: number[];
+  beforeEach(() => {
+    received = [];
+    answers = [];
+    forgetWebhooks('demo');
+    const real = globalThis.fetch;
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (!url.startsWith('https://hooks.example.com/')) return real(input, init);
+      const body = JSON.parse(String(init?.body)) as { type: string; data: Record<string, unknown> };
+      received.push(body);
+      return new Response('ok', { status: answers.shift() ?? 200 });
+    });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  /** Workflow steps run inline; `sleep` moves a fake clock instead of waiting. */
+  function clockSteps(clock: { now: number }) {
+    const names: string[] = [];
+    return {
+      names,
+      do: async <T,>(name: string, run: () => Promise<T>) => {
+        names.push(name);
+        return run();
+      },
+      sleep: async (name: string, ms: number) => {
+        names.push(name);
+        clock.now += ms;
+      },
+    };
+  }
+
+  const summaryJson = {
+    summary: 'Ada asked about weekend work and left her number for a callback.',
+    intent: 'Weekend availability',
+    sentiment: 'positive',
+    leadQuality: 'hot',
+    outcome: 'callback_requested',
+    topics: ['weekends', 'callback'],
+    unanswered: ['Do you work on public holidays?'],
+    followUp: 'Call Ada back today.',
+    contact: { name: 'Ada', email: '', phone: '0412 345 678' },
+  };
+  const ai = { run: async () => ({ choices: [{ message: { content: JSON.stringify(summaryJson) } }], usage: { prompt_tokens: 900, completion_tokens: 120 } }) };
+
+  it('summarises a conversation once it goes quiet, labels it, and sends conversation.completed', async () => {
+    const { runConversationJob } = await import('../src/conversations/complete.js');
+    const created: Created[] = [];
+    const w = await world({ AI: ai, CRAWL_WORKFLOW: { create: async (o: Created) => void created.push(o) } });
+    const cookie = await login(w.admin);
+    await w.admin.fetch('/admin/api/webhooks', {
+      method: 'POST',
+      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: 'https://hooks.example.com/murmur', events: ['conversation.completed'] }),
+    });
+    const started = await startSession(w.h, { ...startBody, firstMessage: 'Do you work weekends?' });
+    await w.h.post('/v1/sessions/messages', { kind: 'text', text: 'Call me on 0412 345 678', clientId: 'c1' }, { headers: { Authorization: `Bearer ${started.sessionToken}` } });
+    await w.settle();
+
+    expect(created).toHaveLength(1);
+    expect(created[0]).toMatchObject({ id: `conv-${started.sessionId}`, params: { kind: 'conversation', siteId: 'demo', conversationId: started.sessionId } });
+
+    const lastAt = (w.db.raw.prepare('SELECT last_at FROM conversations WHERE id = ?').get(started.sessionId) as { last_at: number }).last_at;
+    const clock = { now: lastAt + 60_000 };
+    const steps = clockSteps(clock);
+    const params = created[0]!.params as Parameters<typeof runConversationJob>[2];
+    expect(await runConversationJob(steps, { db: w.db, ai, fetch: globalThis.fetch, now: () => clock.now }, params)).toEqual({ status: 'completed' });
+    // It slept until five minutes after the last message, then checked again.
+    expect(steps.names).toEqual(['check:0', 'idle:0', 'check:1', 'summarize', 'complete']);
+    expect(clock.now).toBe(lastAt + 5 * 60_000);
+
+    const stored = w.db.raw.prepare('SELECT summary, intent, completed_at FROM conversations WHERE id = ?').get(started.sessionId) as Record<string, unknown>;
+    expect(JSON.parse(String(stored['summary']))).toMatchObject({ leadQuality: 'hot', outcome: 'callback_requested', unanswered: ['Do you work on public holidays?'] });
+    expect(stored['completed_at']).toBe(clock.now);
+
+    expect(received).toHaveLength(1);
+    expect(received[0]).toMatchObject({
+      type: 'conversation.completed',
+      data: {
+        conversationId: started.sessionId,
+        summary: summaryJson.summary,
+        labels: { intent: 'Weekend availability', leadQuality: 'hot', outcome: 'callback_requested', topics: ['weekends', 'callback'] },
+        unanswered: ['Do you work on public holidays?'],
+        lead: { name: 'Ada', email: 'ada@example.com', phone: '0412 345 678' },
+      },
+    });
+    expect((received[0]!.data['transcript'] as unknown[]).length).toBeGreaterThanOrEqual(3);
+
+    // Run again (a retried instance): nothing is sent twice.
+    expect((await runConversationJob(clockSteps(clock), { db: w.db, ai, fetch: globalThis.fetch, now: () => clock.now }, params)).status).toBe('skipped');
+    expect(received).toHaveLength(1);
+
+    // The visitor comes back: the conversation reopens, and a new job will complete it again.
+    await w.h.post('/v1/sessions/messages', { kind: 'text', text: 'One more thing', clientId: 'c2' }, { headers: { Authorization: `Bearer ${started.sessionToken}` } });
+    await w.settle();
+    expect(w.db.raw.prepare('SELECT completed_at FROM conversations WHERE id = ?').get(started.sessionId)).toEqual({ completed_at: null });
+    expect(created).toHaveLength(2);
+    expect(created[1]!.id).toMatch(new RegExp(`^conv-${started.sessionId}-`));
+  });
+
+  it('retries a failed delivery later, through the Workflow, until it gets through', async () => {
+    const { emitTo, runWebhookRetry, RETRY_SCHEDULE_MS } = await import('../src/webhooks/deliver.js');
+    const w = await world();
+    const cookie = await login(w.admin);
+    const hook = (await (
+      await w.admin.fetch('/admin/api/webhooks', {
+        method: 'POST',
+        headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: 'https://hooks.example.com/murmur' }),
+      })
+    ).json()) as { id: string };
+
+    const handed: Parameters<NonNullable<Parameters<typeof emitTo>[0]['retry']>>[0][] = [];
+    answers = [503];
+    await emitTo({ db: w.db, fetch: globalThis.fetch, retry: async (p) => void handed.push(p) }, 'demo', 'lead.captured', { email: 'ada@example.com' });
+    expect(received).toHaveLength(1);
+    expect(handed).toMatchObject([{ kind: 'webhook', siteId: 'demo', hookId: hook.id, event: { type: 'lead.captured' } }]);
+    expect(w.db.raw.prepare('SELECT last_status FROM webhooks WHERE id = ?').get(hook.id)).toEqual({ last_status: 'retrying' });
+
+    // Still down at the next try, up at the one after.
+    answers = [500, 200];
+    const clock = { now: Date.now() };
+    const steps = clockSteps(clock);
+    expect(await runWebhookRetry(steps, { db: w.db, fetch: globalThis.fetch, now: () => clock.now }, handed[0]!)).toEqual({ delivered: true, tries: 3 });
+    expect(steps.names).toEqual(['wait:0', 'try:2', 'wait:1', 'try:3']);
+    expect(received.map((r) => r.type)).toEqual(['lead.captured', 'lead.captured', 'lead.captured']);
+    expect(w.db.raw.prepare('SELECT last_status FROM webhooks WHERE id = ?').get(hook.id)).toEqual({ last_status: 'ok' });
+    expect(RETRY_SCHEDULE_MS).toHaveLength(5);
+
+    // A 4xx is the endpoint saying no: it is not retried.
+    handed.length = 0;
+    answers = [404];
+    await emitTo({ db: w.db, fetch: globalThis.fetch, retry: async (p) => void handed.push(p) }, 'demo', 'lead.captured', {});
+    expect(handed).toEqual([]);
+    expect(w.db.raw.prepare('SELECT last_status FROM webhooks WHERE id = ?').get(hook.id)).toEqual({ last_status: 'failed' });
+  });
+});
+
+describe('the reply waits for no write', () => {
+  // Earlier tests leave webhooks cached for the site; these send none.
+  beforeEach(() => forgetWebhooks('demo'));
+  const send = (h: Harness, token: string, body: Record<string, unknown> = { kind: 'text', text: 'hi', clientId: 'c' }) =>
+    h.post('/v1/sessions/messages', body, { headers: { Authorization: `Bearer ${token}` } });
+
+  it('answers while every KV and database write hangs, and writes nothing to KV per message', async () => {
+    resetSchemaMemo();
+    const real = d1();
+    const never = new Promise<never>(() => {});
+    // Reads answer; writes never finish. A reply that awaited one would never come.
+    const db: D1Like = {
+      prepare: (sql) => {
+        const wrap = (statement: D1Statement): D1Statement => ({ ...statement, bind: (...v: unknown[]) => wrap(statement.bind(...v)), run: () => never });
+        return wrap(real.prepare(sql));
+      },
+      batch: () => never,
+    };
+    const kv = memoryKv();
+    let puts = 0;
+    const hangingKv = { ...kv, put: () => ((puts += 1), never) };
+    const limited: string[] = [];
+    const env = testEnv({
+      MURMUR_DB: db,
+      MURMUR_KV: hangingKv,
+      MURMUR_IP_LIMITER: { limit: async ({ key }: { key: string }) => (limited.push(key), { success: true }) },
+      MURMUR_IP_LIMIT: '10',
+    });
+    const h = harness(testConfig(), env);
+    const started = await startSession(h);
+    const afterStart = puts;
+    for (let i = 0; i < 3; i += 1) expect((await send(h, started.sessionToken)).status).toBe(200);
+    expect(puts).toBe(afterStart);
+    expect(limited).toHaveLength(3);
+  });
+
+  it('refuses past the per-visitor minute limit when the binding says so', async () => {
+    const env = testEnv({ MURMUR_IP_LIMITER: { limit: async () => ({ success: false }) }, MURMUR_IP_LIMIT: '10' });
+    const h = harness(testConfig(), env);
+    const started = await startSession(h);
+    const blocked = await send(h, started.sessionToken);
+    expect(blocked.status).toBe(429);
+    expect(((await blocked.json()) as { error: { code: string } }).error.code).toBe('rate_limited');
+  });
+
+  it('ignores a binding deployed with a different limit than the live one', async () => {
+    const env = testEnv({ MURMUR_IP_LIMITER: { limit: async () => ({ success: false }) }, MURMUR_IP_LIMIT: '99' });
+    const h = harness(testConfig(), env);
+    const started = await startSession(h);
+    expect((await send(h, started.sessionToken)).status).toBe(200);
+  });
+
+  it('counts the conversation and daily caps from the recorded turns', async () => {
+    resetSchemaMemo();
+    const db = d1();
+    const pending: Promise<unknown>[] = [];
+    const settle = async () => void (await Promise.all(pending.splice(0)));
+    const h = harness(testConfig({ security: { limits: { messagesPerSession: 2, messagesPerSitePerDay: 3 } } }), testEnv({ MURMUR_DB: db }), ORIGIN, (p) =>
+      pending.push(p),
+    );
+    const message = async (r: Response) => ((await r.json()) as { error: { message: string } }).error.message;
+
+    const first = await startSession(h);
+    for (let i = 0; i < 2; i += 1) {
+      expect((await send(h, first.sessionToken)).status).toBe(200);
+      await settle();
+    }
+    const full = await send(h, first.sessionToken);
+    expect(full.status).toBe(429);
+    expect(await message(full)).toContain('This conversation has reached its limit');
+
+    const second = await startSession(h);
+    await settle();
+    expect((await send(h, second.sessionToken)).status).toBe(200);
+    await settle();
+    expect(db.raw.prepare('SELECT messages FROM usage_daily').get()).toEqual({ messages: 3 });
+    const spent = await send(h, second.sessionToken);
+    expect(spent.status).toBe(429);
+    expect(await message(spent)).toBe('Chat is unavailable right now.');
+  });
+
+  it("gives stateless backends their history from the record: the visitor's words, a form's fields, each reply", async () => {
+    const w = await world();
+    const started = await startSession(w.h, { ...startBody, firstMessage: 'Do you work weekends?' });
+    await w.settle();
+    await send(w.h, started.sessionToken, { kind: 'text', text: '/options', clientId: 'c1' });
+    await w.settle();
+    await send(w.h, started.sessionToken, { kind: 'action', actionId: 'f', label: 'Send', value: '{"email":"ada@example.com"}', clientId: 'c2' });
+    await w.settle();
+
+    const turns = await recordedHistory(w.db, started.sessionId);
+    expect(turns.map((t) => t.role)).toEqual(['user', 'assistant', 'user', 'assistant', 'user', 'assistant']);
+    expect(turns[0]!.content).toBe('Do you work weekends?');
+    expect(turns[2]!.content).toBe('/options');
+    expect(turns[3]!.content).toContain('[Offered choices:');
+    expect(turns[4]!.content).toBe('Send: email: ada@example.com');
   });
 });

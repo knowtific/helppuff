@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import type { Capabilities, Message, SendRequest, StartSessionRequest } from '@murmur/protocol';
+import type { Turn } from './history.js';
 
 export * from './errors.js';
 export * from './helpers.js';
@@ -43,6 +44,14 @@ export type ConnectorContext<Opts> = {
    * destinations. Absent when the server cannot take one; never throws.
    */
   reportLead?: (lead: Record<string, string>) => void;
+  /** Tell the site's webhooks something happened that only the connector knows (its daily budget). Never throws. */
+  notify?: (type: 'budget.warning' | 'budget.exhausted', data: Record<string, unknown>) => void;
+  /**
+   * The conversation so far, oldest first, from the server's own record of
+   * it (D1, written after each response). When present, `loadHistory` reads
+   * it and `appendHistory` writes nothing: the record is already kept.
+   */
+  history?: () => Promise<Turn[]>;
   /** Report how long a stage took (`rag.embed`, `llm.first_token`…), for the request's Server-Timing. */
   time?: (stage: string, ms: number) => void;
   /**

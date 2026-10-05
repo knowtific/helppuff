@@ -179,9 +179,9 @@ export function mapAnthropicContent(response: Pick<Anthropic.Beta.BetaMessage, '
   return out;
 }
 
-async function respond(ctx: ConnectorContext<AnthropicOptions>, input: string, scope: PromptScope): Promise<Message[]> {
+async function respond(ctx: ConnectorContext<AnthropicOptions>, input: string, scope: PromptScope | Promise<PromptScope>): Promise<Message[]> {
   const options = ctx.options;
-  const [history, system] = await Promise.all([loadHistory(ctx), resolvePrompt(ctx, options.instructions, scope)]);
+  const [history, system] = await Promise.all([loadHistory(ctx), Promise.resolve(scope).then((s) => resolvePrompt(ctx, options.instructions, s))]);
   const context = await retrieve(ctx, history, input);
 
   const client = new Anthropic({
@@ -231,7 +231,7 @@ async function respond(ctx: ConnectorContext<AnthropicOptions>, input: string, s
   }
 
   const reply = withoutDocumentLinks(mapAnthropicContent(final));
-  await appendHistory(ctx, history, [
+  appendHistory(ctx, history, [
     { role: 'user', content: input },
     { role: 'assistant', content: summarizeReply(reply) },
   ]);
@@ -251,7 +251,7 @@ const anthropic: Connector<AnthropicOptions, AnthropicState> = {
 
   async start(ctx, input) {
     const scope: PromptScope = { lead: input.lead, context: input.context, site: { id: ctx.siteId } };
-    await saveScope(ctx, scope);
+    saveScope(ctx, scope);
     if (!input.firstMessage) return { state: { turns: 0 }, messages: [] };
     const messages = await respond(ctx, input.firstMessage, scope);
     ctx.log('anthropic.started');
@@ -259,7 +259,7 @@ const anthropic: Connector<AnthropicOptions, AnthropicState> = {
   },
 
   async send(ctx, state, input) {
-    const messages = await respond(ctx, contentFor(input), await loadScope(ctx));
+    const messages = await respond(ctx, contentFor(input), loadScope(ctx));
     return { state: { turns: state.turns + 1 }, messages };
   },
 };

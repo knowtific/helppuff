@@ -11,8 +11,9 @@ Two shapes, chosen with `mode`.
 ## `mode: "openai"`: any Chat Completions endpoint
 
 vLLM, Ollama, LiteLLM, OpenRouter, DeepSeek, Together, or your own
-OpenAI-compatible server. Murmur keeps the conversation history (in KV, per
-session) and sends `prompt.md` as the system message.
+OpenAI-compatible server. Murmur keeps the conversation history (from its
+record of the conversation in D1, or KV without a database) and sends
+`prompt.md` as the system message.
 
 ```json
 "backend": {

@@ -60,8 +60,8 @@ your website ── <script src=".../loader.js"> ──┐
                       ├─ widget files, chat API, dashboard
                       ├─ Workers AI ── answers, embeddings, reranking
                       ├─ Vectorize + D1 ── knowledge, conversations, leads
-                      ├─ Workflow ── background crawling and file reading
-                      └─ KV ── live config, rate limits
+                      ├─ Workflow ── background jobs: crawls, files, summaries, webhook retries
+                      └─ KV ── live config
 ```
 
 The widget speaks one small REST protocol to the Worker; the Worker talks to

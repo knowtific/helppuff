@@ -30,9 +30,9 @@ Each assistant (one `site`) uses **1 Worker, 1 KV namespace, 1 D1 database,
 | --- | --- | --- | --- |
 | [Workers requests](https://developers.cloudflare.com/workers/platform/limits/#daily-requests) | 100,000 a day, per account | Every widget request (a chat is a handful), dashboard call and webhook delivery. Static widget files do not count | The Worker answers with Cloudflare's error 1027 until midnight UTC |
 | [Workers AI](https://developers.cloudflare.com/workers-ai/platform/pricing/) | 10,000 neurons a day, per account | About 30 per answer: **roughly 300 answers a day**. Crawling costs a few per page, once | Murmur stops at its own budget first (9,000 by default): visitors get your contact details and a callback form |
-| [KV writes](https://developers.cloudflare.com/kv/platform/limits/) | 1,000 a day | About 4 per message (rate-limit counters, chat history): **roughly 250 messages a day** | Chats keep working, but per-visitor rate limits stop counting until midnight UTC. The AI budget and daily cap still hold (they are kept in D1) |
-| [KV reads](https://developers.cloudflare.com/kv/platform/limits/) | 100,000 a day | A few per message | Reads fail softly; limits and settings fall back to defaults |
-| [D1 rows written](https://developers.cloudflare.com/d1/platform/pricing/) | 100,000 a day | Recording conversations, leads, learning pages | Recording stops for the day; chats continue |
+| [KV writes](https://developers.cloudflare.com/kv/platform/limits/) | 1,000 a day | **None per message** with a database (the default): one per new conversation (the sessions-per-visitor limit), plus settings saves. Without a database, about 4 per message | Chats keep working; the sessions-per-visitor limit stops counting until midnight UTC |
+| [KV reads](https://developers.cloudflare.com/kv/platform/limits/) | 100,000 a day | One or two per message (the live config, the conversation's page and form details) | Reads fail softly; settings fall back to the deployed ones |
+| [D1 rows written](https://developers.cloudflare.com/d1/platform/pricing/) | 100,000 a day | Recording conversations (which the limits and the history read back), leads, learning pages | Recording stops for the day; chats continue |
 | [D1 rows read](https://developers.cloudflare.com/d1/platform/pricing/) | 5 million a day | Searches, the dashboard | Searches fail and the assistant offers a callback |
 | [Browser Rendering](https://developers.cloudflare.com/browser-run/limits/) | 10 minutes a day | Only pages drawn by JavaScript, while learning the site | Those pages are skipped, with the reason shown; the next crawl retries |
 | [Vectorize queries](https://developers.cloudflare.com/vectorize/platform/pricing/) | 30 million queried dimensions a month | About 900 searches a day for a 70-page site | Meaning search fails; keyword search still answers |
@@ -43,7 +43,7 @@ Each assistant (one `site`) uses **1 Worker, 1 KV namespace, 1 D1 database,
 | --- | --- | --- |
 | [D1 database size](https://developers.cloudflare.com/d1/platform/limits/) | **500 MB** per database | Conversations, leads and the knowledge base's text. Plenty for a small business: a 70-page site is a few MB, and a conversation a few KB |
 | [Vectorize storage](https://developers.cloudflare.com/vectorize/platform/pricing/) | 5 million stored dimensions | About 4,800 passages at 1024 dimensions (a 70-page site is ~600) |
-| [KV storage](https://developers.cloudflare.com/kv/platform/limits/) | 1 GB | Small: counters, settings, recent chat history |
+| [KV storage](https://developers.cloudflare.com/kv/platform/limits/) | 1 GB | Small: settings, a few counters |
 | [D1 Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/) | 7 days | How far back `murmur upgrade`'s database restore point reaches |
 | Uploaded files | 10 MB each (Murmur's limit) | Up to ~300,000 characters of text are learned per file |
 

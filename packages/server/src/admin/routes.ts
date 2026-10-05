@@ -13,8 +13,10 @@ import { profileRoutes } from './profile.js';
 import { webhookRoutes } from './webhooks.js';
 import { versionRoutes } from './version.js';
 import { dbFrom, ensureSchema, type D1Like } from '../db/d1.js';
-import { leadStatements } from './record.js';
 import { emit } from '../webhooks/deliver.js';
+import { summarizeConversation, type AiRunner } from '../conversations/summary.js';
+import { summaryModel } from '../conversations/complete.js';
+export { extractJson } from '../conversations/summary.js';
 import { PROMPT_LIMIT, PROMPT_SQL, publishPrompt, readPromptState, type PromptCtx, type PromptVersionRow, type PublishResult } from './prompts.js';
 import type { KvStore } from '@murmur/connector-types';
 
@@ -29,7 +31,6 @@ export const adminRoutes = new Hono<HonoEnv>();
 
 const DAY = 86_400_000;
 export const LEAD_STATUSES = ['new', 'contacted', 'qualified', 'won', 'lost'] as const;
-const DEFAULT_SUMMARY_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 
 adminRoutes.use('/admin/api/*', async (c, next) => {
   c.header('Cache-Control', 'no-store');
@@ -263,92 +264,26 @@ adminRoutes.get('/admin/api/conversations/:id', async (c) => {
   return c.json(await loadConversation(db(c), c.req.param('id')));
 });
 
-type AiBinding = { run(model: string, input: object): Promise<unknown> };
-
-/** First JSON object in a model's reply, tolerating prose or fences around it. */
-export function extractJson(text: string): Record<string, unknown> | null {
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start === -1 || end <= start) return null;
-  try {
-    const parsed: unknown = JSON.parse(text.slice(start, end + 1));
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
-  } catch {
-    return null;
-  }
-}
-
 adminRoutes.post('/admin/api/conversations/:id/summary', async (c) => {
   assertSameOrigin(c);
   await currentAdmin(c);
   const ctx = c.get('mm');
-  const ai = ctx.env['AI'] as Partial<AiBinding> | undefined;
+  const ai = ctx.env['AI'] as Partial<AiRunner> | undefined;
   if (!ai || typeof ai.run !== 'function') {
     throw new MurmurError('not_found', { message: 'Summaries need Workers AI. Redeploy with `murmur deploy`.', detail: 'admin_no_ai' });
   }
-  const d = db(c);
   const id = c.req.param('id');
-  const { conversation, messages } = await loadConversation(d, id);
-  const transcript = messages
-    .filter((m) => m.text)
-    .map((m) => `${m.role === 'user' ? 'Visitor' : 'Assistant'}: ${m.text}`)
-    .join('\n')
-    .slice(-12_000);
-  if (!transcript) throw new MurmurError('bad_request', { message: 'Nothing to summarise yet.', detail: 'admin_empty' });
-
-  const model = typeof ctx.env['MURMUR_SUMMARY_MODEL'] === 'string' ? String(ctx.env['MURMUR_SUMMARY_MODEL']) : DEFAULT_SUMMARY_MODEL;
-  const result = (await ai.run!(model, {
-    messages: [
-      {
-        role: 'system',
-        content:
-          'You summarise website chat conversations for a small business owner. Reply with JSON only: ' +
-          '{"summary": "2-3 sentences: what the visitor wanted and how it ended", "intent": "2-4 word label, e.g. Pricing question", ' +
-          '"sentiment": "positive|neutral|negative", "followUp": "one concrete next step for the business, or empty", ' +
-          '"contact": {"name": "", "email": "", "phone": ""}}. Use empty strings for anything not stated. Never invent contact details.',
-      },
-      { role: 'user', content: transcript },
-    ],
-    max_tokens: 400,
-  })) as { response?: unknown };
-  const raw = typeof result?.response === 'string' ? result.response : JSON.stringify(result?.response ?? '');
-  const parsed = extractJson(raw);
-  if (!parsed || typeof parsed['summary'] !== 'string') {
+  const { conversation } = await loadConversation(db(c), id);
+  const model = await summaryModel(ctx, String(conversation['site_id']));
+  let result;
+  try {
+    result = await summarizeConversation({ db: db(c), ai: ai as AiRunner, now: () => ctx.platform.now() }, id, model);
+  } catch {
     throw new MurmurError('connector_error', { message: 'The summary could not be generated. Try again.', detail: 'admin_summary_unparsable' });
   }
-  const now = ctx.platform.now();
-  const summary = {
-    summary: String(parsed['summary']).slice(0, 1000),
-    intent: typeof parsed['intent'] === 'string' ? parsed['intent'].slice(0, 60) : null,
-    sentiment: ['positive', 'neutral', 'negative'].includes(String(parsed['sentiment'])) ? String(parsed['sentiment']) : null,
-    followUp: typeof parsed['followUp'] === 'string' ? parsed['followUp'].slice(0, 300) : null,
-  };
-  const statements = [
-    d
-      .prepare('UPDATE conversations SET summary = ?, intent = ?, summarized_at = ? WHERE id = ?')
-      .bind(JSON.stringify(summary), summary.intent, now, id),
-  ];
-  const contact = (parsed['contact'] ?? {}) as Record<string, unknown>;
-  const pick = (key: string) => (typeof contact[key] === 'string' && String(contact[key]).trim() ? String(contact[key]).trim().slice(0, 200) : undefined);
-  const found = { name: pick('name'), email: pick('email'), phone: pick('phone') };
-  // Only details the visitor actually typed: the transcript must contain them.
-  const inTranscript = (value?: string) => (value && transcript.includes(value) ? value : undefined);
-  const verified = { name: inTranscript(found.name), email: inTranscript(found.email), phone: inTranscript(found.phone) };
-  if (verified.email || verified.phone || (verified.name && conversation['lead_id'])) {
-    statements.push(
-      ...leadStatements(
-        d,
-        String(conversation['site_id']),
-        id,
-        Object.fromEntries(Object.entries(verified).filter(([, v]) => v)) as { name?: string; email?: string; phone?: string },
-        'ai',
-        now,
-      ),
-    );
-  }
-  await d.batch(statements);
-  emit(ctx, String(conversation['site_id']), 'conversation.summarized', { conversationId: id, ...summary });
-  return c.json({ ...summary, lead: verified });
+  if (!result) throw new MurmurError('bad_request', { message: 'Nothing to summarise yet.', detail: 'admin_empty' });
+  emit(ctx, result.siteId, 'conversation.summarized', { conversationId: id, ...result.summary });
+  return c.json({ ...result.summary, lead: result.contact });
 });
 
 adminRoutes.get('/admin/api/leads', async (c) => {

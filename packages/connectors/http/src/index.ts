@@ -200,9 +200,9 @@ async function callMurmur(
 }
 
 /** `openai` mode: one Chat Completions call with the stored history. */
-async function callOpenAi(ctx: ConnectorContext<HttpOptions>, input: string, scope: PromptScope): Promise<Message[]> {
+async function callOpenAi(ctx: ConnectorContext<HttpOptions>, input: string, scope: PromptScope | Promise<PromptScope>): Promise<Message[]> {
   const options = ctx.options;
-  const [history, system] = await Promise.all([loadHistory(ctx), resolvePrompt(ctx, options.instructions, scope)]);
+  const [history, system] = await Promise.all([loadHistory(ctx), Promise.resolve(scope).then((s) => resolvePrompt(ctx, options.instructions, s))]);
   const streaming = Boolean(ctx.onText);
 
   const body = JSON.stringify({
@@ -250,7 +250,7 @@ async function callOpenAi(ctx: ConnectorContext<HttpOptions>, input: string, sco
   }
 
   const reply = [textMessage(answer)].filter((m): m is Message => m !== null);
-  await appendHistory(ctx, history, [
+  appendHistory(ctx, history, [
     { role: 'user', content: input },
     { role: 'assistant', content: summarizeReply(reply) },
   ]);
@@ -282,7 +282,7 @@ const http: Connector<HttpOptions, HttpState> = {
   async start(ctx, input) {
     if (ctx.options.mode === 'openai') {
       const scope: PromptScope = { lead: input.lead, context: input.context, site: { id: ctx.siteId } };
-      await saveScope(ctx, scope);
+      saveScope(ctx, scope);
       const messages = input.firstMessage ? await callOpenAi(ctx, input.firstMessage, scope) : [];
       return { state: {}, messages };
     }
@@ -292,7 +292,7 @@ const http: Connector<HttpOptions, HttpState> = {
 
   async send(ctx, state, input) {
     if (ctx.options.mode === 'openai') {
-      return { messages: await callOpenAi(ctx, inputFor(input), await loadScope(ctx)) };
+      return { messages: await callOpenAi(ctx, inputFor(input), loadScope(ctx)) };
     }
     const result = await callMurmur(ctx, 'message', {
       siteId: ctx.siteId,

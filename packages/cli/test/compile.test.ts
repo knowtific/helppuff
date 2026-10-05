@@ -47,6 +47,16 @@ describe('compile', () => {
     expect(compiled.secrets).toEqual(['MURMUR_SECRET', 'OPENAI_API_KEY']);
   });
 
+  it('counts messages per visitor with a Rate Limiting binding set to the live limit, one namespace per site', () => {
+    const compiled = compile(loaded({ type: 'echo' }));
+    const [limiter] = compiled.wrangler['ratelimits'] as { name: string; namespace_id: string; simple: { limit: number; period: number } }[];
+    expect(limiter).toMatchObject({ name: 'MURMUR_IP_LIMITER', simple: { limit: 10, period: 60 } });
+    expect(Number(limiter!.namespace_id)).toBeGreaterThan(0);
+    expect((compiled.wrangler['vars'] as Record<string, string>)['MURMUR_IP_LIMIT']).toBe('10');
+    const other = compile({ ...loaded({ type: 'echo' }), project: parseProject({ ...loaded({ type: 'echo' }).raw, site: 'beta' }) });
+    expect((other.wrangler['ratelimits'] as { namespace_id: string }[])[0]!.namespace_id).not.toBe(limiter!.namespace_id);
+  });
+
   it('binds an AI Search instance only when one is used', () => {
     expect(compile(loaded({ type: 'cloudflare' })).wrangler['ai_search']).toEqual([
       { binding: 'AI_SEARCH', instance_name: 'knowtific-murmur-acme' },

@@ -23,7 +23,10 @@ export const WEBHOOK_EVENTS = {
   'lead.updated': 'A lead’s status, notes or name changed in the dashboard.',
   'feedback.received': 'A visitor rated a reply (thumbs up or down).',
   'conversation.summarized': 'The dashboard summarised a conversation.',
-  'conversation.ended': 'The visitor ended the chat.',
+  'conversation.ended': 'The visitor started a new chat (or the page called Murmur.reset()), ending this one. Most visitors just leave: see conversation.completed.',
+  'conversation.completed': 'A conversation went quiet (5 minutes after the last message): its summary, labels, lead and transcript.',
+  'budget.warning': 'Today\'s AI budget is 80% used: answers are being kept shorter. Once a day.',
+  'budget.exhausted': 'Today\'s AI budget is used up: visitors get your contact details and a callback form until 00:00 UTC. Once a day.',
   'knowledge.crawl.finished': 'Learning the website finished.',
   'knowledge.file.processed': 'An uploaded file was learned, or failed.',
 } as const;

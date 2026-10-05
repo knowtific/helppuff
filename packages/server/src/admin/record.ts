@@ -1,10 +1,15 @@
 import type { Message, SendRequest, VisitorContext } from '@murmur/protocol';
+import { usageDay } from '@murmur/rag';
 import type { RequestCtx } from '../core/request.js';
 import { dbFrom, ensureSchema, type D1Like, type D1Statement } from '../db/d1.js';
 import { conversationStarted, leadCaptured, turn } from '../webhooks/events.js';
+import { startConversationJob } from '../conversations/complete.js';
 
 /**
  * Writes the conversation to D1 for the dashboard, after the response.
+ * The same record serves the per-conversation and daily limits
+ * (`core/ratelimit.ts`) and the stateless backends' history
+ * (`conversations/history.ts`), so none of those keep a copy in KV.
  *
  * Every call is scheduled with `waitUntil` and swallows its own failures:
  * the dashboard missing a row is a small loss; a visitor's reply waiting
@@ -38,10 +43,29 @@ function messageRows(db: D1Like, conversationId: string, messages: Message[], at
   });
 }
 
-function visitorMessage(conversationId: string, text: string, ts: number, db: D1Like): D1Statement {
+/** A visitor's message. An action keeps its value (a chip's, a form's fields): the model's history reads it. */
+function visitorMessage(conversationId: string, text: string, ts: number, db: D1Like, value?: string): D1Statement {
   return db
     .prepare('INSERT OR IGNORE INTO messages (id, conversation_id, role, type, text, payload, ts) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .bind(`${conversationId}:u${ts}${Math.random().toString(36).slice(2, 6)}`, conversationId, 'user', 'text', text, null, ts);
+    .bind(
+      `${conversationId}:u${ts}${Math.random().toString(36).slice(2, 6)}`,
+      conversationId,
+      'user',
+      'text',
+      text,
+      value === undefined ? null : JSON.stringify({ value }),
+      ts,
+    );
+}
+
+/** One visitor message on the site's day: the daily limit and the dashboard's usage both read it. */
+function countMessage(db: D1Like, siteId: string, now: number): D1Statement {
+  return db
+    .prepare(
+      `INSERT INTO usage_daily (day, site_id, neurons_est, messages) VALUES (?, ?, 0, 1)
+       ON CONFLICT (day, site_id) DO UPDATE SET messages = messages + 1`,
+    )
+    .bind(usageDay(now), siteId);
 }
 
 /**
@@ -180,7 +204,7 @@ export function recordStart(
           (input.firstMessage ? 1 : 0) + input.messages.length,
         ),
     ];
-    if (input.firstMessage) statements.push(visitorMessage(input.sessionId, input.firstMessage, now - 1, db));
+    if (input.firstMessage) statements.push(visitorMessage(input.sessionId, input.firstMessage, now - 1, db), countMessage(db, input.siteId, now));
     statements.push(...messageRows(db, input.sessionId, input.messages, now));
 
     const typed = input.firstMessage ? contactIn(input.firstMessage) : {};
@@ -204,6 +228,8 @@ export function recordStart(
       );
     }
     await db.batch(statements);
+    // The end-of-chat job: summary, labels and conversation.completed, once the visitor goes quiet.
+    startConversationJob(ctx, input.siteId, input.sessionId);
   });
 }
 
@@ -287,8 +313,9 @@ export function recordTurn(
            VALUES (?, ?, ?, ?, ?, 0)`,
         )
         .bind(input.sessionId, input.siteId, now, now, text.slice(0, 500)),
-      visitorMessage(input.sessionId, text, now - 1, db),
+      visitorMessage(input.sessionId, text, now - 1, db, input.request.kind === 'action' ? input.request.value : undefined),
       ...messageRows(db, input.sessionId, input.messages, now),
+      countMessage(db, input.siteId, now),
       db
         .prepare(
           `UPDATE conversations SET last_at = ?, message_count = message_count + ?,
@@ -300,5 +327,13 @@ export function recordTurn(
       statements.push(...leadStatements(db, input.siteId, input.sessionId, typed, 'chat', now));
     }
     await db.batch(statements);
+    // Back after the end-of-chat job ran: it runs again when this part ends.
+    const reopened = (await db
+      .prepare('UPDATE conversations SET completed_at = NULL WHERE id = ? AND completed_at IS NOT NULL')
+      .bind(input.sessionId)
+      .run()) as { meta?: { changes?: number }; changes?: number } | undefined;
+    if ((reopened?.meta?.changes ?? reopened?.changes ?? 0) > 0) {
+      startConversationJob(ctx, input.siteId, input.sessionId, `conv-${input.sessionId}-${now.toString(36)}`);
+    }
   });
 }
