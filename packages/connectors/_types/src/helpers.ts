@@ -1,7 +1,7 @@
 import { readSse, SseIdleTimeout, type Message, type MessageBody, type Option, type Role } from '@murmur/protocol';
 import { ConnectorError } from './errors.js';
 
-/** Outbound calls from a connector time out at 25s (§6.1). */
+/** Outbound calls from a connector time out at 25s. */
 export const CONNECTOR_TIMEOUT_MS = 25_000;
 
 let counter = 0;
@@ -74,7 +74,7 @@ export async function readJson<T = unknown>(response: Response): Promise<T> {
   }
 }
 
-/** Render `{{lead.name}}` / `{{context.pageUrl}}` style templates (§5). */
+/** Render `{{lead.name}}` / `{{context.pageUrl}}` style templates. */
 export function renderTemplate(template: string, scope: Record<string, unknown>): string {
   return template.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_match, path: string) => {
     const value = path.split('.').reduce<unknown>((acc, key) => {

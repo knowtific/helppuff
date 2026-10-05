@@ -1,9 +1,11 @@
 import { ArrowDownRight, ArrowUpRight, MessagesSquare } from 'lucide-react';
+import { CrawlProgress, useKnowledgeStatus } from '../components/knowledge';
+import { UsageMeter } from './Knowledge';
 import { useState } from 'react';
 import { ActivityChart } from '../components/ActivityChart';
 import { PageHeader } from '../components/Shell';
 import { Avatar, Card, CardHeader, Empty, ErrorNote, Segmented, Skeleton, StatusBadge } from '../components/ui';
-import { api, type LeadStatus, type Overview as OverviewData, type Totals } from '../lib/api';
+import { api, type LeadStatus, type Me, type Overview as OverviewData, type Totals } from '../lib/api';
 import { cn, flag, fmtDecimal, fmtNumber, fmtPercent, fmtRelative, href, pathOf, useData } from '../lib/utils';
 
 type Range = '7' | '30' | '90';
@@ -55,7 +57,27 @@ function Bars({ rows, label }: { rows: { key: string; label: string; count: numb
   );
 }
 
-export function Overview() {
+/** Knowledge and today's budget, for workers-ai. */
+function KnowledgeStrip({ me }: { me: Me }) {
+  const { status } = useKnowledgeStatus(Boolean(me.sites[0]?.knowledge));
+  if (!me.sites[0]?.knowledge || !status) return null;
+  if (!status.run) return null;
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      <Card className="px-4 py-3">
+        <CrawlProgress run={status.run} chunks={status.chunks} />
+        <a href={href({ page: 'knowledge' })} className="mt-1 inline-block text-xs text-muted-foreground hover:text-foreground">
+          Manage knowledge
+        </a>
+      </Card>
+      <Card className="px-4 py-3">
+        <UsageMeter usage={status.usage} />
+      </Card>
+    </div>
+  );
+}
+
+export function Overview({ me }: { me: Me }) {
   const [range, setRange] = useState<Range>('30');
   const { data, error, loading, reload } = useData(
     () => api<OverviewData>(`/overview?days=${range}&tz=${-new Date().getTimezoneOffset()}`),
@@ -72,7 +94,7 @@ export function Overview() {
   return (
     <>
       <PageHeader
-        title="Overview"
+        title="Analytics"
         description="How visitors are using your assistant."
         actions={
           <Segmented
@@ -88,6 +110,7 @@ export function Overview() {
         }
       />
       <div className="space-y-4 p-4 md:p-6">
+        <KnowledgeStrip me={me} />
         {error && <ErrorNote error={error} onRetry={reload} />}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {stats.map((s) =>

@@ -33,7 +33,17 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
 
 // ------------------------------------------------------------------ types
 
-export type Site = { id: string; name: string; accent: string; avatar: string | null; embed: string };
+export type Site = {
+  id: string;
+  name: string;
+  accent: string;
+  avatar: string | null;
+  embed: string;
+  connector: string;
+  /** The workers-ai knowledge base is on: Knowledge page and onboarding apply. */
+  knowledge: boolean;
+  website: string | null;
+};
 export type Me = { admin: { email: string; owner: boolean }; sites: Site[]; summaries: boolean };
 
 export type Overview = {
@@ -74,6 +84,8 @@ export type StoredMessage = {
   text: string | null;
   payload: Record<string, unknown> | null;
   ts: number;
+  /** A visitor's rating of an assistant reply: 1, -1, or null. */
+  feedback?: number | null;
 };
 
 export type Lead = {
@@ -91,6 +103,10 @@ export type Lead = {
   notes: string | null;
   createdAt?: number;
   created_at?: number;
+  updatedAt?: number;
+  /** One person can have several chats (the email is the key); the latest is linked. */
+  conversations?: number;
+  lastConversationId?: string | null;
 };
 
 export type ConversationDetail = {
@@ -136,3 +152,116 @@ export type PromptView = {
   versions: PromptVersion[];
 };
 export type PublishResult = { status: 'published' | 'unchanged'; version: number };
+
+// ------------------------------------------------------------------ knowledge
+
+export type PageStatus = 'discovered' | 'queued' | 'fetched' | 'indexed' | 'unchanged' | 'skipped' | 'blocked' | 'error';
+
+export type DiscoveredUrl = {
+  url: string;
+  source: 'home' | 'sitemap' | 'link';
+  category: string;
+  suggested: boolean;
+  selected: boolean;
+  status: PageStatus;
+  title: string | null;
+  error: string | null;
+};
+export type Discovery = { site: string; origin: string; reachable: boolean; sitemaps: string[]; warnings: string[]; urls: DiscoveredUrl[] };
+
+export type CrawlRun = {
+  id: string;
+  status: 'queued' | 'running' | 'done' | 'failed' | 'cancelled';
+  trigger: string | null;
+  total: number;
+  done: number;
+  failed: number;
+  chunks: number;
+  error: string | null;
+  startedAt: number;
+  finishedAt: number | null;
+};
+
+export type Usage = {
+  day: string;
+  neurons: number;
+  messages: number;
+  budget: number;
+  freeAllocation: number;
+  messagesLeft: number;
+  state: 'ok' | 'tight' | 'exhausted' | 'unlimited';
+};
+
+export type KnowledgeStatus = {
+  site: string;
+  connector: string;
+  browserRendering: boolean;
+  workflow: boolean;
+  schedule: string;
+  run: CrawlRun | null;
+  pages: Partial<Record<PageStatus, number>>;
+  chunks: number;
+  lastIndexedAt: number | null;
+  usage: Usage;
+};
+
+export type KnowledgePage = {
+  id: string;
+  url: string;
+  finalUrl: string | null;
+  title: string | null;
+  category: string | null;
+  status: PageStatus;
+  httpStatus: number | null;
+  error: string | null;
+  selected: number;
+  source: string | null;
+  crawledAt: number | null;
+  chunks: number;
+};
+
+export type Passage = { id: string; url: string; title: string; headingPath: string; category: string; content: string; score: number };
+export type SearchResult = { query: string; chunks: Passage[]; trace: { vector: number; keyword: number; reranked: boolean; threshold: number; errors: string[] } };
+
+export type Fact = { key: string; value: string; source: 'owner' | 'crawl' | null; sourceUrl: string | null };
+export type ManualEntry = { id: string; title: string; content: string; updatedAt: number };
+
+export type FileStatus = 'queued' | 'reading' | 'learning' | 'indexed' | 'error';
+export type KnowledgeFile = {
+  id: string;
+  name: string;
+  kind: 'pdf' | 'docx' | 'md' | 'txt';
+  size: number;
+  status: FileStatus;
+  error: string | null;
+  chunks: number;
+  /** Longer than the limit: only the start was learned. */
+  truncated: number;
+  createdAt: number;
+  updatedAt: number;
+};
+
+/** Upload a document as the raw body; it is read and learned in the background. */
+export function uploadFile(file: File): Promise<{ id: string; status: FileStatus }> {
+  return api(`/knowledge/files?name=${encodeURIComponent(file.name)}`, {
+    method: 'POST',
+    body: file,
+    headers: { 'Content-Type': file.type || 'application/octet-stream' },
+  });
+}
+
+export type LeadField = { name: string; label: string; type: 'text' | 'email' | 'tel' | 'textarea' | 'select'; required: boolean; options?: string[] };
+
+export type Settings = {
+  botName: string;
+  businessName: string;
+  welcomeMessage: string;
+  starterQuestions: string[];
+  accent: string;
+  position: 'bottom-right' | 'bottom-left';
+  launcherIcon: string;
+  leads: { enabled: boolean; fields: LeadField[] };
+  assistant: { model: string; locale: string | null; timezone: string | null; rerank: boolean } | null;
+  crawl: { schedule: 'off' | 'daily' | 'weekly' | 'monthly'; include: string[]; exclude: string[]; renderJs: 'auto' | 'always' | 'never' };
+};
+export type SettingsView = { site: string; connector: string; settings: Settings; hash: string; meta: { at: number; by: string | null } | null };

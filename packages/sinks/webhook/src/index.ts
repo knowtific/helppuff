@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { defineSink, signBody, type Sink } from '@murmur/sink-types';
 
 /**
- * POST the lead as JSON to any URL (§6.6). Covers Zapier, Make, n8n, a Google
+ * POST the lead as JSON to any URL. Covers Zapier, Make, n8n, a Google
  * Sheet via Apps Script, and most CRMs without writing a connector.
  */
 
@@ -61,7 +61,7 @@ const webhook: Sink<WebhookOptions> = {
         signal: controller.signal,
       });
       // The status is logged, not thrown — a sink failure must never reach
-      // the visitor (§6.6). The lead is already in the conversation.
+      // the visitor. The lead is already in the conversation.
       if (!response.ok) ctx.log('sink.webhook_status', { status: response.status });
       else ctx.log('sink.webhook_ok');
     } catch {

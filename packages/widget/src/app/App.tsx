@@ -19,6 +19,11 @@ import { toWidgetError, type Api } from './api.js';
 import { clientId, pageContext, pathAllowed, currentPath } from './context.js';
 import { clear as clearStorage, load as loadStored, save as saveStored } from './persist.js';
 import { makeStrings } from './strings.js';
+import { GREETING_PREFIX } from './store.js';
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-/i;
+/** Ids the widget made itself (greetings, flow steps, local notes) never reach the server's records. */
+const isServerMessage = (id: string) => !id.startsWith(GREETING_PREFIX) && !isFlowMessage(id) && !UUID.test(id) && !id.startsWith('c_');
 import {
   findFlow,
   isComplete,
@@ -39,7 +44,7 @@ import {
 } from './store.js';
 
 /**
- * Error boundary (§8.3). The first uncaught render error resets to a safe
+ * Error boundary. The first uncaught render error resets to a safe
  * state and re-renders once. The second is fatal: the widget hides.
  *
  * Children are suppressed the moment an error is caught, and only restored
@@ -126,6 +131,8 @@ export function App({
   /** Filled in below; lets `handlers` start a flow without a circular dep. */
   const startFlowRef = useRef<(flowId: string) => void>(() => {});
   const [path, setPath] = useState(() => currentPath());
+  /** This visitor's ratings, by message id. Kept for the page's life; the server keeps the record. */
+  const [ratings, setRatings] = useState<Record<string, 1 | -1 | 0>>({});
 
   const panel = useRef<HTMLDivElement>(null);
   const launcher = useRef<HTMLDivElement>(null);
@@ -167,7 +174,7 @@ export function App({
     else if (hadSession.current) clearStorage(siteId);
   }, [siteId, state.session, state.messages, state.lead, state.consumedActions, state.sound, state.teaserDismissed]);
 
-  // Two tabs stay in sync rather than clobbering each other (§8.6).
+  // Two tabs stay in sync rather than clobbering each other.
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
       if (event.key !== `mm:${siteId}`) return;
@@ -190,7 +197,7 @@ export function App({
     };
   }, []);
 
-  // SPA route changes, by polling rather than patching history (§8.2).
+  // SPA route changes, by polling rather than patching history.
   useEffect(() => {
     const id = setInterval(() => {
       if (document.hidden) return;
@@ -213,13 +220,13 @@ export function App({
     return () => window.removeEventListener('keydown', onKeyDown, true);
   }, [state.open]);
 
-  // Focus moves into the panel on open and back to the launcher on close (§8.7).
+  // Focus moves into the panel on open and back to the launcher on close.
   useEffect(() => {
     if (!state.open || !panel.current) return;
     return trapFocus(panel.current);
   }, [state.open, state.screen]);
 
-  // The iOS keyboard shrinks the visual viewport; keep the composer visible (§8.8).
+  // The iOS keyboard shrinks the visual viewport; keep the composer visible.
   useEffect(() => {
     const viewport = window.visualViewport;
     if (!viewport || !state.open) return;
@@ -235,7 +242,7 @@ export function App({
   }, [state.open, runtime.host]);
 
   /**
-   * Teaser (§8.7): on matching paths, never once opened or dismissed, and
+   * Teaser: on matching paths, never once opened or dismissed, and
    * never during a live conversation.
    *
    * Two triggers, whichever comes first — time on the page, and how far down
@@ -415,7 +422,10 @@ export function App({
       // With a first-message box, the queued message was prefilled into it,
       // so the box is the whole truth: an edit is what they meant, and a
       // cleared box means send nothing. Without one, the queue is all there is.
-      const message = config.leadForm.askFirstMessage ? firstMessage : (queued ?? undefined);
+      // A "message" field in the form is what they want to ask: it opens the
+      // conversation (shown in the thread, answered first), and stays on the lead.
+      const fromField = lead['message']?.trim() || undefined;
+      const message = config.leadForm.askFirstMessage ? (firstMessage ?? fromField) : (queued ?? fromField);
       dispatch({ type: 'lead/submit', lead, ...(message ? { firstMessage: message } : {}) });
       void startSession(lead, message);
     },
@@ -437,7 +447,7 @@ export function App({
    *
    * Every producer of a message ends up here — the composer, `Murmur.send`,
    * a `reply` shortcut and a finished flow — so none of them can quietly
-   * drop the visitor's words for want of a session (§8.5).
+   * drop the visitor's words for want of a session.
    */
   const sendText = useCallback(
     (text: string) => {
@@ -459,7 +469,7 @@ export function App({
   );
 
   /**
-   * Flows run entirely in the browser (§8.7): each step is a local message,
+   * Flows run entirely in the browser: each step is a local message,
    * and nothing reaches the server until the template is rendered from the
    * collected answers.
    */
@@ -477,7 +487,7 @@ export function App({
     (flowId: string) => {
       const flow = findFlow(config, flowId);
       // A shortcut pointing at a flow that no longer exists does nothing
-      // rather than wedging the widget (§8.3).
+      // rather than wedging the widget.
       if (!flow) return;
       dispatch({ type: 'flow/start', id: flowId });
       askStep(flowId, 0);
@@ -528,7 +538,7 @@ export function App({
   startFlowRef.current = startFlow;
 
   /**
-   * What a card, chip or inline form does when it is used (§4.5). `url`,
+   * What a card, chip or inline form does when it is used. `url`,
    * `tel` and `email` are plain anchors, so they never reach here.
    */
   const handlers: MessageHandlers = useMemo(
@@ -576,8 +586,23 @@ export function App({
       },
 
       isConsumed: (message: Message) => state.consumedActions.includes(message.id),
+
+      // Only replies the server recorded can be rated: not the greeting, a flow step, or a local note.
+      rating:
+        runtime.capabilities.feedback && state.session
+          ? {
+              get: (message: Message) => (isServerMessage(message.id) ? (ratings[message.id] ?? 0) : NaN),
+              set: (message: Message, value: 1 | -1 | 0) => {
+                const session = stateRef.current.session;
+                if (!session || !isServerMessage(message.id)) return;
+                setRatings((current) => ({ ...current, [message.id]: value }));
+                api.rate(session.token, message.id, value);
+              },
+              labels: [t('helpful'), t('notHelpful')] as [string, string],
+            }
+          : undefined,
     }),
-    [config, doSend, addLocal, localMessage, state.consumedActions],
+    [config, doSend, addLocal, localMessage, state.consumedActions, state.session, ratings, runtime, api, t],
   );
 
   const answerFlowRef = useRef<(value: string) => boolean>(() => false);
@@ -586,7 +611,7 @@ export function App({
   /**
    * A shortcut behaves like the action it carries. A `reply` goes through
    * the lead form first if one is required, so the visitor's intent is not
-   * lost (§8.5).
+   * lost.
    */
   const onShortcut = useCallback(
     (shortcut: Shortcut) => {
@@ -645,7 +670,7 @@ export function App({
     close,
     toggle: () => (stateRef.current.open ? close() : open()),
     send: (text: string) => {
-      // §8.1: send() opens the panel as well as delivering the message.
+      // send() opens the panel as well as delivering the message.
       open();
       sendText(text);
     },
@@ -776,7 +801,7 @@ export function App({
 
               <Composer
                 value={state.draft}
-                // A flow answers in the composer before any session exists (§8.7).
+                // A flow answers in the composer before any session exists.
                 disabled={
                   state.status === 'sending' || state.status === 'ended' || (!state.session && !state.flow)
                 }

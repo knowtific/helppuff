@@ -6,7 +6,9 @@ import { VERSION } from './help.js';
 import { chat } from './engine/chat.js';
 import { compile, devOrigin, embedSnippet } from './engine/compile.js';
 import { cloudflareSession } from './engine/credentials.js';
-import { deploy } from './engine/deploy.js';
+import { deploy, startCrawlFromCli, type CrawlRequest } from './engine/deploy.js';
+import { adminApi } from './engine/admin-api.js';
+import { waitForCrawl } from './commands/knowledge.js';
 import { doctor } from './engine/doctor.js';
 import { loadEnv, writeEnvVar } from './engine/env.js';
 import { runInit } from './engine/init.js';
@@ -38,6 +40,11 @@ function cwdOf(args: Json, base: string): string {
   return typeof args['cwd'] === 'string' ? resolve(base, args['cwd']) : base;
 }
 
+function crawlOf(value: string): CrawlRequest {
+  if (value === 'all' || value === 'suggested') return { mode: value };
+  return { mode: 'match', include: value.split(',').map((g) => g.trim()).filter(Boolean) };
+}
+
 export function tools(base: string): Tool[] {
   return [
     {
@@ -50,7 +57,8 @@ export function tools(base: string): Tool[] {
           ...cwdProp,
           url: { type: 'string', description: 'Website, e.g. acme.com, or "none"' },
           name: { type: 'string' },
-          backend: { type: 'string', enum: ['cloudflare', 'openai', 'gemini', 'anthropic', 'http', 'retell'] },
+          defaults: { type: 'boolean', description: 'Take the free default stack (workers-ai: Workers AI + its own knowledge base)' },
+          backend: { type: 'string', enum: ['workers-ai', 'cloudflare', 'openai', 'gemini', 'anthropic', 'http', 'retell'] },
           model: { type: 'string' },
           apiKey: { type: 'string', description: 'Provider API key (openai/gemini/anthropic/retell)' },
           aiSearch: { type: 'string', description: '"new", an existing AI Search instance name, or "endpoint"' },
@@ -89,6 +97,7 @@ export function tools(base: string): Tool[] {
         }
         if (Array.isArray(args['docs'])) answers.docs = args['docs'].map(String);
         if (args['dashboard'] === false) answers.dashboard = false;
+        if (typeof args['defaults'] === 'boolean') answers.defaults = args['defaults'];
         const result = await runInit({
           cwd: cwdOf(args, base),
           answers,
@@ -100,7 +109,7 @@ export function tools(base: string): Tool[] {
           return {
             ...result,
             project: undefined,
-            next: 'Call murmur_deploy, then murmur_chat with a realistic question. If adminPassword is present, show it to the user once.',
+            next: 'Call murmur_deploy (with crawl: "suggested" for workers-ai), then murmur_ask with a realistic question. Give the user setupUrl from the deploy. If adminPassword is present, show it to the user once.',
           };
         }
         return result;
@@ -116,15 +125,87 @@ export function tools(base: string): Tool[] {
           knowledge: { type: 'string', enum: ['auto', 'force', 'skip'], description: 'force = re-sync the knowledge base' },
           force: { type: 'boolean', description: 'Re-upload the Worker even if unchanged' },
           dryRun: { type: 'boolean' },
+          crawl: {
+            type: 'string',
+            description: 'workers-ai: also start a crawl — "suggested", "all", or globs like "**/services/**,**/faq/**". It runs in the background.',
+          },
+          overwriteSettings: { type: 'boolean', description: 'Publish over settings changed in the dashboard. Prefer murmur_config with action pull.' },
         },
       },
-      run: async (args) =>
-        deploy(loadProject(cwdOf(args, base)), {
+      run: async (args) => {
+        const crawl = typeof args['crawl'] === 'string' && args['crawl'] !== 'none' ? crawlOf(args['crawl']) : undefined;
+        return deploy(loadProject(cwdOf(args, base)), {
           knowledge: (args['knowledge'] as 'auto') ?? 'auto',
           forceWorker: args['force'] === true,
           dryRun: args['dryRun'] === true,
+          overwriteSettings: args['overwriteSettings'] === true,
+          ...(crawl ? { crawl } : {}),
           progress,
+        });
+      },
+    },
+    {
+      name: 'murmur_crawl',
+      description:
+        'workers-ai: crawl pages into the knowledge base, in the background on Cloudflare. which: "selected" (default; the first time, the suggested pages), "suggested", "all", globs, or urls. Then poll murmur_knowledge_status (or pass wait:true).',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          ...cwdProp,
+          which: { type: 'string' },
+          urls: { type: 'array', items: { type: 'string' } },
+          wait: { type: 'boolean', description: 'Wait until the crawl finishes (can take minutes).' },
+        },
+      },
+      run: async (args) => {
+        const loaded = loadProject(cwdOf(args, base));
+        const api = adminApi(loaded);
+        const urls = Array.isArray(args['urls']) ? args['urls'].map(String) : null;
+        const which = typeof args['which'] === 'string' ? args['which'] : 'selected';
+        const started = urls
+          ? await startCrawlFromCli(api, { mode: 'urls', urls }, progress)
+          : which === 'selected'
+            ? await api.send<{ runId: string; total: number }>('POST', '/admin/api/knowledge/crawl', {})
+            : await startCrawlFromCli(api, crawlOf(which), progress);
+        if (args['wait'] !== true) return { ...started, status: 'started', next: 'murmur_knowledge_status' };
+        return { ...started, final: await waitForCrawl(api, started.runId, () => {}) };
+      },
+    },
+    {
+      name: 'murmur_knowledge_status',
+      description: 'workers-ai: crawl progress, page statuses, passage count, and today’s usage against the free daily budget.',
+      inputSchema: { type: 'object', properties: cwdProp },
+      run: async (args) => adminApi(loadProject(cwdOf(args, base))).get('/admin/api/knowledge/status'),
+    },
+    {
+      name: 'murmur_knowledge_add',
+      description: 'workers-ai: add hand-written knowledge (a Q&A, a policy, a price list) — indexed and live at once.',
+      inputSchema: { type: 'object', required: ['title', 'text'], properties: { ...cwdProp, title: { type: 'string' }, text: { type: 'string' }, id: { type: 'string' } } },
+      run: async (args) =>
+        adminApi(loadProject(cwdOf(args, base))).send('POST', '/admin/api/knowledge/manual', {
+          title: String(args['title']),
+          content: String(args['text']),
+          ...(typeof args['id'] === 'string' ? { id: args['id'] } : {}),
         }),
+    },
+    {
+      name: 'murmur_ask',
+      description:
+        'Ask the deployed assistant a visitor question and see the passages retrieval found (with scores). Use it to check answers are grounded; when sources is empty the assistant should say it is not sure.',
+      inputSchema: { type: 'object', required: ['question'], properties: { ...cwdProp, question: { type: 'string' }, session: { type: 'string' } } },
+      run: async (args) => {
+        const loaded = loadProject(cwdOf(args, base));
+        const url = loaded.project.cloudflare.url;
+        if (!url) return { ok: false, error: 'Not deployed yet. Call murmur_deploy first.' };
+        const question = String(args['question']);
+        const [turn, search] = await Promise.all([
+          chat({ url, site: loaded.project.site, origin: new URL(url).origin, message: question, session: typeof args['session'] === 'string' ? args['session'] : undefined, secret: loadEnv(loaded.dir)['MURMUR_SECRET'] }),
+          loaded.project.backend.type === 'workers-ai'
+            ? adminApi(loaded).send<{ chunks: { url: string; headingPath: string; score: number }[] }>('POST', '/admin/api/knowledge/search', { query: question }).catch(() => null)
+            : Promise.resolve(null),
+        ]);
+        return { reply: turn.reply, session: turn.session, sources: search?.chunks.map((c) => ({ url: c.url, section: c.headingPath, score: c.score })) ?? null };
+      },
     },
     {
       name: 'murmur_chat',

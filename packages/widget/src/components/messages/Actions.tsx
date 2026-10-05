@@ -2,7 +2,7 @@ import type { Action } from '@murmur/protocol';
 import { Icon } from '../Icon.js';
 
 /**
- * The action row shared by cards and carousel items (§4.5). `url`, `tel` and
+ * The action row shared by cards and carousel items. `url`, `tel` and
  * `email` are real anchors so the browser handles them natively; the rest go
  * back through the protocol.
  */

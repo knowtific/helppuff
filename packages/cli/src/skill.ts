@@ -34,19 +34,22 @@ for you; read it once. Every command with \`--json\` prints one JSON object:
    code). Otherwise make a folder such as \`chat-assistant/\` and work in it.
 
 2. **Ask once, briefly.** The only thing you must have is the **website URL** — never guess
-   it. In one message, also offer these (each has a default; if the user says "just do
-   it", use the defaults):
-   - backend: **Cloudflare AI Search** (default — free tier, needs no other keys),
-     OpenAI, Gemini, Anthropic Claude, or their own API;
-   - the assistant's name; its main goal (turn visitors into enquiries · answer
-     questions · book appointments · recommend products); anything it must know or never
-     say; whether to ask for name/email/phone before chatting;
-   - any documents to learn from (PDF, Word, Markdown…) — put them in a folder.
+   it. The default setup is free and needs nothing else: Workers AI answering from the
+   site's own pages, crawled into a knowledge base on the user's Cloudflare account. Offer
+   the rest in one message (each has a default; "just do it" means the defaults):
+   - nothing else is needed: the setup page reads the business details from the site
+     and asks for the main goal; tone, must-know and never-say are in Settings later.
+   - another backend only if they ask for one: OpenAI, Gemini, Claude, Retell, or their own API.
 
-3. **Create it.**
-   \`${CLI} init --json --url <site> [--backend cloudflare] [--agent-name "…"] [--goal leads|answer|book|sell] [--notes "…"] [--lead-form none|name,email|name,email,phone] [--docs ./folder]\`
+3. **Create and deploy.**
+   \`${CLI} init --json --url <site> --deploy --yes\`
    - \`"status":"needs_input"\` (exit code 10) is not a failure: ask the user exactly those
      \`questions\` (use \`ask\`, \`options\`, \`default\`), then re-run with each \`flag\` added.
+   - You are the onboarding: init starts learning the suggested pages and reads the business
+     details itself, in the background on Cloudflare (a Workflow) — nothing waits for it.
+     \`--crawl "**/services/**,**/faq/**"\` (or \`knowledge.website.include\` in murmur.json)
+     chooses pages; \`murmur discover\` lists what it found. Documents the user gives you:
+     \`${CLI} knowledge upload <file…> --json\`.
 
 4. **Cloudflare access** — the one real prerequisite. If init asks for \`cfToken\`, this
    machine is not connected to Cloudflare. Tell the user, and offer:
@@ -58,22 +61,24 @@ for you; read it once. Every command with \`--json\` prints one JSON object:
      instead, pass it once as \`--cf-token\`; it goes to \`.env\` and is never printed.
    Provider keys work the same way (\`secret set OPENAI_API_KEY\`, or \`--api-key\`).
 
-5. **Deploy.** \`${CLI} deploy --json\` → \`url\`, \`preview\`, \`embed\`, \`dashboard\`. It is live
-   straight away; \`indexing\` shows the knowledge base still building in the background —
-   do not wait for it.
+5. **Test it like a visitor.** Check \`${CLI} knowledge status --json\` until the crawl is
+   \`done\` (or \`${CLI} crawl --wait --json\`), then \`${CLI} ask "<a real question about their
+   business>" --json\` two or three times. Read \`reply\` and \`sources\`: a right answer cites the
+   right page; a question the site does not cover should get "not sure", not a guess. Wrong?
+   Add knowledge (\`knowledge add --file faq.md\`), fix facts (\`knowledge facts set phone=…\`),
+   or tighten \`prompt.md\` and deploy.
 
-6. **Test it like a visitor.** \`${CLI} chat "<a real question about their business>" --json\`,
-   two or three times, and read each \`reply\`. Pages still indexing can make early answers
-   thin; that improves by itself. If an answer is wrong, fix \`prompt.md\` and deploy again.
-
-7. **Put it on their site.** If their website's code is here, add the \`embed\` script before
+6. **Put it on their site.** If their website's code is here, add the \`embed\` script before
    \`</body>\` in the layout every page shares — Next.js App Router: \`app/layout.tsx\` with
    \`<Script src="…/loader.js" data-site="…" strategy="afterInteractive" />\`; plain HTML: the
    shared template or every page. Otherwise give them the snippet to paste.
 
-8. **Hand over.** Tell the user: the preview link, the dashboard link and sign-in email, and
-   the password from init's \`dashboardLogin.password\` if one was generated — shown once,
-   stored only as a hash (\`${CLI} users reset <email>\` makes a new one).
+7. **Hand over.** Give the user three things, nothing more: the dashboard
+   (\`deploy.setupUrl\` — a one-time link, 24 hours, where they create their sign-in; it opens
+   on Home with the test chat, since you did the onboarding), the script (\`deploy.embed\`)
+   and the demo (\`deploy.preview\`). Lost or expired: \`${CLI} dashboard --json\` mints a
+   sign-in link. (Other backends: the dashboard email, and \`dashboardLogin.password\` from
+   init if one was generated.)
 
 ## Changing it
 
@@ -89,8 +94,12 @@ for you; read it once. Every command with \`--json\` prints one JSON object:
 - Look, greeting, pre-chat form, backend →
   \`murmur.json\` (\`${CLI} schema\` lists every field) or \`${CLI} config set <path> <value>\`.
   Then \`${CLI} deploy --json\` — content changes are live in seconds.
-- New documents → add files to a folder in \`knowledge.files\`, then
-  \`${CLI} knowledge sync --json\`; progress with \`knowledge status --json\`.
+- Deploy fails with \`settings_changed\` → the owner changed settings in the dashboard. Run
+  \`${CLI} config pull --json\`, review the murmur.json diff, deploy again.
+- New pages or site changes → \`${CLI} crawl --json\` (re-crawls the selected pages; unchanged
+  pages cost nothing). New documents → \`${CLI} knowledge upload <file…> --wait --json\`
+  (PDF, Word, Markdown or text, read on the Worker), or list them in \`knowledge.files\`
+  and deploy. Other backends: \`knowledge sync\`.
 - Team access → \`users add <email>\`; forgotten password → \`users reset <email>\`.
 - Something wrong → \`${CLI} doctor --json\`: every failing check has a \`fix\`.
 
@@ -99,6 +108,7 @@ for you; read it once. Every command with \`--json\` prints one JSON object:
 - Never print, log or commit \`.env\`; never repeat a secret back to the user.
 - Never guess a website, token, key, email or account id — ask.
 - Keep questions few and together; don't make the user wait for crawling.
+- Stay on the free plan unless the user asks: the default model and budget fit it.
 `;
 
 /** The section `init` appends to a project's AGENTS.md (read by Codex and others). */

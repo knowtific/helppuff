@@ -81,8 +81,8 @@ test.describe('the conversation', () => {
   test("the lead form's first message appears in the thread", async ({ page }) => {
     await openWidget(page);
     await page.locator('murmur-widget .mm-btn').first().click();
-    await page.locator('murmur-widget #mm-f-name').fill('Ahad');
-    await page.locator('murmur-widget #mm-f-email').fill('ahad@example.com');
+    await page.locator('murmur-widget #mm-f-name').fill('Ada');
+    await page.locator('murmur-widget #mm-f-email').fill('ada@example.com');
     await page.locator('murmur-widget #mm-f-phone').fill('0400 000 000');
     await page.locator('murmur-widget #mm-f-first').fill('a question asked up front');
     await page.locator('murmur-widget button[type="submit"]').click();
@@ -134,6 +134,9 @@ test.describe('the conversation', () => {
     await startConversation(page);
     await send(page, 'remember me');
     await expect(agentMessages(page).last()).toContainText('remember me');
+    // A streamed reply shows its text before the turn is done; the conversation
+    // is stored when it is. Wait for that, as a visitor's next page load would.
+    await expect(page.locator('murmur-widget [data-streaming], murmur-widget [data-pending]')).toHaveCount(0);
 
     await page.reload();
     await openWidget(page);
@@ -178,7 +181,7 @@ test.describe('the JavaScript API', () => {
     await expect(panel(page)).toBeVisible();
 
     // The site requires a lead, so the form comes first — but the visitor's
-    // intent is not discarded (§8.5).
+    // intent is not discarded.
     await page.locator('murmur-widget #mm-f-name').fill('Ada');
     await page.locator('murmur-widget #mm-f-email').fill('ada@example.com');
     await page.locator('murmur-widget #mm-f-phone').fill('0400 000 000');
@@ -276,7 +279,7 @@ test.describe('accessibility', () => {
     await page.keyboard.press('Enter');
     await expect(panel(page)).toBeVisible();
 
-    // Focus lands inside the panel on open (§8.7).
+    // Focus lands inside the panel on open.
     const inside = await page.evaluate(() => {
       const root = document.querySelector('murmur-widget')?.shadowRoot;
       return Boolean(root?.querySelector('.mm-panel')?.contains(root.activeElement));
@@ -284,7 +287,7 @@ test.describe('accessibility', () => {
     expect(inside).toBe(true);
   });
 
-  test('every interactive target is at least 44px (§8.7)', async ({ page }) => {
+  test('every interactive target is at least 44px', async ({ page }) => {
     await openWidget(page);
     await startConversation(page);
 
@@ -383,7 +386,7 @@ test.describe('mobile', () => {
 
     await startConversation(page);
     const fontSize = await composer(page).evaluate((el) => getComputedStyle(el).fontSize);
-    // Anything under 16px makes iOS zoom the host page (§8.8).
+    // Anything under 16px makes iOS zoom the host page.
     expect(parseFloat(fontSize)).toBeGreaterThanOrEqual(16);
   });
 });

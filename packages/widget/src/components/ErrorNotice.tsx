@@ -4,9 +4,9 @@ import type { WidgetError } from '../app/store.js';
 import type { StringKey } from '../app/strings.js';
 
 /**
- * Recoverable failures degrade in place (§8.3): the panel stays open, the
+ * Recoverable failures degrade in place: the panel stays open, the
  * typed message is kept, and the visitor is offered a way forward — a retry,
- * a countdown, or the site's fallback contact details (§8.7).
+ * a countdown, or the site's fallback contact details.
  */
 export function ErrorNotice({
   error,

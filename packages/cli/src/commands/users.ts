@@ -7,6 +7,8 @@ import { dashboardUrl } from '../engine/compile.js';
 import { cloudflareSession } from '../engine/credentials.js';
 import { loadEnv } from '../engine/env.js';
 import { loadProject } from '../engine/project.js';
+import { adminApi } from '../engine/admin-api.js';
+import { openBrowser } from '../engine/browser.js';
 import type { Ctx } from './context.js';
 
 /**
@@ -110,13 +112,41 @@ export async function usersCommand(ctx: Ctx): Promise<number> {
   }
 }
 
+/**
+ * `murmur dashboard` — a one-time sign-in link (15 minutes), or the setup
+ * link when nobody has claimed the dashboard yet. The recovery path for a
+ * lost password: whoever holds the project's admin key can always get in.
+ */
 export async function dashboardCommand(ctx: Ctx): Promise<number> {
-  assertKnown(ctx.flags, [], 'dashboard');
+  assertKnown(ctx.flags, ['email', 'browser'], 'dashboard');
   const loaded = loadProject(ctx.cwd);
   if (!loaded.project.dashboard.enabled) throw new CliError('dashboard_disabled', 'The dashboard is turned off in murmur.json.');
   const url = loaded.project.cloudflare.url;
   if (!url) throw new CliError('not_deployed', 'Deploy first to get a dashboard.', { hint: 'murmur deploy' });
   const dashboard = dashboardUrl(url);
+  if (loadEnv(loaded.dir)['ADMIN_API_KEY']) {
+    const api = adminApi(loaded);
+    const email = str(ctx.flags, 'email');
+    let link: { url: string; kind: string; email: string | null; expiresAt: number };
+    try {
+      link = await api.send('POST', '/admin/api/links', { kind: 'login', ...(email ? { email } : {}) });
+    } catch (thrown) {
+      if (!(thrown instanceof CliError) || !/setup link|no accounts/i.test(thrown.message)) throw thrown;
+      link = await api.send('POST', '/admin/api/links', { kind: 'setup' });
+    }
+    if (ctx.interactive && ctx.flags['browser'] !== false) openBrowser(link.url);
+    ctx.out.result({ dashboard, link: link.url, kind: link.kind, email: link.email, expiresAt: link.expiresAt }, () => {
+      process.stdout.write(`${c.cyan(link.url)}\n`);
+      process.stdout.write(
+        c.dim(
+          link.kind === 'setup'
+            ? 'Opens the setup page, where you create the first dashboard account. Valid 24 hours, once.\n'
+            : `Signs ${link.email} in once, within 15 minutes. Do not share it.\n`,
+        ),
+      );
+    });
+    return 0;
+  }
   ctx.out.result({ dashboard, email: loaded.project.dashboard.adminEmail ?? null }, () => {
     process.stdout.write(`${dashboard}\n${c.dim(`Sign in as ${loaded.project.dashboard.adminEmail ?? '(no admin set)'}.`)}\n`);
   });

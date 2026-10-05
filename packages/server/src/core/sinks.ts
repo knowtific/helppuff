@@ -7,7 +7,7 @@ import { getSink } from './registry.js';
 import type { RequestCtx } from './request.js';
 
 /**
- * Run every configured lead destination (§6.6).
+ * Run every configured lead destination.
  *
  * Fire-and-forget through `waitUntil`: the visitor's reply never waits on a
  * CRM, and a sink that fails is logged and never surfaces to them. A broken
@@ -50,7 +50,7 @@ export function dispatchLead(
           /*
            * Includes an unknown sink type and an unresolved `{ env }` ref.
            * The detail names which — `missing_secret:LEAD_WEBHOOK_URL` — and
-           * never carries a value, so it stays safe to log (§7.2). Without it
+           * never carries a value, so it stays safe to log. Without it
            * a misconfigured sink is indistinguishable from a receiver that is
            * simply down.
            */

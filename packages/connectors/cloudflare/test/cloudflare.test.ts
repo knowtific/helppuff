@@ -189,3 +189,16 @@ describe('document names are not links', () => {
     expect(result.messages[1]).toMatchObject({ type: 'links', links: [{ label: 'Pricing', url: 'https://acme.com/pricing' }] });
   });
 });
+
+describe('markers a model copies instead of writing', () => {
+  it('reads an echoed history note as options and drops template placeholders', async () => {
+    const { parseMarkers } = await import('@murmur/connector-types');
+    const echoed = parseMarkers('We install hybrid.\n\n[Offered choices: Get a quote | Call me back]');
+    expect(echoed.text).toBe('We install hybrid.');
+    expect(echoed.messages).toMatchObject([{ type: 'options', options: [{ label: 'Get a quote' }, { label: 'Call me back' }] }]);
+
+    const template = parseMarkers('Here you go.\n[Showed a card: Hybrid]\n[[options: First choice | Second choice | Third choice]]');
+    expect(template).toEqual({ text: 'Here you go.', messages: [] });
+    expect(parseMarkers('Sure.\n[[options: A | B | C]]')).toEqual({ text: 'Sure.', messages: [] });
+  });
+});

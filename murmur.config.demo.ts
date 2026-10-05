@@ -12,9 +12,9 @@ import { defineConfig } from '@murmur/server';
  * what a fresh clone gets — one site on the `echo` connector, which needs no
  * API key and drives every widget feature.
  *
- * See `murmur.config.example.ts` for the shape of a production site, and
- * `docs/deployment.md` for putting config in KV so changing it is not a
- * deploy either.
+ * This is the server's own config, for working on Murmur itself. To deploy
+ * an assistant, use the CLI (`npx @knowtific/murmur`), which writes and
+ * compiles its own from murmur.json.
  */
 export default defineConfig({
   sites: {
@@ -33,8 +33,8 @@ export default defineConfig({
       /*
        * Development values. The whole test suite and every playground reload
        * come from one IP, so the per-IP limits sit well above anything a real
-       * visitor would reach. `murmur.config.example.ts` carries the numbers a
-       * production site should actually use.
+       * visitor would reach. The CLI's defaults are the numbers a production
+       * site should use.
        */
       security: {
         limits: {
@@ -48,8 +48,7 @@ export default defineConfig({
       },
 
       // No lead destination in development — a webhook pointing at a port
-      // with nothing on it just logs a failure on every session. See
-      // `murmur.config.example.ts` for how to configure one.
+      // with nothing on it just logs a failure on every session.
       sinks: [],
 
       widget: {
@@ -62,7 +61,7 @@ export default defineConfig({
 
         launcher: {
           position: 'bottom-right',
-          // Any of the 20 built-in icons (§9.6) — 'wrench', 'phone', 'heart'…
+          // Any of the 20 built-in icons — 'wrench', 'phone', 'heart'…
           icon: 'chat',
           shape: 'pill',
           label: 'Chat with us!',

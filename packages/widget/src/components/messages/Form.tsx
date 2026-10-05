@@ -5,7 +5,7 @@ import { FieldRow, collectValues, validateFields } from '../Fields.js';
 type FormMsg = Extract<Message, { type: 'form' }>;
 
 /**
- * An inline form in the thread (§8.7). Uses the same field component as the
+ * An inline form in the thread. Uses the same field component as the
  * lead form, and submits as an `action` carrying a JSON value and a readable
  * label — the connector gets structured data, the transcript gets prose.
  */

@@ -1,5 +1,5 @@
 import type { Account, AiSearchInstance } from './cloudflare.js';
-import type { BackendType } from './project.js';
+import { DEFAULT_BACKEND, type BackendType } from './project.js';
 import { siteIdFor, type SiteInfo } from './site.js';
 import { RESOURCE_PREFIX } from './project.js';
 import { TOKEN_HELP } from './cloudflare.js';
@@ -20,6 +20,8 @@ import { TOKEN_HELP } from './cloudflare.js';
 export type Answers = {
   website?: string;
   name?: string;
+  /** Take the free default stack (workers-ai) without asking about backends. */
+  defaults?: boolean;
   backend?: BackendType;
   model?: string;
   /** Provider API key (OpenAI / Gemini / Anthropic / Retell) — goes to .env, never murmur.json. */
@@ -65,7 +67,8 @@ export const GOALS: Option[] = [
  */
 export const LATE_QUESTIONS: readonly QuestionId[] = ['adminEmail', 'adminPassword', 'agentName', 'goal', 'notes', 'leadForm'];
 
-export const LEAD_FORM_FIELDS = ['name', 'email', 'phone'] as const;
+export const LEAD_FORM_FIELDS = ['name', 'email', 'phone', 'message'] as const;
+export const DEFAULT_LEAD_FORM = 'name,email,phone,message';
 
 export type QuestionId = keyof Answers;
 
@@ -109,6 +112,12 @@ export const PROVIDER_KEYS: Partial<Record<BackendType, string>> = {
 };
 
 export const MODELS: Partial<Record<BackendType, Option[]>> = {
+  // Checked against developers.cloudflare.com/workers-ai/platform/pricing on 2026-10-04.
+  'workers-ai': [
+    { value: '@cf/zai-org/glm-4.7-flash', label: 'GLM-4.7 Flash', hint: 'default · free plan · ~300 answers a day free' },
+    { value: '@cf/openai/gpt-oss-120b', label: 'gpt-oss 120B', hint: 'free plan · steadier tool use · ~4× the cost per answer' },
+    { value: '@cf/zai-org/glm-5.3-flash', label: 'GLM-5.3 Flash', hint: 'needs Workers Paid or AI Gateway credits' },
+  ],
   cloudflare: [
     { value: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', label: 'Llama 3.3 70B', hint: 'Workers AI · fast, free tier' },
     { value: '@cf/openai/gpt-oss-120b', label: 'gpt-oss 120B', hint: 'Workers AI · stronger reasoning' },
@@ -138,9 +147,14 @@ function backendOptions(facts: Facts): Option[] {
   const found = (backend: BackendType) => (hasKey(facts, PROVIDER_KEYS[backend]) ? ' · key found' : '');
   return [
     {
+      value: 'workers-ai',
+      label: 'Workers AI + your own knowledge base',
+      hint: 'recommended · free plan · Murmur crawls your site into Vectorize and D1 on your account',
+    },
+    {
       value: 'cloudflare',
       label: 'Cloudflare AI Search',
-      hint: 'free tier, answers from your site and docs, needs only your Cloudflare token',
+      hint: 'Cloudflare manages crawling and retrieval; needs AI Search on your account',
     },
     { value: 'openai', label: 'OpenAI + File Search', hint: `GPT models${found('openai')}` },
     { value: 'gemini', label: 'Gemini + File Search', hint: `Google models${found('gemini')}` },
@@ -174,23 +188,25 @@ export function pendingQuestions(answers: Answers, facts: Facts): Question[] {
       kind: 'text',
       ask: 'What is the business called?',
       required: noSite,
-      wizard: true,
+      wizard: noSite,
       ...(facts.site?.origin ? { default: guessName(facts.site.origin) } : {}),
     });
   }
 
-  if (!backend) {
+  if (!backend && answers.defaults === false) {
     out.push({
       id: 'backend',
       flag: '--backend',
       kind: 'select',
       ask: 'Which backend should answer your visitors?',
       options: backendOptions(facts),
-      default: 'cloudflare',
-      required: true,
+      default: DEFAULT_BACKEND,
+      required: false,
+      wizard: true,
     });
   }
 
+  // With the defaults taken, the model is the default too; it is only asked in the advanced path.
   if (backend && MODELS[backend] && answers.model === undefined) {
     out.push({
       id: 'model',
@@ -200,7 +216,8 @@ export function pendingQuestions(answers: Answers, facts: Facts): Question[] {
       options: MODELS[backend],
       default: defaultModel(backend)!,
       required: false,
-      wizard: true,
+      // The wizard asks for the website and nothing else; models, files and the rest are flags or Settings.
+      wizard: false,
     });
   }
 
@@ -300,15 +317,15 @@ export function pendingQuestions(answers: Answers, facts: Facts): Question[] {
     });
   }
 
-  if (backend && ['cloudflare', 'openai', 'gemini', 'anthropic'].includes(backend) && answers.docs === undefined) {
+  if (backend && ['workers-ai', 'cloudflare', 'openai', 'gemini', 'anthropic'].includes(backend) && answers.docs === undefined) {
     out.push({
+      wizard: false,
       id: 'docs',
       flag: '--docs',
       kind: 'list',
       ask: 'Any files or folders to learn from? (PDF, Markdown, text — comma separated, Enter to skip)',
       ...(facts.knowledgeDir ? { default: facts.knowledgeDir } : {}),
       required: false,
-      wizard: true,
     });
   }
 
@@ -335,7 +352,9 @@ export function pendingQuestions(answers: Answers, facts: Facts): Question[] {
     });
   }
 
-  if (answers.dashboard !== false && answers.adminEmail === undefined) {
+  // workers-ai: the first dashboard account is created from the setup link, in the browser.
+  const setupLink = (backend ?? (answers.defaults === false ? undefined : DEFAULT_BACKEND)) === 'workers-ai';
+  if (answers.dashboard !== false && answers.adminEmail === undefined && !setupLink) {
     out.push({
       id: 'adminEmail',
       flag: '--admin-email',
@@ -347,7 +366,7 @@ export function pendingQuestions(answers: Answers, facts: Facts): Question[] {
       wizard: true,
     });
   }
-  if (answers.dashboard !== false && answers.adminPassword === undefined) {
+  if (answers.dashboard !== false && answers.adminPassword === undefined && (!setupLink || answers.adminEmail)) {
     out.push({
       id: 'adminPassword',
       flag: '--admin-password',
@@ -368,7 +387,7 @@ export function pendingQuestions(answers: Answers, facts: Facts): Question[] {
       ask: 'What should visitors see the assistant called?',
       default: 'Assistant',
       required: false,
-      wizard: true,
+      wizard: false,
     });
   }
   if (answers.goal === undefined && promptable) {
@@ -380,7 +399,7 @@ export function pendingQuestions(answers: Answers, facts: Facts): Question[] {
       options: GOALS,
       default: 'leads',
       required: false,
-      wizard: true,
+      wizard: false,
     });
   }
   if (answers.leadForm === undefined) {
@@ -390,13 +409,14 @@ export function pendingQuestions(answers: Answers, facts: Facts): Question[] {
       kind: 'select',
       ask: 'Ask visitors for their details before they start chatting?',
       options: [
-        { value: 'none', label: 'No — let them chat straight away', hint: 'the assistant asks for details once it has helped' },
+        { value: DEFAULT_LEAD_FORM, label: 'Name, email, phone (optional) and their question', hint: 'every conversation becomes a lead' },
+        { value: 'none', label: 'No — let them chat straight away', hint: 'the assistant asks for details only for a callback' },
         { value: 'name,email', label: 'Name and email', hint: 'every conversation becomes a lead' },
         { value: 'name,email,phone', label: 'Name, email and phone', hint: 'phone optional — best for businesses that call back' },
       ],
-      default: 'none',
+      default: DEFAULT_LEAD_FORM,
       required: false,
-      wizard: true,
+      wizard: false,
     });
   }
   if (answers.notes === undefined && promptable) {
@@ -408,7 +428,7 @@ export function pendingQuestions(answers: Answers, facts: Facts): Question[] {
       help: 'For example: "We only serve Melbourne", "Never quote prices — offer a free quote", "Closed on public holidays".',
       default: '',
       required: false,
-      wizard: true,
+      wizard: false,
     });
   }
 

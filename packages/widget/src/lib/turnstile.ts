@@ -1,6 +1,6 @@
 /**
  * Cloudflare Turnstile, for the one request that costs money: starting a
- * session (§7.1 step 6).
+ * session.
  *
  * The server already verifies the token with siteverify and fails closed. This
  * is the missing half — without it the server demands a token the browser
@@ -13,7 +13,7 @@
  *   thing the widget puts outside its own shadow root, and it is loaded only
  *   when a site actually configures a captcha. The challenge itself renders
  *   into a container *inside* the shadow root, so the host page's layout is
- *   still untouched (§8.2).
+ *   still untouched.
  *
  * - **Tokens are single-use.** Siteverify redeems a token exactly once, so a
  *   retry after a failed start needs a fresh one. Each call here renders,
@@ -23,7 +23,7 @@
  * - **It must not be able to hang.** Everything is bounded: script load,
  *   challenge completion, and the interactive case where the visitor simply
  *   never solves it. A caller that never resolves would leave the panel
- *   spinning for ever, which reads as "working" rather than "broken" (§8.3).
+ *   spinning for ever, which reads as "working" rather than "broken".
  */
 
 const SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';

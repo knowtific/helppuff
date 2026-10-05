@@ -40,7 +40,7 @@ export function Card({
 
 /**
  * Horizontal scroll-snap, with arrow buttons on pointer devices and swipe on
- * touch (§8.7).
+ * touch.
  *
  * The scrollbar is deliberately hidden — a native bar under a row of cards
  * looks like a mistake — which means the arrows are the only affordance a

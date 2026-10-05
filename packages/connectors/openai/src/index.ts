@@ -1,10 +1,12 @@
 import { z } from 'zod';
+import { ground } from '@murmur/rag';
 import type { Message, SendRequest } from '@murmur/protocol';
 import {
   ConnectorError,
   RICH_TOOL_SCHEMAS,
   defineConnector,
   fetchWithTimeout,
+  message,
   promptSourceSchema,
   readJsonEvents,
   promptVariables,
@@ -47,7 +49,7 @@ export const openaiOptionsSchema = z.object({
   model: z.string().min(1).default('gpt-5'),
   /**
    * The system prompt. A string, or `{ env }` / `{ kv }` / `{ url }` so the
-   * text lives outside this repository — see `docs/prompts.md`.
+   * text lives outside this repository — see `wiki/Prompts-and-Instructions.md`.
    */
   instructions: promptSourceSchema.optional(),
   /**
@@ -60,7 +62,7 @@ export const openaiOptionsSchema = z.object({
     .optional(),
   /**
    * Declare `show_options` / `show_card` / `show_links` so the model can
-   * return chips, cards and link lists instead of prose (§6.3).
+   * return chips, cards and link lists instead of prose.
    */
   richMessages: z.boolean().default(true),
   /**
@@ -68,6 +70,11 @@ export const openaiOptionsSchema = z.object({
    * tool. `murmur knowledge sync` creates and fills one.
    */
   vectorStoreIds: z.array(z.string().min(1)).max(2).default([]),
+  /**
+   * `murmur`: answer from Murmur's own knowledge base (Vectorize + D1 on the
+   * site's Cloudflare account, crawled by the Worker) instead of a vector store.
+   */
+  retrieval: z.literal('murmur').optional(),
   /** Extra function tools, forwarded verbatim. */
   tools: z.array(z.record(z.string(), z.unknown())).max(16).optional(),
   maxOutputTokens: z.number().int().min(16).max(32_000).default(800),
@@ -236,9 +243,12 @@ async function respond(
   const options = ctx.options;
   // A stored prompt wins: it is versioned on OpenAI's side, so there is no
   // reason to also send text that would silently override it.
-  const instructions = options.promptRef
-    ? undefined
-    : await resolvePrompt(ctx, options.instructions, scope);
+  const prompt = options.promptRef ? undefined : await resolvePrompt(ctx, options.instructions, scope);
+  const grounding =
+    options.retrieval === 'murmur' ? await ground(ctx.env, ctx.siteId, input, { log: ctx.log, waitUntil: ctx.waitUntil }) : null;
+  // With a stored prompt, `instructions` would replace it; the passages ride with the input instead.
+  const instructions = grounding && !options.promptRef ? [prompt, grounding.block].filter(Boolean).join('\n\n') : prompt;
+  const sentInput = grounding && options.promptRef ? `${grounding.block}\n\nVisitor: ${input}` : input;
 
   const response = await fetchWithTimeout(ctx.fetch, `${options.baseUrl}/responses`, {
     method: 'POST',
@@ -248,7 +258,7 @@ async function respond(
     },
     body: JSON.stringify({
       model: options.model,
-      input,
+      input: sentInput,
       ...(instructions ? { instructions } : {}),
       ...(options.promptRef
         ? {
@@ -285,10 +295,9 @@ async function respond(
     });
   }
 
-  return {
-    id: typeof body.id === 'string' ? body.id : null,
-    messages: mapOpenAiOutput(body.output),
-  };
+  const messages = mapOpenAiOutput(body.output);
+  if (grounding?.sources.length) messages.push(message({ type: 'links', title: 'Sources', links: grounding.sources }));
+  return { id: typeof body.id === 'string' ? body.id : null, messages };
 }
 
 function contentFor(input: SendRequest): string {

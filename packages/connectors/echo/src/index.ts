@@ -29,7 +29,7 @@ function longReply(): Message {
   return agent({ type: 'text', text: body });
 }
 
-/** Deterministic commands that exercise every widget feature (§6.2). */
+/** Deterministic commands that exercise every widget feature. */
 async function respond(command: string, raw: string, delayMs: number): Promise<Message[]> {
   switch (command) {
     case '/options':
@@ -160,7 +160,7 @@ async function respond(command: string, raw: string, delayMs: number): Promise<M
 }
 
 /**
- * §4.3: an action carries both a `value` (what the backend acts on) and a
+ * An action carries both a `value` (what the backend acts on) and a
  * `label` (what the transcript shows). Echo dispatches on the value so a
  * shortcut like `{ label: 'Show a card', value: '/card' }` works, and echoes
  * the label so the reply reads the way the visitor expects.

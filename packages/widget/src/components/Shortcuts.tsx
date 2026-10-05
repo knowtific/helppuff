@@ -5,7 +5,7 @@ import { useScrollEdges } from '../lib/scroll-edges.js';
 
 /**
  * Shortcuts appear as tiles on the home screen and as chips above the
- * composer (§8.7). A `url`, `tel` or `email` shortcut is a real anchor; the
+ * composer. A `url`, `tel` or `email` shortcut is a real anchor; the
  * rest go back through the app.
  */
 
@@ -63,7 +63,7 @@ export function ShortcutTiles({
 
 /**
  * The chip row above the composer. It collapses once the conversation is
- * under way, so it does not compete with the thread (§8.7).
+ * under way, so it does not compete with the thread.
  *
  * The row scrolls horizontally, and its scrollbar is hidden — so an edge
  * fade marks the chips that are out of view, a vertical wheel scrolls it

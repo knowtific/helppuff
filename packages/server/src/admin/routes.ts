@@ -2,9 +2,19 @@ import { Hono, type Context } from 'hono';
 import { MurmurError } from '../core/errors.js';
 import { hitWindow, rateLimited } from '../core/ratelimit.js';
 import { requireSecret, type HonoEnv } from '../core/request.js';
-import { cookieValue, issueSession, readSession, SESSION_COOKIE, sessionCookie, verifyPassword } from './auth.js';
-import { dbFrom, ensureSchema, type D1Like } from './db.js';
-import { leadUpsert } from './record.js';
+import { issueSession, sessionCookie, verifyPassword } from './auth.js';
+import { assertSameOrigin, currentAdmin, db, isSecure, siteParam } from './guard.js';
+import { knowledgeRoutes } from './knowledge.js';
+import { resolveSite } from '../config/site.js';
+import { knowledgeEnv, ownsKnowledge } from '../knowledge/env.js';
+import { settingsRoutes } from './settings.js';
+import { setupRoutes } from './setup.js';
+import { profileRoutes } from './profile.js';
+import { webhookRoutes } from './webhooks.js';
+import { versionRoutes } from './version.js';
+import { dbFrom, ensureSchema, type D1Like } from '../db/d1.js';
+import { leadStatements } from './record.js';
+import { emit } from '../webhooks/deliver.js';
 import { PROMPT_LIMIT, PROMPT_SQL, publishPrompt, readPromptState, type PromptCtx, type PromptVersionRow, type PublishResult } from './prompts.js';
 import type { KvStore } from '@murmur/connector-types';
 
@@ -20,43 +30,6 @@ export const adminRoutes = new Hono<HonoEnv>();
 const DAY = 86_400_000;
 export const LEAD_STATUSES = ['new', 'contacted', 'qualified', 'won', 'lost'] as const;
 const DEFAULT_SUMMARY_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
-
-function db(c: Context<HonoEnv>): D1Like {
-  const found = dbFrom(c.get('mm').env);
-  if (!found) {
-    throw new MurmurError('not_found', {
-      message: 'The dashboard is not enabled for this deployment. Run `murmur deploy` with dashboard enabled.',
-      detail: 'admin_no_db',
-    });
-  }
-  return found;
-}
-
-function isSecure(c: Context<HonoEnv>): boolean {
-  return new URL(c.req.url).protocol === 'https:';
-}
-
-/** Mutations must come from the dashboard's own origin. */
-function assertSameOrigin(c: Context<HonoEnv>): void {
-  const origin = c.req.header('Origin');
-  if (origin && origin !== new URL(c.req.url).origin) {
-    throw new MurmurError('forbidden_origin', { message: 'Cross-origin request refused.', detail: 'admin_cross_origin' });
-  }
-}
-
-type Admin = { email: string; owner: boolean };
-
-async function currentAdmin(c: Context<HonoEnv>): Promise<Admin> {
-  const ctx = c.get('mm');
-  const session = await readSession(requireSecret(ctx), cookieValue(c.req.header('Cookie'), SESSION_COOKIE), ctx.platform.now());
-  if (!session) throw new MurmurError('unauthorized', { message: 'Please sign in.', detail: 'admin_no_session' });
-  const owner = String(ctx.env['ADMIN_EMAIL'] ?? '').toLowerCase();
-  if (session.email === owner) return { email: session.email, owner: true };
-  // Removed accounts lose access at their next request, not in seven days.
-  const row = await db(c).prepare('SELECT email FROM admins WHERE email = ?').bind(session.email).first();
-  if (!row) throw new MurmurError('unauthorized', { message: 'Please sign in.', detail: 'admin_revoked' });
-  return { email: session.email, owner: false };
-}
 
 adminRoutes.use('/admin/api/*', async (c, next) => {
   c.header('Cache-Control', 'no-store');
@@ -107,14 +80,25 @@ adminRoutes.get('/admin/api/me', async (c) => {
   const admin = await currentAdmin(c);
   const config = c.get('mm').config;
   const origin = new URL(c.req.url).origin;
-  const sites = Object.entries(config.sites).map(([id, site]) => ({
-    id,
-    name: site.widget.brand.name,
-    accent: site.widget.brand.accent,
-    avatar: site.widget.brand.avatar ?? null,
-    embed: `<script src="${origin}/loader.js" data-site="${id}" async></script>`,
-  }));
-  return c.json({ admin, sites, summaries: Boolean(c.get('mm').env['AI']) });
+  const ctx = c.get('mm');
+  const sites = await Promise.all(
+    Object.keys(config.sites).map(async (id) => {
+      // The live config: the dashboard may have renamed or recoloured it since the deploy.
+      const site = await resolveSite(ctx, id);
+      return {
+        id,
+        name: site.widget.brand.name,
+        accent: site.widget.brand.accent,
+        avatar: site.widget.brand.avatar ?? null,
+        embed: `<script src="${origin}/loader.js" data-site="${id}" async></script>`,
+        connector: site.connector.type,
+        /** Murmur's own knowledge base (workers-ai) is on: the Knowledge page and onboarding apply. */
+        knowledge: ownsKnowledge(site) && Boolean(knowledgeEnv(ctx.env)),
+        website: site.knowledge.website ?? site.origins.find((o) => /^https:/.test(o) && !/workers\.dev/.test(o)) ?? null,
+      };
+    }),
+  );
+  return c.json({ admin, sites, summaries: Boolean(ctx.env['AI']) });
 });
 
 function siteFilter(c: Context<HonoEnv>, column = 'site_id'): { sql: string; params: unknown[] } {
@@ -220,7 +204,8 @@ adminRoutes.get('/admin/api/overview', async (c) => {
 
 adminRoutes.get('/admin/api/conversations', async (c) => {
   await currentAdmin(c);
-  const q = (c.req.query('q') ?? '').trim().slice(0, 100);
+  // D1 refuses LIKE patterns over 50 bytes: `%q%` must fit.
+  const q = (c.req.query('q') ?? '').trim().slice(0, 48);
   const filter = c.req.query('filter') ?? 'all';
   const before = Number(c.req.query('before') ?? 0) || null;
   const limit = Math.min(Number(c.req.query('limit') ?? 30) || 30, 100);
@@ -261,7 +246,7 @@ async function loadConversation(d: D1Like, id: string) {
   if (!conversation) throw new MurmurError('not_found', { message: 'No such conversation.', detail: 'admin_conversation_missing' });
   const [messages, lead] = await Promise.all([
     d
-      .prepare('SELECT id, role, type, text, payload, ts FROM messages WHERE conversation_id = ? ORDER BY ts, id')
+      .prepare('SELECT id, role, type, text, payload, ts, feedback FROM messages WHERE conversation_id = ? ORDER BY ts, id')
       .bind(id)
       .all<{ id: string; role: string; type: string; text: string | null; payload: string | null; ts: number }>(),
     conversation['lead_id'] ? d.prepare('SELECT * FROM leads WHERE id = ?').bind(conversation['lead_id']).first() : null,
@@ -351,7 +336,7 @@ adminRoutes.post('/admin/api/conversations/:id/summary', async (c) => {
   const verified = { name: inTranscript(found.name), email: inTranscript(found.email), phone: inTranscript(found.phone) };
   if (verified.email || verified.phone || (verified.name && conversation['lead_id'])) {
     statements.push(
-      leadUpsert(
+      ...leadStatements(
         d,
         String(conversation['site_id']),
         id,
@@ -359,16 +344,17 @@ adminRoutes.post('/admin/api/conversations/:id/summary', async (c) => {
         'ai',
         now,
       ),
-      d.prepare('UPDATE conversations SET lead_id = ? WHERE id = ?').bind(`lead_${id}`, id),
     );
   }
   await d.batch(statements);
+  emit(ctx, String(conversation['site_id']), 'conversation.summarized', { conversationId: id, ...summary });
   return c.json({ ...summary, lead: verified });
 });
 
 adminRoutes.get('/admin/api/leads', async (c) => {
   await currentAdmin(c);
-  const q = (c.req.query('q') ?? '').trim().slice(0, 100);
+  // D1 refuses LIKE patterns over 50 bytes: `%q%` must fit.
+  const q = (c.req.query('q') ?? '').trim().slice(0, 48);
   const status = c.req.query('status');
   const f = siteFilter(c);
   const where: string[] = ['1=1'];
@@ -384,8 +370,10 @@ adminRoutes.get('/admin/api/leads', async (c) => {
   const rows = await db(c)
     .prepare(
       `SELECT id, site_id AS site, conversation_id AS conversationId, name, email, phone, fields, source, status, notes,
-              created_at AS createdAt, updated_at AS updatedAt
-       FROM leads WHERE ${where.join(' AND ')}${f.sql} ORDER BY created_at DESC LIMIT 500`,
+              created_at AS createdAt, updated_at AS updatedAt,
+              (SELECT COUNT(*) FROM conversations c WHERE c.lead_id = leads.id) AS conversations,
+              (SELECT c.id FROM conversations c WHERE c.lead_id = leads.id ORDER BY c.last_at DESC LIMIT 1) AS lastConversationId
+       FROM leads WHERE ${where.join(' AND ')}${f.sql} ORDER BY updated_at DESC LIMIT 500`,
     )
     .bind(...params, ...f.params)
     .all();
@@ -395,6 +383,17 @@ adminRoutes.get('/admin/api/leads', async (c) => {
     .all<{ status: string; n: number }>();
   return c.json({ items: rows.results, counts: Object.fromEntries(counts.results.map((r) => [r.status, r.n])) });
 });
+
+/** A lead as webhooks send it: no internal columns, form fields parsed. */
+function leadView(row: Record<string, unknown>) {
+  let fields: unknown = null;
+  try {
+    fields = typeof row['fields'] === 'string' ? JSON.parse(row['fields']) : null;
+  } catch {
+    // Kept as null.
+  }
+  return { name: row['name'] ?? null, email: row['email'] ?? null, phone: row['phone'] ?? null, status: row['status'], notes: row['notes'] ?? null, source: row['source'], fields };
+}
 
 adminRoutes.patch('/admin/api/leads/:id', async (c) => {
   assertSameOrigin(c);
@@ -422,7 +421,12 @@ adminRoutes.patch('/admin/api/leads/:id', async (c) => {
     .prepare(`UPDATE leads SET ${sets.join(', ')} WHERE id = ?`)
     .bind(...params, c.req.param('id'))
     .run();
-  return c.json(await db(c).prepare('SELECT * FROM leads WHERE id = ?').bind(c.req.param('id')).first());
+  const lead = await db(c).prepare('SELECT * FROM leads WHERE id = ?').bind(c.req.param('id')).first<Record<string, unknown>>();
+  if (lead) {
+    const changed = Object.fromEntries((['status', 'notes', 'name'] as const).filter((k) => typeof body[k] === 'string').map((k) => [k, lead[k]]));
+    emit(c.get('mm'), String(lead['site_id']), 'lead.updated', { leadId: lead['id'], conversationId: lead['conversation_id'] ?? null, changed, lead: leadView(lead) });
+  }
+  return c.json(lead);
 });
 
 const csvCell = (value: unknown) => {
@@ -470,14 +474,6 @@ function promptCtx(c: Context<HonoEnv>): PromptCtx {
   return { config: ctx.config, kv, now: () => ctx.platform.now() };
 }
 
-/** The site asked for, or the only one — a CLI deployment has exactly one. */
-function promptSite(c: Context<HonoEnv>, value: unknown): string {
-  const sites = Object.keys(c.get('mm').config.sites);
-  const site = typeof value === 'string' && value ? value : sites[0];
-  if (!site || !sites.includes(site)) throw new MurmurError('not_found', { message: 'No such site.', detail: 'admin_unknown_site' });
-  return site;
-}
-
 /** 409 carries the version that won, so the editor can say who moved first and reload. */
 function published(c: Context<HonoEnv>, result: PublishResult) {
   if (result.status !== 'conflict') return c.json(result);
@@ -492,7 +488,7 @@ function published(c: Context<HonoEnv>, result: PublishResult) {
 
 adminRoutes.get('/admin/api/prompt', async (c) => {
   await currentAdmin(c);
-  const site = promptSite(c, c.req.query('site'));
+  const site = siteParam(c, c.req.query('site'));
   const d = db(c);
   const state = await readPromptState(promptCtx(c), d, site);
   const versions = await d.prepare(PROMPT_SQL.list).bind(site, 200).all<PromptVersionRow>();
@@ -512,7 +508,7 @@ adminRoutes.get('/admin/api/prompt', async (c) => {
 
 adminRoutes.get('/admin/api/prompt/versions/:version', async (c) => {
   await currentAdmin(c);
-  const site = promptSite(c, c.req.query('site'));
+  const site = siteParam(c, c.req.query('site'));
   const row = await db(c)
     .prepare(PROMPT_SQL.get)
     .bind(site, Number(c.req.param('version')))
@@ -528,7 +524,7 @@ adminRoutes.post('/admin/api/prompt', async (c) => {
   if (typeof body.text !== 'string' || typeof body.baseVersion !== 'number') {
     throw new MurmurError('bad_request', { message: 'Send the new text and the version it was based on.', detail: 'admin_prompt_body' });
   }
-  const site = promptSite(c, body.site);
+  const site = siteParam(c, body.site);
   const result = await publishPrompt(promptCtx(c), db(c), site, {
     text: body.text,
     baseVersion: body.baseVersion,
@@ -546,7 +542,7 @@ adminRoutes.post('/admin/api/prompt/restore', async (c) => {
   if (typeof body.version !== 'number' || typeof body.baseVersion !== 'number') {
     throw new MurmurError('bad_request', { message: 'Send the version to restore and the current version.', detail: 'admin_prompt_body' });
   }
-  const site = promptSite(c, body.site);
+  const site = siteParam(c, body.site);
   const d = db(c);
   const row = await d.prepare(PROMPT_SQL.get).bind(site, body.version).first<{ text: string }>();
   if (!row) throw new MurmurError('not_found', { message: 'No such version.', detail: 'admin_prompt_version_missing' });
@@ -560,3 +556,12 @@ adminRoutes.post('/admin/api/prompt/restore', async (c) => {
   });
   return published(c, result);
 });
+
+// The knowledge base, settings and one-time links live in their own files;
+// mounted here so the `/admin/api/*` middleware above covers them too.
+adminRoutes.route('/', knowledgeRoutes);
+adminRoutes.route('/', settingsRoutes);
+adminRoutes.route('/', setupRoutes);
+adminRoutes.route('/', profileRoutes);
+adminRoutes.route('/', webhookRoutes);
+adminRoutes.route('/', versionRoutes);

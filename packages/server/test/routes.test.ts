@@ -274,7 +274,8 @@ describe('CORS and transport', () => {
   it('answers the health check', async () => {
     const response = await harness().fetch('/healthz');
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true, protocol: 'v1' });
+    // No MURMUR_VERSION in development: a release stamps it in.
+    expect(await response.json()).toEqual({ ok: true, protocol: 'v1', version: null, schema: expect.any(Number) });
   });
 });
 

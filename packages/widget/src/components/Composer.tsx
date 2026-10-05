@@ -4,7 +4,7 @@ import { isTouch } from '../lib/env.js';
 import type { StringKey } from '../app/strings.js';
 
 const MAX_LENGTH = 1000;
-/** The counter appears only in the last 100 characters (§8.7). */
+/** The counter appears only in the last 100 characters. */
 const COUNTER_FROM = MAX_LENGTH - 100;
 const MAX_HEIGHT_PX = 120;
 
@@ -42,7 +42,7 @@ export function Composer({
   const canSend = value.trim().length > 0 && !disabled && !offline;
 
   const handleKeyDown = (event: KeyboardEvent) => {
-    // On touch devices Enter inserts a newline and the button is primary (§8.7).
+    // On touch devices Enter inserts a newline and the button is primary.
     if (event.key !== 'Enter' || touch || event.shiftKey) return;
     event.preventDefault();
     if (canSend) onSend();

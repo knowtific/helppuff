@@ -10,7 +10,7 @@ import type { Runtime } from '../src/loader.js';
 /**
  * Functional tests for the whole app: the real components, the real reducer
  * and the real persistence layer, driven through a fake transport. These are
- * the tests that prove the pieces work together — §8.5's state machine as a
+ * the tests that prove the pieces work together — the widget's state machine as a
  * visitor actually experiences it.
  */
 
@@ -87,7 +87,7 @@ function setup(
 
 /**
  * The thread and the `aria-live` region deliberately carry the same text —
- * one to read, one to announce (§8.7). Assertions scope to the thread so they
+ * one to read, one to announce. Assertions scope to the thread so they
  * are not ambiguous.
  */
 const inThread = () => within(document.querySelector('.mm-thread') as HTMLElement);
@@ -190,7 +190,7 @@ describe('the lead form path', () => {
     });
 
     await act(async () => {
-      fireEvent.input(screen.getByLabelText(/Name/), { target: { value: 'Ahad' } });
+      fireEvent.input(screen.getByLabelText(/Name/), { target: { value: 'Ada' } });
       fireEvent.input(screen.getByLabelText(/How can we help/), { target: { value: 'qwedae' } });
     });
     await act(async () => {
@@ -217,7 +217,7 @@ describe('the lead form path', () => {
         commands(handle).send(text);
       });
       await act(async () => {
-        fireEvent.input(screen.getByLabelText(/Name/), { target: { value: 'Ahad' } });
+        fireEvent.input(screen.getByLabelText(/Name/), { target: { value: 'Ada' } });
       });
     };
 
@@ -432,7 +432,7 @@ describe('sending and receiving', () => {
   });
 });
 
-describe('recoverable failures degrade in place (§8.3)', () => {
+describe('recoverable failures degrade in place', () => {
   async function failingChat(error: ApiError) {
     const api = fakeApi();
     api.send.mockRejectedValue(error);
@@ -523,7 +523,7 @@ describe('recoverable failures degrade in place (§8.3)', () => {
   });
 });
 
-describe('persistence across a reload (§8.6)', () => {
+describe('persistence across a reload', () => {
   it('restores the session and lands in the thread', async () => {
     const first = setup({ config: { leadForm: { enabled: false } } });
     await openPanel(first.handle);
@@ -678,7 +678,7 @@ describe('the window.Murmur surface', () => {
   });
 });
 
-describe('the error boundary (§8.3)', () => {
+describe('the error boundary', () => {
   function Bomb(): never {
     throw new Error('render exploded');
   }
@@ -725,7 +725,7 @@ describe('the error boundary (§8.3)', () => {
   });
 });
 
-describe('keyboard and focus (§8.7)', () => {
+describe('keyboard and focus', () => {
   it('closes on Escape', async () => {
     const { handle } = setup();
     await openPanel(handle);

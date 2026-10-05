@@ -60,12 +60,20 @@ export function hueOf(value: string): number {
 
 // ------------------------------------------------------------------ routing
 
-export type Route = { page: 'overview' | 'conversations' | 'leads' | 'prompt' | 'settings'; id?: string | undefined };
+export type Route = {
+  /** `setup` and `signin` carry a one-time token and work signed out; `onboarding` is the guided first run. */
+  page: 'home' | 'analytics' | 'conversations' | 'leads' | 'prompt' | 'settings' | 'knowledge' | 'onboarding' | 'setup' | 'signin';
+  id?: string | undefined;
+};
+
+const PAGES: Route['page'][] = ['analytics', 'conversations', 'leads', 'prompt', 'settings', 'knowledge', 'onboarding', 'setup', 'signin'];
 
 function parseHash(): Route {
   const [page, id] = window.location.hash.replace(/^#\/?/, '').split('/');
-  if (page === 'conversations' || page === 'leads' || page === 'prompt' || page === 'settings') return { page, id: id || undefined };
-  return { page: 'overview' };
+  if (PAGES.includes(page as Route['page'])) return { page: page as Route['page'], id: id || undefined };
+  // Old links to the overview land on analytics.
+  if (page === 'overview') return { page: 'analytics' };
+  return { page: 'home' };
 }
 
 export function useRoute(): [Route, (route: Route) => void] {
@@ -79,6 +87,16 @@ export function useRoute(): [Route, (route: Route) => void] {
     window.location.hash = `/${next.page}${next.id ? `/${next.id}` : ''}`;
   }, []);
   return [route, go];
+}
+
+/**
+ * Go to a page without a history entry (a spent one-time link must not be
+ * one "back" away). `replaceState` fires no `hashchange`, so announce it:
+ * without that, `useRoute` keeps the old page until a reload.
+ */
+export function replaceHash(hash: string): void {
+  window.history.replaceState(null, '', hash);
+  window.dispatchEvent(new HashChangeEvent('hashchange'));
 }
 
 export function href(route: Route): string {

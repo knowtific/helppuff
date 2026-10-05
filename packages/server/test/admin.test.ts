@@ -1,8 +1,9 @@
 import { DatabaseSync } from 'node:sqlite';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { hashPassword, verifyPassword } from '../src/admin/auth.js';
-import { resetSchemaMemo, type D1Like, type D1Statement } from '../src/admin/db.js';
+import { resetSchemaMemo, type D1Like, type D1Statement } from '../src/db/d1.js';
 import { contactIn } from '../src/admin/record.js';
+import { forgetWebhooks, signDelivery } from '../src/webhooks/deliver.js';
 import { extractJson as extractJsonForTest } from '../src/admin/routes.js';
 import { memoryKv } from '../src/core/platform.js';
 import { harness, ORIGIN, startBody, startSession, testConfig, testEnv, type Harness } from './helpers.js';
@@ -80,6 +81,41 @@ describe('recording', () => {
     const lead = w.db.raw.prepare('SELECT * FROM leads').get() as Record<string, unknown>;
     // The form's name and email, and the phone typed later, on one lead.
     expect(lead).toMatchObject({ name: 'Ada', email: 'ada@example.com', phone: '0412 345 678', source: 'form', status: 'new' });
+  });
+
+  it('keeps one lead per email: a returning visitor enriches it and both chats point at it', async () => {
+    const first = await startSession(w.h, startBody);
+    const second = await startSession(w.h, { ...startBody, lead: { name: 'Ada L', email: 'ADA@Example.com' } });
+    await w.h.post(
+      '/v1/sessions/messages',
+      { kind: 'text', text: 'Call me on 0412 345 678', clientId: 'c1' },
+      { headers: { Authorization: `Bearer ${second.sessionToken}` } },
+    );
+    await w.settle();
+
+    const leads = w.db.raw.prepare('SELECT * FROM leads').all() as Record<string, unknown>[];
+    expect(leads).toHaveLength(1);
+    expect(leads[0]).toMatchObject({ name: 'Ada', email: 'ada@example.com', phone: '0412 345 678' });
+    const links = w.db.raw.prepare('SELECT id, lead_id FROM conversations ORDER BY started_at').all() as { id: string; lead_id: string }[];
+    expect(new Set(links.map((l) => l.lead_id))).toEqual(new Set([leads[0]!['id']]));
+    expect(links.map((l) => l.id).sort()).toEqual([first.sessionId, second.sessionId].sort());
+  });
+
+  it('folds a lead without an email into the person once the email turns out to be known', async () => {
+    await startSession(w.h, startBody);
+    const second = await startSession(w.h, { ...startBody, lead: { name: 'Bo' } });
+    await w.settle();
+    expect(w.db.raw.prepare('SELECT COUNT(*) AS n FROM leads').get()).toEqual({ n: 2 });
+
+    await w.h.post(
+      '/v1/sessions/messages',
+      { kind: 'text', text: 'It is ada@example.com, ring 0412 345 678', clientId: 'c1' },
+      { headers: { Authorization: `Bearer ${second.sessionToken}` } },
+    );
+    await w.settle();
+    const leads = w.db.raw.prepare('SELECT name, email, phone FROM leads').all();
+    expect(leads).toEqual([{ name: 'Ada', email: 'ada@example.com', phone: '0412 345 678' }]);
+    expect(w.db.raw.prepare('SELECT COUNT(DISTINCT lead_id) AS n FROM conversations').get()).toEqual({ n: 1 });
   });
 
   it('records nothing, and changes nothing, without a database', async () => {
@@ -363,5 +399,120 @@ describe('prompt versions', () => {
       body: JSON.stringify({ text: 'x', baseVersion: 0 }),
     });
     expect(cross.status).toBe(403);
+  });
+});
+
+describe('webhooks', () => {
+  type Received = { headers: Headers; body: { id: string; type: string; site: string; data: Record<string, unknown> } };
+  let received: Received[];
+  let answer: number;
+  beforeEach(() => {
+    received = [];
+    answer = 200;
+    forgetWebhooks('demo');
+    const real = globalThis.fetch;
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (!url.startsWith('https://hooks.example.com/')) return real(input, init);
+      received.push({ headers: new Headers(init?.headers), body: JSON.parse(String(init?.body)) as Received['body'] });
+      return new Response('ok', { status: answer });
+    });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  const call = (w: World & { cookie: string }, method: string, path: string, body?: unknown) =>
+    w.admin.fetch(path, { method, headers: { Cookie: w.cookie, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
+
+  async function withHook(events?: string[]) {
+    const w = await world();
+    const cookie = await login(w.admin);
+    const created = await call({ ...w, cookie }, 'POST', '/admin/api/webhooks', { url: 'https://hooks.example.com/murmur', ...(events ? { events } : {}) });
+    expect(created.status).toBe(201);
+    const hook = (await created.json()) as { id: string; secret: string; events: string[] };
+    return { ...w, cookie, hook };
+  }
+
+  it('signs every event of a conversation and sends it to the endpoint', async () => {
+    const w = await withHook();
+    expect(w.hook.events).toEqual(['*']);
+    const started = await startSession(w.h, { ...startBody, firstMessage: 'Do you work weekends?' });
+    await w.h.post('/v1/sessions/messages', { kind: 'text', text: 'Call me on 0412 345 678', clientId: 'c1' }, { headers: { Authorization: `Bearer ${started.sessionToken}` } });
+    await w.settle();
+
+    const types = received.map((r) => r.body.type);
+    expect(types).toEqual(expect.arrayContaining(['conversation.started', 'message.received', 'message.sent', 'lead.captured']));
+    expect(types.filter((t) => t === 'message.received')).toHaveLength(2);
+    const lead = received.find((r) => r.body.type === 'lead.captured' && r.body.data['phone']);
+    expect(lead?.body.data).toMatchObject({ conversationId: started.sessionId, source: 'chat', phone: '0412 345 678' });
+    const first = received.find((r) => r.body.type === 'conversation.started')!;
+    expect(first.body).toMatchObject({ site: 'demo', data: { conversationId: started.sessionId, firstMessage: 'Do you work weekends?', page: { url: 'https://example.com/pricing' } } });
+
+    // The signature covers the timestamp and the exact body.
+    const timestamp = Number(first.headers.get('X-Murmur-Timestamp'));
+    expect(first.headers.get('X-Murmur-Signature')).toBe(await signDelivery(w.hook.secret, timestamp, JSON.stringify(first.body)));
+    expect(first.headers.get('X-Murmur-Event')).toBe('conversation.started');
+    expect(first.headers.get('X-Murmur-Delivery')).toBe(first.body.id);
+
+    const log = (await (await get(w.admin, `/admin/api/webhooks/${w.hook.id}/deliveries`, w.cookie)).json()) as { deliveries: { ok: boolean; event: string }[] };
+    expect(log.deliveries.length).toBe(received.length);
+    expect(log.deliveries.every((d) => d.ok)).toBe(true);
+  });
+
+  it('sends only the chosen events, none once disabled, and tests on demand', async () => {
+    const w = await withHook(['lead.captured']);
+    await startSession(w.h, startBody);
+    await w.settle();
+    expect(received.map((r) => r.body.type)).toEqual(['lead.captured']);
+
+    received.length = 0;
+    answer = 410;
+    const test = (await (await call(w, 'POST', `/admin/api/webhooks/${w.hook.id}/test`, {})).json()) as { ok: boolean; status: number; attempts: number };
+    expect(test).toMatchObject({ ok: false, status: 410, attempts: 1 });
+    expect(received[0]?.body.type).toBe('test.ping');
+
+    await call(w, 'PATCH', `/admin/api/webhooks/${w.hook.id}`, { enabled: false });
+    received.length = 0;
+    await startSession(w.h, startBody);
+    await w.settle();
+    expect(received).toEqual([]);
+  });
+
+  it('refuses plain http, unknown events, and other sites’ hooks', async () => {
+    const w = await withHook();
+    expect((await call(w, 'POST', '/admin/api/webhooks', { url: 'http://hooks.example.com/x' })).status).toBe(400);
+    expect((await call(w, 'POST', '/admin/api/webhooks', { url: 'https://hooks.example.com/x', events: ['lead.exploded'] })).status).toBe(400);
+    expect((await call(w, 'DELETE', '/admin/api/webhooks/wh_nope')).status).toBe(404);
+    expect((await call(w, 'DELETE', `/admin/api/webhooks/${w.hook.id}`)).status).toBe(200);
+    const listed = (await (await get(w.admin, '/admin/api/webhooks', w.cookie)).json()) as { webhooks: unknown[]; events: { type: string }[] };
+    expect(listed.webhooks).toEqual([]);
+    expect(listed.events.map((e) => e.type)).toContain('callback.requested');
+  });
+});
+
+describe('versions', () => {
+  it('compares releases, pre-releases first', async () => {
+    const { newer } = await import('../src/admin/version.js');
+    expect(newer('1.10.0', '1.9.2')).toBe(true);
+    expect(newer('1.9.2', '1.10.0')).toBe(false);
+    expect(newer('1.0.0', '1.0.0')).toBe(false);
+    expect(newer('1.0.0', '1.0.0-beta.2')).toBe(true);
+    expect(newer('1.0.0-beta.2', '1.0.0')).toBe(false);
+    expect(newer('garbage', '1.0.0')).toBe(false);
+  });
+
+  it('says what runs, what is newest, and the command to upgrade', async () => {
+    const w = await world({ MURMUR_VERSION: '0.1.0' });
+    const cookie = await login(w.admin);
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) =>
+      String(input).startsWith('https://registry.npmjs.org/') ? Response.json({ version: '0.2.0' }) : new Response('no', { status: 500 }),
+    );
+    try {
+      const health = (await (await w.h.fetch('/healthz')).json()) as { version: string; schema: number };
+      expect(health.version).toBe('0.1.0');
+      const info = (await (await get(w.admin, '/admin/api/version', cookie)).json()) as Record<string, unknown>;
+      expect(info).toMatchObject({ current: '0.1.0', latest: '0.2.0', upgradeAvailable: true, command: 'npx @knowtific/murmur@latest upgrade', schema: { expected: health.schema } });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

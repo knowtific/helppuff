@@ -26,13 +26,26 @@ function world(instances: unknown[] = []) {
 }
 
 describe('the questions', () => {
-  it('asks only website, backend, a dashboard email and Cloudflare access when nothing is known', () => {
+  it('asks only for the website and Cloudflare access when nothing is known', () => {
     const ids = pendingQuestions({}, { env: {} }).filter((q) => q.required).map((q) => q.id);
-    expect(ids).toEqual(['website', 'backend', 'cfToken', 'adminEmail']);
+    expect(ids).toEqual(['website', 'cfToken']);
+  });
+
+  it('takes the free default without asking, and offers backends only with --no-defaults', () => {
+    const first = pendingQuestions({ website: 'x.com' }, { env: {}, cloudflareLogin: true }).filter((q) => q.required || q.wizard).map((q) => q.id);
+    expect(first).toEqual([]);
+    const advanced = pendingQuestions({ website: 'x.com', defaults: false }, { env: {}, cloudflareLogin: true });
+    expect(advanced.find((q) => q.id === 'backend')).toMatchObject({ default: 'workers-ai', wizard: true });
+  });
+
+  it('leaves the dashboard account to the setup link on workers-ai', () => {
+    const ids = pendingQuestions({ website: 'x.com', backend: 'workers-ai' }, { env: {}, cloudflareLogin: true }).map((q) => q.id);
+    expect(ids).not.toContain('adminEmail');
+    expect(ids).not.toContain('adminPassword');
   });
 
   it('defaults the dashboard owner to the git email, and drops it with --no-dashboard', () => {
-    const q = pendingQuestions({}, { env: {}, gitEmail: 'me@acme.com' }).find((x) => x.id === 'adminEmail');
+    const q = pendingQuestions({ backend: 'cloudflare' }, { env: {}, gitEmail: 'me@acme.com' }).find((x) => x.id === 'adminEmail');
     expect(q).toMatchObject({ required: false, default: 'me@acme.com' });
     expect(pendingQuestions({ dashboard: false }, { env: {} }).map((x) => x.id)).not.toContain('adminEmail');
   });
@@ -89,7 +102,7 @@ describe('runInit for an agent', () => {
     const result = await runInit({ cwd: dir, answers: { website: 'acme.com.au' }, fetch });
     expect(result.status).toBe('needs_input');
     if (result.status !== 'needs_input') return;
-    expect(result.questions.map((q) => q.id)).toEqual(['backend', 'cfToken']);
+    expect(result.questions.map((q) => q.id)).toEqual(['cfToken']);
     expect(result.known).toEqual({ website: 'acme.com.au' });
     expect(existsSync(join(dir, 'murmur.json'))).toBe(false);
   });
@@ -188,28 +201,31 @@ describe('runInit for an agent', () => {
     ).rejects.toMatchObject({ code: 'invalid_api_key' });
   });
 
-  it('starts the knowledge job before asking the last, prompt-shaping questions', async () => {
+  it('asks a person for the website and nothing else', async () => {
     const dir = tempProject();
-    const order: string[] = [];
+    const asked: string[] = [];
     const result = await runInit({
       cwd: dir,
-      answers: { website: 'acme.com.au', backend: 'cloudflare', cfToken: 't' },
+      answers: { cfToken: 't' },
       fetch: world().fetch,
       ask: async (q) => {
-        order.push(q.id);
-        return q.id === 'goal' ? 'book' : q.id === 'notes' ? 'We never work on Sundays.' : q.kind === 'select' ? q.default : '';
-      },
-      background: async (draft) => {
-        order.push(`background:${draft.project.site}`);
-        return null;
+        asked.push(q.id);
+        return q.id === 'website' ? 'acme.com.au' : q.default;
       },
     });
-    expect(order.indexOf('background:acme')).toBeLessThan(order.indexOf('agentName'));
-    expect(order.slice(-4)).toEqual(['agentName', 'goal', 'leadForm', 'notes']);
+    expect(asked).toEqual(['website']);
+    expect(result.status).toBe('created');
+    if (result.status === 'created') expect(result.project.backend).toEqual({ type: 'workers-ai' });
+    // The prompt comes from the same generator as the dashboard's instructions form.
+    expect(readFileSync(join(dir, 'prompt.md'), 'utf8')).toContain('arrange a callback from the team');
+  });
+
+  it('still takes the old flags from an agent', async () => {
+    const dir = tempProject();
+    await runInit({ cwd: dir, answers: { website: 'acme.com.au', cfToken: 't', goal: 'book', notes: 'We never work on Sundays.' }, yes: true, fetch: world().fetch });
     const prompt = readFileSync(join(dir, 'prompt.md'), 'utf8');
-    expect(prompt).toContain('book a call or appointment');
+    expect(prompt).toContain('help visitors book');
     expect(prompt).toContain('We never work on Sundays.');
-    expect(result.status === 'created' && result.background).toBeTruthy();
   });
 
   it('asks for details up front when told to, and greets by name', async () => {
@@ -233,12 +249,25 @@ describe('runInit for an agent', () => {
     expect(prompt).toContain('do not greet again');
   });
 
-  it('lets visitors chat straight away by default, with a greeting', async () => {
+  it('asks for name, email, an optional phone and the question by default', async () => {
     const dir = tempProject();
     const result = await runInit({ cwd: dir, answers: { website: 'acme.com.au', backend: 'cloudflare', cfToken: 't' }, fetch: world().fetch });
     if (result.status !== 'created') throw new Error('not created');
-    expect(result.project.widget.leadForm.enabled).toBe(false);
+    const form = result.project.widget.leadForm;
+    expect(form.enabled).toBe(true);
+    expect(form.fields.map((f) => [f.name, f.type, Boolean(f.required)])).toEqual([
+      ['name', 'text', true],
+      ['email', 'email', true],
+      ['phone', 'tel', false],
+      ['message', 'textarea', true],
+    ]);
     expect(result.project.widget.chat.initialMessages).toEqual(['Hi {{name}}! How can we help you today?']);
+  });
+
+  it('lets visitors chat straight away with --lead-form none', async () => {
+    const dir = tempProject();
+    const result = await runInit({ cwd: dir, answers: { website: 'acme.com.au', cfToken: 't', leadForm: 'none' }, fetch: world().fetch });
+    if (result.status === 'created') expect(result.project.widget.leadForm.enabled).toBe(false);
   });
 
   it('refuses to overwrite an existing project without --force', async () => {
@@ -246,10 +275,13 @@ describe('runInit for an agent', () => {
     await expect(runInit({ cwd: dir, answers: {}, fetch: world().fetch })).rejects.toMatchObject({ code: 'project_exists' });
   });
 
-  it('with yes, takes the recommended backend', async () => {
+  it('with yes, takes the free default stack', async () => {
     const dir = tempProject();
     const result = await runInit({ cwd: dir, answers: { website: 'acme.com.au', cfToken: 't' }, yes: true, fetch: world().fetch });
     expect(result.status).toBe('created');
-    if (result.status === 'created') expect(result.project.backend.type).toBe('cloudflare');
+    if (result.status !== 'created') return;
+    expect(result.project.backend).toEqual({ type: 'workers-ai' });
+    expect(result.project.dashboard.adminEmail).toBeUndefined();
+    expect(result.adminPassword).toBeUndefined();
   });
 });

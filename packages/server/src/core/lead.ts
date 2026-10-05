@@ -1,8 +1,9 @@
 import type { Field, Lead } from '@murmur/protocol';
 import { MurmurError } from './errors.js';
 
-/** Each lead value is capped independently of the field's own rules (§7.1). */
+/** Each lead value is capped independently of the field's own rules; a message box gets more room. */
 export const MAX_LEAD_VALUE_LENGTH = 200;
+export const MAX_LEAD_TEXTAREA_LENGTH = 2000;
 const EMAIL_RE = /^[^@\s]+@[^@\s.]+\.[^@\s]{2,}$/;
 const TEL_RE = /^[+()\-.\s\d]{6,40}$/;
 
@@ -29,7 +30,7 @@ export function validateLead(lead: Lead | undefined, fields: readonly Field[]): 
       continue;
     }
 
-    if (value.length > MAX_LEAD_VALUE_LENGTH) {
+    if (value.length > (field.type === 'textarea' ? MAX_LEAD_TEXTAREA_LENGTH : MAX_LEAD_VALUE_LENGTH)) {
       throw new MurmurError('bad_request', {
         message: `${field.label} is too long.`,
         detail: `lead_too_long:${field.name}`,

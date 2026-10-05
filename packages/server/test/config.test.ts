@@ -70,7 +70,7 @@ describe('resolveSecrets', () => {
     expect(resolveSecrets({ env: 'HOOK', other: 1 }, env)).toEqual({ env: 'HOOK', other: 1 });
   });
 
-  it('collects every referenced variable name for setup.sh', () => {
+  it('collects every referenced variable name', () => {
     const names = collectSecretNames({ a: { env: 'ONE' }, b: [{ c: { env: 'TWO' } }] });
     expect([...names].sort()).toEqual(['ONE', 'TWO']);
   });

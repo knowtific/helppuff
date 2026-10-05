@@ -10,8 +10,8 @@ function focusable(root: HTMLElement): HTMLElement[] {
 }
 
 /**
- * Keep Tab inside the panel while it is open, and move focus into it on open
- * (§8.7). The dialog is `aria-modal="false"` — it does not block the page —
+ * Keep Tab inside the panel while it is open, and move focus into it on open.
+ * The dialog is `aria-modal="false"` — it does not block the page —
  * so this only loops Tab, it does not take the page hostage.
  */
 export function trapFocus(panel: HTMLElement): () => void {

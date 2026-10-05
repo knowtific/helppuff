@@ -5,7 +5,7 @@ import { httpUrl, safeUrl } from './url-schema.js';
 export const roleSchema = z.enum(['user', 'agent', 'system']);
 export type Role = z.infer<typeof roleSchema>;
 
-/** Optional connector-supplied display metadata (agent identity, §4.6). */
+/** Optional connector-supplied display metadata (agent identity). */
 export const messageMetaSchema = z
   .object({
     agentName: z.string().min(1).max(80).optional(),
@@ -43,21 +43,25 @@ export const cardItemSchema = z.object({
 export type CardItem = z.infer<typeof cardItemSchema>;
 
 export const linkItemSchema = z.object({
-  label: z.string().min(1).max(160),
-  url: safeUrl,
-  description: z.string().max(300).optional(),
+  label: z.string().min(1).max(160).describe('The link text.'),
+  url: safeUrl.describe('Where it goes (https).'),
+  description: z.string().max(300).optional().describe('A line under the link.'),
 });
 export type LinkItem = z.infer<typeof linkItemSchema>;
 
 export const fieldSchema = z.object({
-  name: z.string().min(1).max(64),
-  label: z.string().min(1).max(160),
-  type: z.enum(['text', 'email', 'tel', 'textarea', 'select']),
-  required: z.boolean().optional(),
-  placeholder: z.string().max(160).optional(),
-  options: z.array(z.string().min(1).max(120)).max(50).optional(),
-  pattern: z.string().max(200).optional(),
-  autocomplete: z.string().max(64).optional(),
+  name: z
+    .string()
+    .min(1)
+    .max(64)
+    .describe('The key the answer is stored under. `name`, `email`, `phone` and `message` mean something to the assistant (a `message` opens the chat).'),
+  label: z.string().min(1).max(160).describe('What the visitor sees.'),
+  type: z.enum(['text', 'email', 'tel', 'textarea', 'select']).describe('The kind of input. `select` needs `options`.'),
+  required: z.boolean().optional().describe('Must be filled in.'),
+  placeholder: z.string().max(160).optional().describe('Hint text inside the empty field.'),
+  options: z.array(z.string().min(1).max(120)).max(50).optional().describe('The choices of a `select`.'),
+  pattern: z.string().max(200).optional().describe('A regular expression the answer must match.'),
+  autocomplete: z.string().max(64).optional().describe('The HTML autocomplete hint, e.g. `email`, `tel`.'),
 });
 export type Field = z.infer<typeof fieldSchema>;
 
@@ -106,8 +110,8 @@ export type MessageType = Message['type'];
 export const messagesSchema = z.array(messageSchema).max(20);
 
 /**
- * Drop anything a connector returned that does not satisfy the protocol
- * (§4.4). Returns the surviving messages plus the indexes that were dropped so
+ * Drop anything a connector returned that does not satisfy the protocol.
+ * Returns the surviving messages plus the indexes that were dropped so
  * the caller can log a count without logging content.
  */
 export function sanitizeMessages(input: unknown): { messages: Message[]; dropped: number } {

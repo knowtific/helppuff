@@ -1,7 +1,7 @@
 import { isSafeUrl } from '@murmur/protocol';
 
 /**
- * The markdown subset from §4.4: paragraphs, line breaks, bold, italic, inline
+ * The markdown subset of the protocol: paragraphs, line breaks, bold, italic, inline
  * code, links and `-` bullets. No headings, images, HTML or tables. Urls,
  * emails and phone numbers written as plain text are linked too.
  *

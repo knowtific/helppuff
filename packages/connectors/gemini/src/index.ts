@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ground } from '@murmur/rag';
 import type { LinkItem, Message, SendRequest } from '@murmur/protocol';
 import {
   ConnectorError,
@@ -54,9 +55,11 @@ export const geminiOptionsSchema = z.object({
   /**
    * The system prompt. Gemini has no stored-prompt object, so this is where
    * `{ kv }` earns its keep: the text is edited live, per site, with no
-   * redeploy. See `docs/prompts.md`.
+   * redeploy. See `wiki/Prompts-and-Instructions.md`.
    */
   systemInstruction: promptSourceSchema.optional(),
+  /** `murmur`: answer from Murmur's own knowledge base instead of File Search. */
+  retrieval: z.literal('murmur').optional(),
   richMessages: z.boolean().default(true),
   /** Render the documents an answer came from as a `links` message. */
   showCitations: z.boolean().default(true),
@@ -344,7 +347,10 @@ async function interact(
   scope: PromptScope,
 ): Promise<{ id: string | null; messages: Message[] }> {
   const options = ctx.options;
-  const system = await resolvePrompt(ctx, options.systemInstruction, scope);
+  const prompt = await resolvePrompt(ctx, options.systemInstruction, scope);
+  const grounding =
+    options.retrieval === 'murmur' ? await ground(ctx.env, ctx.siteId, input, { log: ctx.log, waitUntil: ctx.waitUntil }) : null;
+  const system = grounding ? [prompt, grounding.block].filter(Boolean).join('\n\n') : prompt;
 
   const response = await fetchWithTimeout(ctx.fetch, `${options.baseUrl}/interactions`, {
     method: 'POST',
@@ -386,6 +392,7 @@ async function interact(
     const citations = citationMessage(collectCitations(steps));
     if (citations) messages.push(citations);
   }
+  if (grounding?.sources.length) messages.push(message({ type: 'links', title: 'Sources', links: grounding.sources }));
 
   return { id: typeof body.id === 'string' ? body.id : null, messages };
 }

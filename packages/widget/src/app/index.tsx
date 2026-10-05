@@ -9,11 +9,11 @@ import { App, Boundary, type AppHandleRef } from './App.js';
 
 /**
  * The app chunk's only export. The loader imports this lazily and calls it
- * once; a throw here is caught by the loader and treated as fatal (§8.3).
+ * once; a throw here is caught by the loader and treated as fatal.
  */
 export function mount(runtime: Runtime): AppHandle {
   // The loader read only the launcher's fields; this is the full validation
-  // §8.3 requires. A config that cannot be parsed is fatal.
+  // the fail-safe requires. A config that cannot be parsed is fatal.
   const config = parseConfig(runtime.rawConfig);
   if (!config) {
     runtime.hide('config_invalid');

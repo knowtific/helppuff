@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { ground } from '@murmur/rag';
 import type { Message, SendRequest } from '@murmur/protocol';
 import {
   ConnectorError,
@@ -59,6 +60,8 @@ export const anthropicOptionsSchema = z.object({
   /** Retry a safety decline on another model, server-side. Opus 5 / Fable 5.1 only. */
   fallbacks: z.boolean().default(true),
   /** Retrieve from a Cloudflare AI Search instance before each answer. */
+  /** `murmur`: retrieve from Murmur's own knowledge base (Vectorize + D1) instead of AI Search. */
+  retrieval: z.literal('murmur').optional(),
   knowledge: aiSearchSourceSchema
     .extend({ maxResults: z.number().int().min(1).max(20).default(6) })
     .optional(),
@@ -103,6 +106,10 @@ type SearchChunk = { text?: unknown; item?: { key?: unknown } };
  * documents — so errors are logged and swallowed.
  */
 async function retrieve(ctx: ConnectorContext<AnthropicOptions>, history: Turn[], input: string): Promise<string> {
+  if (ctx.options.retrieval === 'murmur') {
+    const grounding = await ground(ctx.env, ctx.siteId, input, { log: ctx.log, waitUntil: ctx.waitUntil });
+    return grounding ? `<knowledge>\n${grounding.block}\n</knowledge>` : '';
+  }
   const knowledge = ctx.options.knowledge;
   if (!knowledge) return '';
   try {

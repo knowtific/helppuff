@@ -278,8 +278,8 @@ test.describe('client-side flows', () => {
     await page.locator('murmur-widget .mm-chips .mm-chip', { hasText: 'Today' }).click();
 
     // No session yet, so the lead form collects one — the answer is not lost.
-    await page.locator('murmur-widget #mm-f-name').fill('Ahad');
-    await page.locator('murmur-widget #mm-f-email').fill('ahad@example.com');
+    await page.locator('murmur-widget #mm-f-name').fill('Ada');
+    await page.locator('murmur-widget #mm-f-email').fill('ada@example.com');
     await page.locator('murmur-widget #mm-f-phone').fill('0400 000 000');
     // The flow's summary is shown in the first-message box, where it can be
     // edited, rather than riding along unseen.

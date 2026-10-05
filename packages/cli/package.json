@@ -1,18 +1,20 @@
 {
   "name": "@knowtific/murmur",
   "version": "0.1.0",
-  "description": "Set up, deploy and manage an AI chat widget on your own Cloudflare account \u2014 built to be driven by people and by AI agents.",
+  "description": "Set up, deploy and manage an AI chat widget on your own Cloudflare account — built to be driven by people and by AI agents.",
   "author": "Knowtific (MYT PTY LTD)",
   "homepage": "https://www.knowtific.com.au",
   "keywords": [
     "chat widget",
     "ai assistant",
     "cloudflare",
-    "ai search",
     "workers",
     "mcp",
     "agents",
-    "crm"
+    "crm",
+    "rag",
+    "vectorize",
+    "workers ai"
   ],
   "license": "MIT",
   "type": "module",
@@ -20,7 +22,8 @@
     "murmur": "./dist/cli.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "AGENTS.md"
   ],
   "engines": {
     "node": ">=20"
@@ -36,7 +39,9 @@
     "@anthropic-ai/sdk": "^0.128.0",
     "@clack/prompts": "^1.8.1",
     "@murmur/connector-types": "workspace:*",
+    "@murmur/connector-workers-ai": "workspace:*",
     "@murmur/protocol": "workspace:*",
+    "@murmur/rag": "workspace:*",
     "@murmur/server": "workspace:*",
     "@murmur/widget": "workspace:*",
     "node-html-parser": "^9.0.4",

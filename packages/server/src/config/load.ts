@@ -61,7 +61,7 @@ export function resolveSecrets(value: unknown, env: Record<string, unknown>, pat
   return value;
 }
 
-/** Collect every env var name a config references, for `setup.sh` to prompt for. */
+/** Collect every env var name a config references: the Worker secrets a deploy must set. */
 export function collectSecretNames(value: unknown, into = new Set<string>()): Set<string> {
   if (isSecretRef(value)) {
     into.add(value.env);

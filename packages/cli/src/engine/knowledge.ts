@@ -1,6 +1,9 @@
+import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { extname, join, relative, resolve } from 'node:path';
+import { basename, extname, join, relative, resolve } from 'node:path';
 import { CliError } from '../errors.js';
+import type { AdminApi } from './admin-api.js';
+import { readState, writeState, type State } from './state.js';
 import type { CloudflareApi, CrawlerSource } from './cloudflare.js';
 import { PAGE_PREFIX, crawlSite, hasSitemap, looksRendered, pageFileName } from './site.js';
 import { pool, syncGeminiStore, syncOpenAiStore, type UploadDoc } from './providers.js';
@@ -48,7 +51,7 @@ export async function gatherDocs(
 
   const website = project.knowledge.website;
   if (website !== false && project.website && !options.skipWebsite) {
-    const settings = typeof website === 'object' ? website : { maxPages: 50 };
+    const settings = typeof website === 'object' ? { ...website, maxPages: website.maxPages ?? 50 } : { maxPages: 50 };
     options.progress?.(`Reading ${project.website} (up to ${settings.maxPages} pages)…`);
     const crawled = await crawlSite(project.website, {
       maxPages: settings.maxPages,
@@ -205,7 +208,8 @@ export async function syncKnowledge(
   const backend = project.backend;
   const progress = deps.progress;
 
-  if (!hasKnowledge(project)) {
+  // workers-ai: the Worker crawls the site itself, and files go up through the admin API (`uploadFilesToWorker`).
+  if (!hasKnowledge(project) || backend.type === 'workers-ai' || ('retrieval' in backend && backend.retrieval === 'murmur')) {
     return { target: 'none', uploaded: 0, removed: 0, pages: 0, files: 0, skipped: [] };
   }
 
@@ -347,6 +351,7 @@ export async function knowledgeMissing(
 ): Promise<boolean> {
   if (!hasKnowledge(project)) return false;
   const backend = project.backend;
+  if ('retrieval' in backend && backend.retrieval === 'murmur') return false;
   if (backend.type === 'openai') return !backend.vectorStoreId;
   if (backend.type === 'gemini') return !backend.fileSearchStore;
   const instance = aiSearchInstanceFor(project);
@@ -359,4 +364,73 @@ export async function knowledgeMissing(
   if (project.knowledge.files.length > 0 && !ours(FILE_PREFIX)) return true;
   if (found.type === 'web-crawler') return false;
   return project.website !== undefined && project.knowledge.website !== false && !ours(PAGE_PREFIX);
+}
+
+const TEXT_TYPES = new Set(['text/markdown', 'text/plain', 'text/html', 'text/csv', 'application/json']);
+/** Read on the Worker (Workers AI's document converter), in the background. */
+const DOCUMENT_TYPES = new Set(['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']);
+
+export type FilesSynced = { uploaded: number; unchanged: number; removed: number; skipped: string[] };
+
+/**
+ * workers-ai: bring the knowledge base in line with `knowledge.files`.
+ *
+ *  - Text formats become hand-written entries, indexed at once.
+ *  - PDF and Word documents are uploaded; the Worker reads, cleans and
+ *    learns them in the background (`murmur knowledge files` shows progress).
+ *  - A file whose bytes have not changed since the last deploy is left alone
+ *    (`.murmur/state.json` remembers each one's hash and id), and one taken
+ *    out of `knowledge.files` is removed from the knowledge base.
+ */
+export async function uploadFilesToWorker(loaded: LoadedProject, api: Pick<AdminApi, 'send' | 'upload'>, progress?: Progress): Promise<FilesSynced> {
+  const gathered = await gatherDocs(loaded, { skipWebsite: true, ...(progress ? { progress } : {}) });
+  const skipped = [...gathered.skipped];
+  const state = readState(loaded.dir);
+  const before = state.files ?? {};
+  const after: NonNullable<State['files']> = {};
+  let uploaded = 0;
+  let unchanged = 0;
+  for (const doc of gathered.docs) {
+    const path = doc.name.replace(FILE_PREFIX, '').replace(/__/g, '/');
+    const hash = createHash('sha256').update(doc.data).digest('hex').slice(0, 32);
+    const previous = before[path];
+    if (previous?.hash === hash) {
+      after[path] = previous;
+      unchanged++;
+      continue;
+    }
+    if (DOCUMENT_TYPES.has(doc.type)) {
+      progress?.(`  ${path}`);
+      if (previous?.kind === 'file') await api.send('DELETE', `/admin/api/knowledge/files/${encodeURIComponent(previous.id)}`).catch(() => null);
+      const added = await api.upload<{ id: string }>('/admin/api/knowledge/files', { name: basename(path) }, doc.data, doc.type);
+      after[path] = { hash, id: added.id, kind: 'file' };
+      uploaded++;
+      continue;
+    }
+    if (!TEXT_TYPES.has(doc.type)) {
+      skipped.push(`${path} (unsupported type)`);
+      continue;
+    }
+    const id = `file-${path.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`.slice(0, 64);
+    let content = new TextDecoder().decode(doc.data);
+    if (doc.type === 'text/html') content = content.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ');
+    progress?.(`  ${path}`);
+    await api.send('POST', '/admin/api/knowledge/manual', { id, title: path, content });
+    after[path] = { hash, id, kind: 'manual' };
+    uploaded++;
+  }
+  let removed = 0;
+  for (const [path, gone] of Object.entries(before)) {
+    if (after[path]) continue;
+    // Still listed but unreadable this time (too big, say): keep what was learned.
+    if (skipped.some((s) => s.startsWith(`${path} `))) {
+      after[path] = gone;
+      continue;
+    }
+    const route = gone.kind === 'file' ? 'files' : 'manual';
+    await api.send('DELETE', `/admin/api/knowledge/${route}/${encodeURIComponent(gone.id)}`).catch(() => null);
+    removed++;
+  }
+  writeState(loaded.dir, { ...readState(loaded.dir), files: after });
+  return { uploaded, unchanged, removed, skipped };
 }

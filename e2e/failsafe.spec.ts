@@ -13,7 +13,7 @@ import {
 } from './helpers.js';
 
 /**
- * §8.3 is the highest-priority behavioural requirement in the plan, so it
+ * The fail-safe is the highest-priority behavioural requirement, so it
  * gets its own suite: every fatal condition forced individually, each leaving
  * the DOM clean, `window.Murmur` callable and inert, the console silent and
  * the host page untouched.
@@ -176,7 +176,7 @@ test.describe('fatal conditions hide the widget silently', () => {
     await page.waitForTimeout(1500);
     await expectNoWidgetInDom(page);
 
-    // §8.3: storage is left alone.
+    // The fail-safe: storage is left alone.
     expect(await page.evaluate(() => localStorage.getItem('mm:demo'))).toBe(stored);
   });
 });

@@ -67,9 +67,15 @@ importers:
       '@murmur/connector-types':
         specifier: workspace:*
         version: link:../connectors/_types
+      '@murmur/connector-workers-ai':
+        specifier: workspace:*
+        version: link:../connectors/workers-ai
       '@murmur/protocol':
         specifier: workspace:*
         version: link:../protocol
+      '@murmur/rag':
+        specifier: workspace:*
+        version: link:../rag
       '@murmur/server':
         specifier: workspace:*
         version: link:../server
@@ -106,6 +112,9 @@ importers:
       '@murmur/protocol':
         specifier: workspace:*
         version: link:../../protocol
+      '@murmur/rag':
+        specifier: workspace:*
+        version: link:../../rag
       zod:
         specifier: ^3.25.76
         version: 3.25.76
@@ -142,6 +151,9 @@ importers:
       '@murmur/protocol':
         specifier: workspace:*
         version: link:../../protocol
+      '@murmur/rag':
+        specifier: workspace:*
+        version: link:../../rag
       zod:
         specifier: ^3.25.76
         version: 3.25.76
@@ -166,6 +178,9 @@ importers:
       '@murmur/protocol':
         specifier: workspace:*
         version: link:../../protocol
+      '@murmur/rag':
+        specifier: workspace:*
+        version: link:../../rag
       zod:
         specifier: ^3.25.76
         version: 3.25.76
@@ -178,6 +193,21 @@ importers:
       '@murmur/protocol':
         specifier: workspace:*
         version: link:../../protocol
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
+
+  packages/connectors/workers-ai:
+    dependencies:
+      '@murmur/connector-types':
+        specifier: workspace:*
+        version: link:../_types
+      '@murmur/protocol':
+        specifier: workspace:*
+        version: link:../../protocol
+      '@murmur/rag':
+        specifier: workspace:*
+        version: link:../../rag
       zod:
         specifier: ^3.25.76
         version: 3.25.76
@@ -222,6 +252,12 @@ importers:
         specifier: ^3.25.76
         version: 3.25.76
 
+  packages/rag:
+    dependencies:
+      node-html-parser:
+        specifier: ^9.0.4
+        version: 9.0.4
+
   packages/server:
     dependencies:
       '@murmur/connector-anthropic':
@@ -248,9 +284,15 @@ importers:
       '@murmur/connector-types':
         specifier: workspace:*
         version: link:../connectors/_types
+      '@murmur/connector-workers-ai':
+        specifier: workspace:*
+        version: link:../connectors/workers-ai
       '@murmur/protocol':
         specifier: workspace:*
         version: link:../protocol
+      '@murmur/rag':
+        specifier: workspace:*
+        version: link:../rag
       '@murmur/sink-types':
         specifier: workspace:*
         version: link:../sinks/_types
@@ -282,9 +324,6 @@ importers:
 
   packages/sinks/webhook:
     dependencies:
-      '@murmur/protocol':
-        specifier: workspace:*
-        version: link:../../protocol
       '@murmur/sink-types':
         specifier: workspace:*
         version: link:../_types

@@ -37,6 +37,10 @@ export const EXIT = {
   ok: 0,
   error: 1,
   usage: 2,
+  /** Cloudflare (or the admin API) refused the credentials or a permission. */
+  auth: 3,
+  /** A Cloudflare quota or plan limit was hit. */
+  quota: 4,
   /** Setup needs answers the CLI was not given and could not ask for. */
   needsInput: 10,
 } as const;

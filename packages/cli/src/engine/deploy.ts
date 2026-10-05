@@ -1,7 +1,22 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { DASHBOARD_SCHEMA, promptField, promptHash, siteConfigKey, type PromptMeta, type StoredSiteConfig } from '@murmur/server';
+import { PACKAGE_NAME, VERSION } from './version.js';
+import {
+  migrate,
+  newer,
+  murmurConfigSchema,
+  promptField,
+  promptHash,
+  readSettings,
+  settingsHash,
+  siteConfigKey,
+  type PromptMeta,
+  type StoredSiteConfig,
+} from '@murmur/server';
+import { DEFAULT_RETRIEVAL, EMBEDDING_DIMENSIONS } from '@murmur/rag';
+import { EXIT } from '../errors.js';
+import { adminApi, type AdminApi } from './admin-api.js';
 import { CliError } from '../errors.js';
-import { previewPage, runtimeVersion, writeWorker } from './build.js';
+import { chatPage, previewPage, runtimeVersion, writeWorker } from './build.js';
 import { compile, dashboardUrl, embedSnippet } from './compile.js';
 import { cloudflareSession, type CloudflareSession } from './credentials.js';
 import { loadEnv, writeEnvVar } from './env.js';
@@ -10,6 +25,8 @@ import {
   indexingStatus,
   knowledgeMissing,
   syncKnowledge,
+  uploadFilesToWorker,
+  type FilesSynced,
   type IndexingStatus,
   type Progress,
   type SyncResult,
@@ -25,7 +42,17 @@ import {
   type LivePrompt,
   type Remote,
 } from './prompt.js';
-import { dashboardEnabled, resourceName, updateProject, workerNameFor, type LoadedProject } from './project.js';
+import {
+  dashboardEnabled,
+  needsDatabase,
+  resourceName,
+  updateProject,
+  usesMurmurKnowledge,
+  vectorizeIndexFor,
+  workerNameFor,
+  type LoadedProject,
+  type Project,
+} from './project.js';
 import { readState, writeState } from './state.js';
 import { wranglerDeploy } from './wrangler.js';
 
@@ -42,8 +69,27 @@ import { wranglerDeploy } from './wrangler.js';
  *   7. A health check through the real protocol endpoint
  */
 
+/** Which pages to crawl after a workers-ai deploy. Omitted: none (the setup page or `murmur crawl` picks them). */
+export type CrawlRequest =
+  | { mode: 'suggested' | 'all' }
+  | { mode: 'match'; include: string[] }
+  | { mode: 'urls'; urls: string[] };
+
 export type DeployOptions = {
   knowledge?: 'auto' | 'force' | 'skip';
+  crawl?: CrawlRequest;
+  /**
+   * No person is at the setup page to do onboarding (an AI agent, CI): when
+   * the site has never been learned, start learning the suggested pages
+   * (murmur.json's `knowledge.website.include`/`exclude` shape the
+   * suggestion) and read the business details now, so the assistant is ready
+   * without anyone opening the dashboard.
+   */
+  unattended?: boolean;
+  /** Deploy although the Worker runs a newer release (a deliberate rollback). */
+  allowDowngrade?: boolean;
+  /** Publish over settings changed in the dashboard since this folder last pulled them. */
+  overwriteSettings?: boolean;
   forceWorker?: boolean;
   dryRun?: boolean;
   cf?: { token?: string | undefined; accountId?: string | undefined };
@@ -66,6 +112,12 @@ export type DeployResult = {
   prompt: { version: number; published: boolean } | null;
   /** AI Search indexing progress. Deploy never waits for it; answers improve as it completes. */
   indexing: IndexingStatus | null;
+  /** workers-ai: the one-time link that creates the first dashboard account (24 hours). Null once set up. */
+  setupUrl: string | null;
+  /** workers-ai: the crawl this deploy started, if any. It runs in the background. */
+  crawl: { runId: string; total: number } | null;
+  /** workers-ai: local files uploaded as knowledge entries. */
+  files: FilesSynced | null;
   healthy: boolean;
   warnings: string[];
 };
@@ -91,14 +143,23 @@ async function ensureSubdomain(cf: CloudflareSession, progress?: Progress, readO
   });
 }
 
-/** MURMUR_SECRET signs session tokens. Generated once and kept in .env so redeploys do not log visitors out. */
-function ensureMurmurSecret(dir: string, env: Record<string, string>): string {
-  const existing = env['MURMUR_SECRET'];
+/**
+ * A generated secret, kept in .env so redeploys reuse it:
+ *  - MURMUR_SECRET signs session tokens (rotating it logs visitors out);
+ *  - ADMIN_API_KEY is how this CLI (and agents) call the Worker's admin API.
+ */
+function ensureGeneratedSecret(dir: string, env: Record<string, string>, name: 'MURMUR_SECRET' | 'ADMIN_API_KEY'): string {
+  const existing = env[name] ?? (name === 'ADMIN_API_KEY' ? env['MURMUR_ADMIN_API_KEY'] : undefined);
   if (existing && existing.length >= 32) return existing;
-  const secret = randomBytes(32).toString('base64');
-  writeEnvVar(dir, 'MURMUR_SECRET', secret);
-  env['MURMUR_SECRET'] = secret;
+  const secret = name === 'ADMIN_API_KEY' ? `mm_${randomBytes(32).toString('base64url')}` : randomBytes(32).toString('base64');
+  writeEnvVar(dir, name, secret);
+  env[name] = secret;
   return secret;
+}
+
+export function embeddingModelFor(project: Project): string {
+  const backend = project.backend;
+  return backend.type === 'workers-ai' ? (backend.retrieval?.embeddingModel ?? DEFAULT_RETRIEVAL.embeddingModel) : DEFAULT_RETRIEVAL.embeddingModel;
 }
 
 export async function deploy(initial: LoadedProject, options: DeployOptions = {}): Promise<DeployResult> {
@@ -117,11 +178,24 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
   const subdomain = await ensureSubdomain(cf, progress, options.dryRun);
   const url = `https://${workerName}.${subdomain}.workers.dev`;
 
+  // Never go backwards by accident (an old npx cache, a stale global install):
+  // a rollback is a choice, made with --allow-downgrade.
+  const live = await liveVersion(url, doFetch);
+  if (live.version && newer(live.version, VERSION) && !options.allowDowngrade) {
+    throw new CliError('downgrade', `The Worker runs murmur ${live.version}; this is ${VERSION}, which is older.`, {
+      hint: `Upgrade instead: npx ${PACKAGE_NAME}@latest upgrade — or, to roll back on purpose, add --allow-downgrade.`,
+      details: { live: live.version, cli: VERSION },
+    });
+  }
+
   // Secrets are checked up front: a Worker deployed without them answers
   // every visitor with an error.
-  if (!options.dryRun) ensureMurmurSecret(loaded.dir, env);
+  if (!options.dryRun) {
+    ensureGeneratedSecret(loaded.dir, env, 'MURMUR_SECRET');
+    if (needsDatabase(loaded.project)) ensureGeneratedSecret(loaded.dir, env, 'ADMIN_API_KEY');
+  }
   const required = compile(loaded, { workerUrl: url }).secrets;
-  const missing = required.filter((name) => !env[name] && !(options.dryRun && name === 'MURMUR_SECRET'));
+  const missing = required.filter((name) => !env[name] && !(options.dryRun && (name === 'MURMUR_SECRET' || name === 'ADMIN_API_KEY')));
   if (missing.length) {
     throw new CliError('missing_secret', `Missing secret(s): ${missing.join(', ')}.`, {
       hint: missing
@@ -148,6 +222,9 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
       indexing: null,
       healthy: false,
       prompt: null,
+      setupUrl: null,
+      crawl: null,
+      files: null,
       warnings: ['dry run: nothing was changed'],
     };
   }
@@ -155,12 +232,26 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
   progress?.('Preparing storage…');
   const kvNamespaceId = await cf.api.ensureKvNamespace(cf.accountId, resourceName(loaded.project.site));
   let d1DatabaseId: string | undefined;
-  if (dashboardEnabled(loaded.project)) {
-    progress?.('Preparing the dashboard database…');
+  if (needsDatabase(loaded.project)) {
+    progress?.('Preparing the database…');
     d1DatabaseId = await cf.api.ensureD1Database(cf.accountId, resourceName(loaded.project.site));
-    for (const statement of DASHBOARD_SCHEMA) await cf.api.d1Query(cf.accountId, d1DatabaseId, statement);
+    const databaseId = d1DatabaseId;
+    await migrate((sql, params) => cf.api.d1Query(cf.accountId, databaseId, sql, params));
   } else if (loaded.project.dashboard.enabled) {
     warnings.push('The dashboard is on but has no admin: set it with `murmur config set dashboard.adminEmail you@example.com`.');
+  }
+  const vectorizeIndex = vectorizeIndexFor(loaded.project);
+  if (vectorizeIndex) {
+    const model = embeddingModelFor(loaded.project);
+    const dimensions = EMBEDDING_DIMENSIONS[model];
+    if (!dimensions) {
+      throw new CliError('unknown_embedding_model', `murmur does not know the vector size of ${model}.`, {
+        hint: `Use one of: ${Object.keys(EMBEDDING_DIMENSIONS).join(', ')}`,
+        exitCode: EXIT.usage,
+      });
+    }
+    progress?.('Preparing the vector index…');
+    await cf.api.ensureVectorizeIndex(cf.accountId, vectorizeIndex, dimensions);
   }
   await ensureAiSearchInstance(cf.api, cf.accountId, loaded.project, progress, doFetch);
 
@@ -185,6 +276,18 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
     } else {
       promptToPublish = { text, hash, live };
     }
+  }
+
+  // Settings edited in the dashboard live only in KV until pulled; publishing
+  // murmur.json over them would silently undo the owner's changes.
+  const { stored: liveStored } = await readLivePrompt(promptRemote, loaded.project.site).catch(() => ({ stored: null }));
+  const liveSettings = liveStored?.settings;
+  // A deploy's own write (from any copy of murmur.json) may be replaced; anything else must be pulled first.
+  if (liveSettings && liveSettings.by !== 'deploy' && liveSettings.hash !== state.settings?.hash && !options.overwriteSettings) {
+    throw new CliError('settings_changed', `Settings were changed in the dashboard${liveSettings.by ? ` by ${liveSettings.by}` : ''} since this folder last saw them.`, {
+      hint: 'Run `murmur config pull` to bring them into murmur.json, then deploy. Or deploy with --overwrite-settings to discard them.',
+      details: { changedAt: liveSettings.at, by: liveSettings.by },
+    });
   }
 
   let knowledge: SyncResult | null = null;
@@ -212,7 +315,7 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
   const workerExists = await cf.api.workerExists(cf.accountId, workerName);
   let workerDeployed = false;
   // The preview page is generated here, not shipped in the runtime, so it is part of the Worker too.
-  const workerHash = fingerprint(`${compiled.workerHash}:${previewPage(loaded.project)}`);
+  const workerHash = fingerprint(`${compiled.workerHash}:${previewPage(loaded.project)}:${chatPage(loaded.project)}`);
 
   if (options.forceWorker || !workerExists || state.workerHash !== workerHash) {
     progress?.(workerExists ? 'Updating the Worker…' : 'Deploying the Worker (first time takes a minute)…');
@@ -249,7 +352,12 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
     promptMeta = recorded.meta;
     rollback = recorded.rollback;
   }
-  const stored = { ...(compiled.storedConfig as StoredSiteConfig), ...(promptMeta ? { prompt: promptMeta } : {}) };
+  const settingsNow = await settingsHash(readSettings(murmurConfigSchema.parse(compiled.serverConfig).sites[compiled.site]!));
+  const stored = {
+    ...(compiled.storedConfig as StoredSiteConfig),
+    ...(promptMeta ? { prompt: promptMeta } : {}),
+    settings: { at: Date.now(), by: 'deploy', hash: settingsNow },
+  };
   try {
     await cf.api.kvPut(cf.accountId, kvNamespaceId, siteConfigKey(compiled.site), JSON.stringify(stored));
   } catch (thrown) {
@@ -257,10 +365,9 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
     await rollback();
     throw thrown;
   }
-  if (promptMeta) {
-    state.prompt = { version: promptMeta.version, hash: promptMeta.hash };
-    writeState(loaded.dir, state);
-  }
+  if (promptMeta) state.prompt = { version: promptMeta.version, hash: promptMeta.hash };
+  state.settings = { hash: settingsNow };
+  writeState(loaded.dir, state);
 
   // Live from here on: AI Search uploads (and any wait for a first crawl) happen now.
   if (wantsKnowledge && !storeInConfig) await syncNow();
@@ -273,6 +380,7 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
       url,
       kvNamespaceId,
       ...(d1DatabaseId ? { d1DatabaseId } : {}),
+      ...(vectorizeIndex ? { vectorizeIndex } : {}),
     };
   });
 
@@ -284,6 +392,41 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
         ? 'The Worker did not answer the health check. Run `murmur doctor`.'
         : 'The Worker is deployed but not answering yet — a new workers.dev address can take a few minutes to go live.',
     );
+  }
+
+  // workers-ai, once live: the setup link, local files, and the first crawl.
+  let setupUrl: string | null = null;
+  let crawl: DeployResult['crawl'] = null;
+  let files: DeployResult['files'] = null;
+  if (healthy && usesMurmurKnowledge(loaded.project)) {
+    const api = adminApi(loaded, { url, fetch: doFetch, env });
+    await waitForAdminKey(api, progress);
+    setupUrl = await mintSetupLink(api, warnings);
+    if (loaded.project.knowledge.files.length) {
+      progress?.('Adding your files to the knowledge base…');
+      files = await uploadFilesToWorker(loaded, api, progress).catch((thrown: unknown) => {
+        warnings.push(`Files were not added: ${(thrown as Error).message}. Run \`murmur knowledge add\`.`);
+        return null;
+      });
+      if (files?.skipped.length) warnings.push(`Not added: ${files.skipped.join(', ')}`);
+    }
+    crawl = await startLearning(api, loaded.project, options, warnings, progress);
+    // Vectors from one embedding model mean nothing to another: when the model
+    // changed (or this folder never recorded it), re-learn the pages already
+    // chosen. Unchanged pages are re-embedded because the model is in their hash.
+    const model = embeddingModelFor(loaded.project);
+    if (state.embeddingModel !== model) {
+      if (!crawl) {
+        const learned = await api.get<{ run: unknown }>('/admin/api/knowledge/status').catch(() => null);
+        if (learned?.run) {
+          progress?.('Re-learning your site for the new embedding model…');
+          crawl = await api.send<{ runId: string; total: number }>('POST', '/admin/api/knowledge/crawl', {}).catch(() => null);
+          if (!crawl) warnings.push('The embedding model changed; run `murmur crawl` to re-learn your site.');
+        }
+      }
+      state.embeddingModel = model;
+      writeState(loaded.dir, state);
+    }
   }
 
   return {
@@ -298,6 +441,9 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
     knowledge,
     indexing,
     healthy,
+    setupUrl,
+    crawl,
+    files,
     warnings,
     prompt: promptMeta ? { version: promptMeta.version, published: Boolean(promptToPublish) } : null,
   };
@@ -325,4 +471,92 @@ export async function healthCheck(
   return false;
 }
 
-export { hasDeployed } from './state.js';
+
+/** A new secret takes a few seconds to reach every location; wait until the admin API accepts the key. */
+async function waitForAdminKey(api: AdminApi, progress?: Progress, attempts = 10): Promise<void> {
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      await api.get('/admin/api/setup/state');
+      return;
+    } catch (thrown) {
+      if (!(thrown instanceof CliError) || thrown.code !== 'admin_unauthorized') return;
+      if (attempt === 0) progress?.('Waiting for the admin key to reach the Worker…');
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  }
+}
+
+/** The one-time setup link, while nobody has claimed the dashboard. */
+export async function mintSetupLink(api: AdminApi, warnings: string[]): Promise<string | null> {
+  try {
+    const link = await api.send<{ url: string }>('POST', '/admin/api/links', { kind: 'setup' });
+    return link.url;
+  } catch (thrown) {
+    if (thrown instanceof CliError && /already complete/i.test(thrown.message)) return null;
+    warnings.push(`No setup link: ${(thrown as Error).message}. Run \`murmur dashboard\` for a sign-in link.`);
+    return null;
+  }
+}
+
+type Discovered = { urls: { url: string; suggested: boolean; selected?: boolean; category: string }[]; warnings: string[] };
+
+/** Start a crawl through the admin API, choosing pages as the request says. */
+/**
+ * After a deploy: the crawl asked for (--crawl), or — with no person to do
+ * onboarding (`unattended`) and nothing learned yet — the suggested pages,
+ * plus the business details read now. Failures become warnings: the
+ * assistant is live either way.
+ */
+/** What the deployed Worker reports at /healthz: its release and the D1 migration it expects. Nulls when unknown. */
+export async function liveVersion(url: string, doFetch: typeof fetch = fetch): Promise<{ version: string | null; schema: number | null }> {
+  try {
+    const response = await doFetch(`${url}/healthz`, { signal: AbortSignal.timeout(5000) });
+    if (!response.ok) return { version: null, schema: null };
+    const body = (await response.json()) as { version?: unknown; schema?: unknown };
+    return { version: typeof body.version === 'string' ? body.version : null, schema: typeof body.schema === 'number' ? body.schema : null };
+  } catch {
+    return { version: null, schema: null };
+  }
+}
+
+export async function startLearning(
+  api: AdminApi,
+  project: Project,
+  options: Pick<DeployOptions, 'crawl' | 'unattended'>,
+  warnings: string[],
+  progress?: Progress,
+): Promise<{ runId: string; total: number } | null> {
+  let request = options.crawl;
+  if (!request && options.unattended && project.website && project.knowledge.website !== false) {
+    const learned = await api.get<{ run: unknown }>('/admin/api/knowledge/status').catch(() => null);
+    if (learned && !learned.run) request = { mode: 'suggested' };
+  }
+  if (!request) return null;
+  const crawl = await startCrawlFromCli(api, request, progress).catch((thrown: unknown) => {
+    warnings.push(`The crawl did not start: ${(thrown as Error).message}. Run \`murmur crawl\`.`);
+    return null;
+  });
+  // What onboarding would have shown a person: the business details, read now rather than when the crawl ends.
+  if (crawl && options.unattended) {
+    progress?.('Reading your business details…');
+    await api.send('POST', '/admin/api/knowledge/facts/detect', {}).catch(() => null);
+  }
+  return crawl;
+}
+
+export async function startCrawlFromCli(api: AdminApi, request: CrawlRequest, progress?: Progress): Promise<{ runId: string; total: number }> {
+  if (request.mode === 'urls') return api.send('POST', '/admin/api/knowledge/crawl', { urls: request.urls });
+  progress?.('Finding the pages of your site…');
+  const found = await api.send<Discovered>('POST', '/admin/api/knowledge/discover', {});
+  const urls =
+    request.mode === 'all'
+      ? found.urls.filter((u) => u.category !== 'legal').map((u) => u.url)
+      : request.mode === 'suggested'
+        ? found.urls.filter((u) => u.suggested).map((u) => u.url)
+        : found.urls.map((u) => u.url);
+  progress?.(`Crawling ${request.mode === 'match' ? 'the matching' : urls.length} page(s) in the background…`);
+  return api.send('POST', '/admin/api/knowledge/crawl', {
+    urls,
+    ...(request.mode === 'match' ? { include: request.include } : {}),
+  });
+}

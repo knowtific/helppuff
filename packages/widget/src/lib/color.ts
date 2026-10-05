@@ -1,5 +1,5 @@
 /**
- * Just enough colour maths to keep the accent accessible (§8.7): the
+ * Just enough colour maths to keep the accent accessible: the
  * foreground on an accent fill is chosen at runtime, not assumed. No colour
  * library — this is ~30 lines and the budget is 35 kb.
  */
@@ -45,7 +45,7 @@ const BLACK: Rgb = { r: 17, g: 17, b: 20 };
 
 /**
  * Pick black or white text for an accent fill, whichever has more contrast.
- * §8.7: checked against the accent at runtime rather than assumed white.
+ * Accessibility: checked against the accent at runtime rather than assumed white.
  */
 export function foregroundFor(accent: string): string {
   const rgb = parseHex(accent);
@@ -54,15 +54,9 @@ export function foregroundFor(accent: string): string {
 }
 
 /** Whether a colour pair clears WCAG AA for normal text. */
-export function meetsAA(foreground: string, background: string): boolean {
-  const fg = parseHex(foreground);
-  const bg = parseHex(background);
-  if (!fg || !bg) return false;
-  return contrastRatio(fg, bg) >= 4.5;
-}
 
 /**
- * Rotate a hex colour's hue, for the orb's gradient (§9.2). Works in HSL,
+ * Rotate a hex colour's hue, for the orb's gradient. Works in HSL,
  * which is close enough for a soft gradient and far smaller than an OKLCH
  * implementation.
  */

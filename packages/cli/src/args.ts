@@ -18,6 +18,19 @@ const BOOLEAN = new Set([
   'skip-knowledge',
   'local',
   'agent-files',
+  'defaults',
+  'wait',
+  'browser',
+  'all',
+  'live',
+  'non-interactive',
+  'verbose',
+  'keep-data',
+  'overwrite-settings',
+  'apply',
+  'timing',
+  'check',
+  'allow-downgrade',
 ]);
 /** Flags that may repeat, collected into a list. */
 const LIST = new Set(['docs']);
@@ -88,7 +101,8 @@ export function bool(flags: Flags, name: string): boolean | undefined {
 }
 
 export function assertKnown(flags: Flags, allowed: string[], command: string): void {
-  const known = new Set([...allowed, 'json', 'help', 'h', 'cwd', 'version']);
+  // Global flags: accepted by every command.
+  const known = new Set([...allowed, 'json', 'help', 'h', 'cwd', 'version', 'non-interactive', 'verbose', 'config']);
   const unknown = Object.keys(flags).filter((name) => !known.has(name));
   if (unknown.length) {
     throw new CliError('usage', `Unknown option(s) for \`murmur ${command}\`: ${unknown.map((u) => `--${u}`).join(', ')}`, {

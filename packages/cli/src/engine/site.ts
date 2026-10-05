@@ -168,6 +168,56 @@ export function looksRendered(html: string): boolean {
   return text.length < 400 && scripts >= 2;
 }
 
+/** Saturation in HSL, 0–1: greys are 0. */
+function saturation(hex: string): number {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255) as [number, number, number];
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  return max === min ? 0 : (max - min) / (1 - Math.abs(2 * l - 1));
+}
+
+const expandHex = (value: string) => {
+  const hex = value.slice(1).toLowerCase();
+  return `#${hex.length === 3 ? hex.split('').map((c) => c + c).join('') : hex.slice(0, 6)}`;
+};
+
+/**
+ * The brand colour from the site's CSS, when it publishes no theme-color: a
+ * custom property named like one (`--primary`, `--brand`, `--accent`), else
+ * the most used saturated colour, counting buttons and links three times.
+ * Reads inline styles and up to two same-site stylesheets.
+ */
+async function accentFromCss(root: HTMLElement, base: string, doFetch: typeof fetch): Promise<string | null> {
+  const css: string[] = root.querySelectorAll('style').map((el) => el.text);
+  css.push(root.querySelectorAll('[style]').map((el) => el.getAttribute('style') ?? '').join(';'));
+  const sheets = root
+    .querySelectorAll('link[rel="stylesheet"]')
+    .map((el) => absolute(el.getAttribute('href'), base))
+    .filter((href): href is string => Boolean(href) && sameSite(href!, base))
+    .slice(0, 2);
+  for (const sheet of sheets) {
+    const text = await (await get(doFetch, sheet, 5000))?.text().catch(() => '');
+    if (text) css.push(text.slice(0, 400_000));
+  }
+  const all = css.join('\n');
+
+  const named = /--(?:[\w-]*?)(?:primary|brand|accent|theme)(?:-colou?r)?\s*:\s*(#[0-9a-f]{3}(?:[0-9a-f]{3})?)\b/i.exec(all)?.[1];
+  if (named && usableAccent(expandHex(named)) && saturation(expandHex(named)) > 0.2) return usableAccent(expandHex(named));
+
+  const counts = new Map<string, number>();
+  for (const rule of all.split('}')) {
+    const weight = /\b(btn|button|primary|accent|brand|cta)\b|(^|[\s,}])a(:hover)?\s*\{/i.test(rule) ? 3 : 1;
+    for (const match of rule.matchAll(/#[0-9a-f]{6}\b|#[0-9a-f]{3}\b/gi)) {
+      const hex = expandHex(match[0]);
+      if (!usableAccent(hex) || saturation(hex) < 0.25) continue;
+      counts.set(hex, (counts.get(hex) ?? 0) + weight);
+    }
+  }
+  const best = [...counts].sort((a, b) => b[1] - a[1])[0];
+  return best && best[1] >= 2 ? usableAccent(best[0]) : null;
+}
+
 export async function inspectSite(input: string, doFetch: typeof fetch = fetch): Promise<SiteInfo> {
   const url = normalizeUrl(input);
   const response = await get(doFetch, url);
@@ -208,6 +258,8 @@ export async function inspectSite(input: string, doFetch: typeof fetch = fetch):
       info.accent = usableAccent((body as { theme_color?: string } | null)?.theme_color);
     }
   }
+
+  if (!info.accent) info.accent = await accentFromCss(root, finalUrl, doFetch);
 
   const icon =
     root.querySelector('link[rel="apple-touch-icon"]')?.getAttribute('href') ??

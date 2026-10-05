@@ -9,8 +9,12 @@ import { Conversations } from './pages/Conversations';
 import { Leads } from './pages/Leads';
 import { Login } from './pages/Login';
 import { Overview } from './pages/Overview';
+import { Home } from './pages/Home';
 import { Prompt } from './pages/Prompt';
 import { Settings } from './pages/Settings';
+import { Knowledge } from './pages/Knowledge';
+import { Onboarding } from './pages/Onboarding';
+import { Setup, SignIn } from './pages/Setup';
 
 function App() {
   const [me, setMe] = useState<Me | null | 'signed-out'>(null);
@@ -32,6 +36,9 @@ function App() {
       </div>
     );
   }
+  // One-time links work signed out: claim a fresh deployment, or sign in without a password.
+  if (route.page === 'setup' && route.id && me === 'signed-out') return <Setup token={route.id} onDone={load} />;
+  if (route.page === 'signin' && route.id) return <SignIn token={route.id} onDone={load} />;
   if (me === 'signed-out') return <Login onDone={load} />;
 
   const logout = async () => {
@@ -41,11 +48,14 @@ function App() {
 
   return (
     <Shell me={me} route={route} onLogout={() => void logout()}>
-      {route.page === 'overview' && <Overview />}
+      {route.page === 'home' && <Home me={me} />}
+      {route.page === 'analytics' && <Overview me={me} />}
       {route.page === 'conversations' && <Conversations id={route.id} me={me} />}
       {route.page === 'leads' && <Leads />}
       {route.page === 'prompt' && <Prompt me={me} />}
-      {route.page === 'settings' && <Settings me={me} />}
+      {route.page === 'settings' && <Settings me={me} section={route.id} />}
+      {route.page === 'knowledge' && <Knowledge me={me} />}
+      {(route.page === 'onboarding' || route.page === 'setup') && <Onboarding me={me} />}
     </Shell>
   );
 }

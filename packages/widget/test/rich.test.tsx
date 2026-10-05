@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/preact';
 import type { Message } from '@murmur/protocol';
 import { MessageView, inertHandlers, type MessageHandlers } from '../src/components/messages/index.js';
 
-/** The rich message types from §4.4, added in M4. */
+/** The rich message types. */
 
 function setup(message: Message, overrides: Partial<MessageHandlers> = {}) {
   const handlers: MessageHandlers = {

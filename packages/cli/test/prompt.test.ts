@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
-import { DASHBOARD_SCHEMA, promptHash } from '@murmur/server';
+import { MIGRATIONS, promptHash } from '@murmur/server';
 import type { CloudflareApi } from '../src/engine/cloudflare.js';
 import { parseProject } from '../src/engine/project.js';
 import { driftError, promptSync, pullPrompt, readLivePrompt, recordPublish, type Remote } from '../src/engine/prompt.js';
@@ -43,7 +43,7 @@ describe('promptSync', () => {
 function deployment(options: { dashboard?: boolean } = {}) {
   const kv = new Map<string, string>();
   const db = new DatabaseSync(':memory:');
-  for (const sql of DASHBOARD_SCHEMA) db.exec(sql);
+  for (const migration of MIGRATIONS) for (const sql of migration.statements) db.exec(sql);
   const api = {
     kvGet: async (_a: string, _n: string, key: string) => kv.get(key) ?? null,
     d1Query: async (_a: string, _d: string, sql: string, params: unknown[] = []) => {

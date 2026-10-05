@@ -5,13 +5,13 @@ import { parseConfig, parseMessages } from './validate.js';
 import type { SendInput, Session, WidgetError } from './store.js';
 import type { WidgetConfig } from '@murmur/protocol';
 
-/** §8.3: config gets 6s, a message send gets 30s. Nothing is unbounded. */
+/** Fail-safe: config gets 6s, a message send gets 30s. Nothing is unbounded. */
 export const CONFIG_TIMEOUT_MS = 6000;
 export const SEND_TIMEOUT_MS = 30_000;
 
 const TOKEN_HEADER = 'x-murmur-token';
 
-export type Capabilities = { poll: boolean; end: boolean; stream: boolean };
+export type Capabilities = { poll: boolean; end: boolean; stream: boolean; feedback?: boolean };
 
 export type ConfigResult = {
   config: WidgetConfig;
@@ -148,7 +148,7 @@ export class Api {
   }
 
   /**
-   * A failure here is fatal — the widget hides (§8.3) — so this throws rather
+   * A failure here is fatal — the widget hides — so this throws rather
    * than returning a partial config.
    */
   async getConfig(): Promise<ConfigResult> {
@@ -164,11 +164,11 @@ export class Api {
     const widget = parseConfig((body as { widget?: unknown } | null)?.widget);
     if (!widget) throw new ApiError({ code: 'internal', message: 'Bad config', retryable: false });
 
-    const raw = (body as { capabilities?: { poll?: unknown; end?: unknown; stream?: unknown } } | null)
+    const raw = (body as { capabilities?: { poll?: unknown; end?: unknown; stream?: unknown; feedback?: unknown } } | null)
       ?.capabilities;
     return {
       config: widget,
-      capabilities: { poll: raw?.poll === true, end: raw?.end === true, stream: raw?.stream === true },
+      capabilities: { poll: raw?.poll === true, end: raw?.end === true, stream: raw?.stream === true, feedback: raw?.feedback === true },
     };
   }
 
@@ -246,6 +246,25 @@ export class Api {
       messages: parseMessages(body['messages']),
       ...(refreshed ? { token: refreshed } : {}),
     };
+  }
+
+  /** A thumbs up (1), down (-1) or taken back (0). Fire-and-forget, like `end`. */
+  rate(token: string, messageId: string, value: 1 | -1 | 0): void {
+    try {
+      void fetchWithTimeout(
+        this.url('/v1/sessions/feedback'),
+        {
+          method: 'POST',
+          credentials: 'omit',
+          mode: 'cors',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ messageId, value }),
+        },
+        SEND_TIMEOUT_MS,
+      ).catch(() => {});
+    } catch {
+      // A rating is never worth an error in front of the visitor.
+    }
   }
 
   /** Fire-and-forget: nothing waits on it and nothing reports its failure. */

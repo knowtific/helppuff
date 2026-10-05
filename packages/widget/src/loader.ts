@@ -4,10 +4,10 @@ import { LOADER_CSS, accentCss, launcherMarkup } from './launcher-shell.js';
 import { fetchConfig, launcherHints, type LauncherHints, type RawConfig } from './loader-config.js';
 
 /**
- * The loader (§8.4). Under 4 kb gzipped, no Preact: it puts a launcher on the
+ * The loader. Under 4 kb gzipped, no Preact: it puts a launcher on the
  * page, fetches the config, and pulls in the app on the first sign of intent.
  *
- * It also owns the fail-safe contract (§8.3). Every path through this file
+ * It also owns the fail-safe contract. Every path through this file
  * either results in a working widget or in `hide()` — never in an exception
  * reaching the host page, and never in a visible broken element.
  *
@@ -39,7 +39,7 @@ export type Runtime = {
    * fields the launcher needed.
    */
   rawConfig: unknown;
-  capabilities: { poll: boolean; end: boolean; stream: boolean };
+  capabilities: { poll: boolean; end: boolean; stream: boolean; feedback?: boolean };
   disposer: Disposer;
   version: string;
   /** Tear everything down, silently. */
@@ -53,7 +53,7 @@ const HOST_TAG = 'murmur-widget';
 
 /**
  * Inline styles on the host element, so no page stylesheet can reach it
- * (inline beats any non-important document rule) (§8.2).
+ * (inline beats any non-important document rule).
  *
  * The host covers the viewport but is `pointer-events: none`, with only the
  * widget's own surfaces re-enabling them. A zero-sized host with fixed
@@ -147,7 +147,7 @@ function appUrlFrom(script: HTMLScriptElement | null): string {
 
 /**
  * Leave `window.Murmur` callable and inert, so host-page code that calls
- * `Murmur.open()` never throws (§8.3).
+ * `Murmur.open()` never throws.
  */
 function inertGlobal(): void {
   const stub: MurmurGlobal = { __loaded: true };
@@ -168,7 +168,7 @@ function fail(reason: string): void {
 }
 
 function boot(): void {
-  // Guard against the script tag appearing twice (§8.2).
+  // Guard against the script tag appearing twice.
   if ((window as { Murmur?: MurmurGlobal }).Murmur?.__loaded) return log('already loaded');
 
   const script = findScript();
@@ -219,7 +219,7 @@ class Loader {
 
   /**
    * One factory covers every command: forward it to the app, or queue it and
-   * start loading. Nothing here can throw into the host page (§8.3).
+   * start loading. Nothing here can throw into the host page.
    */
   private command(name: Method) {
     return (...args: unknown[]): undefined => {
@@ -292,7 +292,7 @@ class Loader {
     try {
       result = await fetchConfig(this.apiBase, this.siteId);
     } catch (error) {
-      // A config that fails, times out or is malformed is fatal (§8.3).
+      // A config that fails, times out or is malformed is fatal.
       log('config_failed', error);
       return this.hide('config_failed');
     }
@@ -307,7 +307,7 @@ class Loader {
    * The launcher is rendered only once the config has arrived. Painting it
    * earlier would risk an orb in the wrong colour, or on a path where
    * `hideOnPaths` says it does not belong — and then removing it, which is
-   * the visible flash §8.3 forbids. The launcher is `position: fixed`, so
+   * the visible flash the fail-safe forbids. The launcher is `position: fixed`, so
    * waiting costs no layout shift either way.
    */
   private mountShell(): void {
@@ -318,6 +318,7 @@ class Loader {
       const host = document.createElement(HOST_TAG);
       host.setAttribute('style', HOST_STYLE);
       host.setAttribute('data-theme', this.script?.getAttribute('data-theme') ?? hints.theme);
+      if (this.script?.hasAttribute('data-fill')) host.setAttribute('data-fill', '');
 
       const root = host.attachShadow({ mode: 'open' });
       applyStyles(root, LOADER_CSS + accentCss(hints));
@@ -351,7 +352,7 @@ class Loader {
     const button = shell.querySelector('button');
 
     if (button) {
-      // Any of these means the visitor is about to need the app (§8.4).
+      // Any of these means the visitor is about to need the app.
       const warm = () => void this.ensureApp();
       this.disposer.listen(button, 'pointerdown', warm);
       this.disposer.listen(button, 'mouseenter', warm);
@@ -364,7 +365,7 @@ class Loader {
   }
 
   /**
-   * Load while the page is idle, so the first click is instant (§8.4).
+   * Load while the page is idle, so the first click is instant.
    *
    * A teaser is drawn by the app, so the chunk has to be in place before its
    * trigger fires — otherwise a 2s teaser would not appear until 6s. Scroll
@@ -415,7 +416,7 @@ class Loader {
 
     let handle: AppHandle;
     try {
-      // A failed import — offline, CSP, network — is fatal (§8.3).
+      // A failed import — offline, CSP, network — is fatal.
       const module = await import(/* @vite-ignore */ this.appUrl);
       const mount = (module as { mount?: (r: Runtime) => AppHandle }).mount;
       if (typeof mount !== 'function') return this.hide('app_missing_mount');
@@ -444,7 +445,7 @@ class Loader {
   }
 
   /**
-   * What "hide" means exactly (§8.3): the host element goes, every listener
+   * What "hide" means exactly: the host element goes, every listener
    * and timer goes, `window.Murmur` stays callable and inert, nothing is
    * written to the console, localStorage is left untouched so a later page
    * load can still restore, and nothing is retried in this page view.

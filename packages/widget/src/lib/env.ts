@@ -1,5 +1,5 @@
 /**
- * Feature detection, never user-agent sniffing (§8.3). A browser missing any
+ * Feature detection, never user-agent sniffing. A browser missing any
  * of these simply never sees the launcher, which is the correct outcome: no
  * widget beats a broken one.
  */
@@ -22,7 +22,7 @@ export function isSupported(): boolean {
   }
 }
 
-/** `?mmdebug=1` turns on console logging for this page view only (§8.3). */
+/** `?mmdebug=1` turns on console logging for this page view only. */
 export function debugEnabled(): boolean {
   try {
     return new URLSearchParams(location.search).get('mmdebug') === '1';
@@ -47,14 +47,6 @@ export function log(event: string, data?: unknown): void {
     console.log(`[murmur] ${event}`, data ?? '');
   } catch {
     // A host page that broke console is not our problem to solve.
-  }
-}
-
-export function prefersReducedMotion(): boolean {
-  try {
-    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  } catch {
-    return false;
   }
 }
 

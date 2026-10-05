@@ -23,3 +23,29 @@ describe('the agent skill', () => {
     for (const command of new Set(used)) expect(Object.keys(COMMAND_HELP), command).toContain(command);
   });
 });
+
+describe('the package AGENTS.md', () => {
+  it('is the generated agent guide — run `pnpm sync:plugin` after editing help.ts', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const { agentsGuide } = await import('../src/help.js');
+    expect(readFileSync(join(__dirname, '..', 'AGENTS.md'), 'utf8')).toBe(agentsGuide());
+  });
+
+  it('keeps the wiki\'s generated pages current — run `pnpm sync:plugin` after editing help.ts or a schema', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const { cliReferencePage } = await import('../src/help.js');
+    const { configReferencePage } = await import('../src/engine/reference.js');
+    const wiki = join(__dirname, '..', '..', '..', 'wiki');
+    expect(readFileSync(join(wiki, 'CLI-Reference.md'), 'utf8')).toBe(cliReferencePage());
+    expect(readFileSync(join(wiki, 'Configuration-Reference.md'), 'utf8')).toBe(configReferencePage());
+  });
+
+  it('documents every command and exit code', async () => {
+    const { agentsGuide, COMMAND_HELP } = await import('../src/help.js');
+    const guide = agentsGuide();
+    for (const name of Object.keys(COMMAND_HELP)) expect(guide).toContain(`### \`murmur ${name}\``);
+    for (const code of ['`0` ok', '`2` bad usage', '`3` auth', '`4` Cloudflare quota', '`10` needs_input']) expect(guide).toContain(code);
+  });
+});

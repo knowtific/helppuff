@@ -2,12 +2,13 @@ import { Hono } from 'hono';
 import type { ConfigResponse } from '@murmur/protocol';
 import { resolveSite } from '../config/site.js';
 import { getConnector } from '../core/registry.js';
+import { dbFrom } from '../db/d1.js';
 import { capabilitiesOf, prepareConnector } from '../core/run.js';
 import type { HonoEnv, RequestCtx } from '../core/request.js';
 import type { SiteConfig } from '../config/schema.js';
 import type { Platform } from '../core/platform.js';
 
-/** Public config is cacheable at the edge for 5 minutes (§5.1). */
+/** Public config is cacheable at the edge for 5 minutes. */
 const CACHE_CONTROL = 'public, max-age=60, s-maxage=300';
 
 /**
@@ -44,7 +45,7 @@ function captchaFor(
  */
 function capabilitiesFor(ctx: RequestCtx, site: SiteConfig): ConfigResponse['capabilities'] {
   try {
-    return capabilitiesOf(prepareConnector(ctx, site));
+    return capabilitiesOf(prepareConnector(ctx, site), Boolean(dbFrom(ctx.env)));
   } catch {
     return { ...getConnector(site.connector.type).capabilities, stream: false };
   }

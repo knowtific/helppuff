@@ -2,7 +2,7 @@ import { launcherIconSvg } from './lib/icons.js';
 import type { LauncherHints } from './loader-config.js';
 
 /**
- * The launcher the loader paints before Preact exists (§8.4). The app renders
+ * The launcher the loader paints before Preact exists. The app renders
  * the same markup and reuses this stylesheet, so the handoff is invisible.
  *
  * Kept small and string-based: this is the only CSS in the loader's budget.
@@ -40,7 +40,7 @@ export const LOADER_CSS = `
  * rules outrank :host for the host element, and the host's own inline
  * 'all: initial' outranks :host declarations too — so neither is a reliable
  * place to establish the widget's own type. Nothing in the host page can
- * match a shadow-internal element (§8.2).
+ * match a shadow-internal element.
  */
 .mm-root {
   font-family: var(--mm-font, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Roboto, sans-serif);
@@ -111,7 +111,7 @@ svg { display: block; fill: none; }
 .mm-orb:active { transform: scale(.98); }
 .mm-orb svg { width: 24px; height: 24px; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 
-/* The living gradient (§9.2), derived entirely from the accent. */
+/* The living gradient, derived entirely from the accent. */
 @supports (background: color-mix(in oklab, red, blue)) {
   .mm-orb {
     background-image:

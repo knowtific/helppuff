@@ -255,7 +255,7 @@ describe('failures', () => {
     const { ctx: c } = ctx({}, [new Response('backend detail here', { status })]);
     await expect(retell.start(c, start)).rejects.toSatisfy((e: unknown) => {
       if (!isConnectorError(e)) return false;
-      // Retell's own error text must never reach the visitor (§8.3).
+      // Retell's own error text must never reach the visitor.
       return e.retryable === retryable && !e.message.includes('backend detail');
     });
   });

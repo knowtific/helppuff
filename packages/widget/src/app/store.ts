@@ -2,7 +2,7 @@ import type { ErrorCode, Message, WidgetConfig } from '@murmur/protocol';
 import { makeStrings } from './strings.js';
 
 /**
- * §8.5's diagram, encoded as three orthogonal fields rather than one enum.
+ * The widget's states, encoded as three orthogonal fields rather than one enum.
  * `open` is panel visibility, `screen` is what the panel shows, and `status`
  * is the transient in-flight phase. Keeping them apart is what lets a visitor
  * close the panel mid-conversation and reopen it without losing the thread.
@@ -23,7 +23,7 @@ export type WidgetError = {
   retryAfter?: number;
 };
 
-/** A user message shown before the server has acknowledged it (§8.5). */
+/** A user message shown before the server has acknowledged it. */
 export type Pending = {
   clientId: string;
   message: Message;
@@ -35,7 +35,7 @@ export type SendInput =
   | { kind: 'text'; text: string }
   | { kind: 'action'; actionId: string; value: string; label: string };
 
-/** An in-progress client-side flow (§8.7). */
+/** An in-progress client-side flow. */
 export type FlowState = { id: string; step: number; answers: Record<string, string> };
 
 export type State = {
@@ -121,14 +121,14 @@ export type Action =
   | { type: 'expired' }
   | { type: 'reset' };
 
-/** Persisted transcripts are capped so localStorage never grows unbounded (§8.6). */
+/** Persisted transcripts are capped so localStorage never grows unbounded. */
 export const MAX_STORED_MESSAGES = 60;
 
 function capMessages(messages: Message[]): Message[] {
   return messages.length > MAX_STORED_MESSAGES ? messages.slice(-MAX_STORED_MESSAGES) : messages;
 }
 
-/** Whether the lead form has everything it needs to be skipped (§8.7). */
+/** Whether the lead form has everything it needs to be skipped. */
 export function leadIsComplete(config: WidgetConfig | null, lead: Record<string, string> | null): boolean {
   if (!config) return false;
   if (!config.leadForm.enabled) return true;
@@ -258,7 +258,7 @@ export function reducer(state: State, action: Action): State {
       };
 
     case 'session/failed':
-      // Stay on the screen the visitor is on; the error renders inline (§8.3).
+      // Stay on the screen the visitor is on; the error renders inline.
       return { ...state, status: 'idle', error: action.error, preview: '' };
 
     case 'stream/text':
@@ -307,7 +307,7 @@ export function reducer(state: State, action: Action): State {
         status: pending.length > 0 ? 'sending' : 'idle',
         preview: '',
         error: action.error,
-        // Hand a failed text message back to the composer rather than losing it (§8.3).
+        // Hand a failed text message back to the composer rather than losing it.
         draft: failed?.input.kind === 'text' && !state.draft ? failed.input.text : state.draft,
       };
     }

@@ -1,50 +1,6 @@
 import { log } from './env.js';
 
 /**
- * Nothing the widget exposes to a host page may ever throw into it (§8.3).
- * These wrappers are the boundary: every public method, every listener and
- * every timer callback goes through one of them.
- */
-
-export function safe<A extends unknown[], R>(
-  name: string,
-  fn: (...args: A) => R,
-  onError?: (error: unknown) => void,
-): (...args: A) => R | undefined {
-  return (...args: A) => {
-    try {
-      return fn(...args);
-    } catch (error) {
-      log(`caught:${name}`, error);
-      try {
-        onError?.(error);
-      } catch {
-        // An error handler that itself throws must not escape either.
-      }
-      return undefined;
-    }
-  };
-}
-
-export async function safeAsync<T>(
-  name: string,
-  fn: () => Promise<T>,
-  onError?: (error: unknown) => void,
-): Promise<T | undefined> {
-  try {
-    return await fn();
-  } catch (error) {
-    log(`caught:${name}`, error);
-    try {
-      onError?.(error);
-    } catch {
-      // As above.
-    }
-    return undefined;
-  }
-}
-
-/**
  * Timers, listeners and observers registered here are all removed by one
  * `dispose()` — the same path `Murmur.destroy()` and a fatal `hide()` take.
  */
@@ -104,7 +60,7 @@ export class Disposer {
 }
 
 /**
- * Every fetch is bounded (§8.3): 6s for config, 30s for a message. No
+ * Every fetch is bounded: 6s for config, 30s for a message. No
  * unbounded retry and no backoff loop that outlives the page view.
  */
 export async function fetchWithTimeout(

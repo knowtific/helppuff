@@ -32,7 +32,7 @@ export function Header({
         <div class="mm-header-status">{thinking ? t('thinking') : t('status')}</div>
       </div>
 
-      <button type="button" class="mm-icon-btn" aria-label={t('close')} onClick={onClose}>
+      <button type="button" class="mm-icon-btn mm-close" aria-label={t('close')} onClick={onClose}>
         <Icon name="close" />
       </button>
     </header>

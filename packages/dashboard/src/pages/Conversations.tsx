@@ -1,4 +1,4 @@
-import { ArrowLeft, ExternalLink, Loader2, Mail, MessagesSquare, Phone, Search, Sparkles } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Loader2, Mail, MessagesSquare, Phone, Search, Sparkles, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { useState } from 'react';
 import { PageHeader } from '../components/Shell';
 import { Avatar, Badge, Button, Card, Empty, ErrorNote, Input, Segmented, Skeleton, StatusBadge } from '../components/ui';
@@ -75,7 +75,19 @@ function Bubble({ message }: { message: StoredMessage }) {
           ))}
         </div>
       )}
-      <span className="px-1 text-[10px] text-muted-foreground">{fmtTime(message.ts)}</span>
+      <span className="flex items-center gap-1.5 px-1 text-[10px] text-muted-foreground">
+        {fmtTime(message.ts)}
+        {message.feedback === 1 && (
+          <span className="inline-flex items-center gap-0.5 text-foreground">
+            <ThumbsUp className="size-3" aria-hidden /> Helpful
+          </span>
+        )}
+        {message.feedback === -1 && (
+          <span className="inline-flex items-center gap-0.5 text-danger">
+            <ThumbsDown className="size-3" aria-hidden /> Not helpful
+          </span>
+        )}
+      </span>
     </div>
   );
 }

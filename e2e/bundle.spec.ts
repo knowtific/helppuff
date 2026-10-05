@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 
 /**
- * §11's size budgets, asserted against the real production bundles. Run
+ * The size budgets, asserted against the real production bundles. Run
  * `pnpm --filter @murmur/widget build` first; the suite skips if dist/ is
  * absent so a fresh clone does not fail on a missing artefact.
  */
@@ -41,7 +41,7 @@ test.describe('bundle budgets', () => {
   test('the widget bundles no markdown, state or animation library', () => {
     const app = readdirSync(DIST).find((f) => /^app-.*\.js$/.test(f)) as string;
     const source = readFileSync(join(DIST, app), 'utf8');
-    // Zod would cost a third of the budget (§13) — the widget validates by hand.
+    // Zod would cost a third of the budget — the widget validates by hand.
     expect(source).not.toContain('ZodError');
     expect(source).not.toContain('zod');
   });

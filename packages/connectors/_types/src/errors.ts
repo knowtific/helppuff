@@ -2,7 +2,7 @@ import type { ErrorCode } from '@murmur/protocol';
 
 /**
  * The only error a connector should throw. `message` is shown to the visitor,
- * so it must never contain a backend's raw error text (§8.3).
+ * so it must never contain a backend's raw error text.
  */
 export class ConnectorError extends Error {
   readonly code: ErrorCode;

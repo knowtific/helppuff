@@ -1,4 +1,4 @@
-import { CliError } from '../errors.js';
+import { CliError, EXIT } from '../errors.js';
 
 /**
  * The slice of the Cloudflare REST API setup needs, over plain fetch.
@@ -20,10 +20,11 @@ const API = 'https://api.cloudflare.com/client/v4';
 export const TOKEN_PERMISSIONS = [
   'Account › Workers Scripts › Edit',
   'Account › Workers KV Storage › Edit',
-  'Account › AI Search › Edit',
-  'Account › AI Search › Run',
   'Account › D1 › Edit',
+  'Account › Vectorize › Edit',
   'Account › Account Settings › Read',
+  'Account › AI Search › Edit (only for the Cloudflare AI Search backend)',
+  'Account › AI Search › Run (only for the Cloudflare AI Search backend)',
 ];
 
 export const TOKEN_HELP = [
@@ -206,6 +207,78 @@ export class CloudflareApi {
     return out.result?.[0]?.results ?? [];
   }
 
+  async deleteD1Database(accountId: string, databaseId: string): Promise<void> {
+    await this.call('DELETE', `/accounts/${accountId}/d1/database/${databaseId}`);
+  }
+
+  // ------------------------------------------------------------ Vectorize
+  // developers.cloudflare.com/api/resources/vectorize (checked 2026-10-04):
+  //   POST   /vectorize/v2/indexes                       { name, config: { dimensions, metric } }
+  //   GET    /vectorize/v2/indexes/{name}
+  //   DELETE /vectorize/v2/indexes/{name}
+  //   POST   /vectorize/v2/indexes/{name}/metadata_index/create   { propertyName, indexType }
+  //   GET    /vectorize/v2/indexes/{name}/metadata_index/list
+
+  async vectorizeIndex(accountId: string, name: string): Promise<{ name: string; dimensions: number; metric: string } | null> {
+    try {
+      const out = await this.call<{ name: string; config?: { dimensions?: number; metric?: string } }>(
+        'GET',
+        `/accounts/${accountId}/vectorize/v2/indexes/${encodeURIComponent(name)}`,
+      );
+      return { name: out.result.name, dimensions: out.result.config?.dimensions ?? 0, metric: out.result.config?.metric ?? '' };
+    } catch (thrown) {
+      if (thrown instanceof CliError && (thrown.details?.['status'] === 404 || thrown.details?.['status'] === 410)) return null;
+      throw thrown;
+    }
+  }
+
+  /** Find or create the index, and the metadata index on `category`. Refuses an index with the wrong vector size. */
+  async ensureVectorizeIndex(accountId: string, name: string, dimensions: number): Promise<{ created: boolean }> {
+    const existing = await this.vectorizeIndex(accountId, name);
+    if (existing && existing.dimensions && existing.dimensions !== dimensions) {
+      throw new CliError('vectorize_dimensions', `The Vectorize index ${name} stores ${existing.dimensions}-dimension vectors; the embedding model makes ${dimensions}.`, {
+        hint: `Use the embedding model the index was made for, or delete the index (\`npx wrangler vectorize delete ${name}\`) and deploy again — the next crawl refills it.`,
+      });
+    }
+    if (!existing) {
+      await this.call('POST', `/accounts/${accountId}/vectorize/v2/indexes`, {
+        json: { name, description: 'Murmur knowledge base', config: { dimensions, metric: 'cosine' } },
+      });
+    }
+    const listed = await this.call<{ metadataIndexes?: { propertyName?: string }[] }>(
+      'GET',
+      `/accounts/${accountId}/vectorize/v2/indexes/${encodeURIComponent(name)}/metadata_index/list`,
+    ).catch(() => null);
+    if (!listed?.result?.metadataIndexes?.some((m) => m.propertyName === 'category')) {
+      await this.call('POST', `/accounts/${accountId}/vectorize/v2/indexes/${encodeURIComponent(name)}/metadata_index/create`, {
+        json: { propertyName: 'category', indexType: 'string' },
+      });
+    }
+    return { created: !existing };
+  }
+
+  async deleteVectorizeIndex(accountId: string, name: string): Promise<void> {
+    await this.call('DELETE', `/accounts/${accountId}/vectorize/v2/indexes/${encodeURIComponent(name)}`);
+  }
+
+  // ------------------------------------------------------------ teardown
+
+  async deleteWorker(accountId: string, name: string): Promise<void> {
+    await this.call('DELETE', `/accounts/${accountId}/workers/scripts/${name}?force=true`);
+  }
+
+  async deleteWorkflow(accountId: string, name: string): Promise<void> {
+    await this.call('DELETE', `/accounts/${accountId}/workflows/${encodeURIComponent(name)}`);
+  }
+
+  async deleteKvNamespace(accountId: string, namespaceId: string): Promise<void> {
+    await this.call('DELETE', `/accounts/${accountId}/storage/kv/namespaces/${namespaceId}`);
+  }
+
+  async deleteAiSearchInstance(accountId: string, id: string): Promise<void> {
+    await this.call('DELETE', this.aiSearch(accountId, `/${id}`));
+  }
+
   // ------------------------------------------------------------ AI Search
 
   private aiSearch(accountId: string, suffix = ''): string {
@@ -333,6 +406,8 @@ function cloudflareError(
   const details = { status, method, path: path.replace(/\/accounts\/[0-9a-f]{32}/, '/accounts/…'), errors };
   const area = /\/d1\//.test(path)
     ? 'D1 › Edit'
+    : /vectorize/.test(path)
+    ? 'Vectorize › Edit'
     : /ai-search/.test(path)
     ? 'AI Search › Edit and AI Search › Run'
     : /storage\/kv/.test(path)
@@ -345,6 +420,14 @@ function cloudflareError(
     return new CliError('cloudflare_permission', `Cloudflare refused ${method} ${details.path}: ${message}`, {
       hint: `The API token needs the "${area}" permission. Edit it at https://dash.cloudflare.com/profile/api-tokens`,
       details,
+      exitCode: EXIT.auth,
+    });
+  }
+  if (/\b(limit|quota|exceeded|maximum number)\b/i.test(message) && status !== 404) {
+    return new CliError('cloudflare_limit', `Cloudflare ${method} ${details.path}: ${message}`, {
+      hint: 'A plan limit was reached. Remove unused resources, or check your plan at https://dash.cloudflare.com.',
+      details,
+      exitCode: EXIT.quota,
     });
   }
   if (status === 404) {

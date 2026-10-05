@@ -5,6 +5,7 @@ import { Links } from './Links.js';
 import { NoticeMessage } from './Notice.js';
 import { OptionsMessage } from './Options.js';
 import { TextMessage, UserMessage } from './Text.js';
+import { Rating } from './Rating.js';
 
 /** What a message needs from the app to be interactive. */
 export type MessageHandlers = {
@@ -16,6 +17,8 @@ export type MessageHandlers = {
   onFormSubmit: (message: Message, value: string, label: string) => void;
   /** Whether this message has already been answered. */
   isConsumed: (message: Message) => boolean;
+  /** Thumbs up/down on a reply, when the server records ratings. */
+  rating?: { get: (message: Message) => number; set: (message: Message, value: 1 | -1 | 0) => void; labels: [string, string] } | undefined;
 };
 
 /**
@@ -31,7 +34,7 @@ export const inertHandlers: MessageHandlers = {
 
 /**
  * The renderer switch. An unknown type renders nothing rather than throwing
- * (§8.3) — that is what lets a newer server talk to an older widget.
+ * — that is what lets a newer server talk to an older widget.
  */
 export function MessageView({ message, handlers }: { message: Message; handlers: MessageHandlers }) {
   if (message.role === 'user' && message.type === 'text') {
@@ -42,7 +45,14 @@ export function MessageView({ message, handlers }: { message: Message; handlers:
 
   switch (message.type) {
     case 'text':
-      return <TextMessage text={message.text} />;
+      return handlers.rating && message.role === 'agent' && !Number.isNaN(handlers.rating.get(message)) ? (
+        <>
+          <TextMessage text={message.text} />
+          <Rating value={handlers.rating.get(message)} labels={handlers.rating.labels} onRate={(value) => handlers.rating!.set(message, value)} />
+        </>
+      ) : (
+        <TextMessage text={message.text} />
+      );
 
     case 'notice':
       return <NoticeMessage text={message.text} {...(message.tone ? { tone: message.tone } : {})} />;
@@ -94,7 +104,7 @@ export function MessageView({ message, handlers }: { message: Message; handlers:
 /**
  * Whether this build can actually draw the message.
  *
- * §8.3 says an unrenderable message renders nothing — which has to mean no
+ * The fail-safe says an unrenderable message renders nothing — which has to mean no
  * row at all. Emitting an empty wrapper still costs a fade-in animation, a
  * gap and a timestamp, so the visitor sees something flash and disappear.
  */
@@ -104,7 +114,7 @@ export function canRender(message: Message): boolean {
   return DRAWABLE.has(message.type);
 }
 
-/** Whether two adjacent messages should be visually grouped (§8.7). */
+/** Whether two adjacent messages should be visually grouped. */
 export function isGrouped(previous: Message | undefined, current: Message): boolean {
   if (!previous) return false;
   if (previous.role !== current.role) return false;

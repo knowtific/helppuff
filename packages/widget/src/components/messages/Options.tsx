@@ -6,7 +6,7 @@ import { renderMarkdown } from '../../lib/markdown.js';
 type OptionsMsg = Extract<Message, { type: 'options' }>;
 
 /**
- * Option chips (§8.7). Tapping one sends it as an `action`; once answered the
+ * Option chips. Tapping one sends it as an `action`; once answered the
  * chips go disabled so the thread still reads as a record of what was on
  * offer. A `multi` message collects a set and confirms once.
  */

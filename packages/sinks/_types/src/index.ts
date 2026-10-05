@@ -2,7 +2,7 @@ import type { z } from 'zod';
 import type { Lead, VisitorContext } from '@murmur/protocol';
 
 /**
- * A lead destination (§6.6). Sinks run after the lead is accepted, via
+ * A lead destination. Sinks run after the lead is accepted, via
  * `waitUntil`, so they never block the visitor — and a failure is logged and
  * never surfaces to them.
  */
@@ -21,7 +21,7 @@ export type SinkContext<Opts> = {
   options: Opts;
   siteId: string;
   fetch: typeof fetch;
-  /** Structured logging. Never receives lead data (§7.2). */
+  /** Structured logging. Never receives lead data. */
   log: (event: string, data?: object) => void;
 };
 
@@ -46,7 +46,7 @@ export function defineSink<Opts>(sink: Sink<Opts>): ErasedSink {
   };
 }
 
-/** HMAC-SHA256 of the body, so a receiver can verify it came from us (§6.4). */
+/** HMAC-SHA256 of the body, so a receiver can verify it came from us. */
 export async function signBody(secret: string, body: string): Promise<string> {
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(

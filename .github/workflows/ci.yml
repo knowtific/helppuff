@@ -35,7 +35,7 @@ jobs:
       - name: Unit and functional tests
         run: pnpm test
 
-      # Also enforces §11's size budgets, so a regression fails the build.
+      # Also enforces the bundle size budgets, so a regression fails the build.
       - name: Build the widget
         run: pnpm build
 

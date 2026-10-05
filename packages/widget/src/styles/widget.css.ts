@@ -1,10 +1,10 @@
 /**
- * Every widget style, as one string (§3). Applied to the shadow root with a
+ * Every widget style, as one string. Applied to the shadow root with a
  * constructable stylesheet, so nothing is ever added to 'document.head' and
- * no 'style-src 'unsafe-inline'' is needed (§8.2).
+ * no 'style-src 'unsafe-inline'' is needed.
  *
  * Logical properties throughout ('inset-inline', 'margin-inline', 'padding-
- * block') so RTL works without a second stylesheet (§8.7).
+ * block') so RTL works without a second stylesheet.
  */
 export const WIDGET_CSS = `
 /* ---------------------------------------------------------------- panel */
@@ -96,7 +96,7 @@ export const WIDGET_CSS = `
 .mm-header-status { font-size: var(--mm-text-xs); color: var(--mm-text-3); }
 
 .mm-icon-btn {
-  /* §8.7: every target is at least 44x44. */
+  /* Accessibility: every target is at least 44x44. */
   width: 44px; height: 44px; min-width: 44px;
   border-radius: 10px;
   display: grid; place-items: center;
@@ -127,7 +127,7 @@ export const WIDGET_CSS = `
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   /* A platform scrollbar with stepper arrows is louder than anything else in
-     the panel, so the thread draws a quiet one of its own (§9.1). */
+     the panel, so the thread draws a quiet one of its own. */
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--mm-text) 22%, transparent) transparent;
 }
@@ -209,7 +209,7 @@ export const WIDGET_CSS = `
   border-radius: var(--mm-radius-sm);
   background: var(--mm-surface);
   border: 1px solid var(--mm-border);
-  /* 16px minimum stops iOS zooming the page on focus (§8.8). */
+  /* 16px minimum stops iOS zooming the page on focus. */
   font-size: 16px;
   color: var(--mm-text);
   transition: border-color var(--mm-dur-fast), background var(--mm-dur-fast);
@@ -232,8 +232,19 @@ export const WIDGET_CSS = `
   to   { opacity: 1; transform: none; }
 }
 
-/* Agent messages have no bubble — plain text, editorial and calm (§9.4). */
+/* Agent messages have no bubble — plain text, editorial and calm. */
 .mm-agent { max-width: 88%; color: var(--mm-text); font-size: var(--mm-text-md); }
+.mm-rate { display: flex; gap: 2px; margin-top: 4px; }
+.mm-rate-btn {
+  display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0;
+  border: 0; border-radius: var(--mm-radius-sm); background: transparent; color: var(--mm-text-3); cursor: pointer;
+  opacity: .7; transition: opacity var(--mm-dur-fast) var(--mm-ease-out), background var(--mm-dur-fast) var(--mm-ease-out);
+}
+.mm-rate-btn svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.mm-rate-btn:hover, .mm-rate-btn:focus-visible { opacity: 1; background: var(--mm-surface-2); color: var(--mm-text); }
+.mm-rate-btn:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 1px; }
+.mm-rate-btn[aria-pressed="true"] { opacity: 1; color: var(--mm-accent); }
+.mm-rate-btn[aria-pressed="true"] svg { fill: currentColor; fill-opacity: .15; }
 .mm-agent p + p { margin-top: 10px; }
 .mm-agent ul { margin: 8px 0 0; padding-inline-start: 20px; }
 .mm-agent li { margin-top: 4px; }
@@ -340,13 +351,13 @@ a.mm-chip { text-decoration: none; display: inline-flex; align-items: center; ga
 
 /*
  * The scrollbar is hidden, so these are the only affordance a mouse user
- * gets. Touch devices swipe instead and never see them (§8.7).
+ * gets. Touch devices swipe instead and never see them.
  */
 .mm-carousel-nav {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  /* §8.7: every target is at least 44x44, overlay controls included. */
+  /* Accessibility: every target is at least 44x44, overlay controls included. */
   width: 44px;
   height: 44px;
   border-radius: 50%;
@@ -609,13 +620,28 @@ a.mm-chip { text-decoration: none; display: inline-flex; align-items: center; ga
     inset: 0;
     width: 100vw;
     max-width: none;
-    /* dvh follows the iOS toolbar, so the composer stays reachable (§8.8). */
+    /* dvh follows the iOS toolbar, so the composer stays reachable. */
     height: 100dvh;
     border-radius: 0;
     padding-bottom: env(safe-area-inset-bottom);
   }
   .mm-panel[data-keyboard] { height: var(--mm-viewport-h, 100dvh); }
 }
+
+/* ------------------------------------------------------------------ fill */
+
+/* data-fill: the chat is the whole page (the dashboard's test chat, a full-page link). */
+:host([data-fill]) .mm-panel {
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  border-radius: 0;
+  box-shadow: none;
+  animation: none;
+}
+:host([data-fill]) .mm-panel ~ .mm-launcher, :host([data-fill]) .mm-launcher:has(~ .mm-panel) { display: none; }
+:host([data-fill]) .mm-close, :host([data-fill]) .mm-teaser { display: none; }
 
 /* -------------------------------------------------------- reduced motion */
 

@@ -4,7 +4,7 @@ import type { PreparedConnector } from './run.js';
 import type { RequestCtx } from './request.js';
 
 /**
- * Streamed replies (see docs/protocol.md). A route streams only when both
+ * Streamed replies (see wiki/Protocol.md). A route streams only when both
  * sides want it: the client asked with `Accept: text/event-stream`, and the
  * site's connector has streaming turned on. Otherwise it answers with the
  * usual JSON, so a client that asks is never worse off.
@@ -53,7 +53,11 @@ export function streamResponse(
 
   const run = (async () => {
     try {
-      await write('done', await work(onText));
+      const body = await work(onText);
+      // Stage timings, as a comment clients skip: readable with curl or the network panel.
+      await writer.write(encoder.encode(`: timing ${ctx.timing.header()}\n\n`)).catch(() => {});
+      ctx.platform.log('timing', { path, ...ctx.timing.summary() });
+      await write('done', body);
     } catch (thrown) {
       const error = toMurmurError(thrown);
       ctx.platform.log('request.error', { code: error.code, detail: error.detail ?? 'none', path, streamed: true });
@@ -73,4 +77,23 @@ export function streamResponse(
       'X-Accel-Buffering': 'no',
     },
   });
+}
+
+/**
+ * Reply text produced before the stream exists (a gated connector starts
+ * before the limits are known): queued, then flushed when the stream attaches.
+ */
+export function textRelay(): { onText: (delta: string) => void; attach: (target: (delta: string) => void) => void } {
+  let target: ((delta: string) => void) | null = null;
+  const queued: string[] = [];
+  return {
+    onText: (delta) => {
+      if (target) target(delta);
+      else queued.push(delta);
+    },
+    attach: (next) => {
+      target = next;
+      for (const delta of queued.splice(0)) next(delta);
+    },
+  };
 }

@@ -3,7 +3,7 @@ import { ICON_PATHS } from './lib/icons.js';
 import { fetchWithTimeout } from './lib/safe.js';
 
 /**
- * The loader's slice of the config (§8.4). It needs only enough to paint a
+ * The loader's slice of the config. It needs only enough to paint a
  * launcher in the right colour, in the right corner, on the right pages — so
  * it reads those fields directly rather than importing the full validator,
  * which costs more than the loader's entire 4 kb budget.
@@ -38,14 +38,14 @@ export type LauncherHints = {
   teaserOnScroll: boolean;
 };
 
-export type RawConfig = { widget: unknown; capabilities: { poll: boolean; end: boolean; stream: boolean } };
+export type RawConfig = { widget: unknown; capabilities: { poll: boolean; end: boolean; stream: boolean; feedback: boolean } };
 
 const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
 /**
  * Fetch and structurally check the config. A failure, a timeout, a non-2xx or
- * a body that is not shaped like a config is fatal (§8.3) and throws.
+ * a body that is not shaped like a config is fatal and throws.
  */
 export async function fetchConfig(base: string, siteId: string): Promise<RawConfig> {
   const response = await fetchWithTimeout(
@@ -65,6 +65,7 @@ export async function fetchConfig(base: string, siteId: string): Promise<RawConf
       poll: capabilities['poll'] === true,
       end: capabilities['end'] === true,
       stream: capabilities['stream'] === true,
+      feedback: capabilities['feedback'] === true,
     },
   };
 }
@@ -106,7 +107,7 @@ export function launcherHints(widget: unknown): LauncherHints {
 }
 
 /**
- * Black or white, whichever reads better on the accent (§8.7). The full
+ * Black or white, whichever reads better on the accent. The full
  * WCAG helpers live in `lib/color.ts`, in the app chunk; this is the one
  * calculation the loader cannot defer.
  */

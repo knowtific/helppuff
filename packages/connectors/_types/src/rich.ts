@@ -2,7 +2,7 @@ import type { Message } from '@murmur/protocol';
 import { message, messageId } from './helpers.js';
 
 /**
- * Turning a backend's tool/function calls into protocol messages (§6.3).
+ * Turning a backend's tool/function calls into protocol messages.
  *
  * Retell, the OpenAI Responses API and the Gemini Interactions API all let a
  * model call a named function, so one convention covers all three: declare
@@ -17,7 +17,7 @@ import { message, messageId } from './helpers.js';
 
 /**
  * The tool definitions to paste into an agent's configuration. Exported so
- * `docs/connectors.md` and the connector READMEs stay in step with the
+ * `wiki/Providers.md` and the connector READMEs stay in step with the
  * parser rather than drifting from it.
  */
 export const RICH_TOOL_SCHEMAS = {
@@ -124,7 +124,7 @@ const httpUrl = (value: unknown): string | null => {
   }
 };
 
-/** Anything a visitor may be sent to: the protocol's allowed schemes (§4.4). */
+/** Anything a visitor may be sent to: the protocol's allowed schemes. */
 const safeUrl = (value: unknown): string | null => {
   if (typeof value !== 'string') return null;
   try {
@@ -242,19 +242,37 @@ export function toolCallToMessage(name: string, rawArguments: unknown): Message 
 }
 
 /**
- * The inline-marker fallback (§6.3), for an agent that cannot be given tools.
+ * The inline-marker fallback, for an agent that cannot be given tools.
  * A trailing `[[options: A | B | C]]` or `[[link: Label | https://…]]` block
  * is parsed out and stripped; malformed markers are stripped silently rather
  * than shown to the visitor as stray punctuation.
  */
 const MARKER = /\[\[\s*(options|link)\s*:\s*([^\]]*)\]\]/gi;
 
+/**
+ * How earlier replies are written into the history (`summarizeReply`). Models
+ * imitate them: an echoed `[Offered choices: …]` is read as the options it
+ * meant to give, and the others are dropped.
+ */
+const ECHO = /\[(Offered choices|Showed a card|Showed cards|Shared links)\s*:\s*([^\]]*)\]/gi;
+
+/**
+ * Templates from `MARKER_INSTRUCTIONS`, now and before ("A | B | C",
+ * "First choice | Second choice"): a model that copies one is not offering anything.
+ */
+const PLACEHOLDER = /^(?:[A-D]|(?:first|second|third|fourth) (?:choice|option))$/i;
+
 export function parseMarkers(input: string): { text: string; messages: Message[] } {
   const messages: Message[] = [];
   let options: string[] = [];
   const links: { label: string; url: string }[] = [];
 
-  const stripped = input.replace(MARKER, (_match, kind: string, body: string) => {
+  const stripped = input
+    .replace(ECHO, (_match, kind: string, body: string) => {
+      if (kind.toLowerCase() === 'offered choices') options = options.concat(body.split('|').map((part) => part.trim()).filter(Boolean));
+      return '';
+    })
+    .replace(MARKER, (_match, kind: string, body: string) => {
     const parts = body.split('|').map((part) => part.trim()).filter(Boolean);
     if (kind.toLowerCase() === 'options') {
       options = options.concat(parts);
@@ -265,6 +283,7 @@ export function parseMarkers(input: string): { text: string; messages: Message[]
     return '';
   });
 
+  options = options.filter((option) => !PLACEHOLDER.test(option));
   if (options.length > 0) {
     const built = optionsMessage({ options: options.slice(0, 10) });
     if (built) messages.push(built);

@@ -37,11 +37,16 @@ export const retellOptionsSchema = z.object({
   agentVersion: z.union([z.string().min(1), z.number().int().min(0)]).optional(),
   /**
    * Values injected into the agent's prompt, templated from the lead and the
-   * page context — `{{lead.name}}`, `{{context.pageUrl}}` (§5).
+   * page context — `{{lead.name}}`, `{{context.pageUrl}}`.
    */
   dynamicVariables: z.record(z.string().min(1).max(64), z.string().max(500)).optional(),
-  /** Parse `[[options: A | B]]` markers when the agent has no tools (§6.3). */
+  /** Parse `[[options: A | B]]` markers when the agent has no tools. */
   inlineMarkers: z.boolean().default(false),
+  /**
+   * `murmur`: deploy Murmur's knowledge base for this site and let the agent
+   * search it through a custom function at `/v1/sites/<site>/retell/kb`.
+   */
+  retrieval: z.literal('murmur').optional(),
   baseUrl: z.string().url().default(BASE_URL),
 });
 
@@ -71,7 +76,7 @@ async function fail(response: Response, operation: string): Promise<never> {
     {
       retryable,
       ...(response.status === 429 ? { retryAfter: 20 } : {}),
-      // Retell's own text never reaches the visitor (§8.3).
+      // Retell's own text never reaches the visitor.
       detail: `retell_${operation}_${response.status}:${body.slice(0, 200)}`,
     },
   );
@@ -187,7 +192,7 @@ const retell: Connector<RetellOptions, RetellState> = {
   },
 
   async send(ctx, state, input) {
-    // §4.3: the connector acts on an action's value, and the label is what
+    // The connector acts on an action's value, and the label is what
     // the transcript shows — Retell only takes one string, so it gets the
     // value, which is what the agent's prompt is written against.
     const content = contentFor(input);

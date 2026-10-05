@@ -35,7 +35,7 @@ mkdirSync(dist, { recursive: true });
 
 /**
  * The stylesheets live in template literals so they can be handed to
- * `adoptedStyleSheets` (§8.2). esbuild will not touch string contents, so
+ * `adoptedStyleSheets`. esbuild will not touch string contents, so
  * they are minified here instead — worth ~35% of the CSS.
  */
 const minifyCssLiterals = {
@@ -124,7 +124,7 @@ for (const name of readdirSync(dist).filter((f) => f.endsWith('.js'))) {
 writeFileSync(join(dist, 'manifest.json'), JSON.stringify({ version, app: appFile }, null, 2));
 
 /*
- * Headers for the Worker's static assets (§7.3).
+ * Headers for the Worker's static assets.
  *
  * `Access-Control-Allow-Origin` matters more than it looks: the loader is a
  * classic script, which a `<script src>` fetches without CORS — but its
@@ -158,6 +158,6 @@ for (const r of report) {
 console.log('');
 
 if (failed) {
-  console.error('  Size budget exceeded (§11).\n');
+  console.error('  Size budget exceeded.\n');
   process.exit(1);
 }

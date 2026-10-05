@@ -1,6 +1,6 @@
 import { HTTP_STATUS_FOR_ERROR, type ErrorCode, type ErrorEnvelope } from '@murmur/protocol';
 
-/** Default visitor-facing copy. Never leaks a backend's own error text (§8.3). */
+/** Default visitor-facing copy. Never leaks a backend's own error text. */
 const DEFAULT_MESSAGES: Record<ErrorCode, string> = {
   bad_request: 'Something in that request was not quite right.',
   unauthorized: 'This conversation is no longer available.',

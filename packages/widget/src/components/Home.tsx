@@ -16,7 +16,7 @@ export function Home({
   onShortcut,
 }: {
   config: WidgetConfig;
-  /** Already filtered by `paths` for the current page (§8.7). */
+  /** Already filtered by `paths` for the current page. */
   shortcuts: Shortcut[];
   hasSession: boolean;
   lastMessage: Message | undefined;

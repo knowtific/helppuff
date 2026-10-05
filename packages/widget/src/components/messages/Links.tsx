@@ -1,7 +1,7 @@
 import type { LinkItem } from '@murmur/protocol';
 import { Icon } from '../Icon.js';
 
-/** Stacked rows with a title, optional description and an arrow (§8.7). */
+/** Stacked rows with a title, optional description and an arrow. */
 export function Links({ title, links }: { title?: string | undefined; links: LinkItem[] }) {
   return (
     <div class="mm-links">

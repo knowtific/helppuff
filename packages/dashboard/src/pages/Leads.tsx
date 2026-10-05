@@ -98,14 +98,15 @@ export function Leads() {
                     <th className="px-4 py-2 font-medium">Contact</th>
                     <th className="px-4 py-2 font-medium">Status</th>
                     <th className="px-4 py-2 font-medium">Source</th>
-                    <th className="px-4 py-2 font-medium">Added</th>
-                    <th className="px-2 py-2" aria-label="Conversation" />
+                    <th className="px-4 py-2 font-medium">Last active</th>
+                    <th className="px-2 py-2" aria-label="Conversations" />
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {leads.map((lead) => {
-                    const conversation = lead.conversationId ?? lead.conversation_id;
-                    const created = lead.createdAt ?? lead.created_at ?? 0;
+                    const conversation = lead.lastConversationId ?? lead.conversationId ?? lead.conversation_id;
+                    const active = lead.updatedAt ?? lead.createdAt ?? lead.created_at ?? 0;
+                    const chats = lead.conversations ?? 1;
                     return (
                       <Fragment key={lead.id}>
                         <tr className="cursor-pointer hover:bg-subtle" onClick={() => setOpen(open === lead.id ? null : lead.id)}>
@@ -136,11 +137,16 @@ export function Leads() {
                           <td className="px-4 py-2.5">
                             <Badge>{SOURCE[lead.source] ?? lead.source}</Badge>
                           </td>
-                          <td className="px-4 py-2.5 text-muted-foreground">{fmtRelative(created)}</td>
+                          <td className="px-4 py-2.5 text-muted-foreground">{fmtRelative(active)}</td>
                           <td className="px-2 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                             {conversation && (
-                              <a href={href({ page: 'conversations', id: conversation })} className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Open conversation">
+                              <a
+                                href={href({ page: 'conversations', id: conversation })}
+                                className="inline-flex h-7 min-w-7 items-center justify-center gap-1 rounded-md px-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+                                aria-label={chats > 1 ? `Open the latest of ${chats} conversations` : 'Open conversation'}
+                              >
                                 <MessageSquare className="size-4" />
+                                {chats > 1 && <span className="tabular-nums">{chats}</span>}
                               </a>
                             )}
                           </td>

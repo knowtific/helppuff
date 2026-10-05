@@ -8,7 +8,7 @@ export * from './prompt.js';
 export * from './history.js';
 export * from './ai-search.js';
 
-/** A minimal key/value store with TTL — Workers KV in production (§7.3). */
+/** A minimal key/value store with TTL — Workers KV in production. */
 export interface KvStore {
   /** `cacheTtl` is the Workers KV edge cache, in seconds (minimum 60). */
   get(key: string, options?: { cacheTtl?: number }): Promise<string | null>;
@@ -26,7 +26,7 @@ export type ConnectorContext<Opts> = {
   kv: KvStore;
   /** Injected so tests can supply a mock. */
   fetch: typeof fetch;
-  /** Structured logging. Never pass lead data or message text (§7.2). */
+  /** Structured logging. Never pass lead data or message text. */
   log: (event: string, data?: object) => void;
   /** Schedule work that must not block the response. */
   waitUntil: (promise: Promise<unknown>) => void;
@@ -37,10 +37,26 @@ export type ConnectorContext<Opts> = {
    * returns the complete messages at the end, which replace the preview.
    */
   onText?: (delta: string) => void;
+  /**
+   * Hand a lead the conversation produced (a tool call, say) to the server,
+   * which records it for the dashboard and forwards it to the site's lead
+   * destinations. Absent when the server cannot take one; never throws.
+   */
+  reportLead?: (lead: Record<string, string>) => void;
+  /** Report how long a stage took (`rag.embed`, `llm.first_token`…), for the request's Server-Timing. */
+  time?: (stage: string, ms: number) => void;
+  /**
+   * For a `gated` connector: resolves once the request has passed its rate
+   * limits, rejects when it has not. Await it before anything that costs —
+   * the model call — so cheap preparation can overlap the limit check.
+   */
+  gate?: Promise<void>;
 };
 
 export interface Connector<Opts = unknown, State = unknown> {
   type: string;
+  /** Starts before the rate limits are known and awaits `ctx.gate` before its costly call. */
+  gated?: boolean;
   /** Options arrive untyped from the config file, so the input side is `unknown`. */
   optionsSchema: z.ZodType<Opts, z.ZodTypeDef, unknown>;
   capabilities: Capabilities;
@@ -85,6 +101,7 @@ export interface Connector<Opts = unknown, State = unknown> {
  */
 export interface ErasedConnector {
   readonly type: string;
+  readonly gated: boolean;
   readonly capabilities: Capabilities;
   /** Validate raw options from the config file. Throws `ZodError` if invalid. */
   parseOptions(input: unknown): unknown;
@@ -120,6 +137,7 @@ export function defineConnector<Opts, State>(connector: Connector<Opts, State>):
 
   const erased: ErasedConnector = {
     type: connector.type,
+    gated: connector.gated === true,
     capabilities: connector.capabilities,
     parseOptions: (input) => connector.optionsSchema.parse(input),
     streams: (options) => connector.streams?.(options as Opts) ?? false,

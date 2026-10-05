@@ -17,7 +17,7 @@ export const errorCodes = [
 export const errorCodeSchema = z.enum(errorCodes);
 export type ErrorCode = z.infer<typeof errorCodeSchema>;
 
-/** The only error shape any endpoint ever returns (§4). */
+/** The only error shape any endpoint ever returns. */
 export const errorEnvelopeSchema = z.object({
   error: z.object({
     code: errorCodeSchema,
@@ -62,8 +62,11 @@ export const visitorContextSchema = z.object({
 });
 export type VisitorContext = z.infer<typeof visitorContextSchema>;
 
-/** Lead values are always strings; each is capped at 200 chars (§7.1). */
-export const leadSchema = z.record(z.string().min(1).max(64), z.string().max(200));
+/**
+ * Lead values are always strings: short fields are capped at 200
+ * characters by the server's validation, a `textarea` (a message) at 2000.
+ */
+export const leadSchema = z.record(z.string().min(1).max(64), z.string().max(2000));
 export type Lead = z.infer<typeof leadSchema>;
 
 export const startSessionRequestSchema = z.object({
@@ -84,6 +87,8 @@ export const capabilitiesSchema = z.object({
    * plain JSON whenever it will not stream, so asking is always safe.
    */
   stream: z.boolean().optional(),
+  /** Whether replies can be rated (thumbs up/down): the deployment records conversations. */
+  feedback: z.boolean().optional(),
 });
 export type Capabilities = z.infer<typeof capabilitiesSchema>;
 
@@ -126,7 +131,14 @@ export type StreamedSendDone = z.infer<typeof streamedSendDoneSchema>;
 export const pollResponseSchema = z.object({ messages: z.array(messageSchema) });
 export type PollResponse = z.infer<typeof pollResponseSchema>;
 
-/** Response header carrying a refreshed session token (§7.1). */
+/** A visitor rating one of the assistant's replies. `0` takes a rating back. */
+export const feedbackRequestSchema = z.object({
+  messageId: z.string().min(1).max(64),
+  value: z.union([z.literal(1), z.literal(-1), z.literal(0)]),
+});
+export type FeedbackRequest = z.infer<typeof feedbackRequestSchema>;
+
+/** Response header carrying a refreshed session token. */
 export const TOKEN_HEADER = 'X-Murmur-Token';
-/** Request header carrying the HMAC signature for the `http` connector (§6.4). */
+/** Request header carrying the HMAC signature for the `http` connector. */
 export const SIGNATURE_HEADER = 'X-Murmur-Signature';

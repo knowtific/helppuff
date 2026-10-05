@@ -1,12 +1,12 @@
 /**
  * URL safety, with no dependencies — the widget imports this directly so its
- * bundle never pulls in Zod (§13's dependency budget). The Zod wrappers live
+ * bundle never pulls in Zod (the widget's dependency budget). The Zod wrappers live
  * in `url-schema.ts`.
  */
 
 /**
  * The only URL schemes allowed anywhere in the protocol. Everything else is
- * rejected server-side and rendered as plain text client-side (§4.4).
+ * rejected server-side and rendered as plain text client-side.
  */
 export const ALLOWED_SCHEMES = ['https:', 'http:', 'mailto:', 'tel:'] as const;
 

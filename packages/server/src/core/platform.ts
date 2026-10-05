@@ -3,7 +3,7 @@ import type { KvStore } from '@murmur/connector-types';
 /**
  * Everything the core needs from its host. Keeping Worker-only APIs behind
  * this interface is what makes a Node or Vercel adapter a small file rather
- * than a rewrite (§7.3).
+ * than a rewrite.
  */
 export interface Platform {
   kv: KvStore;
@@ -11,7 +11,7 @@ export interface Platform {
   /** Visitor IP, already extracted from the platform's own header. */
   ip: string | null;
   now: () => number;
-  /** Structured logging. Never receives lead data or message text (§7.2). */
+  /** Structured logging. Never receives lead data or message text. */
   log: (event: string, data?: object) => void;
 }
 
@@ -49,7 +49,7 @@ export function memoryKv(): KvStore & { size: () => number } {
 /**
  * A KV binding that is missing or broken must never take the site down: reads
  * return null and writes are dropped. Rate limits degrade open, which is the
- * documented tradeoff — KV is for abuse bounds, never for billing (§7.2).
+ * documented tradeoff — KV is for abuse bounds, never for billing.
  */
 export function resilientKv(kv: KvStore | undefined, log: Platform['log']): KvStore {
   if (!kv) {
@@ -87,7 +87,7 @@ export function resilientKv(kv: KvStore | undefined, log: Platform['log']): KvSt
   };
 }
 
-/** SHA-256 of the IP with a secret salt. Raw IPs never enter a key or a log (§7.2). */
+/** SHA-256 of the IP with a secret salt. Raw IPs never enter a key or a log. */
 export async function hashIp(ip: string | null, salt: string): Promise<string> {
   if (!ip) return 'noip';
   const bytes = new TextEncoder().encode(`${salt}:${ip}`);

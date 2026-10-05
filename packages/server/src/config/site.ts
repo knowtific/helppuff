@@ -20,7 +20,7 @@ import type { Platform } from '../core/platform.js';
  *
  * A stored config that will not parse is ignored rather than fatal: the site
  * falls back to what shipped in the bundle. A bad paste into KV should degrade
- * to the last known-good config, never take a site offline (§8.3).
+ * to the last known-good config, never take a site offline.
  */
 
 export const SITE_CONFIG_PREFIX = 'config:';
@@ -55,6 +55,7 @@ export async function resolveSite(ctx: Ctx, siteId: string): Promise<SiteConfig>
     ...(overrides.sinks ? { sinks: overrides.sinks } : {}),
     ...(overrides.security ? { security: overrides.security } : {}),
     ...(overrides.widget ? { widget: overrides.widget } : {}),
+    ...(overrides.knowledge ? { knowledge: overrides.knowledge } : {}),
   };
 }
 
@@ -70,7 +71,7 @@ function parseStored(stored: string, siteId: string, log: Platform['log']) {
   const result = storedSiteConfigSchema.safeParse(json);
   if (!result.success) {
     // Issue paths name the offending field without echoing its value, which
-    // could be anything — so this stays safe to log (§7.2).
+    // could be anything — so this stays safe to log.
     log('config.kv_invalid', {
       siteId,
       issues: result.error.issues.map((issue) => issue.path.join('.') || '(root)').slice(0, 10),

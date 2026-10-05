@@ -1,7 +1,7 @@
 import type { VisitorContext } from '@murmur/protocol';
 
 /**
- * What the widget tells the server about the page it is sitting on (§4.2).
+ * What the widget tells the server about the page it is sitting on.
  * Every read is guarded: a sandboxed iframe throws on `document.referrer`, and
  * a locked-down browser throws on `Intl`.
  */

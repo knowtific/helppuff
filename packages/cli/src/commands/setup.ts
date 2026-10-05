@@ -3,16 +3,17 @@ import { assertKnown, bool, str } from '../args.js';
 import { CliError } from '../errors.js';
 import { c } from '../output.js';
 import { runtimeVersion, writeWorker } from '../engine/build.js';
-import { writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { openBrowser } from '../engine/browser.js';
 import { compile, DEV_PORT } from '../engine/compile.js';
 import { cloudflareSession } from '../engine/credentials.js';
-import { deploy, type DeployResult } from '../engine/deploy.js';
+import { deploy, type CrawlRequest, type DeployResult } from '../engine/deploy.js';
 import { loadEnv } from '../engine/env.js';
 import { LOGGED_IN, runInit, type InitResult } from '../engine/init.js';
 import { wranglerLogin } from '../engine/wrangler-auth.js';
-import { indexingStatus, syncKnowledge, type IndexingStatus, type SyncResult } from '../engine/knowledge.js';
+import { syncKnowledge, type IndexingStatus, type SyncResult } from '../engine/knowledge.js';
 import { aiSearchInstanceFor, hasKnowledge, loadProject, updateProject } from '../engine/project.js';
 import type { Answers, Question } from '../engine/questions.js';
 import { writeSchemaFile } from '../engine/schema.js';
@@ -40,6 +41,7 @@ async function ask(question: Question): Promise<unknown> {
       p.log.warn('The login did not complete; paste a token instead.');
     }
   }
+  if (question.help && question.kind === 'confirm') p.note(question.help, 'The default setup');
   if (question.help && question.kind === 'secret') p.note(question.id === 'cfToken' ? question.help.split('\n').slice(1).join('\n') : question.help);
   let value: unknown;
   switch (question.kind) {
@@ -86,6 +88,7 @@ function answersFrom(ctx: Ctx): Answers {
   };
   set('website', str(f, 'url'));
   set('name', str(f, 'name'));
+  if (typeof f['defaults'] === 'boolean') answers.defaults = f['defaults'];
   set('backend', str(f, 'backend') as Answers['backend']);
   set('model', str(f, 'model'));
   set('apiKey', str(f, 'api-key'));
@@ -102,7 +105,7 @@ function answersFrom(ctx: Ctx): Answers {
   if (Array.isArray(f['docs'])) answers.docs = f['docs'];
   else if (f['docs'] === false) answers.docs = [];
   set('cfToken', str(f, 'cf-token'));
-  set('cfAccount', str(f, 'cf-account'));
+  set('cfAccount', str(f, 'cf-account') ?? str(f, 'account-id'));
   set('adminEmail', str(f, 'admin-email')?.toLowerCase());
   set('adminPassword', str(f, 'admin-password'));
   if (f['dashboard'] === false) answers.dashboard = false;
@@ -116,11 +119,11 @@ function answersFrom(ctx: Ctx): Answers {
 export async function initCommand(ctx: Ctx): Promise<number> {
   assertKnown(
     ctx.flags,
-    ['url', 'name', 'backend', 'model', 'api-key', 'ai-search', 'ai-search-endpoint', 'http-url', 'http-mode', 'http-token', 'retell-agent', 'docs', 'cf-token', 'cf-account', 'admin-email', 'admin-password', 'dashboard', 'agent-name', 'goal', 'notes', 'lead-form', 'yes', 'y', 'deploy', 'force', 'agent-files'],
+    ['url', 'name', 'defaults', 'backend', 'model', 'api-key', 'ai-search', 'ai-search-endpoint', 'http-url', 'http-mode', 'http-token', 'retell-agent', 'docs', 'cf-token', 'cf-account', 'account-id', 'admin-email', 'admin-password', 'dashboard', 'agent-name', 'goal', 'notes', 'lead-form', 'yes', 'y', 'deploy', 'force', 'agent-files', 'crawl', 'crawl-file', 'browser', 'non-interactive'],
     'init',
   );
   const { out } = ctx;
-  if (ctx.interactive) p.intro(c.bold(' murmur · set up your chat assistant '));
+  if (ctx.interactive) p.intro(c.bold(' An AI assistant for your website '));
 
   // In the wizard, the knowledge base starts building while the last few
   // questions are answered; its progress is shown once they are done.
@@ -208,40 +211,37 @@ export async function initCommand(ctx: Ctx): Promise<number> {
   const storeInConfig = project.backend.type === 'openai' || project.backend.type === 'gemini';
   if (storeInConfig) await finishKnowledge();
 
+  // A person at a terminal gets it deployed straight away; an agent asks with --deploy.
   const deployFlag = bool(ctx.flags, 'deploy');
-  let shouldDeploy = deployFlag ?? false;
-  if (ctx.interactive) {
-    p.log.success(`Wrote ${result.files.join(', ')}${result.secrets.length ? ` and ${result.secrets.length} secret(s) to .env` : ''}`);
-    if (Object.keys(result.assumed).length) {
-      p.log.info(`Defaults: ${Object.entries(result.assumed).map(([k, v]) => `${k} = ${v}`).join(' · ')}`);
-    }
-    if (result.adminPassword) {
-      p.note(
-        `Email     ${project.dashboard.adminEmail}\nPassword  ${c.bold(result.adminPassword)}\n\n${c.dim('Save it now — it is stored only as a hash. Change it any time with `murmur users reset`.')}`,
-        'Dashboard sign-in',
-      );
-    }
-    if (deployFlag === undefined) {
-      const answer = await p.confirm({ message: 'Deploy it to Cloudflare now?', initialValue: true });
-      shouldDeploy = !p.isCancel(answer) && answer === true;
-    }
+  const shouldDeploy = deployFlag ?? ctx.interactive;
+  if (ctx.interactive && result.adminPassword) {
+    p.note(
+      `Email     ${project.dashboard.adminEmail}\nPassword  ${c.bold(result.adminPassword)}\n\n${c.dim('Shown once — it is stored only as a hash.')}`,
+      'Dashboard sign-in',
+    );
   }
 
   if (!shouldDeploy) {
     await finishKnowledge();
-    out.result({ ...summary, next: ['murmur deploy --json', 'murmur chat "<question>" --json'] }, () => {
-      p.outro(`Next: ${c.cyan('murmur deploy')}  — then ${c.cyan('murmur chat "a question"')} to test it.`);
-    });
+    out.result({ ...summary, next: ['murmur deploy --json'] }, () => p.outro(`Next: ${c.cyan('murmur deploy')}`));
     return 0;
   }
 
+  // workers-ai: a person picks the pages on the setup page (onboarding). With no
+  // person there — an AI agent, or --no-browser — the terminal does onboarding:
+  // --crawl if given, else the suggested pages, and the business details.
+  const browser = ctx.interactive && ctx.flags['browser'] !== false;
+  const crawl = crawlFrom(ctx);
+
   // A background job owns the knowledge; deploy must not start a second one.
-  const deployed = await runDeploy(ctx, knowledgeReady || result.background ? { knowledge: 'skip' } : {});
-  out.result({ ...summary, deploy: deployed }, () => printDeployed(deployed, !result.background));
-  if (!storeInConfig && result.background) {
-    await finishKnowledge();
-    p.outro(`Test it: ${c.cyan('murmur chat "a question a visitor would ask"')}`);
-  }
+  const deployed = await runDeploy(ctx, {
+    ...(knowledgeReady || result.background ? { knowledge: 'skip' as const } : {}),
+    ...(crawl ? { crawl } : {}),
+    unattended: !browser,
+  });
+  if (!storeInConfig && result.background) await finishKnowledge();
+  if (deployed.setupUrl && browser) openBrowser(deployed.setupUrl);
+  out.result({ ...summary, deploy: deployed, next: nextSteps(deployed) }, () => printDeployed(deployed, ctx.interactive, !browser));
   return 0;
 }
 
@@ -249,13 +249,13 @@ async function runDeploy(ctx: Ctx, options: Parameters<typeof deploy>[1]): Promi
   const loaded = loadProject(ctx.cwd);
   writeSchemaFile(loaded.dir);
   const spinner = ctx.interactive ? p.spinner() : null;
-  spinner?.start('Deploying');
+  spinner?.start('Setting up on your Cloudflare account');
   try {
     const result = await deploy(loaded, {
       ...options,
-      progress: spinner ? (m) => spinner.message(m) : ctx.out.progress,
+      progress: spinner ? (m) => spinner.message(m.trim()) : ctx.out.progress,
     });
-    spinner?.stop(result.healthy ? 'Deployed' : 'Deployed (still starting up)');
+    spinner?.stop(result.healthy ? 'Live on Cloudflare' : 'Deployed — it can take a minute to answer');
     return result;
   } catch (thrown) {
     spinner?.error('Deploy failed');
@@ -263,38 +263,75 @@ async function runDeploy(ctx: Ctx, options: Parameters<typeof deploy>[1]): Promi
   }
 }
 
-function printDeployed(result: DeployResult, first = false): void {
-  const lines = [
-    `${c.bold('Preview')}   ${c.cyan(result.preview)}`,
-    ...(result.dashboard ? [`${c.bold('Dashboard')} ${c.cyan(result.dashboard)}`] : []),
-    `${c.bold('Embed')}     ${result.embed}`,
-    `${c.bold('Account')}   ${result.account.name ?? result.account.id}`,
+/** `--crawl all | suggested | none | <globs>` and `--crawl-file urls.txt`. */
+export function crawlFrom(ctx: Ctx): CrawlRequest | undefined {
+  const file = str(ctx.flags, 'crawl-file');
+  if (file) {
+    const path = resolve(ctx.cwd, file);
+    if (!existsSync(path)) throw new CliError('usage', `No such file: ${file}`, { exitCode: 2 });
+    return { mode: 'urls', urls: readFileSync(path, 'utf8').split(/\s+/).filter((u) => /^https?:\/\//.test(u)) };
+  }
+  const value = str(ctx.flags, 'crawl');
+  if (!value || value === 'none') return undefined;
+  if (value === 'all' || value === 'suggested') return { mode: value };
+  return { mode: 'match', include: value.split(',').map((g) => g.trim()).filter(Boolean) };
+}
+
+function nextSteps(result: DeployResult): string[] {
+  return [
+    ...(result.crawl ? ['murmur knowledge status --json   (learning runs in the background on Cloudflare; nothing to wait for)'] : []),
+    'murmur ask "<a question a visitor would ask>" --json',
+    result.setupUrl
+      ? `Give the user three things: the dashboard link ${result.setupUrl} (one-time, 24h: they create their sign-in there), the script (deploy.embed) and the demo ${result.preview}`
+      : `Give the user three things: the dashboard ${result.dashboard ?? result.url}, the script (deploy.embed) and the demo ${result.preview}`,
   ];
-  if (result.knowledge && result.knowledge.target !== 'none') {
-    lines.push(`${c.bold('Knowledge')} ${result.knowledge.uploaded} document(s) → ${result.knowledge.target}`);
-  }
-  if (result.indexing) lines.push(`${c.bold('Indexing')}  ${describeIndexing(result.indexing)}`);
-  if (result.secretsUploaded.length) lines.push(`${c.bold('Secrets')}   ${result.secretsUploaded.join(', ')}`);
-  if (!result.workerDeployed) lines.push(c.dim('Only content changed, so the Worker was not re-uploaded.'));
-  for (const warning of result.warnings) lines.push(`${c.yellow('!')} ${warning}`);
-  if (first) {
-    p.note(lines.join('\n'), 'Your assistant is live');
-    p.outro(`Test it: ${c.cyan('murmur chat "a question a visitor would ask"')}`);
-  } else {
-    process.stdout.write(`${lines.join('\n')}\n`);
-  }
+}
+
+/**
+ * For a person about to do onboarding: one link, nothing else — the setup
+ * page until the assistant is set up, then the dashboard (where the test
+ * chat, the snippet and the demo link live).
+ *
+ * When onboarding was done here instead (`unattended`: an agent, or
+ * --no-browser), the result: the dashboard, the script and the demo.
+ * Warnings still show — they are things to act on.
+ */
+function printDeployed(result: DeployResult, wizard = false, unattended = false): void {
+  for (const warning of result.warnings) (wizard ? p.log.warn : (m: string) => process.stdout.write(`${c.yellow('!')} ${m}\n`))(warning);
+  const dashboard = result.setupUrl
+    ? `${c.cyan(result.setupUrl)} ${c.dim('(one-time link: create your sign-in)')}`
+    : result.dashboard
+      ? c.cyan(result.dashboard)
+      : null;
+  const lines = unattended
+    ? [
+        ...(dashboard ? [`Dashboard  ${dashboard}`] : []),
+        `Demo       ${c.cyan(result.preview)}`,
+        `Script     ${result.embed}`,
+        ...(result.crawl ? [c.dim(`Learning ${result.crawl.total} pages in the background on Cloudflare — answers improve as it goes.`)] : []),
+      ]
+    : [result.setupUrl ? `Finish setting up: ${dashboard}` : dashboard ? `Dashboard: ${dashboard}` : `Live: ${c.cyan(result.preview)}`];
+  if (wizard) p.outro(lines.join('\n'));
+  else process.stdout.write(`${lines.join('\n')}\n`);
 }
 
 export async function deployCommand(ctx: Ctx): Promise<number> {
-  assertKnown(ctx.flags, ['knowledge', 'skip-knowledge', 'force', 'dry-run', 'cf-account'], 'deploy');
+  assertKnown(ctx.flags, ['knowledge', 'skip-knowledge', 'force', 'dry-run', 'cf-account', 'account-id', 'crawl', 'crawl-file', 'overwrite-settings', 'allow-downgrade', 'browser', 'yes', 'y', 'non-interactive'], 'deploy');
   const knowledge = ctx.flags['knowledge'] ? 'force' : ctx.flags['skip-knowledge'] ? 'skip' : 'auto';
+  const crawl = crawlFrom(ctx);
+  const browser = ctx.interactive && ctx.flags['browser'] !== false;
   const result = await runDeploy(ctx, {
+    unattended: !browser,
     knowledge,
     forceWorker: Boolean(ctx.flags['force']),
     dryRun: Boolean(ctx.flags['dry-run']),
-    cf: { accountId: str(ctx.flags, 'cf-account') },
+    overwriteSettings: Boolean(ctx.flags['overwrite-settings']),
+    allowDowngrade: Boolean(ctx.flags['allow-downgrade']),
+    cf: { accountId: str(ctx.flags, 'cf-account') ?? str(ctx.flags, 'account-id') },
+    ...(crawl ? { crawl } : {}),
   });
-  ctx.out.result({ ...result, next: [`murmur chat "<question>" --json`] }, () => printDeployed(result));
+  if (result.setupUrl && browser) openBrowser(result.setupUrl);
+  ctx.out.result({ ...result, next: nextSteps(result) }, () => printDeployed(result, false, !browser));
   return 0;
 }
 
@@ -306,11 +343,15 @@ export async function devCommand(ctx: Ctx): Promise<number> {
   const port = await freePort(wanted);
   if (port !== wanted) ctx.out.warn(`Port ${wanted} is in use; using ${port}.`);
   const compiled = compile(loaded, { dev: true, devPort: port, runtimeVersion: runtimeVersion() });
-  const devVars: Record<string, string> = { MURMUR_SECRET: env['MURMUR_SECRET'] ?? 'dev-secret-dev-secret-dev-secret-0000', MURMUR_LOG: '1' };
+  const devVars: Record<string, string> = {
+    MURMUR_SECRET: env['MURMUR_SECRET'] ?? 'dev-secret-dev-secret-dev-secret-0000',
+    ADMIN_API_KEY: env['ADMIN_API_KEY'] ?? 'dev-admin-key-dev-admin-key-dev-admin-key',
+    MURMUR_LOG: '1',
+  };
   const missing: string[] = [];
   for (const name of compiled.secrets) {
     if (env[name]) devVars[name] = env[name]!;
-    else if (name !== 'MURMUR_SECRET') missing.push(name);
+    else if (!devVars[name]) missing.push(name);
   }
   if (missing.length) ctx.out.warn(`Not set in .env: ${missing.join(', ')} — replies will fail until you run \`murmur secret set\`.`);
 
@@ -343,41 +384,4 @@ export function describeIndexing(status: IndexingStatus): string {
   const source = status.crawler ? `Cloudflare is crawling ${status.crawler}` : `instance ${status.instance}`;
   if (status.done) return `${status.indexed} document(s) indexed (${source})${status.failed ? `, ${status.failed} failed` : ''}`;
   return `${status.indexed} indexed, ${status.pending} in progress — ${source}. It is live now; answers get better as this finishes (\`murmur knowledge status\`).`;
-}
-
-export async function knowledgeCommand(ctx: Ctx): Promise<number> {
-  const sub = ctx.positionals[0];
-  if (sub === 'status') {
-    assertKnown(ctx.flags, [], 'knowledge');
-    const loaded = loadProject(ctx.cwd);
-    const cf = await cloudflareSession(loadEnv(loaded.dir));
-    const status = await indexingStatus(cf.api, cf.accountId, loaded.project);
-    ctx.out.result({ indexing: status }, () =>
-      process.stdout.write(`${status ? describeIndexing(status) : 'This backend has no AI Search index; see `murmur status`.'}\n`),
-    );
-    return 0;
-  }
-  if (sub !== 'sync') {
-    throw new CliError('usage', 'Usage: murmur knowledge sync | status', { exitCode: 2, hint: 'murmur knowledge --help' });
-  }
-  assertKnown(ctx.flags, [], 'knowledge');
-  const loaded = loadProject(ctx.cwd);
-  const env = loadEnv(loaded.dir);
-  const needsCloudflare = Boolean(aiSearchInstanceFor(loaded.project));
-  const cf = needsCloudflare ? await cloudflareSession(env) : undefined;
-  const result = await syncKnowledge(loaded, { env, progress: ctx.out.progress, ...(cf ? { cf } : {}) });
-  if (result.backendUpdate) {
-    updateProject(loaded, (raw) => Object.assign(raw['backend'] as object, result.backendUpdate));
-  }
-  const next = result.backendUpdate ? ['murmur deploy --json   (publishes the new store id)'] : [];
-  ctx.out.result({ ...result, next }, () => {
-    ctx.out.success(
-      result.target === 'none'
-        ? 'Nothing to sync: this backend has no knowledge base, or there is no website or files configured.'
-        : `${result.uploaded} document(s) → ${result.target} (${result.pages} page(s), ${result.files} file(s)${result.removed ? `, ${result.removed} removed` : ''})`,
-    );
-    for (const skipped of result.skipped) ctx.out.warn(`Skipped ${skipped}`);
-    if (next.length) ctx.out.info(`Run ${c.cyan('murmur deploy')} to switch the assistant to the new knowledge.`);
-  });
-  return 0;
 }

@@ -168,7 +168,7 @@ describe('a broken stored config', () => {
     expect((invalid?.data as { issues: string[] } | undefined)?.issues).toContain(
       'security.limits.maxMessageLength',
     );
-    // The offending value is never echoed — it could be anything (§7.2).
+    // The offending value is never echoed — it could be anything.
     expect(JSON.stringify(events)).not.toContain('twelve');
   });
 });

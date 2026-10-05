@@ -16,7 +16,7 @@ import {
  *
  * The relationship between them is deliberately asymmetric, not identical.
  * The server is strict: a message that breaks any rule is dropped whole, so a
- * connector cannot smuggle anything past it. The widget is salvaging: §8.3
+ * connector cannot smuggle anything past it. The widget is salvaging: the fail-safe
  * says to prefer a missing feature over a blank space, so a card with an
  * unsafe image renders without the image rather than not at all.
  *
@@ -144,7 +144,7 @@ describe('parseConfig — poweredBy', () => {
   });
 });
 
-describe('parseConfig — conservative defaults (§8.3)', () => {
+describe('parseConfig — conservative defaults', () => {
   it('makes a fully functional widget from {}', () => {
     const config = parseConfig({});
     expect(config).not.toBeNull();
@@ -217,7 +217,7 @@ describe('parseConfig — conservative defaults (§8.3)', () => {
   });
 
   it('falls back to the default delay when the configured one is unusable', () => {
-    // §8.3: a field of the wrong type is treated as absent and its default
+    // Fail-safe: a field of the wrong type is treated as absent and its default
     // applied — dropping the whole teaser would hide a configured feature.
     expect(parseConfig({ teaser: { text: 'Hi', delayMs: 500 } })?.teaser).toMatchObject({
       delayMs: DEFAULT_TEASER_DELAY_MS,

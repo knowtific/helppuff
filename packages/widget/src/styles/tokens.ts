@@ -2,11 +2,11 @@ import type { WidgetConfig } from '@murmur/protocol';
 import { foregroundFor, rotateHue } from '../lib/color.js';
 
 /**
- * §9.3's token set. Everything the widget renders reads these custom
+ * The design token set. Everything the widget renders reads these custom
  * properties, so theming is entirely a matter of overriding them.
  *
- * Rem units are forbidden — they follow the host page's 'html' font-size
- * (§8.2). Everything here is px or unitless.
+ * Rem units are forbidden — they follow the host page's 'html' font-size.
+ * Everything here is px or unitless.
  */
 export const BASE_TOKENS = `
 :host {
@@ -84,7 +84,7 @@ export const BASE_TOKENS = `
 /**
  * Shadow DOM blocks selectors but not inheritance, so font-size, colour,
  * line-height and direction still leak in from the host page. This resets
- * every inherited property explicitly (§8.2).
+ * every inherited property explicitly.
  */
 export const RESET = `
 :host {
@@ -189,7 +189,7 @@ function hexToRgba(hex: string, alpha: number): string {
 
 /**
  * Apply a stylesheet to a shadow root, preferring a constructable sheet so
- * nothing needs 'style-src 'unsafe-inline'' (§8.2). Falls back to a '<style>'
+ * nothing needs 'style-src 'unsafe-inline''. Falls back to a '<style>'
  * element inside the root — never 'document.head'.
  */
 export function applyStyles(root: ShadowRoot, css: string): () => void {

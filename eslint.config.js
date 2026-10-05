@@ -17,6 +17,7 @@ export default tseslint.config(
       '**/.wrangler/**',
       'test-results/**',
       'playwright-report/**',
+      'private/**',
     ],
   },
 
@@ -29,12 +30,12 @@ export default tseslint.config(
       globals: { ...globals.browser, ...globals.node },
     },
     rules: {
-      // §13: no console.log in shipped bundles; the server uses injected `log`.
+      // No console.log in shipped bundles; the server uses injected `log`.
       'no-console': 'error',
       // A dropped promise is how a fail-safe path silently stops working.
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/no-misused-promises': 'error',
-      // §13: no `any` in the protocol or connector interfaces.
+      // No `any` in the protocol or connector interfaces.
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/consistent-type-imports': ['error', { fixStyle: 'inline-type-imports' }],
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],

@@ -8,6 +8,9 @@ import { configRoutes } from './routes/config.js';
 import { messageRoutes } from './routes/messages.js';
 import { sessionRoutes } from './routes/sessions.js';
 import { adminRoutes } from './admin/routes.js';
+import { retellRoutes } from './routes/retell.js';
+import { deployedVersion } from './admin/version.js';
+import { LATEST_MIGRATION } from './db/migrations.js';
 
 export function createApp(config: MurmurConfig): Hono<HonoEnv> {
   const app = new Hono<HonoEnv>();
@@ -17,7 +20,7 @@ export function createApp(config: MurmurConfig): Hono<HonoEnv> {
     c.set('mm', buildRequestCtx(c, config));
 
     // CORS reflection only decides what the browser may read. Authorization is
-    // enforced per site inside each route (§7.2).
+    // enforced per site inside each route.
     const headers = corsHeaders(c.req.header('Origin'), origins);
 
     if (c.req.method === 'OPTIONS') {
@@ -27,16 +30,18 @@ export function createApp(config: MurmurConfig): Hono<HonoEnv> {
     await next();
     for (const [key, value] of Object.entries(headers)) c.res.headers.set(key, value);
 
-    // Session endpoints must never be cached (§7.2).
+    // Session endpoints must never be cached.
     if (c.req.path.includes('/sessions')) c.res.headers.set('Cache-Control', 'no-store');
   });
 
-  app.get('/healthz', (c) => c.json({ ok: true, protocol: PROTOCOL_VERSION }));
+  // `version` is the release that deployed this Worker (null in development); `schema` the D1 migration it expects.
+  app.get('/healthz', (c) => c.json({ ok: true, protocol: PROTOCOL_VERSION, version: deployedVersion(c.get('mm').env), schema: LATEST_MIGRATION }));
 
   app.route('/', configRoutes);
   app.route('/', sessionRoutes);
   app.route('/', messageRoutes);
   app.route('/', adminRoutes);
+  app.route('/', retellRoutes);
 
   app.notFound(() => {
     throw new MurmurError('not_found', { detail: 'no_route' });
@@ -44,8 +49,7 @@ export function createApp(config: MurmurConfig): Hono<HonoEnv> {
 
   /**
    * The single exit for every failure. Always the JSON envelope, never an HTML
-   * error page — the widget's parser must always have something valid to read
-   * (§8.3).
+   * error page — the widget's parser must always have something valid to read.
    */
   app.onError((thrown, c) => {
     const error = toMurmurError(thrown);

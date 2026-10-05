@@ -77,7 +77,7 @@ describe('echo connector', () => {
     expect(result.state).toEqual({ turn: 4 });
   });
 
-  it('acts on an action\'s value, not its label (§4.3)', async () => {
+  it('acts on an action\'s value, not its label', async () => {
     const { messages } = await echo.send(
       ctx(),
       { turn: 1 },

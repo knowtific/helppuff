@@ -304,7 +304,7 @@ function Gallery() {
 
       <h2>Messages</h2>
       <div class="grid wide">
-        <Specimen title="Markdown subset" note="§4.4 — and the XSS cases, neutralised" {...spec} height={430}>
+        <Specimen title="Markdown subset" note="and the XSS cases, neutralised" {...spec} height={430}>
           {shell(<Thread messages={MARKDOWN} busy={false} pendingIds={new Set()} handlers={inertHandlers} t={t} />)}
         </Specimen>
         <Specimen title="Notices" note="info and warn" {...spec} height={180}>
@@ -357,7 +357,7 @@ function Gallery() {
         <Specimen title="Header" note="Orb, name, status, close" {...spec} height={80}>
           <Header config={CONFIG} thinking={false} showBack={false} t={t} onBack={() => {}} onClose={() => {}} />
         </Specimen>
-        <Specimen title="Icon set" note="§9.6 — 20 inline SVGs, no icon font" {...spec} height={150}>
+        <Specimen title="Icon set" note="20 inline SVGs, no icon font" {...spec} height={150}>
           <div style={{ padding: '16px', display: 'flex', flexWrap: 'wrap', gap: '12px', color: 'var(--mm-text-2)' }}>
             {ICONS.map((name) => (
               <span key={name} title={name}>

@@ -5,27 +5,28 @@ compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
-# `setup.sh` fills in the real id. KV holds rate-limit counters, per-session
-# message counts and prompt overrides — no session state and no lead data.
+# For `pnpm dev` only: wrangler simulates KV locally, so the ids are
+# placeholders. Real deployments are made by the CLI, which writes its own
+# wrangler config. KV holds rate-limit counters, per-session message counts and
+# config overrides — no session state and no lead data.
 #
 # Keep every top-level key above the [tables] below: in TOML a bare key after
 # a [section] belongs to that section, which silently moved this binding into
 # [assets] the first time round.
 kv_namespaces = [
-  { binding = "MURMUR_KV", id = "05c83483cba3457989f1edb9de65e8cd", preview_id = "95e6544e0bfe451999e2823d9f05847f" }
+  { binding = "MURMUR_KV", id = "local-dev", preview_id = "local-dev" }
 ]
 
 [vars]
 MURMUR_LOG = "0"
 
-# One Worker serves both halves (§7.3): the widget bundles as static assets,
+# One Worker serves both halves: the widget bundles as static assets,
 # and the protocol at /v1/*. A request matching a built file is served from
 # Cloudflare's edge without invoking the Worker; everything else falls
 # through to it.
 #
 # That is why the embed snippet needs no second host — `loader.js` and the
-# API share an origin. `data-api` exists for splitting them; see
-# docs/deployment.md.
+# API share an origin. `data-api` exists for splitting them.
 [assets]
 directory = "../widget/dist"
 not_found_handling = "none"

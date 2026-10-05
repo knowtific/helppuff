@@ -1,8 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { AGENTS_MARKER, AGENTS_SECTION, SKILL_MD, SKILL_NAME } from '../skill.js';
-import { PROMPT_FILE, resourceName, type Backend, type ProjectInput } from './project.js';
-import { PROVIDER_KEYS, defaultModel, guessName, type Answers, type Facts, type Goal } from './questions.js';
+import { buildPrompt, DEFAULT_PROFILE } from '@murmur/server';
+import { DEFAULT_BACKEND, PROMPT_FILE, resourceName, type Backend, type ProjectInput } from './project.js';
+import { DEFAULT_LEAD_FORM, PROVIDER_KEYS, defaultModel, guessName, type Answers, type Facts, type Goal } from './questions.js';
 import { originsFor, normalizeUrl, siteIdFor, type SiteInfo } from './site.js';
 
 /** Answers + what was learned → murmur.json, prompt.md and the secrets to store. */
@@ -21,7 +22,7 @@ export function generateProject(answers: Answers, facts: Facts): Generated {
   const website = answers.website && answers.website !== 'none' ? (site?.url ?? normalizeUrl(answers.website)) : undefined;
   const name = (answers.name || site?.name || (website ? guessName(new URL(website).origin) : 'My site')).slice(0, 60);
   const siteId = website ? siteIdFor(website) : slug(name);
-  const backendType = answers.backend ?? 'cloudflare';
+  const backendType = answers.backend ?? DEFAULT_BACKEND;
   const assumed: Record<string, string> = {};
   const secrets: Record<string, string> = {};
 
@@ -30,6 +31,9 @@ export function generateProject(answers: Answers, facts: Facts): Generated {
 
   let backend: Backend | Record<string, unknown>;
   switch (backendType) {
+    case 'workers-ai':
+      backend = { type: 'workers-ai', ...(answers.model && answers.model !== defaultModel('workers-ai') ? { model: answers.model } : {}) };
+      break;
     case 'cloudflare':
     case 'anthropic': {
       const source =
@@ -105,9 +109,23 @@ export function generateProject(answers: Answers, facts: Facts): Generated {
         : `Hi {{name}}! I'm ${agentName} from ${name}. How can I help you today?`,
     ],
   };
+  // workers-ai: the same generator as the dashboard's instructions form, so the two agree.
+  const goal = answers.goal ?? 'leads';
+  const profilePrompt =
+    backendType === 'workers-ai'
+      ? buildPrompt(
+          {
+            ...DEFAULT_PROFILE,
+            goal: goal === 'answer' || goal === 'sell' ? 'answers' : goal === 'book' ? 'bookings' : 'callbacks',
+            mustKnow: answers.notes ?? '',
+            ...(goal === 'book' && site?.pages.booking ? { bookingUrl: site.pages.booking.url } : {}),
+          },
+          { businessName: name, website: website ?? null },
+        )
+      : null;
   return {
     project,
-    prompt: promptFor(name, website, site, backendType, {
+    prompt: profilePrompt ? `${profilePrompt}\n` : promptFor(name, website, site, backendType, {
       agentName,
       goal: answers.goal ?? 'leads',
       notes: answers.notes ?? '',
@@ -118,15 +136,20 @@ export function generateProject(answers: Answers, facts: Facts): Generated {
   };
 }
 
-const FIELD: Record<string, { label: string; type: 'text' | 'email' | 'tel'; autocomplete: string }> = {
+const FIELD: Record<string, { label: string; type: 'text' | 'email' | 'tel' | 'textarea'; autocomplete?: string }> = {
   name: { label: 'Name', type: 'text', autocomplete: 'name' },
   email: { label: 'Email', type: 'email', autocomplete: 'email' },
-  phone: { label: 'Phone', type: 'tel', autocomplete: 'tel' },
+  phone: { label: 'Phone (optional)', type: 'tel', autocomplete: 'tel' },
+  message: { label: 'How can we help?', type: 'textarea' },
 };
 
-/** `name,email,phone` → an enabled form asking for those; `none` → off. Phone is optional — plenty of people won't give one to a website. */
+/**
+ * `name,email,phone,message` (the default) → a form asking for those; `none`
+ * → off. Phone is optional — plenty of people won't give one to a website.
+ * The message becomes the first chat message.
+ */
 export function leadFormFor(choice: string | undefined): Record<string, unknown> {
-  const fields = (choice ?? 'none') === 'none' ? [] : choice!.split(',').map((f) => f.trim()).filter((f) => FIELD[f]);
+  const fields = (choice ?? DEFAULT_LEAD_FORM) === 'none' ? [] : (choice ?? DEFAULT_LEAD_FORM).split(',').map((f) => f.trim()).filter((f) => FIELD[f]);
   if (!fields.length) return { enabled: false };
   return {
     enabled: true,

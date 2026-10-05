@@ -1,5 +1,7 @@
 import config from '../../../murmur.config.js';
-import { createApp } from './app.js';
+import { createWorker } from './worker.js';
 
-/** Cloudflare Worker entry. The config is bundled at build time (§5). */
-export default createApp(config);
+export { CrawlWorkflow } from './workflows/crawl.js';
+
+/** Cloudflare Worker entry. The config is bundled at build time. */
+export default createWorker(config);

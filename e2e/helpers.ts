@@ -60,7 +60,7 @@ export async function send(page: Page, text: string): Promise<void> {
 }
 
 /**
- * Collect console output so a test can assert the widget stayed silent (§8.3).
+ * Collect console output so a test can assert the widget stayed silent.
  * Vite's own dev-server chatter is filtered out.
  */
 export function captureConsole(page: Page): { messages: string[]; errors: string[] } {

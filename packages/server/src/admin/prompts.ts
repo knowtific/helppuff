@@ -3,7 +3,7 @@ import { storedSiteConfigSchema, type ConnectorConfig, type MurmurConfig, type P
 import { siteConfigKey } from '../config/site.js';
 import { MurmurError } from '../core/errors.js';
 import { getConnector } from '../core/registry.js';
-import type { D1Like } from './db.js';
+import type { D1Like } from '../db/d1.js';
 
 /**
  * Prompt versions.

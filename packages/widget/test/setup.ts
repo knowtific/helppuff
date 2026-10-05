@@ -8,7 +8,7 @@ import { cleanup } from '@testing-library/preact';
  */
 
 beforeEach(() => {
-  // Constructable stylesheets — the widget's preferred style path (§8.2).
+  // Constructable stylesheets — the widget's preferred style path.
   if (typeof CSSStyleSheet !== 'undefined' && !CSSStyleSheet.prototype.replaceSync) {
     CSSStyleSheet.prototype.replaceSync = function replaceSync(this: CSSStyleSheet) {
       // happy-dom parses via textContent; the tests assert behaviour, not paint.

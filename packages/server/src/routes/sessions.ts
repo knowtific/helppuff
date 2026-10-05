@@ -5,28 +5,28 @@ import { MurmurError } from '../core/errors.js';
 import { validateLead } from '../core/lead.js';
 import { assertAllowedOrigin } from '../core/origin.js';
 import { requireSecret, type HonoEnv } from '../core/request.js';
+import { dbFrom } from '../db/d1.js';
 import { capabilitiesOf, connectorContext, prepareConnector, runConnector } from '../core/run.js';
-import { streamResponse, wantsStream } from '../core/stream.js';
+import { streamResponse, textRelay, wantsStream } from '../core/stream.js';
 import { sanitizeConnectorMessages } from '../core/sanitize.js';
 import { issueToken, newSessionId } from '../core/token.js';
 import { hitDaily, hitWindow, rateLimited, quotaExceeded } from '../core/ratelimit.js';
 import { assertTurnstile } from '../core/turnstile.js';
 import { resolveSecrets } from '../config/load.js';
 import { dispatchLead } from '../core/sinks.js';
-import { recordStart } from '../admin/record.js';
+import { recordLead, recordStart } from '../admin/record.js';
 
 export const sessionRoutes = new Hono<HonoEnv>();
 
 /**
- * Cheap rejections first, anything that costs money or writes data last
- * (§7.1).
+ * Cheap rejections first, anything that costs money or writes data last.
  */
 sessionRoutes.post('/v1/sites/:siteId/sessions', async (c) => {
   const ctx = c.get('mm');
   const siteId = c.req.param('siteId');
 
   // 1. Resolve site.
-  const site = await resolveSite(ctx, siteId);
+  const site = await ctx.timing.span('site', () => resolveSite(ctx, siteId));
 
   // 2. Origin allowlist.
   assertAllowedOrigin(ctx.origin, site.origins);
@@ -56,39 +56,59 @@ sessionRoutes.post('/v1/sites/:siteId/sessions', async (c) => {
 
   // Scoped by site: each site configures its own limit and its own budget,
   // so one site's traffic must not consume another's.
-  const perIp = (await ctx.isOwner())
-    ? { allowed: true, count: 0 }
-    : await hitWindow(ctx.platform.kv, 'sess', `${siteId}:${ipKey}`, limits.sessionsPerIpPerHour, 3600);
-  if (!perIp.allowed) {
-    ctx.platform.log('limit.sessions_per_ip', { siteId });
-    throw rateLimited(perIp, 'sessions_per_ip_per_hour');
-  }
-
-  // The cost backstop. When this trips the widget shows the fallback contact.
-  const daily = await hitDaily(ctx.platform.kv, siteId, limits.messagesPerSitePerDay);
-  if (!daily.allowed) {
-    ctx.platform.log('limit.site_daily', { siteId });
-    throw quotaExceeded('messages_per_site_per_day', 'Chat is unavailable right now.');
-  }
-
-  // 6. Captcha, last before the connector — it costs a round trip.
-  const captcha = site.security.captcha;
-  if (captcha) {
-    const secretValue = resolveSecrets(captcha.secret, ctx.env);
-    await assertTurnstile(String(secretValue), input.captchaToken, ctx.platform);
-  }
+  // Read together; the counter writes happen after the response (see messages.ts).
+  // Limits and the captcha make one verdict; a gated connector overlaps its
+  // cheap preparation with it and waits for it before the model.
+  const defer = ctx.platform.waitUntil;
+  const verdict = (async () => {
+    const owner = await ctx.isOwner();
+    const [perIp, daily] = await ctx.timing.span('limits', () =>
+      Promise.all([
+        owner
+          ? Promise.resolve({ allowed: true, count: 0 })
+          : hitWindow(ctx.platform.kv, 'sess', `${siteId}:${ipKey}`, limits.sessionsPerIpPerHour, 3600, undefined, defer),
+        hitDaily(ctx.platform.kv, siteId, limits.messagesPerSitePerDay, undefined, defer),
+      ]),
+    );
+    if (!perIp.allowed) {
+      ctx.platform.log('limit.sessions_per_ip', { siteId });
+      throw rateLimited(perIp, 'sessions_per_ip_per_hour');
+    }
+    // The cost backstop. When this trips the widget shows the fallback contact.
+    if (!daily.allowed) {
+      ctx.platform.log('limit.site_daily', { siteId });
+      throw quotaExceeded('messages_per_site_per_day', 'Chat is unavailable right now.');
+    }
+    // 6. Captcha, last before the connector — it costs a round trip.
+    const captcha = site.security.captcha;
+    if (captcha) {
+      const secretValue = resolveSecrets(captcha.secret, ctx.env);
+      await assertTurnstile(String(secretValue), input.captchaToken, ctx.platform);
+    }
+  })();
+  const gate = verdict.then(() => undefined);
+  gate.catch(() => {});
 
   // 7. Connector.
   const secret = requireSecret(ctx);
   const sessionId = newSessionId();
   const prepared = prepareConnector(ctx, site);
 
+  const streaming = wantsStream(c.req.header('Accept'), prepared);
+  const relay = textRelay();
+
   // Steps 7-9, shared by the JSON and the streamed response.
-  const finish = async (onText?: (delta: string) => void): Promise<StartSessionResponse> => {
-    const cctx = connectorContext(ctx, prepared, siteId, sessionId, onText);
-    const started = await runConnector(ctx, 'start', () =>
-      prepared.connector.start(cctx, { ...input, lead }),
+  const finish = async (): Promise<StartSessionResponse> => {
+    const cctx = connectorContext(ctx, prepared, siteId, sessionId, streaming ? relay.onText : undefined, (found) => {
+      recordLead(ctx, { siteId, sessionId, lead: found, source: 'ai' });
+      dispatchLead(ctx, site, siteId, { sessionId, lead: found, context: input.context });
+    });
+    if (prepared.connector.gated) cctx.gate = gate;
+    const started = await ctx.timing.span('connector', () =>
+      runConnector(ctx, 'start', () => prepared.connector.start(cctx, { ...input, lead })),
     );
+    // Nothing is recorded for a request the limits refused.
+    await verdict;
 
     const messages = sanitizeConnectorMessages(started.messages, ctx.platform, { allowEmpty: true });
 
@@ -122,11 +142,28 @@ sessionRoutes.post('/v1/sites/:siteId/sessions', async (c) => {
       ...(input.firstMessage ? { firstMessage: input.firstMessage } : {}),
     });
 
-    return { sessionToken: token, sessionId, expiresAt, messages, capabilities: capabilitiesOf(prepared) };
+    return { sessionToken: token, sessionId, expiresAt, messages, capabilities: capabilitiesOf(prepared, Boolean(dbFrom(ctx.env))) };
   };
 
-  if (wantsStream(c.req.header('Accept'), prepared)) return streamResponse(ctx, c.req.path, finish);
-  return c.json(await finish());
+  let work: Promise<StartSessionResponse>;
+  if (prepared.connector.gated) {
+    work = finish();
+    work.catch(() => {});
+    await verdict;
+  } else {
+    await verdict;
+    work = finish();
+  }
+
+  if (streaming) {
+    return streamResponse(ctx, c.req.path, async (onText) => {
+      relay.attach(onText);
+      return work;
+    });
+  }
+  const body = await work;
+  c.header('Server-Timing', ctx.timing.header());
+  return c.json(body);
 });
 
 export async function readJsonBody(request: Request): Promise<unknown> {

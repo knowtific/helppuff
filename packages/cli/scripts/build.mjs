@@ -36,7 +36,7 @@ cpSync(join(repo, 'packages', 'dashboard', 'dist'), join(dist, 'runtime', 'dashb
 
 // 2. The server, for the Workers runtime.
 await build({
-  entryPoints: [join(repo, 'packages', 'server', 'src', 'lib.ts')],
+  entryPoints: [join(repo, 'packages', 'server', 'src', 'runtime.ts')],
   outfile: join(dist, 'runtime', 'server.js'),
   bundle: true,
   format: 'esm',
@@ -46,7 +46,8 @@ await build({
   mainFields: ['module', 'main'],
   // The Anthropic SDK imports Node built-ins; the Worker runs with
   // `nodejs_compat`, and wrangler supplies them when it bundles the entry.
-  external: ['node:*'],
+  // `cloudflare:workers` (the Workflow base class) is provided by the runtime.
+  external: ['node:*', 'cloudflare:*'],
   minify: true,
   legalComments: 'none',
   logLevel: 'warning',

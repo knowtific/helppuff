@@ -1,4 +1,4 @@
-/** Every visitor-facing string, overridable per site via `widget.strings` (§8.7). */
+/** Every visitor-facing string, overridable per site via `widget.strings`. */
 export const DEFAULT_STRINGS = {
   start: 'Start a conversation',
   resume: 'Continue conversation',
@@ -33,6 +33,8 @@ export const DEFAULT_STRINGS = {
   agentSaid: 'Assistant said',
   flowRunning: 'Answer the questions above, or',
   cancel: 'Cancel',
+  helpful: 'Helpful',
+  notHelpful: 'Not helpful',
 } as const;
 
 export type StringKey = keyof typeof DEFAULT_STRINGS;

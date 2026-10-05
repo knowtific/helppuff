@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { agentMessages, launcher, openWidget, panel, startConversation } from './helpers.js';
 
 /**
- * §11's isolation suite. The widget is embedded in deliberately hostile host
+ * The isolation suite. The widget is embedded in deliberately hostile host
  * pages and must look and behave identically in all of them, while leaving
  * the host page visually and functionally unchanged.
  */
@@ -103,7 +103,7 @@ test.describe('the host page is left alone', () => {
       // which exist only on the dev server — the shipped bundle inlines them,
       // which `e2e/bundle.spec.ts` asserts against dist/.
       murmurGlobals: Object.keys(window).filter((k) => /murmur/i.test(k) && !k.startsWith('__')),
-      // Silent at default verbosity (§8.3).
+      // Silent at default verbosity.
       consoleCalls: (window as never as { __consoleCalls?: number }).__consoleCalls ?? 0,
     }));
 

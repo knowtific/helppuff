@@ -1,9 +1,14 @@
-import { resolve } from 'node:path';
+import { existsSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { parseArgs, str } from './args.js';
 import { CliError, EXIT } from './errors.js';
-import { COMMAND_HELP, MAIN_HELP, VERSION, commandHelp } from './help.js';
+import { COMMAND_HELP, MAIN_HELP, VERSION, agentsGuide, cliReferencePage, commandHelp } from './help.js';
+import { configReferencePage } from './engine/reference.js';
 import { Output } from './output.js';
-import { deployCommand, devCommand, initCommand, knowledgeCommand } from './commands/setup.js';
+import { deployCommand, devCommand, initCommand } from './commands/setup.js';
+import { askCommand, crawlCommand, discoverCommand, knowledgeCommand } from './commands/knowledge.js';
+import { destroyCommand } from './commands/destroy.js';
+import { evalCommand } from './commands/eval.js';
 import {
   chatCommand,
   configCommand,
@@ -17,6 +22,8 @@ import {
 import type { Ctx } from './commands/context.js';
 import { serveMcp } from './mcp.js';
 import { dashboardCommand, usersCommand } from './commands/users.js';
+import { webhooksCommand } from './commands/webhooks.js';
+import { upgradeCommand } from './commands/upgrade.js';
 import { skillCommand } from './commands/skill.js';
 import { promptCommand } from './commands/prompt.js';
 
@@ -29,6 +36,11 @@ const COMMANDS: Record<string, (ctx: Ctx) => Promise<number>> = {
   status: statusCommand,
   doctor: doctorCommand,
   knowledge: knowledgeCommand,
+  discover: discoverCommand,
+  crawl: crawlCommand,
+  ask: askCommand,
+  destroy: destroyCommand,
+  eval: evalCommand,
   secret: secretCommand,
   secrets: secretCommand,
   config: configCommand,
@@ -36,6 +48,8 @@ const COMMANDS: Record<string, (ctx: Ctx) => Promise<number>> = {
   schema: schemaCommand,
   embed: embedCommand,
   users: usersCommand,
+  webhooks: webhooksCommand,
+  upgrade: upgradeCommand,
   dashboard: dashboardCommand,
   skill: skillCommand,
   prompt: promptCommand,
@@ -52,8 +66,27 @@ export async function main(argv: string[]): Promise<number> {
       process.stdout.write(json ? `${JSON.stringify({ ok: true, version: VERSION })}\n` : `${VERSION}\n`);
       return EXIT.ok;
     }
+    // `npx @knowtific/murmur` in a terminal: set up here, or redeploy what is here.
+    if (!command && Object.keys(flags).length === 0 && !json && process.stdin.isTTY && process.stdout.isTTY && !process.env['CI']) {
+      const here = resolve(process.cwd());
+      const ctx: Ctx = { cwd: here, positionals: [], flags: {}, out: new Output(false), interactive: true };
+      return await (existsSync(join(here, 'murmur.json')) ? COMMANDS['deploy']! : COMMANDS['init']!)(ctx);
+    }
     if (!command || command === 'help') {
       const topic = positionals[0];
+      // The wiki's generated pages (`pnpm sync:plugin` writes them).
+      if (topic === 'wiki-cli') {
+        process.stdout.write(cliReferencePage());
+        return EXIT.ok;
+      }
+      if (topic === 'wiki-config') {
+        process.stdout.write(configReferencePage());
+        return EXIT.ok;
+      }
+      if (topic === 'agents') {
+        process.stdout.write(agentsGuide());
+        return EXIT.ok;
+      }
       const help = topic ? commandHelp(topic) : null;
       process.stdout.write(`${help ?? MAIN_HELP}\n`);
       return EXIT.ok;
@@ -73,8 +106,13 @@ export async function main(argv: string[]): Promise<number> {
       });
     }
 
-    const interactive = !json && Boolean(process.stdin.isTTY && process.stdout.isTTY) && !process.env['CI'];
-    const ctx: Ctx = { cwd: resolve(str(flags, 'cwd') ?? process.cwd()), positionals, flags, out: new Output(json), interactive };
+    const interactive =
+      !json && !flags['non-interactive'] && Boolean(process.stdin.isTTY && process.stdout.isTTY) && !process.env['CI'];
+    // `--config path/to/murmur.json` names the project by its file; the folder is what matters.
+    const config = str(flags, 'config');
+    if (config && typeof flags['config'] === 'string') delete flags['config'];
+    const cwd = resolve(config ? dirname(resolve(config)) : (str(flags, 'cwd') ?? process.cwd()));
+    const ctx: Ctx = { cwd, positionals, flags, out: new Output(json), interactive };
     return await run(ctx);
   } catch (thrown) {
     return new Output(json).failure(thrown);

@@ -1,7 +1,7 @@
 import { sanitizeMessages, type Message } from '@murmur/protocol';
 import type { Platform } from './platform.js';
 
-/** Shown when a connector replied but nothing it sent was usable (§8.3). */
+/** Shown when a connector replied but nothing it sent was usable. */
 export const FALLBACK_NOTICE_TEXT = 'Sorry — I could not put that into words. Could you try asking another way?';
 
 function fallbackNotice(now: number): Message {
@@ -18,7 +18,7 @@ function fallbackNotice(now: number): Message {
 /**
  * Validate everything a connector returns before it reaches the widget.
  * Invalid messages are dropped and counted; if that leaves nothing, a single
- * friendly notice is returned rather than an error (§4.4, §8.3).
+ * friendly notice is returned rather than an error.
  */
 export function sanitizeConnectorMessages(
   input: unknown,

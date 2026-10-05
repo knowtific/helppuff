@@ -2,7 +2,7 @@ import { TOKEN_HEADER } from '@murmur/protocol';
 import { MurmurError } from './errors.js';
 
 /**
- * The origin allowlist is mandatory (§7.2). Without it anyone can copy the
+ * The origin allowlist is mandatory. Without it anyone can copy the
  * embed snippet and spend the site owner's AI budget.
  */
 export function normalizeOrigin(value: string): string | null {

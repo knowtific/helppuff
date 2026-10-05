@@ -1,7 +1,7 @@
 import type { Flow, FlowStep, Message, WidgetConfig } from '@murmur/protocol';
 
 /**
- * Multi-step shortcuts, run entirely client-side (§8.7). Each step appears as
+ * Multi-step shortcuts, run entirely client-side. Each step appears as
  * an agent-style message; nothing reaches the server until the last answer is
  * in, at which point the template is rendered and sent as one message.
  *

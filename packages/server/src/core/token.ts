@@ -1,7 +1,7 @@
 import { MurmurError } from './errors.js';
 
 /**
- * Stateless session tokens (§2). Payload is base64url JSON, signed with
+ * Stateless session tokens. Payload is base64url JSON, signed with
  * HMAC-SHA256. No server-side session store exists, so the token is the
  * session.
  */
@@ -9,7 +9,7 @@ export type SessionTokenPayload = {
   v: 1;
   siteId: string;
   sessionId: string;
-  /** Opaque connector state — kept small, it rides in every request (§6.1). */
+  /** Opaque connector state — kept small, it rides in every request. */
   state: unknown;
   /** Messages already counted against `messagesPerSession`. */
   count: number;
@@ -113,7 +113,7 @@ export async function issueToken(secret: string, input: IssueTokenInput): Promis
 /**
  * Verify a token's signature and expiry. Throws `unauthorized` for anything
  * malformed or tampered with, and `session_expired` only for a well-formed
- * token that has aged out — the widget treats those differently (§8.7).
+ * token that has aged out — the widget treats those differently.
  */
 export async function verifyToken(secret: string, token: string, now = Date.now()): Promise<SessionTokenPayload> {
   assertSecret(secret);

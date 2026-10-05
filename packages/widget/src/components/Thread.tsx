@@ -5,7 +5,7 @@ import { stripMarkdown } from '../lib/markdown.js';
 import { TextMessage } from './messages/Text.js';
 import type { StringKey } from '../app/strings.js';
 
-/** How close to the bottom still counts as "at the bottom" (§8.7). */
+/** How close to the bottom still counts as "at the bottom". */
 const NEAR_BOTTOM_PX = 80;
 
 export function Typing() {
@@ -52,7 +52,7 @@ export function Thread({
   // row nor a gap in the grouping survives.
   const drawable = messages.filter(canRender);
 
-  // Auto-scroll only when the visitor was already near the bottom (§8.7).
+  // Auto-scroll only when the visitor was already near the bottom.
   useLayoutEffect(() => {
     const element = scroller.current;
     if (!element || !stuck) return;
@@ -107,7 +107,7 @@ export function Thread({
 
 /**
  * Agent messages are announced politely; the visitor's own messages are not,
- * since they already know what they typed (§8.7).
+ * since they already know what they typed.
  */
 export function LiveRegion({ messages }: { messages: Message[] }) {
   const last = messages[messages.length - 1];

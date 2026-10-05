@@ -7,11 +7,12 @@ import geminiConnector from '@murmur/connector-gemini';
 import cloudflareConnector from '@murmur/connector-cloudflare';
 import anthropicConnector from '@murmur/connector-anthropic';
 import httpConnector from '@murmur/connector-http';
+import workersAiConnector from '@murmur/connector-workers-ai';
 import webhookSink from '@murmur/sink-webhook';
 import { MurmurError } from './errors.js';
 
 /**
- * Registration is explicit (§6.1): the bundle contains only what is listed
+ * Registration is explicit: the bundle contains only what is listed
  * here, so tree-shaking works and no connector is loaded by accident.
  */
 export const connectors: Readonly<Record<string, ErasedConnector>> = {
@@ -22,6 +23,7 @@ export const connectors: Readonly<Record<string, ErasedConnector>> = {
   cloudflare: cloudflareConnector,
   anthropic: anthropicConnector,
   http: httpConnector,
+  'workers-ai': workersAiConnector,
 };
 
 export function getConnector(type: string): ErasedConnector {
@@ -32,7 +34,7 @@ export function getConnector(type: string): ErasedConnector {
   return connector;
 }
 
-/** Sinks are registered the same way (§6.6). */
+/** Sinks are registered the same way. */
 export const sinks: Readonly<Record<string, ErasedSink>> = {
   webhook: webhookSink,
 };

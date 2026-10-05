@@ -2,7 +2,7 @@ import type { KvStore } from '@murmur/connector-types';
 import { MurmurError } from './errors.js';
 
 /**
- * Abuse bounds, held in KV (§7.2).
+ * Abuse bounds, held in KV.
  *
  * KV is eventually consistent, so a determined attacker racing many requests
  * can slip a few past a limit. That is an accepted trade: these exist to
@@ -12,6 +12,19 @@ import { MurmurError } from './errors.js';
  */
 
 export type LimitVerdict = { allowed: boolean; count: number; retryAfter?: number };
+
+/**
+ * Hand a counter's write to `waitUntil` instead of waiting for it. A KV write
+ * goes to Cloudflare's central store — hundreds of milliseconds from far
+ * away — and the verdict needs only the read. Without it, the write is awaited.
+ */
+export type Defer = (write: Promise<unknown>) => void;
+
+async function store(kv: KvStore, key: string, value: string, ttl: number, defer?: Defer): Promise<void> {
+  const write = kv.put(key, value, { expirationTtl: ttl });
+  if (defer) defer(write.catch(() => {}));
+  else await write;
+}
 
 /** `rl:{scope}:{key}:{window}` — the window number keeps keys self-expiring. */
 function windowKey(scope: string, key: string, windowSeconds: number, now: number): string {
@@ -36,6 +49,7 @@ export async function hitWindow(
   limit: number,
   windowSeconds: number,
   now = Date.now(),
+  defer?: Defer,
 ): Promise<LimitVerdict> {
   const bucket = windowKey(scope, key, windowSeconds, now);
   const count = await readCount(kv, bucket);
@@ -47,7 +61,7 @@ export async function hitWindow(
 
   // A TTL twice the window keeps the key alive across the boundary without
   // accumulating; KV rounds TTLs up to a minute anyway.
-  await kv.put(bucket, String(count + 1), { expirationTtl: Math.max(60, windowSeconds * 2) });
+  await store(kv, bucket, String(count + 1), Math.max(60, windowSeconds * 2), defer);
   return { allowed: true, count: count + 1 };
 }
 
@@ -63,16 +77,17 @@ export async function hitTotal(
   key: string,
   limit: number,
   ttlSeconds: number,
+  defer?: Defer,
 ): Promise<LimitVerdict> {
   const count = await readCount(kv, key);
   if (count >= limit) return { allowed: false, count };
-  await kv.put(key, String(count + 1), { expirationTtl: Math.max(60, Math.ceil(ttlSeconds)) });
+  await store(kv, key, String(count + 1), Math.max(60, Math.ceil(ttlSeconds)), defer);
   return { allowed: true, count: count + 1 };
 }
 
 export const sessionMessageKey = (sessionId: string) => `msg:${sessionId}`;
 
-/** `quota:{siteId}:{yyyy-mm-dd}` in UTC — the cost backstop (§7.2). */
+/** `quota:{siteId}:{yyyy-mm-dd}` in UTC — the cost backstop. */
 export function dailyKey(siteId: string, now = Date.now()): string {
   return `quota:${siteId}:${new Date(now).toISOString().slice(0, 10)}`;
 }
@@ -82,6 +97,7 @@ export async function hitDaily(
   siteId: string,
   limit: number,
   now = Date.now(),
+  defer?: Defer,
 ): Promise<LimitVerdict> {
   const key = dailyKey(siteId, now);
   const count = await readCount(kv, key);
@@ -94,7 +110,7 @@ export async function hitDaily(
     );
     return { allowed: false, count, retryAfter: Math.max(1, Math.ceil((midnight - now) / 1000)) };
   }
-  await kv.put(key, String(count + 1), { expirationTtl: 172_800 });
+  await store(kv, key, String(count + 1), 172_800, defer);
   return { allowed: true, count: count + 1 };
 }
 

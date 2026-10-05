@@ -1,7 +1,7 @@
 import type { IconName, LauncherIconName } from '@murmur/protocol';
 
 /**
- * The built-in icon set (§9.6): 1.5px stroke on a 20px grid, rounded caps.
+ * The built-in icon set: 1.5px stroke on a 20px grid, rounded caps.
  * Inline SVG paths — no icon font and no external request.
  *
  * Shared with the loader, which needs whichever icon the site chose for its

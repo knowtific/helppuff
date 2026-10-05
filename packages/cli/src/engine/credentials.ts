@@ -1,4 +1,4 @@
-import { CliError } from '../errors.js';
+import { CliError, EXIT } from '../errors.js';
 import { CloudflareApi, TOKEN_HELP, type Account } from './cloudflare.js';
 import { wranglerOAuthToken } from './wrangler-auth.js';
 
@@ -29,6 +29,7 @@ export async function cloudflareSession(
   if (!token) {
     throw new CliError('needs_cloudflare_token', 'Not connected to Cloudflare.', {
       hint: `${LOGIN_HINT}\n${TOKEN_HELP}\nthen: murmur secret set CLOUDFLARE_API_TOKEN`,
+      exitCode: EXIT.auth,
     });
   }
   const api = new CloudflareApi(token, doFetch);
@@ -48,6 +49,7 @@ export async function cloudflareSession(
     if (accounts.length > 0 && !match) {
       throw new CliError('cloudflare_account_mismatch', `The token cannot access account ${accountId}.`, {
         hint: `Accounts this token can use: ${accounts.map((a) => `${a.name} (${a.id})`).join(', ')}`,
+        exitCode: EXIT.auth,
       });
     }
     return { api, accountId, accountName: match?.name ?? null, token, source };
@@ -55,18 +57,15 @@ export async function cloudflareSession(
   if (accounts.length === 0) {
     throw new CliError('cloudflare_no_account', 'The Cloudflare token cannot see any account.', {
       hint: 'Give the token "Account Settings › Read" and include your account under Account Resources, or set CLOUDFLARE_ACCOUNT_ID.',
+      exitCode: EXIT.auth,
     });
   }
   if (accounts.length > 1) {
     throw new CliError('needs_cloudflare_account', 'The token can access several Cloudflare accounts; pick one.', {
-      hint: 'Pass --cf-account <id> or set CLOUDFLARE_ACCOUNT_ID.',
+      hint: 'Pass --cf-account <id> (or --account-id) or set CLOUDFLARE_ACCOUNT_ID.',
       details: { accounts },
+      exitCode: EXIT.usage,
     });
   }
   return { api, accountId: accounts[0]!.id, accountName: accounts[0]!.name, token, source };
-}
-
-/** Validate a token and list its accounts without choosing one. */
-export async function listAccounts(token: string, doFetch: typeof fetch = fetch): Promise<Account[]> {
-  return new CloudflareApi(token, doFetch).accounts();
 }

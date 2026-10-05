@@ -78,3 +78,15 @@ describe('crawlSite', () => {
     expect(pages.map((p) => p.url)).toEqual(['https://acme.com/', 'https://acme.com/pricing']);
   });
 });
+
+describe('brand colour from CSS', () => {
+  it('reads a --primary custom property, or the most used saturated colour', async () => {
+    const { inspectSite } = await import('../src/engine/site.js');
+    const { fakeFetch, html } = await import('./helpers.js');
+    const page = (css: string) =>
+      fakeFetch([(url) => (url.pathname === '/' ? html(`<html><head><title>Acme</title><style>${css}</style></head><body><main>Hi</main></body></html>`) : undefined)]).fetch;
+    expect((await inspectSite('https://acme.test', page(':root{--color-primary:#0f766e;--bg:#fff}'))).accent).toBe('#0F766E');
+    expect((await inspectSite('https://acme.test', page('body{color:#333}.btn{background:#e11d48}a{color:#e11d48}h1{color:#222}'))).accent).toBe('#E11D48');
+    expect((await inspectSite('https://acme.test', page('body{color:#333;background:#fafafa}'))).accent).toBeNull();
+  });
+});

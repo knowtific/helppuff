@@ -5,8 +5,8 @@ import { fieldSchema, linkItemSchema } from './messages.js';
 import { httpUrl, safeUrl } from './url-schema.js';
 
 /**
- * Every CSS custom property a site may override, without the `--mm-` prefix
- * (§9.3). An unknown key is ignored rather than written into the stylesheet.
+ * Every CSS custom property a site may override, without the `--mm-` prefix.
+ * An unknown key is ignored rather than written into the stylesheet.
  */
 export const THEME_TOKENS = [
   'accent', 'accent-fg', 'accent-soft',
@@ -39,7 +39,7 @@ export type ThemeTokens = z.infer<typeof themeTokensSchema>;
 const hexColor = z.string().regex(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/);
 
 /** A glob pattern matched against `location.pathname`. */
-const pathGlob = z.string().min(1).max(200);
+const pathGlob = z.string().min(1).max(200).describe('A path pattern, e.g. `/services/*` or `/blog/**`.');
 
 export const iconNames = [
   'chat', 'phone', 'mail', 'calendar', 'quote', 'pin', 'clock', 'wrench', 'heart',
@@ -58,93 +58,103 @@ export type IconName = (typeof iconNames)[number];
 export type LauncherIconName = IconName;
 
 export const shortcutSchema = z.object({
-  id: z.string().min(1).max(64),
-  label: z.string().min(1).max(80),
-  description: z.string().max(160).optional(),
-  icon: z.enum(iconNames).optional(),
+  id: z.string().min(1).max(64).describe('Unique among the shortcuts.'),
+  label: z.string().min(1).max(80).describe('What the shortcut says.'),
+  description: z.string().max(160).optional().describe('A line under the label.'),
+  icon: z.enum(iconNames).optional().describe('A built-in icon.'),
   action: actionSchema,
-  paths: z.array(pathGlob).max(20).optional(),
+  paths: z.array(pathGlob).max(20).optional().describe('Show it only on these pages.'),
 });
 export type Shortcut = z.infer<typeof shortcutSchema>;
 
 export const flowStepSchema = z.object({
-  field: z.string().min(1).max(64),
-  ask: z.string().min(1).max(400),
-  input: z.enum(['text', 'choice', 'phone', 'email']),
-  choices: z.array(z.string().min(1).max(120)).max(12).optional(),
-  required: z.boolean().optional(),
+  field: z.string().min(1).max(64).describe('The name the answer is kept under, for the template.'),
+  ask: z.string().min(1).max(400).describe('The question, shown as the assistant\'s message.'),
+  input: z.enum(['text', 'choice', 'phone', 'email']).describe('How the visitor answers.'),
+  choices: z.array(z.string().min(1).max(120)).max(12).optional().describe('The buttons of a `choice` step.'),
+  required: z.boolean().optional().describe('The step cannot be skipped.'),
 });
 export type FlowStep = z.infer<typeof flowStepSchema>;
 
 export const flowSchema = z.object({
-  id: z.string().min(1).max(64),
-  steps: z.array(flowStepSchema).min(1).max(10),
-  submit: z.object({ as: z.literal('message'), template: z.string().min(1).max(1000) }),
+  id: z.string().min(1).max(64).describe('What a `flow` action or shortcut starts it by.'),
+  steps: z.array(flowStepSchema).min(1).max(10).describe('Questions asked one at a time, in the widget, before anything is sent.'),
+  submit: z
+    .object({
+      as: z.literal('message').describe('Sent as one visitor message.'),
+      template: z.string().min(1).max(1000).describe('The message, with `{field}` for each answer, e.g. "Quote for {service} in {suburb}".'),
+    })
+    .describe('What happens with the answers.'),
 });
 export type Flow = z.infer<typeof flowSchema>;
 
 export const brandSchema = z.object({
-  name: z.string().min(1).max(60).default('Chat'),
-  agentName: z.string().min(1).max(60).default('Assistant'),
-  avatar: httpUrl.optional(),
-  accent: hexColor.default('#5B5BF7'),
-  theme: z.enum(['light', 'dark', 'auto']).default('auto'),
-  tokens: themeTokensSchema.optional(),
+  name: z.string().min(1).max(60).default('Chat').describe('The business name in the widget.'),
+  agentName: z.string().min(1).max(60).default('Assistant').describe('The assistant\'s name, in its header and messages.'),
+  avatar: httpUrl.optional().describe('The assistant\'s picture: a square image URL.'),
+  accent: hexColor.default('#5B5BF7').describe('The main colour (hex). Text on it is made readable automatically.'),
+  theme: z.enum(['light', 'dark', 'auto']).default('auto').describe('`auto` follows the visitor\'s system setting.'),
+  tokens: themeTokensSchema.optional().describe('Fine-grained styling: CSS custom properties without the `--mm-` prefix, e.g. `{ "radius-panel": "12px", "font": "Inter, sans-serif" }`.'),
 });
 export type Brand = z.infer<typeof brandSchema>;
 
 export const launcherSchema = z.object({
-  position: z.enum(['bottom-right', 'bottom-left']).default('bottom-right'),
-  offset: z.object({ x: z.number().min(0).max(200), y: z.number().min(0).max(200) }).optional(),
-  /**
-   * Text beside the orb, or inside it when `shape` is `pill`.
-   * For example "Chat with us".
-   */
-  label: z.string().max(40).optional(),
-  /** Which of the built-in icons (§9.6) the launcher shows. */
-  icon: z.enum(iconNames).default('chat'),
-  /**
-   * `orb` is the signature circle (§9.2). `pill` widens it to sit the label
-   * inside the button, which reads as a clearer invitation on a busy page.
-   */
-  shape: z.enum(['orb', 'pill']).default('orb'),
-  hideOnPaths: z.array(pathGlob).max(50).optional(),
+  position: z.enum(['bottom-right', 'bottom-left']).default('bottom-right').describe('Which corner the button sits in.'),
+  offset: z
+    .object({ x: z.number().min(0).max(200).describe('Pixels from the side.'), y: z.number().min(0).max(200).describe('Pixels from the bottom.') })
+    .optional()
+    .describe('Move the button away from the corner, e.g. above a cookie banner.'),
+  label: z.string().max(40).optional().describe('Text beside the orb, or inside it when `shape` is `pill`. For example "Chat with us".'),
+  icon: z.enum(iconNames).default('chat').describe('Which of the built-in icons the launcher shows.'),
+  shape: z.enum(['orb', 'pill']).default('orb').describe('`orb` is the signature circle. `pill` widens it to sit the label inside the button, which reads as a clearer invitation on a busy page.'),
+  hideOnPaths: z.array(pathGlob).max(50).optional().describe('Pages where the widget does not appear, e.g. `/checkout/**`.'),
 });
 
 export const homeSchema = z.object({
-  title: z.string().max(120).default('Hi there'),
-  subtitle: z.string().max(240).default('Ask anything, or pick a shortcut.'),
-  shortcuts: z.array(shortcutSchema).max(8).optional(),
+  title: z.string().max(120).default('Hi there').describe('The heading of the first screen.'),
+  subtitle: z.string().max(240).default('Ask anything, or pick a shortcut.').describe('The line under it.'),
+  shortcuts: z.array(shortcutSchema).max(8).optional().describe('Buttons on the first screen: suggested questions, a call button, a form…'),
   links: z
-    .object({ title: z.string().max(120), items: z.array(linkItemSchema).min(1).max(10) })
-    .optional(),
+    .object({ title: z.string().max(120).describe('The list\'s heading.'), items: z.array(linkItemSchema).min(1).max(10).describe('The links.') })
+    .optional()
+    .describe('A list of useful pages on the first screen.'),
 });
 
-/** Default lead form used when a site configures none, or configures a broken one (§8.3). */
+/** Default lead form used when a site configures none, or configures a broken one. */
 export const DEFAULT_LEAD_FIELDS = [
   { name: 'name', label: 'Name', type: 'text', required: true, autocomplete: 'name' },
   { name: 'phone', label: 'Phone', type: 'tel', required: true, autocomplete: 'tel' },
 ] as const satisfies readonly z.infer<typeof fieldSchema>[];
 
 export const leadFormSchema = z.object({
-  enabled: z.boolean().default(true),
-  title: z.string().max(120).optional(),
-  fields: z.array(fieldSchema).min(1).max(12).catch([...DEFAULT_LEAD_FIELDS]).default([...DEFAULT_LEAD_FIELDS]),
-  submitLabel: z.string().max(60).optional(),
-  privacy: z.object({ text: z.string().min(1).max(300), url: safeUrl }).optional(),
-  askFirstMessage: z.boolean().optional(),
+  enabled: z.boolean().default(true).describe('Ask for details before the chat starts.'),
+  title: z.string().max(120).optional().describe('The form\'s heading.'),
+  fields: z
+    .array(fieldSchema)
+    .min(1)
+    .max(12)
+    .catch([...DEFAULT_LEAD_FIELDS])
+    .default([...DEFAULT_LEAD_FIELDS])
+    .describe('The questions, in order. Add your own; each answer is kept on the lead and shown to the assistant.'),
+  submitLabel: z.string().max(60).optional().describe('The button\'s text.'),
+  privacy: z
+    .object({ text: z.string().min(1).max(300).describe('The notice, e.g. "We only use this to reply to you."'), url: safeUrl.describe('Your privacy policy.') })
+    .optional()
+    .describe('A privacy note under the form.'),
+  askFirstMessage: z.boolean().optional().describe('Add a box for the visitor\'s first message to the form. A field named `message` does the same and can be labelled.'),
 });
 
 export const chatSchema = z.object({
-  placeholder: z.string().max(120).optional(),
-  initialMessages: z.array(z.string().min(1).max(2000)).max(3).optional(),
-  shortcuts: z.array(shortcutSchema).max(8).optional(),
+  placeholder: z.string().max(120).optional().describe('Hint text in the message box.'),
+  initialMessages: z.array(z.string().min(1).max(2000)).max(3).optional().describe('The assistant\'s greeting, before the visitor writes.'),
+  shortcuts: z.array(shortcutSchema).max(8).optional().describe('Buttons above the message box during the chat.'),
   fallbackContact: z
     .object({
-      phone: z.string().max(40).optional(),
-      email: z.string().max(200).optional(),
+      phone: z.string().max(40).optional().describe('Shown when the assistant cannot answer.'),
+      email: z.string().max(200).optional().describe('Shown when the assistant cannot answer.'),
     })
-    .optional(),
+    .optional()
+    .describe('How to reach a person when the assistant is unavailable (an outage, or the daily budget is spent).'),
 });
 
 /** How long to wait before the teaser appears, when no trigger is configured. */
@@ -152,16 +162,11 @@ export const DEFAULT_TEASER_DELAY_MS = 8000;
 
 export const teaserSchema = z
   .object({
-    text: z.string().min(1).max(200),
-    /** Time on the page. Omit to rely on `afterScroll` alone. */
-    delayMs: z.number().int().min(2000).max(120000).optional(),
-    /**
-     * Percentage of the page scrolled, 1–100. Whichever trigger fires first
-     * shows the teaser; a visitor who reads rather than waits still sees it.
-     */
-    afterScroll: z.number().int().min(1).max(100).optional(),
-    paths: z.array(pathGlob).max(50).optional(),
-    oncePerSession: z.boolean().default(true),
+    text: z.string().min(1).max(200).describe('The message, e.g. "Need a quote? Ask me."'),
+    delayMs: z.number().int().min(2000).max(120000).optional().describe('Time on the page. Omit to rely on `afterScroll` alone.'),
+    afterScroll: z.number().int().min(1).max(100).optional().describe('Percentage of the page scrolled, 1–100. Whichever trigger fires first shows the teaser; a visitor who reads rather than waits still sees it.'),
+    paths: z.array(pathGlob).max(50).optional().describe('Show it only on these pages.'),
+    oncePerSession: z.boolean().default(true).describe('Show it once per visit, not on every page.'),
   })
   // A teaser with no trigger at all would never appear, which is never what
   // was meant — fall back to the default delay.
@@ -178,33 +183,36 @@ export const teaserSchema = z
  */
 export const poweredBySchema = z.union([
   z.boolean(),
-  z.object({ text: z.string().min(1).max(60), url: safeUrl.optional() }),
+  z.object({ text: z.string().min(1).max(60).describe('Your own credit text.'), url: safeUrl.optional().describe('Where it links. Without one it is plain text.') }),
 ]);
 export type PoweredBy = z.infer<typeof poweredBySchema>;
 
 export const widgetConfigSchema = z.object({
-  brand: brandSchema.default({}),
-  launcher: launcherSchema.default({}),
-  home: homeSchema.default({}),
-  leadForm: leadFormSchema.default({}),
-  chat: chatSchema.default({}),
-  teaser: teaserSchema.optional(),
-  flows: z.array(flowSchema).max(20).optional(),
+  brand: brandSchema.default({}).describe('Names, colour and theme.'),
+  launcher: launcherSchema.default({}).describe('The button that opens the chat.'),
+  home: homeSchema.default({}).describe('The first screen visitors see.'),
+  leadForm: leadFormSchema.default({}).describe('The short form before the chat.'),
+  chat: chatSchema.default({}).describe('The conversation screen.'),
+  teaser: teaserSchema.optional().describe('A message that pops up beside the button to invite a chat.'),
+  flows: z.array(flowSchema).max(20).optional().describe('Guided questions asked in the widget (no AI), sent as one message at the end.'),
   forms: z
     .record(
       z.string().min(1).max(64),
       z.object({
-        title: z.string().max(120).optional(),
-        fields: z.array(fieldSchema).min(1).max(12),
-        submitLabel: z.string().max(60).optional(),
+        title: z.string().max(120).optional().describe('The form\'s heading.'),
+        fields: z.array(fieldSchema).min(1).max(12).describe('The questions.'),
+        submitLabel: z.string().max(60).optional().describe('The button\'s text.'),
       }),
     )
-    .optional(),
-  sound: z.object({ enabled: z.boolean() }).optional(),
-  captcha: z.object({ provider: z.literal('turnstile'), siteKey: z.string().min(1).max(200) }).optional(),
-  poweredBy: poweredBySchema.default(true),
-  /** UI string overrides (§8.7). Keys are validated by the widget, not here. */
-  strings: z.record(z.string().min(1).max(64), z.string().max(300)).optional(),
+    .optional()
+    .describe('Inline forms by id, opened by a `form` action or shortcut. Submitting one sends its answers to the assistant.'),
+  sound: z.object({ enabled: z.boolean().describe('Play it.') }).optional().describe('A soft sound when a reply arrives.'),
+  captcha: z
+    .object({ provider: z.literal('turnstile').describe('Cloudflare Turnstile.'), siteKey: z.string().min(1).max(200).describe('The Turnstile site key.') })
+    .optional()
+    .describe('Set by `security.captcha`; you do not need to set it here.'),
+  poweredBy: poweredBySchema.default(true).describe('The footer credit: `true`, `false`, or `{ text, url }` for your own.'),
+  strings: z.record(z.string().min(1).max(64), z.string().max(300)).optional().describe('UI string overrides. Keys are validated by the widget, not here.'),
 });
 
 export type WidgetConfig = z.infer<typeof widgetConfigSchema>;

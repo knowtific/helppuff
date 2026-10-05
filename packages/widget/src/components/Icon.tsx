@@ -11,7 +11,7 @@ export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   );
 }
 
-/** The signature orb (§9.2), shared by the launcher and the header. */
+/** The signature orb, shared by the launcher and the header. */
 export function Orb({
   size = 56,
   avatar,

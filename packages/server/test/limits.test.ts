@@ -183,7 +183,7 @@ describe('rate limits on the routes', () => {
     expect(blocked.status).toBe(429);
     const error = await envelope(blocked);
     expect(error?.code).toBe('quota_exceeded');
-    // The widget shows the fallback contact for this code (§8.7).
+    // The widget shows the fallback contact for this code.
     expect(error?.message).not.toMatch(/quota|limit/i);
   });
 

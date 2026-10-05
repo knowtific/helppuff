@@ -6,7 +6,7 @@
  * widget reads it back with `readSse`. Kept free of Zod and of everything
  * else in this package, so the widget can import it without the weight.
  *
- * A streamed reply (see docs/protocol.md) is three event types:
+ * A streamed reply (see wiki/Protocol.md) is three event types:
  *
  *   delta   { text }       Reply text as it is written. A preview only: it is
  *                          never stored, and `done` supersedes it.

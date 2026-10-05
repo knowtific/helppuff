@@ -25,8 +25,12 @@ export function prepareConnector(ctx: RequestCtx, site: SiteConfig): PreparedCon
 }
 
 /** What the widget is told the connector can do, streaming included. */
-export function capabilitiesOf(prepared: PreparedConnector): Capabilities {
-  return { ...prepared.connector.capabilities, stream: prepared.connector.streams(prepared.options) };
+export function capabilitiesOf(prepared: PreparedConnector, records = false): Capabilities {
+  return {
+    ...prepared.connector.capabilities,
+    stream: prepared.connector.streams(prepared.options),
+    ...(records ? { feedback: true } : {}),
+  };
 }
 
 export function connectorContext(
@@ -35,9 +39,12 @@ export function connectorContext(
   siteId: string,
   sessionId: string,
   onText?: (delta: string) => void,
+  reportLead?: (lead: Record<string, string>) => void,
 ): ConnectorContext<unknown> {
   return {
     ...(onText ? { onText } : {}),
+    ...(reportLead ? { reportLead } : {}),
+    time: (stage, ms) => ctx.timing.add(stage, ms),
     options: prepared.options,
     siteId,
     sessionId,
@@ -52,7 +59,7 @@ export function connectorContext(
 /**
  * Run a connector call, converting anything it throws into a clean error
  * envelope. A stack trace or a backend's error string never reaches the
- * visitor (§8.3).
+ * visitor.
  */
 export async function runConnector<T>(ctx: RequestCtx, operation: string, work: () => Promise<T>): Promise<T> {
   try {

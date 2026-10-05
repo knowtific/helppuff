@@ -1,7 +1,7 @@
 import type { Field } from '@murmur/protocol';
 
 /**
- * One field, shared by the lead form and inline `form` messages (§8.7), so
+ * One field, shared by the lead form and inline `form` messages, so
  * validation, labelling and mobile keyboard hints behave identically in both.
  */
 
@@ -48,7 +48,7 @@ export function collectValues(fields: readonly Field[], values: Record<string, s
   return out;
 }
 
-/** Sensible mobile keyboards, so autofill works (§8.7). */
+/** Sensible mobile keyboards, so autofill works. */
 function inputMode(field: Field): string | undefined {
   if (field.type === 'email') return 'email';
   if (field.type === 'tel') return 'tel';

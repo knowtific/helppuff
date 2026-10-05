@@ -2,11 +2,11 @@ import { MurmurError } from './errors.js';
 import type { Platform } from './platform.js';
 
 /**
- * Cloudflare Turnstile siteverify (§7.1 step 6).
+ * Cloudflare Turnstile siteverify.
  *
  * This is the only layer that meaningfully separates a human in a browser
  * from a script — origin checks stop other websites, not `curl`. See
- * `docs/security.md`.
+ * `wiki/Security.md`.
  */
 const SITEVERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
 const TIMEOUT_MS = 8000;
@@ -28,7 +28,7 @@ export async function verifyTurnstile(
   const body = new FormData();
   body.append('secret', secret);
   body.append('response', token);
-  // Cloudflare accepts the raw IP here; it never reaches our own logs (§7.2).
+  // Cloudflare accepts the raw IP here; it never reaches our own logs.
   if (options.ip) body.append('remoteip', options.ip);
 
   const doFetch = options.fetch ?? fetch;

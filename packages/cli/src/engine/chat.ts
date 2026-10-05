@@ -16,7 +16,21 @@ export type ChatTurn = {
   messages: Message[];
   /** The reply flattened to text, for a quick read. */
   reply: string;
+  /** Milliseconds per server stage, from `Server-Timing` (auth, limits, context, rag.*, llm.*, total). */
+  timing: Record<string, number>;
+  /** Wall time seen from here, request to full reply. */
+  elapsedMs: number;
 };
+
+/** `auth;dur=12, rag.embed;dur=340` → `{ auth: 12, 'rag.embed': 340 }`. */
+export function parseServerTiming(header: string | null): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const part of (header ?? '').split(',')) {
+    const match = /^\s*([\w.-]+)\s*;\s*dur=([\d.]+)/.exec(part);
+    if (match) out[match[1]!] = Number(match[2]);
+  }
+  return out;
+}
 
 type Field = { name: string; type?: string; required?: boolean };
 
@@ -104,6 +118,7 @@ export async function chat(input: {
     ...(input.secret && input.secret.length >= 32 ? { [OWNER_HEADER]: await ownerToken(input.secret) } : {}),
   };
 
+  const started = Date.now();
   if (input.session) {
     const response = await call(doFetch, `${base}/v1/sessions/messages`, {
       method: 'POST',
@@ -113,13 +128,14 @@ export async function chat(input: {
     const body = await envelope(response);
     const messages = (body['messages'] ?? []) as Message[];
     const session = response.headers.get('X-Murmur-Token') ?? input.session;
-    return { session, sessionId: sessionIdOf(session), messages, reply: flatten(messages) };
+    return { session, sessionId: sessionIdOf(session), messages, reply: flatten(messages), timing: parseServerTiming(response.headers.get('Server-Timing')), elapsedMs: Date.now() - started };
   }
 
   const config = await envelope(await call(doFetch, `${base}/v1/sites/${input.site}/config`, { headers }));
   const leadForm = (config['widget'] as { leadForm?: { enabled?: boolean; fields?: Field[] } } | undefined)?.leadForm;
   const lead = leadForm?.enabled ? sampleLead(leadForm.fields ?? []) : undefined;
 
+  const sent = Date.now();
   const response = await call(doFetch, `${base}/v1/sites/${input.site}/sessions`, {
     method: 'POST',
     headers,
@@ -132,7 +148,14 @@ export async function chat(input: {
   const body = await envelope(response);
   const messages = (body['messages'] ?? []) as Message[];
   const session = String(body['sessionToken'] ?? '');
-  return { session, sessionId: String(body['sessionId'] ?? sessionIdOf(session)), messages, reply: flatten(messages) };
+  return {
+    session,
+    sessionId: String(body['sessionId'] ?? sessionIdOf(session)),
+    messages,
+    reply: flatten(messages),
+    timing: parseServerTiming(response.headers.get('Server-Timing')),
+    elapsedMs: Date.now() - sent,
+  };
 }
 
 function sessionIdOf(token: string): string {

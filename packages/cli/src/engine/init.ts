@@ -6,7 +6,7 @@ import { CloudflareApi } from './cloudflare.js';
 import { ensureGitignore, loadEnv, writeEnvVar } from './env.js';
 import { generateProject, writeAgentFiles } from './generate.js';
 import { checkKey } from './providers.js';
-import { PROJECT_FILE, PROMPT_FILE, parseProject, saveProject, type BackendType, type LoadedProject, type Project } from './project.js';
+import { DEFAULT_BACKEND, PROJECT_FILE, PROMPT_FILE, parseProject, saveProject, type BackendType, type LoadedProject, type Project } from './project.js';
 import {
   LATE_QUESTIONS,
   LEAD_FORM_FIELDS,
@@ -50,7 +50,7 @@ export type InitResult =
       warnings: string[];
     };
 
-const BACKENDS: BackendType[] = ['cloudflare', 'openai', 'gemini', 'anthropic', 'http', 'retell', 'echo'];
+const BACKENDS: BackendType[] = ['workers-ai', 'cloudflare', 'openai', 'gemini', 'anthropic', 'http', 'retell', 'echo'];
 
 /** Check one answer; returns an error message, or null when it is fine. */
 export function validateAnswer(question: Question, value: unknown, facts: Facts): string | null {
@@ -177,6 +177,7 @@ export async function runInit(options: {
   };
 
   for (let round = 0; round < 40; round++) {
+    if (answers.defaults === true && !answers.backend) answers.backend = DEFAULT_BACKEND;
     await gatherFacts(answers, facts, doFetch, progress);
     const pending = pendingQuestions(answers, facts);
     if (pending.every((q) => LATE_QUESTIONS.includes(q.id))) startBackground();
@@ -228,7 +229,7 @@ export async function runInit(options: {
   }
 
   const warnings: string[] = [];
-  const backend = answers.backend ?? 'cloudflare';
+  const backend = answers.backend ?? DEFAULT_BACKEND;
   const keyName = PROVIDER_KEYS[backend];
   const key = answers.apiKey || (keyName ? facts.env[keyName] : undefined);
   if (keyName && key) {

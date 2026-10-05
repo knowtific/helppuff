@@ -2,13 +2,13 @@ import { isHttpUrl, isSafeUrl } from '@murmur/protocol/url';
 import type { Action, Field, Flow, FlowStep, Img, Message, Option, Shortcut, WidgetConfig } from '@murmur/protocol';
 
 /**
- * Boundary validation for the widget (§8.3): config and every message from the
+ * Boundary validation for the widget: config and every message from the
  * server are parsed before use. A field of the wrong type is treated as absent
  * and its default applied; an unknown message type is dropped.
  *
  * This deliberately mirrors the Zod schemas in `@murmur/protocol` rather than
  * importing them — Zod would cost more than a third of the widget's 35 kb
- * budget (§13). `test/validate.test.ts` cross-checks the two on shared
+ * budget. `test/validate.test.ts` cross-checks the two on shared
  * fixtures so they cannot drift apart.
  */
 
@@ -323,7 +323,7 @@ function parseTokens(input: unknown): Record<string, string> | undefined {
 
 /**
  * Every optional key has a safe default, so `parseConfig({})` returns a fully
- * functional widget (§8.3). Only a non-object is unusable.
+ * functional widget. Only a non-object is unusable.
  */
 export function parseConfig(input: unknown): WidgetConfig | null {
   if (!isObject(input)) return null;

@@ -18,7 +18,7 @@ export type Persisted = {
 export const storageKey = (siteId: string) => `mm:${siteId}`;
 
 /**
- * Storage is never load-bearing (§8.3). Every read and write is guarded, and
+ * Storage is never load-bearing. Every read and write is guarded, and
  * an unavailable or corrupt store degrades to an in-memory session rather than
  * failing.
  */
@@ -73,7 +73,7 @@ export function load(siteId: string, now = Date.now()): Partial<State> | null {
 }
 
 /**
- * Validate at the boundary once, then treat the data as typed (§8.3). A field
+ * Validate at the boundary once, then treat the data as typed. A field
  * of the wrong type is treated as absent and its default applied; a wrong
  * version or a past expiry discards the whole payload.
  */

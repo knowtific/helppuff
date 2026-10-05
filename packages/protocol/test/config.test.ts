@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_LEAD_FIELDS, themeTokensSchema, widgetConfigSchema } from '../src/index.js';
 
 describe('widgetConfigSchema', () => {
-  it('parses an empty object into a fully usable config (§8.3 conservative defaults)', () => {
+  it('parses an empty object into a fully usable config (conservative defaults)', () => {
     const config = widgetConfigSchema.parse({});
     expect(config.brand.accent).toBe('#5B5BF7');
     expect(config.brand.theme).toBe('auto');
