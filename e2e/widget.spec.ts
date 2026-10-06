@@ -159,6 +159,32 @@ test.describe('the conversation', () => {
 });
 
 test.describe('the JavaScript API', () => {
+  test('an API call made while config is loading is replayed after startup', async ({ page }) => {
+    await page.addInitScript(() => {
+      const realFetch = window.fetch.bind(window);
+      let releaseConfig: (() => void) | undefined;
+      const configGate = new Promise<void>((resolve) => {
+        releaseConfig = resolve;
+      });
+
+      (window as never as { __releaseConfig(): void }).__releaseConfig = () => releaseConfig?.();
+      window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String((input as Request)?.url ?? input);
+        if (url.includes('/config')) await configGate;
+        return realFetch(input, init);
+      };
+    });
+
+    await page.reload();
+    await page.waitForFunction(() => typeof (window as never as { HelpPuff?: { open?: unknown } }).HelpPuff?.open === 'function');
+
+    await page.evaluate(() => (window as never as { HelpPuff: { open(): void } }).HelpPuff.open());
+    await expect(page.locator('helppuff-widget')).toHaveCount(0);
+
+    await page.evaluate(() => (window as never as { __releaseConfig(): void }).__releaseConfig());
+    await expect(panel(page)).toBeVisible();
+  });
+
   test('open, close and toggle drive the panel', async ({ page }) => {
     type Api = { open(): void; close(): void; toggle(): void };
     const api = () => page.evaluate.bind(page);

@@ -329,6 +329,10 @@ class Loader {
       this.disposer.add(() => host.remove());
 
       this.renderLauncher();
+      // Host-page API calls can arrive while /config is still in flight.
+      // They are already queued; now that the shell exists, start the app
+      // immediately so those calls do not wait for the idle-load timer.
+      if (this.queue.length > 0) void this.ensureApp();
       this.scheduleIdleLoad();
 
       if (this.script?.hasAttribute('data-open')) this.command('open')();
@@ -391,6 +395,9 @@ class Loader {
 
   private ensureApp(): Promise<void> {
     if (this.dead || this.app) return Promise.resolve();
+    // Do not cache a no-op promise when an API call arrives before /config.
+    // mountShell() retries queued calls as soon as these prerequisites exist.
+    if (!this.raw || !this.root || !this.host) return Promise.resolve();
     this.loading ??= this.importApp();
     return this.loading;
   }
