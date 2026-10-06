@@ -116,15 +116,38 @@ API, never around it.
 
 ## Releasing
 
+Merging to `main` does not publish anything by itself. A release is a pull
+request that changes the version, and `.github/workflows/release.yml`
+publishes it when that pull request is merged. Docs-only and other changes
+between releases are never published: every release makes deployed
+assistants show "Update available", so each one should be worth upgrading to.
+
+While working, add user-visible changes under `## [Unreleased]` in
+`CHANGELOG.md`. To release:
+
 1. Bump `version` in `packages/cli/package.json` (semver: a major release
-   only for changes that need users to act).
-2. Add the release notes to `CHANGELOG.md`, including anything an upgrade
-   does (migrations, re-learning) and, for a major release, what users must change.
+   only for changes that need users to act; `1.2.0-beta.1` publishes a
+   prerelease under npm's `next` tag).
+2. In `CHANGELOG.md`, rename `## [Unreleased]` to `## [x.y.z] - YYYY-MM-DD`
+   and start a new empty `## [Unreleased]` above it. Include anything an
+   upgrade does (migrations, re-learning) and, for a major release, what
+   users must change. The workflow refuses a version without a dated section.
 3. `pnpm sync:docs`, then `pnpm check`.
 4. Try it like a user: `pnpm pack:cli`, install the tarball in a test project,
    `npx helppuff upgrade` against a deployed test assistant.
-5. Publish: `pnpm --filter @knowtific/helppuff publish --access public`, and tag
-   the release.
+5. Merge. The workflow sees a version that has not been released, runs the
+   full checks, stages it on npm with provenance, and creates the `vx.y.z`
+   tag and GitHub release from the changelog section.
+6. Approve it: on npmjs.com (the package's staged versions) or with the
+   `npm stage approve <id>` command in the workflow run's summary. It needs
+   your 2FA. Only then is it live for `npx @knowtific/helppuff`.
+
+The workflow can only stage, never publish. It uses npm trusted publishing,
+so there is no npm token in the repository, and a compromised workflow or
+dependency can at most leave a version waiting for approval. It was set up
+once on npmjs.com (package Settings → Trusted publishing: repository
+`knowtific/helppuff`, workflow `release.yml`, environment `npm`, with
+"Allow npm publish" and "Allow npm dist-tag" unchecked).
 
 Deployed assistants learn of the release within 12 hours (Settings → Updates).
 

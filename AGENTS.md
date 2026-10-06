@@ -113,6 +113,9 @@ to go backwards without `--allow-downgrade`. Rules that keep this safe: D1
 migrations are additive only (expand, then contract in a later major);
 readers of KV config accept older shapes; helppuff.json format changes bump
 `PROJECT_FORMAT` with a step in `PROJECT_UPGRADES`. See `wiki/Upgrading.md`.
+Releases are a version bump plus a dated `CHANGELOG.md` section in a PR;
+`.github/workflows/release.yml` stages it on npm on merge, and a
+maintainer approves it with 2FA (`wiki/Contributing.md` → Releasing). Never bump the version unasked.
 
 ## Commands
 

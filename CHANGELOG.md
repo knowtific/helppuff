@@ -6,7 +6,9 @@ All notable changes to `@knowtific/helppuff`. The format follows
 never needs you to change anything. Upgrade with
 `npx @knowtific/helppuff@latest upgrade` (see the wiki's Upgrading page).
 
-## [0.1.0] - Unreleased
+## [Unreleased]
+
+## [0.1.0] - 2026-10-06
 
 The first public release.
 

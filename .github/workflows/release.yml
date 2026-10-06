@@ -1,0 +1,137 @@
+name: Release
+
+# Releases @knowtific/helppuff when a push to main carries a version of
+# packages/cli/package.json that has not been released yet. Every other push
+# (docs, refactors, work between releases) stops at the first job, so a
+# release is always a deliberate version bump: deployed assistants show
+# "Update available" for each one. See wiki/Contributing.md → Releasing.
+#
+# This workflow can only *stage* a version on npm. It goes live when a
+# maintainer approves it with 2FA (npmjs.com, or `npm stage approve <id>`),
+# so a compromised workflow or dependency can never ship to users by itself.
+#
+# One-time setup: on npmjs.com, @knowtific/helppuff → Settings → Trusted
+# publishing → GitHub Actions: repository knowtific/helppuff, workflow
+# release.yml, environment npm, with "Allow npm publish" and "Allow npm
+# dist-tag" unchecked (stage-only). No npm token is stored here.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      publish: ${{ steps.check.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Is this version new?
+        id: check
+        run: |
+          version=$(node -p "require('./packages/cli/package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if found=$(npm view "@knowtific/helppuff@$version" version --registry https://registry.npmjs.org 2>&1); then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "$version is already on npm; nothing to release."
+            exit 0
+          fi
+          # Only "not found" means new: a registry outage must not look like one.
+          if ! grep -q E404 <<< "$found"; then
+            echo "::error::Could not ask npm about $version: $found"
+            exit 1
+          fi
+          # The tag is made when a version is staged, so a version waiting for
+          # approval on npm is not staged a second time by the next push.
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "v$version is tagged but not on npm yet: it is staged, waiting for approval on npmjs.com."
+            exit 0
+          fi
+          # A release needs its notes: "## [x.y.z] - YYYY-MM-DD", not "Unreleased".
+          if ! grep -Eq "^## \[$version\] - [0-9]{4}-[0-9]{2}-[0-9]{2}" CHANGELOG.md; then
+            echo "::error file=CHANGELOG.md::packages/cli/package.json is $version but CHANGELOG.md has no dated '## [$version] - YYYY-MM-DD' section."
+            exit 1
+          fi
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+          echo "Releasing $version."
+
+  publish:
+    needs: version
+    if: needs.version.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: npm
+    permissions:
+      contents: write # the tag and the GitHub release
+      id-token: write # npm trusted publishing (stage only)
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      # npm stage publish needs a recent npm 11.
+      - run: npm install -g npm@^11.21.0
+
+      - run: pnpm install --frozen-lockfile
+
+      # The same checks as ci.yml, on the exact commit being published.
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm build:cli
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm e2e
+
+      # pnpm packs (replacing workspace:* ranges); npm stages it, with OIDC and provenance.
+      # A prerelease (1.2.0-beta.1) gets the "next" tag so `npx @knowtific/helppuff` keeps the stable one.
+      # The tag is fixed at staging and applied when the version is approved.
+      - name: Stage on npm
+        working-directory: packages/cli
+        run: |
+          set -o pipefail
+          tarball=$(pnpm pack --pack-destination "$RUNNER_TEMP" | tail -n 1)
+          tag=latest
+          case "$VERSION" in *-*) tag=next ;; esac
+          npm stage publish "$tarball" --access public --tag "$tag" --provenance 2>&1 | tee "$RUNNER_TEMP/stage.txt"
+          {
+            echo "## @knowtific/helppuff $VERSION is staged"
+            echo
+            echo "It is not live yet. Approve it with 2FA on npmjs.com (the package's staged versions), or run the command below."
+            echo
+            echo '```'
+            grep -Eo 'staged with id [^ )]+' "$RUNNER_TEMP/stage.txt" | sed 's/staged with id /npm stage approve /' || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Tag and GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          awk -v v="$VERSION" '
+            index($0, "## [" v "]") == 1 { on = 1; next }
+            on && /^## \[/ { exit }
+            on { print }
+          ' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          prerelease=""
+          case "$VERSION" in *-*) prerelease="--prerelease" ;; esac
+          gh release create "v$VERSION" --target "$GITHUB_SHA" --title "v$VERSION" --notes-file "$RUNNER_TEMP/notes.md" $prerelease
