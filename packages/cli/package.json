@@ -4,6 +4,14 @@
   "description": "Set up, deploy and manage an AI chat widget on your own Cloudflare account — built to be driven by people and by AI agents.",
   "author": "Knowtific (MYT PTY LTD)",
   "homepage": "https://www.knowtific.com.au",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/knowtific/helppuff.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/knowtific/helppuff/issues"
+  },
   "keywords": [
     "chat widget",
     "ai assistant",
