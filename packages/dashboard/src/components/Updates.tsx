@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { useData } from '../lib/utils';
 import { CopyBlock } from '../pages/Settings';
+import { WikiLink } from './Shell';
 import { Card, ErrorNote, Skeleton } from './ui';
 
 /**
@@ -20,37 +21,40 @@ export type VersionInfo = {
   releaseNotes: string;
 };
 
-const SEEN = 'hp-version';
+let checked: Promise<VersionInfo> | null = null;
 
-/** The update check, once per browser session (the server caches npm for 12 hours anyway). */
-export function useVersion(): VersionInfo | null {
-  const [info, setInfo] = useState<VersionInfo | null>(() => {
-    try {
-      const saved = sessionStorage.getItem(SEEN);
-      return saved ? (JSON.parse(saved) as VersionInfo) : null;
-    } catch {
-      return null;
-    }
+/**
+ * The update check, once per page load and shared by the sidebar and this
+ * page (the server caches the npm lookup for 12 hours). A reload after an
+ * upgrade asks again; a failed check is retried by the next caller.
+ */
+function checkVersion(): Promise<VersionInfo> {
+  checked ??= api<VersionInfo>('/version').catch((thrown: unknown) => {
+    checked = null;
+    throw thrown;
   });
+  return checked;
+}
+
+export function useVersion(): VersionInfo | null {
+  const [info, setInfo] = useState<VersionInfo | null>(null);
   useEffect(() => {
-    if (info) return;
-    api<VersionInfo>('/version').then(
+    let active = true;
+    void checkVersion().then(
       (v) => {
-        setInfo(v);
-        try {
-          sessionStorage.setItem(SEEN, JSON.stringify(v));
-        } catch {
-          // Private mode: asked again next page load.
-        }
+        if (active) setInfo(v);
       },
       () => {},
     );
-  }, [info]);
+    return () => {
+      active = false;
+    };
+  }, []);
   return info;
 }
 
 export function Updates() {
-  const version = useData(() => api<VersionInfo>('/version'), []);
+  const version = useData(checkVersion, []);
   const v = version.data;
   return (
     <div className="space-y-4">
@@ -76,9 +80,14 @@ export function Updates() {
                 database, and keeps your conversations, leads, settings and knowledge.
               </p>
               <CopyBlock text={v.command} label="upgrade command" />
-              <a href={v.releaseNotes} target="_blank" rel="noreferrer" className="inline-block text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
-                What’s new
-              </a>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                <WikiLink page="Upgrading" className="font-medium text-foreground underline-offset-2 hover:underline">
+                  How to upgrade
+                </WikiLink>
+                <a href={v.releaseNotes} target="_blank" rel="noreferrer" className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
+                  What’s new
+                </a>
+              </div>
             </div>
           )}
         </Card>

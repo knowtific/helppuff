@@ -1,6 +1,7 @@
 import { Loader2, MessagesSquare, ShieldCheck } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Button, Input } from '../components/ui';
+import { HelpLink } from '../components/Shell';
 import { api, ApiError } from '../lib/api';
 import { replaceHash } from '../lib/utils';
 
@@ -122,6 +123,9 @@ export function Setup({ token, onDone }: { token: string; onDone: () => void }) 
           <ShieldCheck className="mt-px size-3.5 shrink-0" aria-hidden />
           This link works once. Everything stays on your own Cloudflare account.
         </p>
+        <div className="flex justify-center pt-1">
+          <HelpLink page="Getting-Started#2-finish-on-the-setup-page" label="Setup help" />
+        </div>
       </form>
     </Frame>
   );

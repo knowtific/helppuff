@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { FactsForm } from '../components/FactsForm';
 import { GoalPicker, loadBehaviour, saveBehaviour, type Behaviour } from '../components/InstructionsForm';
 import { PagePicker } from '../components/knowledge';
+import { HelpLink } from '../components/Shell';
 import { Button, Card, ErrorNote } from '../components/ui';
 import { api, type Discovery, type Me, type SearchResult } from '../lib/api';
 import { cn, fmtNumber, href } from '../lib/utils';
@@ -24,16 +25,19 @@ export function Onboarding({ me }: { me: Me }) {
 
   return (
     <div className="mx-auto max-w-2xl space-y-5 p-4 md:p-8">
-      <ol className="flex gap-6 text-[13px]" aria-label="Setup steps">
-        {['Your pages', 'Your details'].map((label, i) => (
-          <li key={label} aria-current={i === step ? 'step' : undefined} className={cn('flex items-center gap-2', i === step ? 'font-medium' : 'text-muted-foreground')}>
-            <span className={cn('flex size-5 items-center justify-center rounded-full border text-[11px]', i < step && 'border-primary bg-primary text-primary-foreground', i === step && 'border-foreground')}>
-              {i + 1}
-            </span>
-            {label}
-          </li>
-        ))}
-      </ol>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <ol className="flex gap-6 text-[13px]" aria-label="Setup steps">
+          {['Your pages', 'Your details'].map((label, i) => (
+            <li key={label} aria-current={i === step ? 'step' : undefined} className={cn('flex items-center gap-2', i === step ? 'font-medium' : 'text-muted-foreground')}>
+              <span className={cn('flex size-5 items-center justify-center rounded-full border text-[11px]', i < step && 'border-primary bg-primary text-primary-foreground', i === step && 'border-foreground')}>
+                {i + 1}
+              </span>
+              {label}
+            </li>
+          ))}
+        </ol>
+        <HelpLink page="Getting-Started#2-finish-on-the-setup-page" label="Setup help" />
+      </div>
       {step === 0 ? <Pages onStarted={() => setStep(1)} /> : <Details />}
     </div>
   );

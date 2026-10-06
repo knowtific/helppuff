@@ -13,9 +13,10 @@ background Workflow. Everything runs on your Cloudflare account and fits the
 npx @knowtific/helppuff          # the default
 ```
 
-That is all. The setup page (or, for agents, `init --json`) starts learning
-your site. See [[Knowledge base|Knowledge-Base]] for how it crawls, reads files
-and finds answers.
+That is all. The setup page starts learning your site. An agent can do the
+same automatically with `--onboarding defaults`, or leave page selection to
+the setup page with `--onboarding dashboard`. See [[Knowledge base|Knowledge-Base]]
+for how it crawls, reads files and finds answers.
 
 ## How an answer is made
 

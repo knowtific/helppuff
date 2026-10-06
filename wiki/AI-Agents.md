@@ -1,54 +1,51 @@
 # Using with AI agents
 
 HelpPuff is built to be set up and looked after by coding agents (Claude Code,
-Codex, Cursor and others) as much as by people. "Add an AI chatbot to my
-website" is enough: the agent sets it up, tests it, adds the script to your
-site and gives you three links.
+Codex, Cursor, OpenCode and others) as much as by people. Give the agent the
+shared instructions once; it can then set up, test and embed the assistant and
+hand back the dashboard and preview links.
 
-## Teach your agent once
+## The simplest path: give your agent the instructions
 
-```bash
-# Claude Code: the plugin bundles the skill and the MCP server
-/plugin marketplace add <owner>/<repo>
-/plugin install knowtific-helppuff@knowtific
+Copy this prompt into Claude Code, Codex, Cursor, OpenCode or another AI coding
+agent:
 
-# or just the skill (Claude Code; add --codex for Codex)
-npx -y @knowtific/helppuff skill install
+> Follow the HelpPuff instructions at https://raw.githubusercontent.com/knowtific/helppuff/main/instructions.md and install it in this project. Complete setup automatically with the recommended free defaults. Ask me only for information you cannot determine safely or authorization I must complete. Continue until it is deployed, added to the website when possible, tested with real questions, and you have given me the dashboard, embed and preview links.
 
-# or the MCP server, for any MCP client
-claude mcp add helppuff -- npx -y @knowtific/helppuff mcp
-```
-
-Every project `init` creates also carries an `AGENTS.md` and a Claude Code
-skill (`.claude/skills/helppuff/`), so the next agent that opens the folder
-already knows how to change and test it.
+The instructions are plain Markdown. They work across agents and do not require
+a plugin, skill or MCP server.
 
 ## What the agent does
 
-1. Runs `helppuff init --url <site> --deploy --yes --json`.
-2. **Does the onboarding itself.** With no person at a browser (`--json`, no
-   terminal, or `--no-browser`), `init` and the first `deploy` start learning
-   the suggested pages and read the business details from the site, in the
-   background on Cloudflare. Pages can be chosen with `--crawl "<globs>"` or
-   `knowledge.website.include` / `exclude` in `helppuff.json`.
-3. Tests it like a visitor: `helppuff ask "<a real question>" --json`, including
-   one the site does not answer (it should say it is not sure, not guess).
-4. Adds the script to your site's shared layout, if your site's code is in the
+1. Determines the website domain from the project, or asks if it cannot do so
+   safely.
+2. Runs `helppuff init --url <site> --deploy --yes --onboarding defaults --json`.
+3. Starts learning the suggested pages and reads the business details in the
+   background on Cloudflare.
+4. After learning finishes, tests it like a visitor with
+   `helppuff ask "<a real question>" --json`, including one the site does not
+   answer (it should say it is not sure, not guess).
+5. Adds the script to your site's shared layout, if your site's code is in the
    workspace.
-5. Hands over three things: the **dashboard** link (`deploy.setupUrl`, a
-   one-time link where you create your sign-in; it opens on Home, since there
-   is nothing left to onboard), the **script** (`deploy.embed`) and the
-   **demo** (`deploy.preview`).
+6. Hands over the **dashboard** link (`deploy.setupUrl`), the **script**
+   (`deploy.embed`) and the **preview** (`deploy.preview`). The setup link
+   creates the user's sign-in and then opens Home because onboarding is done.
+
+If you explicitly want to choose pages and confirm business details yourself,
+ask the agent to use `--onboarding dashboard`. This is an optional handoff,
+not a question agents ask during normal setup. The choice is remembered, so a
+later `helppuff deploy` does not start learning pages behind your back.
 
 If the machine is not connected to Cloudflare, the agent stops and asks you
-to run `! npx wrangler login` (a browser sign-in) or store an API token with
-`! npx -y @knowtific/helppuff secret set CLOUDFLARE_API_TOKEN`. It never asks
-you to paste credentials into the chat.
+to run `npx wrangler login` (a browser sign-in) or store an API token with
+`npx -y @knowtific/helppuff secret set CLOUDFLARE_API_TOKEN`, run in the
+project folder the agent names. It never asks you to paste credentials into
+the chat.
 
 ## The contract
 
-Everything an agent needs is in `helppuff --help` (written to be followed
-literally) and in [[CLI reference|CLI-Reference]].
+The shared instructions describe the workflow. Command details are also in
+`helppuff --help` and the [[CLI reference|CLI-Reference]].
 
 **Output.** With `--json`, stdout is exactly one JSON object:
 `{"ok": true, …}`, or `{"ok": false, "error": {"code", "message", "hint"}}`.
@@ -84,19 +81,12 @@ per-conversation or daily caps), so an agent can test freely.
 **Upgrades.** `npx -y @knowtific/helppuff@latest upgrade --check --json` reports
 what would change; `… upgrade --yes --json` does it. See [[Upgrading]].
 
-## MCP tools
-
-`helppuff mcp` serves the same engine over stdio: `helppuff_setup`,
-`helppuff_deploy`, `helppuff_crawl`, `helppuff_knowledge_status`,
-`helppuff_knowledge_add`, `helppuff_knowledge_sync`, `helppuff_ask`, `helppuff_chat`,
-`helppuff_status`, `helppuff_doctor`, `helppuff_config`, `helppuff_prompt`,
-`helppuff_secret`, `helppuff_schema`.
-
-## Rules the skill gives agents
+## Rules the instructions give agents
 
 - Never print, log or commit `.env` or `ADMIN_API_KEY`; never repeat a secret.
 - Never guess a website, token, key, email or account id; ask.
-- Ask few questions, all together; do not make the user wait for learning.
+- Ask few questions, all together. Give the setup link immediately while
+  learning continues, then finish testing when it completes.
 - Stay on the free plan unless the user asks otherwise.
 - Before editing `prompt.md`, run `helppuff prompt pull`: the owner may have
   changed it in the dashboard. Before deploying settings, `helppuff config pull`.

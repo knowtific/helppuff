@@ -122,9 +122,9 @@ describe('env and args', () => {
   });
 
   it('parses flags the way the help describes', () => {
-    const parsed = parseArgs(['init', '--url', 'acme.com', '--docs', 'a,b', '--docs=c', '--no-agent-files', '-y', '--json']);
+    const parsed = parseArgs(['init', '--url', 'acme.com', '--docs', 'a,b', '--docs=c', '-y', '--json']);
     expect(parsed.command).toBe('init');
-    expect(parsed.flags).toMatchObject({ url: 'acme.com', docs: ['a', 'b', 'c'], 'agent-files': false, y: true, json: true });
+    expect(parsed.flags).toMatchObject({ url: 'acme.com', docs: ['a', 'b', 'c'], y: true, json: true });
     expect(() => parseArgs(['init', '--url'])).toThrow(/needs a value/);
   });
 });

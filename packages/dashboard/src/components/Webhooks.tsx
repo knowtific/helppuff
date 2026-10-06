@@ -1,4 +1,4 @@
-import { Check, ChevronRight, Copy, Eye, EyeOff, Loader2, Plus, Send, Trash2 } from 'lucide-react';
+import { Check, ChevronRight, Copy, Eye, EyeOff, Loader2, Plus, Send, ShieldCheck, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '../lib/api';
 import { cn, fmtRelative, useData } from '../lib/utils';
@@ -26,6 +26,7 @@ type Delivery = { id: string; event: string; ok: boolean; status: number | null;
 type TestResult = { ok: boolean; status: number | null; error: string | null };
 
 const ALL = '*';
+const SIGNED_HEADERS = ['X-HelpPuff-Event', 'X-HelpPuff-Delivery', 'X-HelpPuff-Timestamp', 'X-HelpPuff-Signature'];
 
 export function Webhooks() {
   const list = useData(() => api<{ webhooks: Webhook[]; events: EventInfo[] }>('/webhooks'), []);
@@ -64,13 +65,35 @@ export function Webhooks() {
         )
       )}
 
-      <Card className="space-y-2 px-4 py-3 text-xs text-muted-foreground">
-        <p className="text-[13px] font-medium text-foreground">Checking it came from us</p>
-        <p>
-          Every delivery is a JSON <code>POST</code> with <code>X-HelpPuff-Event</code>, <code>X-HelpPuff-Delivery</code>, <code>X-HelpPuff-Timestamp</code> and{' '}
-          <code>X-HelpPuff-Signature</code>. The signature is <code>sha256=</code> + the hex HMAC-SHA256 of <code>timestamp + "." + body</code> with the webhook’s signing secret.
-          Reject timestamps older than five minutes; use the body’s <code>id</code> to ignore a repeat.
-        </p>
+      <Card className="overflow-hidden bg-subtle/60" role="note" aria-labelledby="webhook-signing-title">
+        <div className="flex items-start gap-3 border-b px-4 py-3.5">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-card text-muted-foreground">
+            <ShieldCheck className="size-4" aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <h3 id="webhook-signing-title" className="text-[13px] font-medium">Verify webhook signatures</h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">Confirm each delivery came from HelpPuff before processing it.</p>
+          </div>
+        </div>
+        <div className="space-y-3 px-4 py-3.5 text-xs text-muted-foreground">
+          <p className="leading-relaxed">
+            Every delivery is a JSON <code>POST</code> with these headers:
+          </p>
+          <ul className="flex flex-wrap gap-1.5" aria-label="Webhook signature headers">
+            {SIGNED_HEADERS.map((header) => (
+              <li key={header}>
+                <code className="block rounded-md border bg-card px-2 py-1 text-[11px] text-foreground">{header}</code>
+              </li>
+            ))}
+          </ul>
+          <div className="space-y-2 border-t pt-3">
+            <p className="leading-relaxed">Create the signature with the endpoint’s signing secret:</p>
+            <code className="block overflow-x-auto whitespace-nowrap rounded-md bg-muted px-2.5 py-2 text-[11px] text-foreground">
+              sha256=hex(HMAC-SHA256(secret, timestamp + "." + body))
+            </code>
+            <p className="leading-relaxed">Reject timestamps older than five minutes, and use the body’s <code>id</code> to ignore a repeated delivery.</p>
+          </div>
+        </div>
       </Card>
     </div>
   );

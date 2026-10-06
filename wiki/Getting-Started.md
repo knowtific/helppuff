@@ -8,6 +8,9 @@ You need:
 
 ## 1. Run it
 
+You can either run the CLI yourself, or ask any coding agent to follow the
+shared [instructions.md](https://raw.githubusercontent.com/knowtific/helppuff/main/instructions.md).
+
 In an empty folder (it becomes the assistant's project folder):
 
 ```bash
@@ -28,6 +31,14 @@ That is the only question. HelpPuff then:
 3. deploys the widget, the server, the knowledge base and the dashboard to
    your Cloudflare account, all named `knowtific-helppuff-<site>`;
 4. prints a one-time **setup link**, valid for 24 hours.
+
+### When an AI agent installs it
+
+An agent finishes onboarding automatically with the recommended defaults: it
+selects the suggested pages, reads the business details, tests the result and
+adds the widget when it has access to the website source. If you explicitly
+prefer to choose pages and details yourself, ask it to use
+`--onboarding dashboard`.
 
 ## 2. Finish on the setup page
 
@@ -83,7 +94,6 @@ npx @knowtific/helppuff@latest upgrade         # move to a new release (see Upgr
 | `prompt.md` | How it talks (the system prompt) | yes |
 | `.env` | Secrets: provider keys, `HELPPUFF_SECRET`, `ADMIN_API_KEY` | **never** (gitignored) |
 | `.helppuff/` | Generated: the Worker build, the JSON Schema, deploy state | no (gitignored) |
-| `AGENTS.md`, `.claude/skills/helppuff/` | Instructions for coding agents that open the folder | yes |
 
 ## Choosing another AI provider
 

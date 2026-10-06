@@ -579,7 +579,14 @@ describe('versions', () => {
       const health = (await (await w.h.fetch('/healthz')).json()) as { version: string; schema: number };
       expect(health.version).toBe('0.1.0');
       const info = (await (await get(w.admin, '/admin/api/version', cookie)).json()) as Record<string, unknown>;
-      expect(info).toMatchObject({ current: '0.1.0', latest: '0.2.0', upgradeAvailable: true, command: 'npx @knowtific/helppuff@latest upgrade', schema: { expected: health.schema } });
+      expect(info).toMatchObject({
+        current: '0.1.0',
+        latest: '0.2.0',
+        upgradeAvailable: true,
+        command: 'npx @knowtific/helppuff@latest upgrade',
+        releaseNotes: 'https://github.com/knowtific/helppuff/blob/main/CHANGELOG.md',
+        schema: { expected: health.schema },
+      });
     } finally {
       vi.unstubAllGlobals();
     }

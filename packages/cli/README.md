@@ -25,9 +25,10 @@ link and the script tag for your site.
   Vectorize resources controlled by your Cloudflare account.
 - **Skip server maintenance:** Cloudflare runs the compute, storage, background
   work and edge network. There is no VPS or server fleet to manage.
-- **Let an AI agent do the work:** Claude Code, Codex, Cursor and other agents
-  can configure, deploy, test, diagnose and upgrade HelpPuff through its JSON
-  CLI, installable skill and MCP server.
+- **Let any AI agent do the work:** Claude Code, Codex, Cursor, OpenCode and
+  other agents can follow the shared [instructions](https://github.com/knowtific/helppuff/blob/main/instructions.md),
+  then configure, deploy, test, diagnose and upgrade HelpPuff through its JSON
+  CLI.
 - **Choose your AI:** use Workers AI by default, or switch to OpenAI, Gemini,
   Claude, Cloudflare AI Search, Retell or your own API.
 
@@ -67,23 +68,12 @@ link and the script tag for your site.
 
 ## Built for AI agents
 
-Ask your coding agent:
+Copy this prompt into any coding agent:
 
-> Add HelpPuff to this website, learn our content, deploy it to Cloudflare and
-> test it with real customer questions.
+> Follow the HelpPuff instructions at https://raw.githubusercontent.com/knowtific/helppuff/main/instructions.md and install it in this project. Complete setup automatically with the recommended free defaults. Ask me only for information you cannot determine safely or authorization I must complete. Continue until it is deployed, added to the website when possible, tested with real questions, and you have given me the dashboard, embed and preview links.
 
-Install the agent skill:
-
-```bash
-npx -y @knowtific/helppuff skill install          # Claude Code
-npx -y @knowtific/helppuff skill install --codex  # Codex
-```
-
-Or expose the same engine to an MCP client:
-
-```bash
-npx -y @knowtific/helppuff mcp
-```
+The instructions are plain Markdown and do not require a plugin, skill or MCP
+server.
 
 Commands support structured `--json` output, return missing decisions as
 `needs_input`, never echo secrets, and work non-interactively.

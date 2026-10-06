@@ -13,7 +13,7 @@ import { compile, DEV_PORT, devOrigin, embedSnippet } from '../engine/compile.js
 import { cloudflareSession } from '../engine/credentials.js';
 import { doctor } from '../engine/doctor.js';
 import { loadEnv, redact, writeEnvVar } from '../engine/env.js';
-import { GENERATED_DIR, loadProject, updateProject, workerNameFor, type LoadedProject } from '../engine/project.js';
+import { findProject, GENERATED_DIR, loadProject, updateProject, workerNameFor, type LoadedProject } from '../engine/project.js';
 import { projectJsonSchema, writeSchemaFile } from '../engine/schema.js';
 import type { Ctx } from './context.js';
 
@@ -168,9 +168,9 @@ async function readSecretValue(ctx: Ctx, name: string): Promise<string> {
 export async function secretCommand(ctx: Ctx): Promise<number> {
   const [sub, name] = ctx.positionals;
   assertKnown(ctx.flags, ['value'], 'secret');
-  const loaded = loadProject(ctx.cwd);
 
   if (sub === 'list') {
+    const loaded = loadProject(ctx.cwd);
     const env = loadEnv(loaded.dir);
     let required: string[] = [];
     try {
@@ -210,12 +210,18 @@ export async function secretCommand(ctx: Ctx): Promise<number> {
   }
   const value = await readSecretValue(ctx, name);
   if (!value) throw new CliError('usage', 'Empty value; nothing was stored.', { exitCode: 2 });
-  writeEnvVar(loaded.dir, name, value);
+  // Before `helppuff init` there is no project yet: the .env goes in this
+  // folder, which is only found if init runs here too.
+  const loaded = findProject(ctx.cwd);
+  const dir = loaded?.dir ?? resolve(ctx.cwd);
+  writeEnvVar(dir, name, value);
+  const stored = loaded ? '.env' : join(dir, '.env');
+  if (!loaded) ctx.out.warn(`No helppuff.json here yet: run \`helppuff init\` in ${dir} so it finds ${name}.`);
 
   let uploaded = false;
-  const env = loadEnv(loaded.dir);
+  const env = loadEnv(dir);
   const isWorkerSecret = !name.startsWith('CLOUDFLARE_');
-  if (isWorkerSecret && loaded.project.cloudflare.url && env['CLOUDFLARE_API_TOKEN']) {
+  if (isWorkerSecret && loaded?.project.cloudflare.url && env['CLOUDFLARE_API_TOKEN']) {
     const cf = await cloudflareSession(env);
     const worker = workerNameFor(loaded.project);
     if (await cf.api.workerExists(cf.accountId, worker)) {
@@ -223,8 +229,8 @@ export async function secretCommand(ctx: Ctx): Promise<number> {
       uploaded = true;
     }
   }
-  ctx.out.result({ name, stored: '.env', uploadedToWorker: uploaded }, () =>
-    ctx.out.success(`${name} saved to .env${uploaded ? ' and set on the Worker' : ''}.`),
+  ctx.out.result({ name, stored, uploadedToWorker: uploaded }, () =>
+    ctx.out.success(`${name} saved to ${stored}${uploaded ? ' and set on the Worker' : ''}.`),
   );
   return 0;
 }

@@ -1,4 +1,4 @@
-<!-- Generated from packages/cli/src/help.ts by `pnpm sync:plugin`. Edit that file, not this page. -->
+<!-- Generated from packages/cli/src/help.ts by `pnpm sync:docs`. Edit that file, not this page. -->
 
 # CLI reference
 
@@ -46,13 +46,14 @@ Set up a new assistant in this folder. In a terminal it asks only for the websit
 | `--deploy / --no-deploy` | Deploy right after setup (default: yes in a terminal, no in --json) |
 | `--crawl <which>` | workers-ai, with --deploy: suggested \| all \| none \| globs like "**/services/**,**/faq/**" |
 | `--crawl-file <file>` | workers-ai, with --deploy: crawl exactly the URLs in this file |
+| `--onboarding <mode>` | defaults: learn suggested pages automatically \| dashboard: let the user choose pages and details |
 | `--no-browser` | Do not open the setup page; continue in the terminal |
 | `--force` | Overwrite an existing helppuff.json |
-| `--no-agent-files` | Do not write AGENTS.md and the Claude Code skill |
 
 ```bash
 helppuff init
-helppuff init --url acme.com.au --deploy --crawl suggested --yes --json
+helppuff init --url acme.com.au --deploy --onboarding defaults --yes --json
+helppuff init --url acme.com.au --deploy --onboarding dashboard --yes --json
 helppuff init --url acme.com.au --deploy --crawl "**/services/**,**/faq/**" --yes --json
 helppuff init --url acme.com --backend cloudflare --yes --json
 helppuff init --url acme.com --backend openai --api-key "$OPENAI_API_KEY" --deploy --json
@@ -97,6 +98,7 @@ Create or update the Worker, storage, knowledge, secrets and config on Cloudflar
 | `--dry-run` | Check credentials and secrets and show the URL, change nothing |
 | `--crawl <which>` | workers-ai: also start a crawl — suggested \| all \| globs |
 | `--crawl-file <file>` | workers-ai: crawl exactly the URLs in this file |
+| `--onboarding <mode>` | first deploy: defaults starts learning automatically; dashboard leaves page selection to the setup page. Remembered for later deploys |
 | `--overwrite-settings` | Publish helppuff.json over settings changed in the dashboard (otherwise: config pull first) |
 | `--allow-downgrade` | Deploy although the Worker runs a newer release: a deliberate rollback |
 | `--account-id <id>` | The Cloudflare account, when the token sees several |
@@ -104,6 +106,7 @@ Create or update the Worker, storage, knowledge, secrets and config on Cloudflar
 ```bash
 helppuff deploy
 helppuff deploy --json
+helppuff deploy --onboarding dashboard --json
 helppuff deploy --crawl suggested --json
 helppuff deploy --knowledge
 ```
@@ -234,7 +237,7 @@ Delete everything this project created on Cloudflare: the Worker and its Workflo
 helppuff secret set <NAME> [--value <v>]   |   helppuff secret list
 ```
 
-Store a secret in .env and, if deployed, on the Worker. The value is read from --value, from stdin when piped, or prompted (hidden) in a terminal. Values are never printed.
+Store a secret in .env, even before init, and, if deployed, on the Worker. The value is read from --value, from stdin when piped, or prompted (hidden) in a terminal. Values are never printed. Listing secrets requires an initialized project.
 
 ```bash
 helppuff secret set OPENAI_API_KEY
@@ -372,24 +375,3 @@ helppuff dashboard [--email <e>] [--no-browser]
 ```
 
 Mint a one-time sign-in link to the dashboard (15 minutes), or the setup link if nobody has an account yet, and open it. The recovery path for a lost password.
-
-### `helppuff skill`
-
-```
-helppuff skill install [--project] [--codex]  |  helppuff skill print
-```
-
-Install the "website-chatbot" agent skill so a fresh Claude Code session knows how to set up, test and deploy an assistant: into ~/.claude/skills (default) or this repository (--project); --codex also adds it to ~/.codex/AGENTS.md. Or install the Claude Code plugin, which bundles the skill and the MCP server.
-
-```bash
-npx -y @knowtific/helppuff skill install
-npx -y @knowtific/helppuff skill install --codex
-```
-
-### `helppuff mcp`
-
-```
-helppuff mcp
-```
-
-Serve the helppuff tools over MCP (stdio). Add to Claude Code with: claude mcp add helppuff -- npx -y @knowtific/helppuff mcp

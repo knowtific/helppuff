@@ -1,9 +1,32 @@
-import { ArrowUpCircle, BookOpen, ChartColumn, ChevronDown, House, LogOut, MessagesSquare, Moon, PhoneCall, Settings, Sun, Users } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { ArrowUpCircle, BookOpen, ChartColumn, ChevronDown, CircleHelp, House, LogOut, MessagesSquare, Moon, PhoneCall, Settings, Sun, Users } from 'lucide-react';
+import { useEffect, useState, type ComponentProps, type ReactNode } from 'react';
 import { api, type CallbackList, type Me, type Site } from '../lib/api';
 import { cn, href, useTheme, type Route } from '../lib/utils';
 import { Avatar, Button } from './ui';
 import { useVersion } from './Updates';
+
+const WIKI = 'https://github.com/knowtific/helppuff/wiki';
+
+export function wikiHref(page: string): string {
+  return `${WIKI}/${page}`;
+}
+
+/** A wiki page, opened in a new tab. */
+export function WikiLink({ page, ...props }: { page: string } & Omit<ComponentProps<'a'>, 'href' | 'target' | 'rel'>) {
+  return <a href={wikiHref(page)} target="_blank" rel="noreferrer" {...props} />;
+}
+
+export function HelpLink({ page, label = 'Learn more', className }: { page: string; label?: string; className?: string }) {
+  return (
+    <WikiLink
+      page={page}
+      className={cn('inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline', className)}
+    >
+      <CircleHelp className="size-3.5" aria-hidden />
+      {label}
+    </WikiLink>
+  );
+}
 
 const ALL_NAV: {
   page: Route['page'];
@@ -161,6 +184,14 @@ export function Shell({ me, route, onLogout, children }: { me: Me; route: Route;
           <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" title={me.admin.email}>
             {me.admin.email}
           </span>
+          <WikiLink
+            page="Home"
+            className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            aria-label="Open HelpPuff help"
+            title="Help and documentation"
+          >
+            <CircleHelp className="size-4" aria-hidden />
+          </WikiLink>
           <Button variant="ghost" size="icon" className="size-7" onClick={toggleTheme} aria-label={dark ? 'Light theme' : 'Dark theme'}>
             {dark ? <Sun /> : <Moon />}
           </Button>
@@ -190,12 +221,17 @@ export function Shell({ me, route, onLogout, children }: { me: Me; route: Route;
   );
 }
 
-export function PageHeader({ title, description, actions }: { title: string; description?: ReactNode; actions?: ReactNode }) {
+export function PageHeader({ title, description, actions, help }: { title: string; description?: ReactNode; actions?: ReactNode; help?: string }) {
   return (
     <header className="flex flex-wrap items-end justify-between gap-3 border-b px-4 py-3.5 md:px-6">
       <div>
         <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
-        {description && <p className="mt-0.5 text-[13px] text-muted-foreground">{description}</p>}
+        {(description || help) && (
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+            {description && <p className="text-[13px] text-muted-foreground">{description}</p>}
+            {help && <HelpLink page={help} />}
+          </div>
+        )}
       </div>
       {actions && <div className="flex items-center gap-2">{actions}</div>}
     </header>

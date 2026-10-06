@@ -282,7 +282,7 @@ export function Conversations({ id, me }: { id?: string | undefined; me: Me }) {
   return (
     <div className="flex h-full flex-col">
       <div className={cn(id && 'hidden lg:block')}>
-        <PageHeader title="Conversations" description="Every chat, newest first." />
+        <PageHeader title="Conversations" description="Every chat, newest first." help="Dashboard#conversations" />
       </div>
       <div className="flex min-h-0 flex-1">
         <section className={cn('flex w-full flex-col border-r lg:w-[380px] lg:shrink-0', id && 'hidden lg:flex')}>

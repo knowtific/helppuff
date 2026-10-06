@@ -1,6 +1,3 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { AGENTS_MARKER, AGENTS_SECTION, SKILL_MD, SKILL_NAME } from '../skill.js';
 import { DEFAULT_BACKEND, PROMPT_FILE, resourceName, type Backend, type ProjectInput } from './project.js';
 import { DEFAULT_LEAD_FORM, PROVIDER_KEYS, defaultModel, guessName, type Answers, type Facts } from './questions.js';
 import { originsFor, normalizeUrl, siteIdFor, type SiteInfo } from './site.js';
@@ -192,30 +189,4 @@ export function promptFor(name: string, site: SiteInfo | null, backend: string, 
     notes.trim(),
   ].filter(Boolean);
   return `${parts.join('\n\n')}\n`;
-}
-
-// ------------------------------------------------------------ agent files
-
-/**
- * Drop the agent guides into the project: AGENTS.md (read by Codex and
- * others) and a Claude Code skill. An existing AGENTS.md gets a section
- * appended once, never rewritten.
- */
-export function writeAgentFiles(dir: string): string[] {
-  const written: string[] = [];
-  const agents = join(dir, 'AGENTS.md');
-  if (!existsSync(agents)) {
-    writeFileSync(agents, `# Agent notes\n\n${AGENTS_SECTION}`);
-    written.push('AGENTS.md');
-  } else if (!readFileSync(agents, 'utf8').includes(AGENTS_MARKER)) {
-    writeFileSync(agents, `${readFileSync(agents, 'utf8').trimEnd()}\n\n${AGENTS_SECTION}`);
-    written.push('AGENTS.md (section added)');
-  }
-  const skill = join(dir, '.claude', 'skills', SKILL_NAME, 'SKILL.md');
-  if (!existsSync(skill)) {
-    mkdirSync(dirname(skill), { recursive: true });
-    writeFileSync(skill, SKILL_MD);
-    written.push(`.claude/skills/${SKILL_NAME}/SKILL.md`);
-  }
-  return written;
 }

@@ -33,8 +33,8 @@ click (you review and publish). `helppuff prompt` shows the same list.
 ### Business details and placeholders
 
 Business details (phone, email, hours, address) are not in the prompt: they
-come from the Knowledge page and are given to the assistant with every
-answer, always current. To mention one in your own words, use a placeholder,
+come from **Settings → Business details** and are given to the assistant with
+every answer, always current. To mention one in your own words, use a placeholder,
 filled in on every answer, so it never goes stale:
 
 | Placeholder | Becomes |

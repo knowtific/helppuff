@@ -13,6 +13,9 @@ It asks for your website, deploys, and gives you one link: a setup page where
 you create your sign-in and check what it learned. Coding agents (Claude Code,
 Codex, Cursor…) can do the whole thing for you; see [[Using with AI agents|AI-Agents]].
 
+For the agent path, copy the prompt from [[Using with AI agents|AI-Agents]], or
+give your agent the shared [instructions.md](https://raw.githubusercontent.com/knowtific/helppuff/main/instructions.md).
+
 ## Start here
 
 - **[[Getting started|Getting-Started]]**: install, the setup page, adding it to your site.

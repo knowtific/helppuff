@@ -17,6 +17,7 @@ export const versionRoutes = new Hono<HonoEnv>();
 const PACKAGE = '@knowtific/helppuff';
 const LATEST_KEY = 'meta:latest-version';
 const CHECK_EVERY_S = 12 * 3600;
+const RELEASE_NOTES = 'https://github.com/knowtific/helppuff/blob/main/CHANGELOG.md';
 
 export const deployedVersion = (env: Record<string, unknown>): string | null => (typeof env['HELPPUFF_VERSION'] === 'string' && env['HELPPUFF_VERSION'] ? env['HELPPUFF_VERSION'] : null);
 
@@ -65,6 +66,6 @@ versionRoutes.get('/admin/api/version', async (c) => {
     upgradeAvailable: Boolean(current && latest && newer(latest, current)),
     schema: { applied: schema, expected: LATEST_MIGRATION },
     command: `npx ${PACKAGE}@latest upgrade`,
-    releaseNotes: `https://www.npmjs.com/package/${PACKAGE}?activeTab=versions`,
+    releaseNotes: RELEASE_NOTES,
   });
 });

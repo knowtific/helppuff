@@ -22,5 +22,6 @@ The first public release.
 - Other backends: Cloudflare AI Search, OpenAI, Gemini, Anthropic Claude,
   Retell, and your own API.
 - Webhooks for every event, signed.
-- An agent-native CLI: `--json`, `needs_input`, MCP, a Claude Code plugin and skill.
+- An agent-native CLI with `--json`, structured `needs_input` responses and one
+  shared instruction file for Claude Code, Codex, Cursor, OpenCode and others.
 - `helppuff upgrade`, with version reporting, a D1 restore point and guarded rollbacks.

@@ -4,7 +4,7 @@ import { CliError } from '../errors.js';
 import { generatePassword, gitEmail, hashPassword } from './admins.js';
 import { CloudflareApi } from './cloudflare.js';
 import { ensureGitignore, loadEnv, writeEnvVar } from './env.js';
-import { generateProject, writeAgentFiles } from './generate.js';
+import { generateProject } from './generate.js';
 import { checkKey } from './providers.js';
 import { DEFAULT_BACKEND, PROJECT_FILE, PROMPT_FILE, parseProject, saveProject, type BackendType, type LoadedProject, type Project } from './project.js';
 import {
@@ -141,7 +141,6 @@ export async function runInit(options: {
   ask?: Ask | null;
   yes?: boolean;
   force?: boolean;
-  agentFiles?: boolean;
   fetch?: typeof fetch;
   progress?: (message: string) => void;
   /**
@@ -263,8 +262,6 @@ export async function runInit(options: {
   for (const [name, value] of Object.entries(generated.secrets)) writeEnvVar(cwd, name, value);
   ensureGitignore(cwd, ['.env', '.helppuff/']);
   writeSchemaFile(cwd);
-  if (options.agentFiles !== false) files.push(...writeAgentFiles(cwd));
-
   return {
     status: 'created',
     dir: cwd,

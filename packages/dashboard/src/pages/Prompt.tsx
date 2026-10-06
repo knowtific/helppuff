@@ -83,6 +83,7 @@ export function Prompt({ me }: { me: Me }) {
       <PageHeader
         title="Prompt"
         description="How the assistant behaves. Every change is kept as a version you can restore."
+        help="Prompts-and-Instructions"
         actions={
           me.sites.length > 1 && (
             <Select

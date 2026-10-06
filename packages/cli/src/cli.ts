@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { parseArgs, str } from './args.js';
 import { CliError, EXIT } from './errors.js';
-import { COMMAND_HELP, MAIN_HELP, VERSION, agentsGuide, cliReferencePage, commandHelp } from './help.js';
+import { COMMAND_HELP, MAIN_HELP, VERSION, cliReferencePage, commandHelp } from './help.js';
 import { configReferencePage } from './engine/reference.js';
 import { Output } from './output.js';
 import { deployCommand, devCommand, initCommand } from './commands/setup.js';
@@ -20,12 +20,10 @@ import {
   validateCommand,
 } from './commands/manage.js';
 import type { Ctx } from './commands/context.js';
-import { serveMcp } from './mcp.js';
 import { dashboardCommand, usersCommand } from './commands/users.js';
 import { webhooksCommand } from './commands/webhooks.js';
 import { callbacksCommand } from './commands/callbacks.js';
 import { upgradeCommand } from './commands/upgrade.js';
-import { skillCommand } from './commands/skill.js';
 import { promptCommand } from './commands/prompt.js';
 
 const COMMANDS: Record<string, (ctx: Ctx) => Promise<number>> = {
@@ -53,7 +51,6 @@ const COMMANDS: Record<string, (ctx: Ctx) => Promise<number>> = {
   callbacks: callbacksCommand,
   upgrade: upgradeCommand,
   dashboard: dashboardCommand,
-  skill: skillCommand,
   prompt: promptCommand,
 };
 
@@ -76,17 +73,13 @@ export async function main(argv: string[]): Promise<number> {
     }
     if (!command || command === 'help') {
       const topic = positionals[0];
-      // The wiki's generated pages (`pnpm sync:plugin` writes them).
+      // The wiki's generated pages (`pnpm sync:docs` writes them).
       if (topic === 'wiki-cli') {
         process.stdout.write(cliReferencePage());
         return EXIT.ok;
       }
       if (topic === 'wiki-config') {
         process.stdout.write(configReferencePage());
-        return EXIT.ok;
-      }
-      if (topic === 'agents') {
-        process.stdout.write(agentsGuide());
         return EXIT.ok;
       }
       const help = topic ? commandHelp(topic) : null;
@@ -97,8 +90,6 @@ export async function main(argv: string[]): Promise<number> {
       process.stdout.write(`${commandHelp(command) ?? MAIN_HELP}\n`);
       return EXIT.ok;
     }
-    if (command === 'mcp') return await serveMcp(resolve(str(flags, 'cwd') ?? process.cwd()));
-
     const run = COMMANDS[command];
     if (!run) {
       const close = Object.keys(COMMAND_HELP).find((name) => name.startsWith(command.slice(0, 3)));

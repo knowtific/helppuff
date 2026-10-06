@@ -111,7 +111,7 @@ export function Callbacks() {
 
   return (
     <>
-      <PageHeader title="Callbacks" description="Visitors who asked the team to call or email them back. Mark each one done when you have." />
+      <PageHeader title="Callbacks" description="Visitors who asked the team to call or email them back. Mark each one done when you have." help="Leads#callbacks" />
       <div className="space-y-3 p-4 md:p-6">
         <div className="flex flex-wrap gap-1" role="group" aria-label="Filter by status">
           {TABS.map((t) => (

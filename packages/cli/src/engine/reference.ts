@@ -3,7 +3,7 @@ import { projectJsonSchema } from './schema.js';
 /**
  * The wiki's configuration reference: every helppuff.json field, its type,
  * default, limits and description, generated from the JSON Schema (itself
- * generated from the Zod schemas the CLI validates with). `pnpm sync:plugin`
+ * generated from the Zod schemas the CLI validates with). `pnpm sync:docs`
  * writes it; a test fails when it is stale. To change the text, change the
  * `.describe()` on the field.
  */
@@ -108,7 +108,7 @@ export function configReferencePage(): string {
   const schema = projectJsonSchema() as Node;
   const props = schema.properties ?? {};
   const out: string[] = [
-    '<!-- Generated from the helppuff.json schema by `pnpm sync:plugin`. Change a field\'s `.describe()`, not this page. -->',
+    '<!-- Generated from the helppuff.json schema by `pnpm sync:docs`. Change a field\'s `.describe()`, not this page. -->',
     '',
     '# Configuration reference',
     '',

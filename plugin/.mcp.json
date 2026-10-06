@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "helppuff": {
-      "command": "npx",
-      "args": ["-y", "@knowtific/helppuff", "mcp"]
-    }
-  }
-}

@@ -16,7 +16,7 @@
     "build": "pnpm ensure-config && pnpm --filter @helppuff/widget build",
     "build:cli": "pnpm --filter @knowtific/helppuff build",
     "helppuff": "node packages/cli/dist/cli.js",
-    "sync:plugin": "pnpm build:cli && node packages/cli/dist/cli.js skill print > plugin/skills/website-chatbot/SKILL.md && node packages/cli/dist/cli.js help agents > packages/cli/AGENTS.md && node packages/cli/dist/cli.js help wiki-cli > wiki/CLI-Reference.md && node packages/cli/dist/cli.js help wiki-config > wiki/Configuration-Reference.md",
+    "sync:docs": "pnpm build:cli && node packages/cli/dist/cli.js help wiki-cli > wiki/CLI-Reference.md && node packages/cli/dist/cli.js help wiki-config > wiki/Configuration-Reference.md",
     "test": "pnpm ensure-config && vitest run",
     "test:watch": "pnpm ensure-config && vitest",
     "e2e": "pnpm ensure-config && playwright test",

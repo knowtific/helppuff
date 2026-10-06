@@ -59,7 +59,7 @@ export function Knowledge({ me }: { me: Me }) {
   if (!site.knowledge) {
     return (
       <>
-        <PageHeader title="Knowledge" />
+        <PageHeader title="Knowledge" help="Knowledge-Base" />
         <Empty icon={<BookOpen />} title="Managed by your backend">
           This assistant uses the {site.connector} backend, which keeps its own knowledge. Update it with <code>helppuff knowledge sync</code>.
         </Empty>
@@ -88,6 +88,7 @@ export function Knowledge({ me }: { me: Me }) {
       <PageHeader
         title="Knowledge"
         description="What your assistant has learned, and where from."
+        help="Knowledge-Base"
         actions={
           <>
             <Button variant="outline" onClick={() => setChoosing(!choosing)} aria-expanded={choosing}>

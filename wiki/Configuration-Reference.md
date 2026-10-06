@@ -1,4 +1,4 @@
-<!-- Generated from the helppuff.json schema by `pnpm sync:plugin`. Change a field's `.describe()`, not this page. -->
+<!-- Generated from the helppuff.json schema by `pnpm sync:docs`. Change a field's `.describe()`, not this page. -->
 
 # Configuration reference
 

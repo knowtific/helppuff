@@ -96,6 +96,7 @@ export function Overview({ me }: { me: Me }) {
       <PageHeader
         title="Analytics"
         description="How visitors are using your assistant."
+        help="Dashboard#analytics"
         actions={
           <Segmented
             label="Date range"

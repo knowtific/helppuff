@@ -1,6 +1,7 @@
 import { ArrowRight, CheckCircle2, ExternalLink, Loader2 } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { CrawlProgress, useKnowledgeStatus } from '../components/knowledge';
+import { HelpLink } from '../components/Shell';
 import { Button, Card, CardHeader, ErrorNote } from '../components/ui';
 import { api, type Me, type SettingsView } from '../lib/api';
 import { cn, href, pathOf } from '../lib/utils';
@@ -77,7 +78,7 @@ export function Home({ me }: { me: Me }) {
         )}
 
         <Card>
-          <CardHeader title="Go live" description="Two ways to put it in front of people." />
+          <CardHeader title="Go live" description="Two ways to put it in front of people." action={<HelpLink page="Getting-Started#3-add-it-to-your-website" />} />
           <ol className="space-y-5 px-4 pb-4">
             <Step n={1} title="Add it to your website" description="Paste before </body> on every page, or send it to whoever looks after your site.">
               <CopyBlock text={site.embed} label="script" />

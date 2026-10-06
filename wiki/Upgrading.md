@@ -18,6 +18,11 @@ From the folder you set the assistant up in (the one with `helppuff.json`):
 npx @knowtific/helppuff@latest upgrade
 ```
 
+Or give a coding agent the shared instructions and ask it to update the
+existing project:
+
+> Follow the HelpPuff instructions at https://raw.githubusercontent.com/knowtific/helppuff/main/instructions.md. This is an existing installation: check the available update, explain the plan, apply it after I approve, and verify the deployment.
+
 Use `@latest` so `npx` fetches the newest CLI rather than a cached one. It:
 
 1. **Shows the plan**: the version running, the version you are moving to,

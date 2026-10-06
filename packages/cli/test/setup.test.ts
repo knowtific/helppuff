@@ -1,7 +1,11 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type * as AdminsModule from '../src/engine/admins.js';
+import { secretCommand } from '../src/commands/manage.js';
+import { nextSteps, onboardingFrom, projectOnboarding, unattendedFrom } from '../src/commands/setup.js';
+import type { DeployResult } from '../src/engine/deploy.js';
+import { readState } from '../src/engine/state.js';
 import { runInit } from '../src/engine/init.js';
 import { pendingQuestions, matchingInstance } from '../src/engine/questions.js';
 import { ACME_HOME, cf, fakeFetch, html, tempProject } from './helpers.js';
@@ -96,6 +100,102 @@ describe('the questions', () => {
 });
 
 describe('runInit for an agent', () => {
+  it('makes the automatic or dashboard onboarding choice explicit', () => {
+    expect(onboardingFrom({ flags: { onboarding: 'defaults' } } as never, false, undefined)).toBe('defaults');
+    expect(onboardingFrom({ flags: { onboarding: 'dashboard' } } as never, false, undefined)).toBe('dashboard');
+    expect(onboardingFrom({ flags: {} } as never, false, undefined)).toBe('defaults');
+    expect(onboardingFrom({ flags: {} } as never, true, undefined)).toBe('dashboard');
+    expect(() => onboardingFrom({ flags: { onboarding: 'dashboard' } } as never, false, { mode: 'suggested' })).toThrow(/cannot be combined/);
+    expect(() => onboardingFrom({ flags: { onboarding: 'unknown' } } as never, false, undefined)).toThrow(/must be "defaults" or "dashboard"/);
+  });
+
+  it('remembers an explicit onboarding choice, so a later bare deploy does not crawl', () => {
+    const dir = tempProject();
+    const ctx = (flags: Record<string, unknown>) => ({ flags }) as never;
+    expect(projectOnboarding(ctx({}), dir, false, undefined)).toBe('defaults');
+    expect(readState(dir).onboarding).toBeUndefined();
+
+    expect(projectOnboarding(ctx({ onboarding: 'dashboard' }), dir, false, undefined)).toBe('dashboard');
+    expect(readState(dir).onboarding).toBe('dashboard');
+    // `helppuff deploy --json` from an agent, with no flag: still the user's setup page.
+    expect(projectOnboarding(ctx({}), dir, false, undefined)).toBe('dashboard');
+    expect(unattendedFrom(ctx({}), 'dashboard')).toBe(false);
+    // Pages asked for explicitly win over the saved choice, without an error.
+    expect(projectOnboarding(ctx({ crawl: 'all' }), dir, false, { mode: 'all' })).toBe('defaults');
+    expect(readState(dir).onboarding).toBe('dashboard');
+    // A dry run changes nothing.
+    expect(projectOnboarding(ctx({ onboarding: 'defaults', 'dry-run': true }), dir, false, undefined)).toBe('defaults');
+    expect(readState(dir).onboarding).toBe('dashboard');
+
+    expect(projectOnboarding(ctx({ onboarding: 'defaults' }), dir, true, undefined)).toBe('defaults');
+    expect(projectOnboarding(ctx({}), dir, true, undefined)).toBe('defaults');
+  });
+
+  it('learns nothing with --crawl none, even with the default onboarding', () => {
+    expect(unattendedFrom({ flags: {} } as never, 'defaults')).toBe(true);
+    expect(unattendedFrom({ flags: { crawl: 'none' } } as never, 'defaults')).toBe(false);
+    expect(unattendedFrom({ flags: { crawl: 'none' } } as never, 'dashboard')).toBe(false);
+  });
+
+  it('hands dashboard onboarding to the user even without a setup link', () => {
+    const deployed = {
+      url: 'https://w.example.workers.dev',
+      dashboard: 'https://w.example.workers.dev/admin/',
+      preview: 'https://w.example.workers.dev/',
+      setupUrl: null,
+      crawl: null,
+    } as DeployResult;
+    const steps = nextSteps(deployed, 'dashboard').join('\n');
+    expect(steps).toContain('https://w.example.workers.dev/admin/');
+    expect(steps).toContain('helppuff dashboard --json');
+    expect(steps).toContain('nothing is learned until they do');
+    expect(steps).not.toMatch(/^helppuff ask/m);
+
+    const withLink = nextSteps({ ...deployed, setupUrl: 'https://w.example.workers.dev/admin/setup#t' }, 'dashboard').join('\n');
+    expect(withLink).toContain('setup link https://w.example.workers.dev/admin/setup#t');
+    expect(nextSteps(deployed, 'defaults')[0]).toMatch(/^helppuff ask/);
+  });
+
+  it('stores Cloudflare access safely before the project is initialized', async () => {
+    const dir = tempProject();
+    const result = vi.fn();
+    const warn = vi.fn();
+
+    await secretCommand({
+      cwd: dir,
+      positionals: ['set', 'CLOUDFLARE_API_TOKEN'],
+      flags: { value: 'cf-secret' },
+      interactive: false,
+      out: { result, warn } as never,
+    });
+
+    expect(readFileSync(join(dir, '.env'), 'utf8')).toContain('CLOUDFLARE_API_TOKEN=cf-secret');
+    expect(readFileSync(join(dir, '.gitignore'), 'utf8')).toContain('.env');
+    // No project yet: say exactly which folder init must run in to find it.
+    expect(result).toHaveBeenCalledWith(
+      { name: 'CLOUDFLARE_API_TOKEN', stored: join(dir, '.env'), uploadedToWorker: false },
+      expect.any(Function),
+    );
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(`run \`helppuff init\` in ${dir}`));
+    expect(JSON.stringify([result.mock.calls, warn.mock.calls])).not.toContain('cf-secret');
+  });
+
+  it('stores a secret in the project folder from anywhere inside it', async () => {
+    const dir = tempProject();
+    await runInit({ cwd: dir, answers: { website: 'acme.com.au', cfToken: 't' }, yes: true, fetch: world().fetch });
+    const sub = join(dir, 'src');
+    mkdirSync(sub);
+    const result = vi.fn();
+    const warn = vi.fn();
+
+    await secretCommand({ cwd: sub, positionals: ['set', 'OPENAI_API_KEY'], flags: { value: 'sk-x' }, interactive: false, out: { result, warn } as never });
+
+    expect(readFileSync(join(dir, '.env'), 'utf8')).toContain('OPENAI_API_KEY=sk-x');
+    expect(existsSync(join(sub, '.env'))).toBe(false);
+    expect(result).toHaveBeenCalledWith({ name: 'OPENAI_API_KEY', stored: '.env', uploadedToWorker: false }, expect.any(Function));
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it('returns needs_input, with what it already knows, and writes nothing', async () => {
     const dir = tempProject();
     const { fetch } = world();
@@ -131,8 +231,8 @@ describe('runInit for an agent', () => {
     expect(readFileSync(join(dir, '.env'), 'utf8')).toContain('CLOUDFLARE_API_TOKEN=cf-token');
     expect(readFileSync(join(dir, '.gitignore'), 'utf8')).toContain('.env');
     expect(readFileSync(join(dir, 'prompt.md'), 'utf8')).toContain('Acme Plumbing');
-    expect(existsSync(join(dir, 'AGENTS.md'))).toBe(true);
-    expect(existsSync(join(dir, '.claude/skills/website-chatbot/SKILL.md'))).toBe(true);
+    expect(existsSync(join(dir, 'AGENTS.md'))).toBe(false);
+    expect(existsSync(join(dir, '.claude'))).toBe(false);
     if (result.status === 'created') expect(result.assumed['model']).toBe('@cf/meta/llama-3.3-70b-instruct-fp8-fast');
   });
 

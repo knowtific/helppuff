@@ -10,12 +10,13 @@ HelpPuff: an open-source AI chat widget for websites, plus a Cloudflare Worker
 that translates one small REST protocol to AI backends via **connectors**.
 Published to npm as the CLI **`@knowtific/helppuff`**, which sets up and deploys
 widget + Worker + knowledge base + CRM dashboard to the user's own Cloudflare
-account. Product direction: agent-native CLI (`--json`, `needs_input`, MCP),
-Cloudflare-first defaults, ask as few questions as possible.
+account. Product direction: one shared instruction file for coding agents,
+an agent-native CLI (`--json`, `needs_input`), Cloudflare-first defaults, and
+as few questions as possible.
 
 - User docs: the GitHub wiki, whose source is [wiki/](wiki/) (published by
   `.github/workflows/wiki.yml`). `wiki/CLI-Reference.md` and
-  `wiki/Configuration-Reference.md` are **generated** by `pnpm sync:plugin`
+  `wiki/Configuration-Reference.md` are **generated** by `pnpm sync:docs`
   from `cli/src/help.ts` and the schemas' `.describe()` text: edit those, not
   the pages. A test fails when they are stale.
 
@@ -38,8 +39,8 @@ Cloudflare-first defaults, ask as few questions as possible.
 | `packages/sinks/*` | `@helppuff/sink-*` | Lead destinations (`webhook`) |
 | `packages/widget` | `@helppuff/widget` | Preact widget in a shadow root. `src/loader.ts` (tiny loader, no Preact, owns fail-safe) → lazy `src/app/` (store, api, persist, strings, validate) + `components/` + `flows/` + `lib/` (markdown, safe, turnstile…) + `styles/` (CSS in TS template literals). `demo/` = playground, gallery, hostile-host fixtures |
 | `packages/dashboard` | `@helppuff/dashboard` | React + Tailwind v4 dashboard served at `/admin/`: Home (test chat), Conversations, Leads, Knowledge, Analytics, Settings (sub-pages, incl. Webhooks and Updates). Look: shadcn / Notion / Twenty, minimal |
-| `packages/cli` | `@knowtific/helppuff` | The published CLI. `src/cli.ts` (command table), `commands/` (incl. `upgrade.ts`, `webhooks.ts`), `engine/` (init, deploy, compile, admin-api, knowledge, cloudflare, wrangler, doctor, `version.ts`, `reference.ts` (wiki config page)…), `mcp.ts`, `skill.ts`, `help.ts` (help text for agents; `AGENTS.md` and the wiki's CLI page are generated from it by `pnpm sync:plugin`) |
-| `plugin/`, `.claude-plugin/` | | Claude Code plugin; `plugin/skills/website-chatbot/SKILL.md` is **generated** by `pnpm sync:plugin` — edit `packages/cli/src/skill.ts` instead |
+| `packages/cli` | `@knowtific/helppuff` | The published CLI. `src/cli.ts` (command table), `commands/` (incl. `upgrade.ts`, `webhooks.ts`), `engine/` (init, deploy, compile, admin-api, knowledge, cloudflare, wrangler, doctor, `version.ts`, `reference.ts` (wiki config page)…), `help.ts` (the wiki's CLI page is generated from it by `pnpm sync:docs`) |
+| `instructions.md` | | The cross-agent install, deploy, test and upgrade workflow linked from the README and wiki. No plugin, skill or MCP setup is required. |
 | `e2e/` | | Playwright suites against real Worker + widget |
 | `wiki/` | | The user docs, published to the GitHub wiki |
 | `scripts/` | | `ensure-config.mjs` (creates `helppuff.config.ts` for `pnpm dev`) |
@@ -162,7 +163,7 @@ pnpm check          # lint + typecheck + test + build + e2e (what CI runs)
   Turnstile), check the current docs; don't invent endpoints or fields.
   `wiki/Providers.md` has the verified references.
 - Update `wiki/` when something user-visible changes. Describe every
-  `helppuff.json` field with `.describe()` in its schema; `pnpm sync:plugin`
+  `helppuff.json` field with `.describe()` in its schema; `pnpm sync:docs`
   regenerates the reference pages.
 
 ## Recipes
@@ -194,9 +195,8 @@ pnpm check          # lint + typecheck + test + build + e2e (what CI runs)
 - **CLI command**: add to `COMMANDS` in `packages/cli/src/cli.ts`, help in
   `help.ts`; must work with `--json` and non-interactively (missing answers →
   `needs_input`). Anything the dashboard does goes through the admin API
-  (`engine/admin-api.ts`), never around it. If the skill or help text changes,
-  run `pnpm sync:plugin` (regenerates the plugin SKILL.md, `packages/cli/AGENTS.md`
-  and the wiki's reference pages).
+  (`engine/admin-api.ts`), never around it. If help text or a documented schema
+  changes, run `pnpm sync:docs` (regenerates the wiki's reference pages).
 
 ## Tests live next to each package
 

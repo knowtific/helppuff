@@ -98,6 +98,18 @@ so the details are pre-filled in seconds rather than when the crawl ends.
 Facts the owner sets (setup page, Settings, `helppuff knowledge facts set`) are
 marked as theirs and never overwritten by a crawl.
 
+## Business details
+
+Dashboard → Settings → **Business details** keeps the name, phone, email,
+address, opening hours and service areas that the assistant receives with every
+answer. HelpPuff detects these from the website during setup; corrections made
+by the owner take priority and later crawls never overwrite them.
+
+Dashboard → Knowledge → **Your own answers** is for authoritative facts that do
+not fit those fields: parking instructions, warranty terms, service boundaries
+or a concise FAQ. They become searchable immediately and can also be managed
+with `helppuff knowledge facts set` and `helppuff knowledge add`.
+
 ## 2b. Files
 
 Documents the site does not have — price lists, brochures, policies — are

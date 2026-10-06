@@ -49,6 +49,7 @@ export function Leads() {
       <PageHeader
         title="Leads"
         description="People who left their details. Move them through your pipeline."
+        help="Leads"
         actions={
           <Button variant="outline" onClick={() => (window.location.href = '/admin/api/leads.csv')}>
             <Download /> Export CSV

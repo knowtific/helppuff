@@ -17,18 +17,17 @@ QUICK START (people)
   npx @knowtific/helppuff                asks for your website, deploys, and prints one link: the setup page
 
 QUICK START (AI agents: Claude Code, Codex, Cursor…)
-  1. helppuff init --url <site> --deploy --yes --json
+  1. helppuff init --url <site> --deploy --yes --onboarding defaults --json
        → {"ok":false,"status":"needs_input","questions":[…]}   ask the user exactly these,
          then re-run with each question's "flag". Repeat until {"ok":true,"status":"created"}.
-     With no person at a browser, init does the onboarding itself: it starts learning the
-     suggested pages (--crawl "<globs>" or knowledge.website.include/exclude in helppuff.json
-     to choose) and reads the business details. It all runs on Cloudflare; nothing to wait for.
-  2. helppuff knowledge status --json            progress (or: helppuff crawl --wait --json to block)
+     This starts learning suggested pages and reads business details automatically. Only when
+     explicitly requested, use --onboarding dashboard to leave those choices to the setup page.
+  2. helppuff knowledge status --json            follow learning progress
   3. helppuff ask "a real visitor question" --json   → read "reply" and "sources"; if it is wrong, fix
      prompt.md, add knowledge (helppuff knowledge upload price-list.pdf) or facts, and ask again
   4. Give the user three things: deploy.setupUrl (the dashboard — a one-time link, 24h, where they
-     create their sign-in; it opens on Home, no onboarding), deploy.embed (the script) and
-     deploy.preview (the demo). Lost the link? \`helppuff dashboard\` mints a sign-in link.
+     create their sign-in; defaults opens Home, dashboard continues web onboarding), deploy.embed
+     (the script) and deploy.preview (the demo). Lost it? \`helppuff dashboard\` mints a new link.
   Rules: never invent a URL, key or account id; ask. Never print or commit .env or ADMIN_API_KEY.
   Secrets: prefer asking the user to run \`helppuff secret set NAME\`; pass --api-key only if they gave it to you.
 
@@ -72,10 +71,6 @@ COMMANDS
     dashboard            A one-time sign-in link to the dashboard (or the setup link, before setup)
     validate             Check helppuff.json and prompt.md without deploying
     schema               Print the JSON Schema of helppuff.json (every field, with descriptions)
-
-  Agents
-    skill install        Teach Claude Code (and with --codex, Codex) about helppuff on this machine
-    mcp                  Run as an MCP server over stdio (tools: setup, deploy, ask, crawl, status, …)
 
 BACKENDS (--backend; default: workers-ai)
   workers-ai   Workers AI + HelpPuff's own knowledge base (Vectorize + D1). Free plan. (default)
@@ -156,13 +151,14 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       ['--deploy / --no-deploy', 'Deploy right after setup (default: yes in a terminal, no in --json)'],
       ['--crawl <which>', 'workers-ai, with --deploy: suggested | all | none | globs like "**/services/**,**/faq/**"'],
       ['--crawl-file <file>', 'workers-ai, with --deploy: crawl exactly the URLs in this file'],
+      ['--onboarding <mode>', 'defaults: learn suggested pages automatically | dashboard: let the user choose pages and details'],
       ['--no-browser', 'Do not open the setup page; continue in the terminal'],
       ['--force', 'Overwrite an existing helppuff.json'],
-      ['--no-agent-files', 'Do not write AGENTS.md and the Claude Code skill'],
     ],
     examples: [
       'helppuff init',
-      'helppuff init --url acme.com.au --deploy --crawl suggested --yes --json',
+      'helppuff init --url acme.com.au --deploy --onboarding defaults --yes --json',
+      'helppuff init --url acme.com.au --deploy --onboarding dashboard --yes --json',
       'helppuff init --url acme.com.au --deploy --crawl "**/services/**,**/faq/**" --yes --json',
       'helppuff init --url acme.com --backend cloudflare --yes --json',
       'helppuff init --url acme.com --backend openai --api-key "$OPENAI_API_KEY" --deploy --json',
@@ -193,11 +189,12 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       ['--dry-run', 'Check credentials and secrets and show the URL, change nothing'],
       ['--crawl <which>', 'workers-ai: also start a crawl — suggested | all | globs'],
       ['--crawl-file <file>', 'workers-ai: crawl exactly the URLs in this file'],
+      ['--onboarding <mode>', 'first deploy: defaults starts learning automatically; dashboard leaves page selection to the setup page. Remembered for later deploys'],
       ['--overwrite-settings', 'Publish helppuff.json over settings changed in the dashboard (otherwise: config pull first)'],
       ['--allow-downgrade', 'Deploy although the Worker runs a newer release: a deliberate rollback'],
       ['--account-id <id>', 'The Cloudflare account, when the token sees several'],
     ],
-    examples: ['helppuff deploy', 'helppuff deploy --json', 'helppuff deploy --crawl suggested --json', 'helppuff deploy --knowledge'],
+    examples: ['helppuff deploy', 'helppuff deploy --json', 'helppuff deploy --onboarding dashboard --json', 'helppuff deploy --crawl suggested --json', 'helppuff deploy --knowledge'],
     notes:
       'workers-ai: the first deploy creates a Vectorize index, a D1 database, a KV namespace and a Workflow, generates ADMIN_API_KEY into .env, and returns setupUrl — a one-time link (24h) to the setup page. Re-running never creates duplicates.',
   },
@@ -272,7 +269,7 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   secret: {
     usage: 'helppuff secret set <NAME> [--value <v>]   |   helppuff secret list',
     summary:
-      'Store a secret in .env and, if deployed, on the Worker. The value is read from --value, from stdin when piped, or prompted (hidden) in a terminal. Values are never printed.',
+      'Store a secret in .env, even before init, and, if deployed, on the Worker. The value is read from --value, from stdin when piped, or prompted (hidden) in a terminal. Values are never printed. Listing secrets requires an initialized project.',
     examples: ['helppuff secret set OPENAI_API_KEY', 'echo "$KEY" | helppuff secret set OPENAI_API_KEY', 'helppuff secret list --json'],
   },
   config: {
@@ -329,17 +326,6 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     summary:
       'Mint a one-time sign-in link to the dashboard (15 minutes), or the setup link if nobody has an account yet, and open it. The recovery path for a lost password.',
   },
-  skill: {
-    usage: 'helppuff skill install [--project] [--codex]  |  helppuff skill print',
-    summary:
-      'Install the "website-chatbot" agent skill so a fresh Claude Code session knows how to set up, test and deploy an assistant: into ~/.claude/skills (default) or this repository (--project); --codex also adds it to ~/.codex/AGENTS.md. Or install the Claude Code plugin, which bundles the skill and the MCP server.',
-    examples: ['npx -y @knowtific/helppuff skill install', 'npx -y @knowtific/helppuff skill install --codex'],
-  },
-  mcp: {
-    usage: 'helppuff mcp',
-    summary:
-      'Serve the helppuff tools over MCP (stdio). Add to Claude Code with: claude mcp add helppuff -- npx -y @knowtific/helppuff mcp',
-  },
 };
 
 export function commandHelp(name: string): string | null {
@@ -356,12 +342,7 @@ export function commandHelp(name: string): string | null {
   return lines.join('\n');
 }
 
-/**
- * AGENTS.md for the published package: the same help, as one Markdown
- * document an agent can read without running anything. Generated, so it
- * cannot drift from `--help`; `pnpm sync:plugin` writes it and a test checks it.
- */
-/** Every command as Markdown: usage, summary, options, examples. Shared by the agent guide and the wiki. */
+/** Every command as Markdown: usage, summary, options and examples. */
 export function commandReference(): string {
   return Object.entries(COMMAND_HELP)
     .map(([name, help]) => {
@@ -376,9 +357,9 @@ export function commandReference(): string {
     .join('\n');
 }
 
-/** The wiki's CLI reference page. Generated by `pnpm sync:plugin`; edit help.ts, not the page. */
+/** The wiki's CLI reference page. Generated by `pnpm sync:docs`; edit help.ts, not the page. */
 export function cliReferencePage(): string {
-  return `<!-- Generated from packages/cli/src/help.ts by \`pnpm sync:plugin\`. Edit that file, not this page. -->
+  return `<!-- Generated from packages/cli/src/help.ts by \`pnpm sync:docs\`. Edit that file, not this page. -->
 
 # CLI reference
 
@@ -392,89 +373,3 @@ input · \`3\` auth or permission · \`4\` Cloudflare quota or limit · \`10\` n
 
 ${commandReference()}`;
 }
-
-export function agentsGuide(): string {
-  const commands = commandReference();
-  return `# @knowtific/helppuff — guide for AI agents
-
-HelpPuff puts an AI chat assistant on a website, entirely on the site owner's own
-Cloudflare account: one Worker serves the widget, the chat API, a dashboard and a
-knowledge base it builds by crawling the site (Workers AI + Vectorize + D1, crawled in
-a Workflow). The default setup runs on the Workers Free plan. Everything a person
-can do in the dashboard can be done here, non-interactively, with \`--json\`.
-
-## Quick start (non-interactive)
-
-\`\`\`bash
-npx -y @knowtific/helppuff init --url https://acme.com.au --deploy --yes --json
-npx -y @knowtific/helppuff knowledge status --json          # learning runs in the background
-npx -y @knowtific/helppuff ask "Do you service Lilydale?" --json
-\`\`\`
-
-Without a person at a browser (\`--json\`, no terminal, or \`--no-browser\`), \`init\` and
-\`deploy\` do onboarding themselves the first time: they start learning the suggested pages
-(shape them with \`--crawl "<globs>"\` or \`knowledge.website.include\`/\`exclude\` in
-helppuff.json) and read the business details from the site. Then give the user three things
-from the result: \`deploy.setupUrl\` (the dashboard: a one-time link, 24 hours, where they
-create their sign-in — it opens on Home, with nothing left to onboard), \`deploy.embed\`
-(the script) and \`deploy.preview\` (the demo). \`helppuff dashboard --json\` mints a fresh
-sign-in link at any time.
-
-## Output, exit codes and environment
-
-- With \`--json\`, stdout is exactly one JSON object: \`{"ok":true,…}\` or
-  \`{"ok":false,"error":{"code","message","hint"}}\`. Progress goes to stderr.
-- Exit codes: \`0\` ok · \`1\` error · \`2\` bad usage or missing input · \`3\` auth or
-  permission · \`4\` Cloudflare quota or limit · \`10\` needs_input (\`init\` returns the
-  questions; ask the user, re-run with each question's \`flag\`).
-- Never prompts when \`--json\`, \`--non-interactive\`, \`CI=1\` or there is no terminal.
-- Global flags: \`--json\`, \`--non-interactive\`, \`--cwd <dir>\`, \`--config <helppuff.json>\`,
-  \`--yes\`, \`--account-id\` (where Cloudflare is used).
-- Environment: \`CLOUDFLARE_API_TOKEN\`, \`CLOUDFLARE_ACCOUNT_ID\`, \`HELPPUFF_ADMIN_API_KEY\`
-  (or \`ADMIN_API_KEY\` in \`.env\`), \`OPENAI_API_KEY\`, \`GEMINI_API_KEY\`,
-  \`ANTHROPIC_API_KEY\`, \`RETELL_API_KEY\`. Values in the environment win over \`.env\`.
-
-## Cloudflare token permissions
-
-\`npx wrangler login\` needs none of this. An API token needs: ${TOKEN_PERMISSION_LIST}.
-
-## Configuration
-
-\`helppuff.json\` (commit it) says what the assistant is; \`prompt.md\` how it behaves;
-\`.env\` holds secrets (never commit, never print). \`helppuff schema\` prints the JSON
-Schema of every field. Settings changed in the dashboard are pulled with
-\`helppuff config pull\`; deploy refuses to overwrite them otherwise.
-
-## Commands
-
-${commands}
-## Recipes
-
-- **Install with defaults:** \`helppuff init --url <site> --deploy --yes --json\`
-- **Add documents:** \`helppuff knowledge upload price-list.pdf brochure.docx --wait --json\`
-- **Crawl only services and FAQ:** \`helppuff crawl --include "**/services/**,**/faq/**" --wait --json\`
-- **Switch the model:** \`helppuff config set backend.model @cf/qwen/qwen3-30b-a3b-fp8 && helppuff deploy --json\` (compared on the wiki's AI models page)
-- **Faster answers:** \`helppuff config set backend.reasoning low && helppuff deploy --json\` (thinking cannot be switched off: answers without it proved unsafe)
-- **Add a manual FAQ:** \`helppuff knowledge add --file faq.md --json\`
-- **Correct a fact:** \`helppuff knowledge facts set phone="03 9876 5432" --json\`
-- **Get the embed snippet:** \`helppuff embed\`
-- **Check usage against the free budget:** \`helppuff knowledge status --json\` → \`usage\`
-- **Lost dashboard password:** \`helppuff dashboard --json\` → a one-time sign-in link
-- **Remove everything:** \`helppuff destroy --yes --json\`
-
-## Rules
-
-- Never print, log or commit \`.env\`, \`ADMIN_API_KEY\` or any provider key.
-- Never guess a website, token, key, email or account id — ask the user.
-- Stay on the Workers Free plan unless the user asks otherwise.
-`;
-}
-
-const TOKEN_PERMISSION_LIST = [
-  'Account › Workers Scripts › Edit',
-  'Workers KV Storage › Edit',
-  'D1 › Edit',
-  'Vectorize › Edit',
-  'Account Settings › Read',
-  'and, for the AI Search backend only, AI Search › Edit and Run',
-].join(', ');

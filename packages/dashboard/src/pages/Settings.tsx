@@ -45,6 +45,18 @@ const DESCRIPTIONS: Record<SettingsSection, string> = {
   updates: 'The version running, and how to upgrade it.',
 };
 
+const HELP: Record<SettingsSection, string> = {
+  chat: 'Widget#customising',
+  appearance: 'Widget#customising',
+  leads: 'Leads#the-form-in-helppuffjson',
+  instructions: 'Prompts-and-Instructions',
+  business: 'Knowledge-Base#business-details',
+  advanced: 'AI-Models',
+  webhooks: 'Webhooks',
+  team: 'Dashboard#team--security',
+  updates: 'Upgrading',
+};
+
 /** One page per topic; the sidebar's Settings sub-menu (or the tabs on a phone) moves between them. */
 export function Settings({ me, section }: { me: Me; section: string | undefined }) {
   const site = me.sites[0];
@@ -52,7 +64,7 @@ export function Settings({ me, section }: { me: Me; section: string | undefined 
   const current = sections.find((s) => s.id === section) ?? sections[0]!;
   return (
     <>
-      <PageHeader title={current.label} description={DESCRIPTIONS[current.id]} />
+      <PageHeader title={current.label} description={DESCRIPTIONS[current.id]} help={HELP[current.id]} />
       <nav className="flex gap-1 overflow-x-auto border-b px-4 py-2 scroll-thin md:hidden" aria-label="Settings">
         {sections.map((s) => (
           <a

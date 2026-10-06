@@ -10,16 +10,18 @@ fits the **Workers Free plan**.
 > No HelpPuff subscription. No VPS to patch. No chatbot vendor holding your
 > customer database.
 
+## Install it
+
+You can either run the CLI yourself:
+
 ```bash
 npx @knowtific/helppuff
 ```
 
-Give it your website address and HelpPuff deploys the widget, API, knowledge
-base, database and dashboard. Or ask Claude Code, Codex, Cursor or another
-coding agent:
+Or copy this prompt into Claude Code, Codex, Cursor, OpenCode or another
+AI coding agent:
 
-> Add HelpPuff to this website, learn our content, deploy it to Cloudflare and
-> test it with real customer questions.
+> Follow the HelpPuff instructions at https://raw.githubusercontent.com/knowtific/helppuff/main/instructions.md and install it in this project. Complete setup automatically with the recommended free defaults. Ask me only for information you cannot determine safely or authorization I must complete. Continue until it is deployed, added to the website when possible, tested with real questions, and you have given me the dashboard, embed and preview links.
 
 The agent can complete the setup, configure the assistant, add the embed code,
 deploy it and test the result. You only step in when authorization or a real
@@ -42,10 +44,10 @@ platform to rent:
 - **Own the data.** Conversations, leads, customer details and knowledge stay in
   D1, KV and Vectorize resources controlled by your Cloudflare account. There is
   no HelpPuff-operated service between you and your visitors.
-- **Let your AI agent operate it.** HelpPuff's CLI supports structured JSON,
-  explicit `needs_input` responses, an installable skill and MCP tools. An agent
-  can build, deploy, customize, test, diagnose and upgrade the assistant instead
-  of walking you through a long configuration checklist.
+- **Let your AI agent operate it.** HelpPuff's CLI supports structured JSON and
+  explicit `needs_input` responses. Any coding agent can follow the shared
+  [`instructions.md`](instructions.md) to build, deploy, customize, test,
+  diagnose and upgrade the assistant.
 - **Run at the edge.** The widget and API enter Cloudflare's global network close
   to the visitor, while managed services handle compute, storage and background
   work. There is no server fleet, operating system or VPS for you to maintain.
@@ -59,8 +61,8 @@ platform to rent:
 Cloudflare's current free allocation includes 100,000 Worker requests and
 10,000 Workers AI neurons per day. HelpPuff keeps its own AI budget below that
 limit and degrades to contact details and callback capture instead of producing
-an unexpected bill. See [Costs and limits](../../wiki/Costs-and-Limits) and the
-[Cloudflare Free plan guide](../../wiki/Cloudflare-Free-Plan) for the exact
+an unexpected bill. See [Costs and limits](wiki/Costs-and-Limits.md) and the
+[Cloudflare Free plan guide](wiki/Cloudflare-Free-Plan.md) for the exact
 limits and failure behaviour.
 
 ## One complete stack on Cloudflare
@@ -86,8 +88,8 @@ architecture manually.
 | **Turnstile** | Adds human verification to new chats for public-site abuse protection | Optional |
 | **AI Gateway** | Adds model observability, caching and centralized AI controls | Optional |
 
-Learn how the models divide the work in [AI models](../../wiki/AI-Models), or
-see every allowance in [Cloudflare Free plan limits](../../wiki/Cloudflare-Free-Plan).
+Learn how the models divide the work in [AI models](wiki/AI-Models.md), or
+see every allowance in [Cloudflare Free plan limits](wiki/Cloudflare-Free-Plan.md).
 
 ## Features
 
@@ -96,19 +98,19 @@ experience, the operational tools and the customer follow-up workflow.
 
 | Feature | What it gives you | Learn more |
 | --- | --- | --- |
-| **Website and file knowledge** | Crawls selected pages and learns PDF, Word, Markdown and text files using hybrid semantic + keyword search | [Knowledge base](../../wiki/Knowledge-Base) |
-| **Fast, isolated widget** | An accessible, mobile-first widget in a shadow root; one script tag and about 6 KB gzipped before lazy loading | [Widget](../../wiki/Widget) |
-| **Rich conversations** | Streaming replies, shortcut buttons, suggested questions, option chips, cards, links and forms directly inside chat | [Widget](../../wiki/Widget) |
-| **Pre-chat forms** | Capture name, email, phone and custom fields before a conversation, with configurable required fields | [Leads](../../wiki/Leads) |
-| **Built-in CRM** | One lead per person, repeat conversations, pipeline stages, notes, custom answers and CSV export | [Dashboard](../../wiki/Dashboard#leads) |
-| **Conversation intelligence** | Automatic summaries, intent, sentiment, lead quality, outcome, topics, next steps and unanswered questions | [Dashboard](../../wiki/Dashboard#conversations) |
-| **Callback requests** | Turns “please call me” into a tracked task your team can complete, dismiss or reopen | [Callbacks](../../wiki/Leads#callbacks) |
-| **Analytics and ratings** | Conversation and lead trends, conversion, top pages, countries and visitor feedback | [Dashboard](../../wiki/Dashboard#analytics) |
-| **Signed webhooks** | Sends leads, callbacks, messages, summaries, ratings and knowledge events to Zapier, Make, n8n, a CRM or your API, with retries | [Webhooks](../../wiki/Webhooks) |
-| **Agent-native operations** | JSON CLI, MCP server, installable agent skill and non-interactive setup, testing and upgrades | [Using with AI agents](../../wiki/AI-Agents) |
-| **Safety and cost controls** | Origin allowlists, signed sessions, daily budgets, rate limits, optional Turnstile and graceful fallbacks | [Security](../../wiki/Security) |
-| **Pluggable AI backends** | Switch the answer model without replacing the widget, dashboard, leads or webhooks | [Providers](../../wiki/Providers) |
-| **Safe upgrades** | Additive database migrations, compatibility checks, restore points and downgrade protection | [Upgrading](../../wiki/Upgrading) |
+| **Website and file knowledge** | Crawls selected pages and learns PDF, Word, Markdown and text files using hybrid semantic + keyword search | [Knowledge base](wiki/Knowledge-Base.md) |
+| **Fast, isolated widget** | An accessible, mobile-first widget in a shadow root; one script tag and about 6 KB gzipped before lazy loading | [Widget](wiki/Widget.md) |
+| **Rich conversations** | Streaming replies, shortcut buttons, suggested questions, option chips, cards, links and forms directly inside chat | [Widget](wiki/Widget.md) |
+| **Pre-chat forms** | Capture name, email, phone and custom fields before a conversation, with configurable required fields | [Leads](wiki/Leads.md) |
+| **Built-in CRM** | One lead per person, repeat conversations, pipeline stages, notes, custom answers and CSV export | [Dashboard](wiki/Dashboard.md#leads) |
+| **Conversation intelligence** | Automatic summaries, intent, sentiment, lead quality, outcome, topics, next steps and unanswered questions | [Dashboard](wiki/Dashboard.md#conversations) |
+| **Callback requests** | Turns “please call me” into a tracked task your team can complete, dismiss or reopen | [Callbacks](wiki/Leads.md#callbacks) |
+| **Analytics and ratings** | Conversation and lead trends, conversion, top pages, countries and visitor feedback | [Dashboard](wiki/Dashboard.md#analytics) |
+| **Signed webhooks** | Sends leads, callbacks, messages, summaries, ratings and knowledge events to Zapier, Make, n8n, a CRM or your API, with retries | [Webhooks](wiki/Webhooks.md) |
+| **Agent-native operations** | Shared instructions for any coding agent, a JSON CLI, structured questions and non-interactive setup, testing and upgrades | [Using with AI agents](wiki/AI-Agents.md) |
+| **Safety and cost controls** | Origin allowlists, signed sessions, daily budgets, rate limits, optional Turnstile and graceful fallbacks | [Security](wiki/Security.md) |
+| **Pluggable AI backends** | Switch the answer model without replacing the widget, dashboard, leads or webhooks | [Providers](wiki/Providers.md) |
+| **Safe upgrades** | Additive database migrations, compatibility checks, restore points and downgrade protection | [Upgrading](wiki/Upgrading.md) |
 
 ## Your data stays yours
 
@@ -131,18 +133,14 @@ HelpPuff is designed so a coding agent can take the project from an empty
 folder to a tested production assistant. Every operation available in the
 dashboard is also available through the CLI or admin API.
 
-```bash
-# Install the project skill (add --codex when installing for Codex)
-npx -y @knowtific/helppuff skill install
-
-# Or expose the same engine to any MCP client
-npx -y @knowtific/helppuff mcp
-```
+Use the agent prompt in the [Install it](#install-it) section above. The
+instructions are plain Markdown and do not require a plugin, skill or MCP
+server.
 
 Agent-facing commands never open an interactive prompt. Missing decisions are
 returned as structured questions, secrets are never echoed, and test commands
 can verify real answers without consuming visitor rate limits. See
-[Using HelpPuff with AI agents](../../wiki/AI-Agents).
+[Using HelpPuff with AI agents](wiki/AI-Agents.md).
 
 ## How it works
 
@@ -175,18 +173,18 @@ site's identity and useful pages, deploys the stack and gives you a one-time
 dashboard setup link. The dashboard then provides the exact script tag to add
 to your website.
 
-Follow the [Getting started guide](../../wiki/Getting-Started), or let your
-coding agent follow [the agent workflow](../../wiki/AI-Agents).
+Follow the [Getting started guide](wiki/Getting-Started.md), or let your coding
+agent follow [the agent workflow](wiki/AI-Agents.md).
 
 ## Documentation
 
-Everything is in the **[wiki](../../wiki)**:
+Everything is in the **[wiki](wiki/)**:
 
-- [Getting started](../../wiki/Getting-Started) · [Using with AI agents](../../wiki/AI-Agents) · [Dashboard](../../wiki/Dashboard)
-- [Configuration](../../wiki/Configuration) · [Configuration reference](../../wiki/Configuration-Reference) · [CLI reference](../../wiki/CLI-Reference)
-- [Providers](../../wiki/Providers) · [Knowledge base](../../wiki/Knowledge-Base) · [Widget](../../wiki/Widget) · [Leads](../../wiki/Leads) · [Webhooks](../../wiki/Webhooks)
-- [Deployment](../../wiki/Deployment) · [Upgrading](../../wiki/Upgrading) · [Costs and limits](../../wiki/Costs-and-Limits) · [Security](../../wiki/Security) · [Troubleshooting](../../wiki/Troubleshooting)
-- [Extending HelpPuff](../../wiki/Extending) · [Protocol](../../wiki/Protocol) · [Contributing](../../wiki/Contributing)
+- [Getting started](wiki/Getting-Started.md) · [Using with AI agents](wiki/AI-Agents.md) · [Dashboard](wiki/Dashboard.md)
+- [Configuration](wiki/Configuration.md) · [Configuration reference](wiki/Configuration-Reference.md) · [CLI reference](wiki/CLI-Reference.md)
+- [Providers](wiki/Providers.md) · [Knowledge base](wiki/Knowledge-Base.md) · [Widget](wiki/Widget.md) · [Leads](wiki/Leads.md) · [Webhooks](wiki/Webhooks.md)
+- [Deployment](wiki/Deployment.md) · [Upgrading](wiki/Upgrading.md) · [Costs and limits](wiki/Costs-and-Limits.md) · [Security](wiki/Security.md) · [Troubleshooting](wiki/Troubleshooting.md)
+- [Extending HelpPuff](wiki/Extending.md) · [Protocol](wiki/Protocol.md) · [Contributing](wiki/Contributing.md)
 
 The wiki's source is the [`wiki/`](wiki) folder in this repository.
 
@@ -198,7 +196,7 @@ pnpm dev        # Worker :8787 + widget playground :5173; no API key needed
 pnpm check      # lint, typecheck, tests, build and end-to-end tests
 ```
 
-See [Contributing](../../wiki/Contributing) and [`CONTRIBUTING.md`](CONTRIBUTING.md).
+See [Contributing](wiki/Contributing.md) and [`CONTRIBUTING.md`](CONTRIBUTING.md).
 Coding agents working on this repository start from [`AGENTS.md`](AGENTS.md).
 
 ## License

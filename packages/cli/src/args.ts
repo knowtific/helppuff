@@ -17,7 +17,6 @@ const BOOLEAN = new Set([
   'knowledge',
   'skip-knowledge',
   'local',
-  'agent-files',
   'defaults',
   'wait',
   'browser',

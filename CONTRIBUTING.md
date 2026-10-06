@@ -1,7 +1,7 @@
 # Contributing to HelpPuff
 
 Thanks for helping. The full guide is in the wiki:
-**[Contributing](../../wiki/Contributing)** (setup, the repository's layout,
+**[Contributing](wiki/Contributing.md)** (setup, the repository's layout,
 rules, and how releases work).
 
 The short version:

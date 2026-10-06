@@ -250,12 +250,19 @@ export function findProjectDir(start: string): string | null {
 }
 
 export function loadProject(cwd: string): LoadedProject {
-  const dir = findProjectDir(cwd);
-  if (!dir) {
+  const loaded = findProject(cwd);
+  if (!loaded) {
     throw new CliError('no_project', `No ${PROJECT_FILE} found in ${cwd} or any parent folder.`, {
       hint: 'Run `helppuff init` to create one.',
     });
   }
+  return loaded;
+}
+
+/** The nearest project from `cwd`, or null before `helppuff init`. */
+export function findProject(cwd: string): LoadedProject | null {
+  const dir = findProjectDir(cwd);
+  if (!dir) return null;
   const file = join(dir, PROJECT_FILE);
   let raw: Record<string, unknown>;
   try {

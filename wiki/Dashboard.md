@@ -60,7 +60,10 @@ See [[Knowledge base|Knowledge-Base]].
 ## Analytics
 
 Conversations and leads over time, conversion, top pages, countries, recent
-questions.
+questions. Choose 7, 30 or 90 days. **Became a lead** is the share of
+conversations linked to a person who provided contact details; **messages per
+conversation** counts visitor and assistant messages together. Countries come
+from Cloudflare's request metadata; HelpPuff does not store visitor IP addresses.
 
 ## Settings
 
@@ -76,12 +79,21 @@ Opens as a menu in the sidebar:
 | **Advanced** | The AI model (see [[AI models|AI-Models]]), thinking (low, medium, high), "double-check answers before replying" (the reranker), how often the site is re-learned, time zone and language |
 | **Webhooks** | Endpoints that receive every event as signed JSON; see [[Webhooks]] |
 | **Team & security** | Who can sign in, and what to do when locked out |
-| **Updates** | The version running and how to upgrade; see [[Upgrading]] |
+| **Updates** | Checks the version running against the latest npm release, shows an update notice and command, and links to the [[upgrade instructions|Upgrading]] |
 
 Changes are live within a minute. If you also keep the project in git, run
 `helppuff config pull` (settings) and `helppuff prompt pull` (the prompt) to bring
 dashboard changes into `helppuff.json` and `prompt.md`; `deploy` refuses to
 overwrite them until you do.
+
+## Team & security
+
+The first person who claims the setup link is the owner. Add or remove
+teammates from the project folder with `helppuff users add <email>` and
+`helppuff users remove <email>`; reset a password with
+`helppuff users reset <email>`. `helppuff dashboard` creates a one-time sign-in
+link when someone is locked out. Password hashes and the admin API key remain
+Worker secrets; the dashboard never shows them. See [[Security]].
 
 ## Turning it off
 

@@ -17,7 +17,6 @@
     "ai assistant",
     "cloudflare",
     "workers",
-    "mcp",
     "agents",
     "crm",
     "rag",
@@ -30,8 +29,7 @@
     "helppuff": "./dist/cli.js"
   },
   "files": [
-    "dist",
-    "AGENTS.md"
+    "dist"
   ],
   "engines": {
     "node": ">=20"

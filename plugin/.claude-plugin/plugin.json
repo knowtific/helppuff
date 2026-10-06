@@ -1,9 +1,0 @@
-{
-  "name": "knowtific-helppuff",
-  "version": "0.1.0",
-  "description": "Set up, test and deploy an AI chat assistant for any website — answering from the site and your documents, with a leads dashboard — on your own Cloudflare account.",
-  "author": { "name": "Knowtific", "url": "https://www.knowtific.com.au" },
-  "homepage": "https://www.knowtific.com.au",
-  "license": "MIT",
-  "keywords": ["chatbot", "website", "cloudflare", "ai-search", "leads", "crm"]
-}

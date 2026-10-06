@@ -14,9 +14,10 @@ import { loadEnv } from '../engine/env.js';
 import { LOGGED_IN, runInit, type InitResult } from '../engine/init.js';
 import { wranglerLogin } from '../engine/wrangler-auth.js';
 import { syncKnowledge, type IndexingStatus, type SyncResult } from '../engine/knowledge.js';
-import { aiSearchInstanceFor, hasKnowledge, loadProject, updateProject } from '../engine/project.js';
+import { aiSearchInstanceFor, hasKnowledge, loadProject, updateProject, usesHelpPuffKnowledge, type LoadedProject, type Project } from '../engine/project.js';
 import type { Answers, Question } from '../engine/questions.js';
 import { writeSchemaFile } from '../engine/schema.js';
+import { readState, writeState, type State } from '../engine/state.js';
 import { runWrangler } from '../engine/wrangler.js';
 import type { Ctx } from './context.js';
 
@@ -119,10 +120,14 @@ function answersFrom(ctx: Ctx): Answers {
 export async function initCommand(ctx: Ctx): Promise<number> {
   assertKnown(
     ctx.flags,
-    ['url', 'name', 'defaults', 'backend', 'model', 'api-key', 'ai-search', 'ai-search-endpoint', 'http-url', 'http-mode', 'http-token', 'retell-agent', 'docs', 'cf-token', 'cf-account', 'account-id', 'admin-email', 'admin-password', 'dashboard', 'agent-name', 'goal', 'notes', 'lead-form', 'yes', 'y', 'deploy', 'force', 'agent-files', 'crawl', 'crawl-file', 'browser', 'non-interactive'],
+    ['url', 'name', 'defaults', 'backend', 'model', 'api-key', 'ai-search', 'ai-search-endpoint', 'http-url', 'http-mode', 'http-token', 'retell-agent', 'docs', 'cf-token', 'cf-account', 'account-id', 'admin-email', 'admin-password', 'dashboard', 'agent-name', 'goal', 'notes', 'lead-form', 'yes', 'y', 'deploy', 'force', 'crawl', 'crawl-file', 'onboarding', 'browser', 'non-interactive'],
     'init',
   );
   const { out } = ctx;
+  const browser = ctx.interactive && ctx.flags['browser'] !== false;
+  const crawl = crawlFrom(ctx);
+  // A bad --onboarding fails here, before anything is written.
+  onboardingFrom(ctx, browser, crawl);
   if (ctx.interactive) p.intro(c.bold(' An AI assistant for your website '));
 
   // In the wizard, the knowledge base starts building while the last few
@@ -134,7 +139,6 @@ export async function initCommand(ctx: Ctx): Promise<number> {
     ask: ctx.interactive ? ask : null,
     yes: Boolean(ctx.flags['yes'] || ctx.flags['y']),
     force: Boolean(ctx.flags['force']),
-    agentFiles: ctx.flags['agent-files'] !== false,
     progress: ctx.interactive ? (m) => p.log.step(m) : out.progress,
     ...(ctx.interactive
       ? {
@@ -161,6 +165,8 @@ export async function initCommand(ctx: Ctx): Promise<number> {
 
   for (const warning of result.warnings) out.warn(warning);
   const project = result.project;
+  const onboarding = projectOnboarding(ctx, result.dir, browser, crawl);
+  const handOver = agentOnboarding(ctx, project, onboarding);
   const summary = {
     status: 'created',
     site: project.site,
@@ -223,30 +229,27 @@ export async function initCommand(ctx: Ctx): Promise<number> {
 
   if (!shouldDeploy) {
     await finishKnowledge();
-    out.result({ ...summary, next: ['helppuff deploy --json'] }, () => p.outro(`Next: ${c.cyan('helppuff deploy')}`));
+    const next = `helppuff deploy${handOver === 'dashboard' ? ' --onboarding dashboard' : ''}`;
+    out.result({ ...summary, next: [`${next} --json`] }, () => p.outro(`Next: ${c.cyan(next)}`));
     return 0;
   }
 
-  // workers-ai: a person picks the pages on the setup page (onboarding). With no
-  // person there — an AI agent, or --no-browser — the terminal does onboarding:
-  // --crawl if given, else the suggested pages, and the business details.
-  const browser = ctx.interactive && ctx.flags['browser'] !== false;
-  const crawl = crawlFrom(ctx);
-
+  // A person normally picks pages on the setup page. An agent or --no-browser
+  // run defaults to doing that work itself, unless it explicitly hands
+  // onboarding to the user with --onboarding dashboard.
   // A background job owns the knowledge; deploy must not start a second one.
   const deployed = await runDeploy(ctx, {
     ...(knowledgeReady || result.background ? { knowledge: 'skip' as const } : {}),
     ...(crawl ? { crawl } : {}),
-    unattended: !browser,
+    unattended: unattendedFrom(ctx, onboarding),
   });
   if (!storeInConfig && result.background) await finishKnowledge();
   if (deployed.setupUrl && browser) openBrowser(deployed.setupUrl);
-  out.result({ ...summary, deploy: deployed, next: nextSteps(deployed) }, () => printDeployed(deployed, ctx.interactive, !browser));
+  out.result({ ...summary, deploy: deployed, next: nextSteps(deployed, handOver) }, () => printDeployed(deployed, ctx.interactive, onboarding === 'defaults'));
   return 0;
 }
 
-async function runDeploy(ctx: Ctx, options: Parameters<typeof deploy>[1]): Promise<DeployResult> {
-  const loaded = loadProject(ctx.cwd);
+async function runDeploy(ctx: Ctx, options: Parameters<typeof deploy>[1], loaded: LoadedProject = loadProject(ctx.cwd)): Promise<DeployResult> {
   writeSchemaFile(loaded.dir);
   const spinner = ctx.interactive ? p.spinner() : null;
   spinner?.start('Setting up on your Cloudflare account');
@@ -277,7 +280,63 @@ export function crawlFrom(ctx: Ctx): CrawlRequest | undefined {
   return { mode: 'match', include: value.split(',').map((g) => g.trim()).filter(Boolean) };
 }
 
-function nextSteps(result: DeployResult): string[] {
+type OnboardingMode = NonNullable<State['onboarding']>;
+
+/**
+ * Who does onboarding: HelpPuff (`defaults`: learn the suggested pages, read
+ * the business details) or the user on the setup page (`dashboard`). An
+ * explicit --onboarding wins; then the choice an earlier init or deploy saved
+ * (unless pages were asked for with --crawl); then a person with a browser
+ * gets the setup page and anyone else the defaults.
+ */
+export function onboardingFrom(ctx: Ctx, browser: boolean, crawl: CrawlRequest | undefined, saved?: OnboardingMode): OnboardingMode {
+  const value = str(ctx.flags, 'onboarding');
+  if (value !== undefined && value !== 'defaults' && value !== 'dashboard') {
+    throw new CliError('usage', `--onboarding must be "defaults" or "dashboard"; got "${value}".`, { exitCode: 2 });
+  }
+  if (value === 'dashboard' && crawl) {
+    throw new CliError('usage', '--onboarding dashboard cannot be combined with --crawl or --crawl-file; the user chooses pages in the dashboard.', { exitCode: 2 });
+  }
+  if (value) return value;
+  if (saved && !crawl) return saved;
+  return browser ? 'dashboard' : 'defaults';
+}
+
+/** onboardingFrom for a project folder: an explicit --onboarding is saved in .helppuff/state.json for the next deploy. */
+export function projectOnboarding(ctx: Ctx, dir: string, browser: boolean, crawl: CrawlRequest | undefined): OnboardingMode {
+  const state = readState(dir);
+  const mode = onboardingFrom(ctx, browser, crawl, state.onboarding);
+  if (str(ctx.flags, 'onboarding') && !ctx.flags['dry-run'] && state.onboarding !== mode) writeState(dir, { ...state, onboarding: mode });
+  return mode;
+}
+
+/** Whether deploy does onboarding itself. `--crawl none` learns nothing now, whoever onboards. */
+export function unattendedFrom(ctx: Ctx, onboarding: OnboardingMode): boolean {
+  return onboarding === 'defaults' && str(ctx.flags, 'crawl') !== 'none';
+}
+
+/**
+ * The onboarding an agent's next steps describe. Only workers-ai has a setup
+ * page that chooses pages; other backends learn during deploy, so for them it
+ * is always the defaults.
+ */
+function agentOnboarding(ctx: Ctx, project: Project, onboarding: OnboardingMode): OnboardingMode {
+  if (usesHelpPuffKnowledge(project)) return onboarding;
+  if (str(ctx.flags, 'onboarding') === 'dashboard') ctx.out.warn(`--onboarding dashboard applies to the workers-ai backend only; ignored for ${project.backend.type}.`);
+  return 'defaults';
+}
+
+export function nextSteps(result: DeployResult, onboarding: OnboardingMode = 'defaults'): string[] {
+  if (onboarding === 'dashboard') {
+    const link = result.setupUrl
+      ? `the dashboard setup link ${result.setupUrl} (one-time, 24h)`
+      : `the dashboard ${result.dashboard ?? result.url} (if they cannot sign in, \`helppuff dashboard --json\` makes a sign-in link)`;
+    return [
+      `Give the user ${link}. They will choose the pages and confirm business details there; nothing is learned until they do.`,
+      `You can add the widget now with deploy.embed and share the demo ${result.preview}.`,
+      'helppuff knowledge status --json   (test answers with `helppuff ask` only once the user has started learning and it has finished)',
+    ];
+  }
   return [
     ...(result.crawl ? ['helppuff knowledge status --json   (learning runs in the background on Cloudflare; nothing to wait for)'] : []),
     'helppuff ask "<a question a visitor would ask>" --json',
@@ -316,12 +375,14 @@ function printDeployed(result: DeployResult, wizard = false, unattended = false)
 }
 
 export async function deployCommand(ctx: Ctx): Promise<number> {
-  assertKnown(ctx.flags, ['knowledge', 'skip-knowledge', 'force', 'dry-run', 'cf-account', 'account-id', 'crawl', 'crawl-file', 'overwrite-settings', 'allow-downgrade', 'browser', 'yes', 'y', 'non-interactive'], 'deploy');
+  assertKnown(ctx.flags, ['knowledge', 'skip-knowledge', 'force', 'dry-run', 'cf-account', 'account-id', 'crawl', 'crawl-file', 'onboarding', 'overwrite-settings', 'allow-downgrade', 'browser', 'yes', 'y', 'non-interactive'], 'deploy');
   const knowledge = ctx.flags['knowledge'] ? 'force' : ctx.flags['skip-knowledge'] ? 'skip' : 'auto';
   const crawl = crawlFrom(ctx);
   const browser = ctx.interactive && ctx.flags['browser'] !== false;
+  const loaded = loadProject(ctx.cwd);
+  const onboarding = projectOnboarding(ctx, loaded.dir, browser, crawl);
   const result = await runDeploy(ctx, {
-    unattended: !browser,
+    unattended: unattendedFrom(ctx, onboarding),
     knowledge,
     forceWorker: Boolean(ctx.flags['force']),
     dryRun: Boolean(ctx.flags['dry-run']),
@@ -329,9 +390,9 @@ export async function deployCommand(ctx: Ctx): Promise<number> {
     allowDowngrade: Boolean(ctx.flags['allow-downgrade']),
     cf: { accountId: str(ctx.flags, 'cf-account') ?? str(ctx.flags, 'account-id') },
     ...(crawl ? { crawl } : {}),
-  });
+  }, loaded);
   if (result.setupUrl && browser) openBrowser(result.setupUrl);
-  ctx.out.result({ ...result, next: nextSteps(result) }, () => printDeployed(result, false, !browser));
+  ctx.out.result({ ...result, next: nextSteps(result, agentOnboarding(ctx, loaded.project, onboarding)) }, () => printDeployed(result, false, onboarding === 'defaults'));
   return 0;
 }
 

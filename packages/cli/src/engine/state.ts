@@ -18,6 +18,8 @@ export type State = {
   embeddingModel?: string;
   /** workers-ai: each `knowledge.files` file as last sent — its hash, and the id it lives under on the Worker. */
   files?: Record<string, { hash: string; id: string; kind: 'file' | 'manual' }>;
+  /** workers-ai: who does onboarding, as last chosen with --onboarding, so a later `deploy` without it keeps the choice. */
+  onboarding?: 'defaults' | 'dashboard';
   /** `helppuff upgrade` runs, newest last: what it went from and to, and the D1 restore point taken just before. */
   upgrades?: { from: string | null; to: string; at: string; restoreTimestamp: number | null }[];
 };

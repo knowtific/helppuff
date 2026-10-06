@@ -44,7 +44,7 @@ pnpm e2e            # Playwright: the whole stack in a browser (run `npx playwri
 pnpm check          # all of the above: what CI runs
 pnpm build:cli      # the publishable CLI: widget + dashboard + server runtime
 pnpm pack:cli       # …as an installable tarball, to test like a user would
-pnpm sync:plugin    # regenerate the agent skill, packages/cli/AGENTS.md and the wiki's reference pages
+pnpm sync:docs      # regenerate the wiki's reference pages
 ```
 
 ## The repository
@@ -60,8 +60,8 @@ A pnpm monorepo, TypeScript strict, ESM.
 | `packages/sinks/*` | Lead destinations |
 | `packages/widget` | The Preact widget, in a shadow root: a tiny loader plus a lazily loaded app |
 | `packages/dashboard` | The React + Tailwind dashboard served at `/admin/` |
-| `packages/cli` | `@knowtific/helppuff`, the published CLI: commands, deploy engine, MCP server, help text |
-| `plugin/`, `.claude-plugin/` | The Claude Code plugin; its `SKILL.md` is generated from `packages/cli/src/skill.ts` |
+| `packages/cli` | `@knowtific/helppuff`, the published CLI: commands, deploy engine and help text |
+| `instructions.md` | The setup, deployment, testing and upgrade workflow shared by every coding agent |
 | `e2e/` | Playwright suites |
 | `wiki/` | This wiki, published to GitHub's wiki by CI. `CLI-Reference.md` and `Configuration-Reference.md` are generated |
 
@@ -86,7 +86,7 @@ repository, with recipes for common changes.
   write against a remembered shape.
 - **Docs:** a user-visible change updates the wiki in the same pull request.
   Field descriptions live in the schemas (`.describe()`), so
-  `pnpm sync:plugin` regenerates the reference.
+  `pnpm sync:docs` regenerates the reference.
 
 ## Changes that need care
 
@@ -120,7 +120,7 @@ API, never around it.
    only for changes that need users to act).
 2. Add the release notes to `CHANGELOG.md`, including anything an upgrade
    does (migrations, re-learning) and, for a major release, what users must change.
-3. `pnpm sync:plugin`, then `pnpm check`.
+3. `pnpm sync:docs`, then `pnpm check`.
 4. Try it like a user: `pnpm pack:cli`, install the tarball in a test project,
    `npx helppuff upgrade` against a deployed test assistant.
 5. Publish: `pnpm --filter @knowtific/helppuff publish --access public`, and tag
