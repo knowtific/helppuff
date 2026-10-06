@@ -114,6 +114,11 @@ export function Leads() {
                             <span className="flex items-center gap-2.5">
                               <Avatar name={lead.name ?? lead.email} />
                               <span className="font-medium">{lead.name ?? <span className="text-muted-foreground">Unnamed</span>}</span>
+                              {Boolean(lead.openCallbacks) && (
+                                <a href={href({ page: 'callbacks' })} title="Waiting for a callback">
+                                  <Badge dot="#d97706">Callback requested</Badge>
+                                </a>
+                              )}
                             </span>
                           </td>
                           <td className="px-4 py-2.5">

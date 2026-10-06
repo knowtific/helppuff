@@ -1,5 +1,5 @@
 import type { MurmurConfig, SiteConfig } from './schema.js';
-import { storedSiteConfigSchema } from './schema.js';
+import { assistantConfigSchema, storedSiteConfigSchema } from './schema.js';
 import { MurmurError } from '../core/errors.js';
 import type { Platform } from '../core/platform.js';
 
@@ -56,6 +56,7 @@ export async function resolveSite(ctx: Ctx, siteId: string): Promise<SiteConfig>
     ...(overrides.security ? { security: overrides.security } : {}),
     ...(overrides.widget ? { widget: overrides.widget } : {}),
     ...(overrides.knowledge ? { knowledge: overrides.knowledge } : {}),
+    ...(overrides.assistant ? { assistant: overrides.assistant } : legacyAssistant(overrides.profile)),
   };
 }
 
@@ -81,4 +82,12 @@ function parseStored(stored: string, siteId: string, log: Platform['log']) {
 
   log('config.kv_hit', { siteId, sections: Object.keys(result.data) });
   return result.data;
+}
+
+/** A site last saved by the retired instructions form keeps its choices: goal, tone, length and booking page. */
+function legacyAssistant(profile: Record<string, unknown> | undefined): { assistant?: SiteConfig['assistant'] } {
+  if (!profile) return {};
+  const { goal, tone, length, bookingUrl } = profile;
+  const parsed = assistantConfigSchema.safeParse({ goal, tone, length, ...(bookingUrl ? { bookingUrl } : {}) });
+  return parsed.success ? { assistant: parsed.data } : {};
 }

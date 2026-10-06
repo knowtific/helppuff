@@ -1,4 +1,4 @@
-import { addUsage, neurons as costOf } from '@murmur/rag';
+import { addUsage, neurons as costOf, reasoningInputs } from '@murmur/rag';
 import { leadStatements } from '../admin/record.js';
 import type { D1Like } from '../db/d1.js';
 
@@ -103,8 +103,8 @@ export async function summarizeConversation(
       { role: 'user', content: transcript },
     ],
     max_tokens: 500,
-    // GLM thinks before answering unless told not to, which only costs output here.
-    ...(/glm/i.test(model) ? { chat_template_kwargs: { enable_thinking: false } } : {}),
+    // A background job: thinking only costs output here.
+    ...reasoningInputs(model, 'off'),
   });
   const reply = replyOf(raw);
   const parsed = extractJson(reply.text);

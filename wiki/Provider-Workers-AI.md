@@ -35,7 +35,8 @@ The common ones; every option is in the
 
 | Option | Default | |
 | --- | --- | --- |
-| `model` | `@cf/zai-org/glm-4.7-flash` | `@cf/openai/gpt-oss-120b` is steadier and costs about 4× as much. `@cf/zai-org/glm-5.3-flash` needs Workers Paid |
+| `model` | `@cf/zai-org/glm-4.7-flash` | Any Workers AI chat model. Compared for speed, quality and answers a day on [[AI models|AI-Models]] |
+| `reasoning` | `medium` | How long the model thinks before answering: `low`, `medium`, `high`. Thinking keeps answers safe; deeper helps multi-step questions, but is slower to start and the thinking is billed. It cannot be switched off. Near the daily budget it drops to `low`. See [[AI models|AI-Models]] |
 | `fallbackModel` | — | Tried once if the main model fails |
 | `timezone`, `locale` | — | e.g. `Australia/Melbourne`, `en-AU`: "are you open now?", spelling |
 | `maxAnswerSentences` | `4` | Shorter is cheaper and reads better in a chat |
@@ -49,15 +50,17 @@ The common ones; every option is in the
 | `gateway` | — | An AI Gateway id, for caching and logs in front of every model call |
 
 Change any of them with `murmur config set backend.<option> <value>` and
-deploy, or in the dashboard (model, reranker, time zone, language).
+deploy, or in the dashboard (model, thinking, reranker, time zone, language).
 
 ## Speed
 
-A reply usually starts streaming within 1–2 seconds. Where the time goes, for
-a typical message measured from a Worker: limits and context ~20 ms, keyword
-search ~20 ms, embedding 50–400 ms, vector search ~190 ms, reranking
-300–800 ms (capped at 0.8 s), the model's first words 350–550 ms. See where
-yours goes with:
+With the default settings a reply starts streaming in about 4 seconds
+(measured by a visitor, see [[AI models|AI-Models]]).
+Where the time goes, for a typical message measured from a Worker: limits and
+context ~25 ms, keyword search ~20 ms, embedding 50–400 ms, vector search
+~230 ms, reranking 300–800 ms (capped at 0.8 s), then the model: its thinking
+(about 2 s with GLM-4.7 Flash at Medium) and its first words. See where yours
+goes with:
 
 ```bash
 murmur ask "How much is a service call?" --timing

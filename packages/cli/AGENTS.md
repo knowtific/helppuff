@@ -292,7 +292,7 @@ Read or change murmur.json by dotted path; values are parsed as JSON when they l
 
 ```bash
 murmur config pull && murmur deploy
-murmur config set backend.model @cf/openai/gpt-oss-120b
+murmur config set backend.model @cf/qwen/qwen3-30b-a3b-fp8
 murmur config set backend.timezone Australia/Melbourne
 murmur config get backend
 murmur config set backend.model gpt-5
@@ -383,12 +383,26 @@ murmur users list
 murmur webhooks list | add <url> [--events a,b] [--description …] | remove <id> | test <id> | enable <id> | disable <id> | events
 ```
 
-Endpoints that receive what happens, as signed JSON: conversation.started, message.received, message.sent, lead.captured, callback.requested, lead.updated, feedback.received, conversation.summarized, conversation.ended, knowledge.crawl.finished, knowledge.file.processed (`events` lists them). The same as Settings → Webhooks in the dashboard; stored on the Worker. Each has a signing secret: X-Murmur-Signature is sha256= + hex HMAC-SHA256 of "<X-Murmur-Timestamp>.<body>". https only; up to 10 per site.
+Endpoints that receive what happens, as signed JSON: conversations, messages, leads, callback requests and their updates, summaries, budget alerts, learning (`murmur webhooks events` lists every type). The same as Settings → Webhooks in the dashboard; stored on the Worker. Each has a signing secret: X-Murmur-Signature is sha256= + hex HMAC-SHA256 of "<X-Murmur-Timestamp>.<body>". https only; up to 10 per site.
 
 ```bash
 murmur webhooks add https://hooks.zapier.com/hooks/catch/123/abc --events lead.captured,callback.requested --json
 murmur webhooks test wh_1a2b3c
 murmur webhooks list --json
+```
+
+### `murmur callbacks`
+
+```
+murmur callbacks list [--status open|done|dismissed|all] | done <id> [--note …] | dismiss <id> [--note …] | reopen <id>
+```
+
+Visitors who asked to be called back, the same as the dashboard's Callbacks page: waiting ones oldest first, with how to reach them, why, and the conversation. Mark one done (with a note of what happened) or dismissed; each change sends the callback.updated webhook. A conversation has at most one waiting request; asking again updates it.
+
+```bash
+murmur callbacks --json
+murmur callbacks done cb_k2x9 --note "Booked a measure for Tuesday"
+murmur callbacks list --status done
 ```
 
 ### `murmur dashboard`
@@ -425,7 +439,8 @@ Serve the murmur tools over MCP (stdio). Add to Claude Code with: claude mcp add
 - **Install with defaults:** `murmur init --url <site> --deploy --yes --json`
 - **Add documents:** `murmur knowledge upload price-list.pdf brochure.docx --wait --json`
 - **Crawl only services and FAQ:** `murmur crawl --include "**/services/**,**/faq/**" --wait --json`
-- **Switch to gpt-oss-120b:** `murmur config set backend.model @cf/openai/gpt-oss-120b && murmur deploy --json`
+- **Switch the model:** `murmur config set backend.model @cf/qwen/qwen3-30b-a3b-fp8 && murmur deploy --json` (compared on the wiki's AI models page)
+- **Faster answers:** `murmur config set backend.reasoning low && murmur deploy --json` (thinking cannot be switched off: answers without it proved unsafe)
 - **Add a manual FAQ:** `murmur knowledge add --file faq.md --json`
 - **Correct a fact:** `murmur knowledge facts set phone="03 9876 5432" --json`
 - **Get the embed snippet:** `murmur embed`

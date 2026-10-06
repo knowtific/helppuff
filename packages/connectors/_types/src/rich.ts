@@ -260,7 +260,25 @@ const ECHO = /\[(Offered choices|Showed a card|Showed cards|Shared links)\s*:\s*
  * Templates from `MARKER_INSTRUCTIONS`, now and before ("A | B | C",
  * "First choice | Second choice"): a model that copies one is not offering anything.
  */
-const PLACEHOLDER = /^(?:[A-D]|(?:first|second|third|fourth) (?:choice|option))$/i;
+const PLACEHOLDER = /^(?:[A-D]|(?:first|second|third|fourth) (?:choice|option)|<[^>]*>)$/i;
+
+/**
+ * Options a model wrote as lettered text instead of the marker: a last line
+ * like "A: Book a callback | B: Email us", or "A: … B: … C: …" run together.
+ */
+const LETTERED = /(?:^|\n|[.!?:]\s+)(A[:.)]\s+[^\n]*?(?:\s*\|\s*|\s+|\n)B[:.)]\s+[^\n]*(?:\n[C-D][:.)]\s+[^\n]*)*)\s*$/;
+
+function letteredOptions(text: string): { text: string; options: string[] } | null {
+  const found = LETTERED.exec(text);
+  if (!found) return null;
+  const block = found[1]!;
+  const options = block
+    .split(/\s*\|\s*(?=[A-D][:.)]\s)|\s+(?=[B-D][:.)]\s)|\n(?=[B-D][:.)]\s)/)
+    .map((part) => part.replace(/^[A-D][:.)]\s+/, '').trim())
+    .filter(Boolean);
+  if (options.length < 2 || options.length > 4 || options.some((o) => o.length > 100)) return null;
+  return { text: text.slice(0, text.length - block.length).trimEnd(), options };
+}
 
 export function parseMarkers(input: string): { text: string; messages: Message[] } {
   const messages: Message[] = [];
@@ -283,6 +301,14 @@ export function parseMarkers(input: string): { text: string; messages: Message[]
     return '';
   });
 
+  let text = stripped;
+  if (!options.length) {
+    const lettered = letteredOptions(text);
+    if (lettered) {
+      text = lettered.text;
+      options = lettered.options;
+    }
+  }
   options = options.filter((option) => !PLACEHOLDER.test(option));
   if (options.length > 0) {
     const built = optionsMessage({ options: options.slice(0, 10) });
@@ -293,7 +319,7 @@ export function parseMarkers(input: string): { text: string; messages: Message[]
     if (built) messages.push(built);
   }
 
-  return { text: stripped.replace(/[ \t]+\n/g, '\n').trim(), messages };
+  return { text: text.replace(/[ \t]+\n/g, '\n').trim(), messages };
 }
 
 /** A text reply, dropped when the model returned only whitespace. */

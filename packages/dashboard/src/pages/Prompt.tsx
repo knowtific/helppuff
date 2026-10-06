@@ -147,6 +147,45 @@ export function Prompt({ me }: { me: Me }) {
                   }
                 />
                 <div className="space-y-3 px-4 pb-4">
+                  {(() => {
+                    // Lines of the live prompt that settings or built-in rules already cover, still in the text being edited.
+                    const lines = new Set(text.split('\n').map((l) => l.trim()));
+                    const repeats = data.overlaps.filter((o) => lines.has(o.text));
+                    if (!repeats.length) return null;
+                    return (
+                      <div className="rounded-md border bg-subtle px-3 py-2.5 text-xs" role="note">
+                        <p className="font-medium">
+                          {repeats.length === 1 ? 'One line repeats' : `${repeats.length} lines repeat`} what Murmur already adds from your settings and rules
+                        </p>
+                        <ul className="mt-1.5 space-y-1 text-muted-foreground">
+                          {repeats.map((o) => (
+                            <li key={o.line}>
+                              <span className="text-foreground">“{o.text.length > 90 ? `${o.text.slice(0, 90)}…` : o.text}”</span> — {o.why}
+                            </li>
+                          ))}
+                        </ul>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-2"
+                          onClick={() => {
+                            const drop = new Set(repeats.map((o) => o.text));
+                            setDraft(
+                              text
+                                .split('\n')
+                                .filter((l) => !drop.has(l.trim()))
+                                .join('\n')
+                                .replace(/\n{3,}/g, '\n\n')
+                                .trim(),
+                            );
+                          }}
+                        >
+                          Remove these lines
+                        </Button>
+                        <span className="ml-2 text-muted-foreground">Then review and publish; nothing changes until you do.</span>
+                      </div>
+                    );
+                  })()}
                   <Textarea
                     value={text}
                     onChange={(e) => setDraft(e.target.value)}
@@ -154,7 +193,8 @@ export function Prompt({ me }: { me: Me }) {
                     className="min-h-[28rem] resize-y font-mono text-[12.5px] leading-relaxed"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Instructions only — facts belong in the knowledge base. You can use{' '}
+                    Only what is specific to your business: goal, tone and length are settings, and Murmur adds its rules itself. Facts belong in the
+                    knowledge base. You can use <code className="rounded bg-muted px-1">{'{{business.phone}}'}</code>,{' '}
                     <code className="rounded bg-muted px-1">{'{{lead.name}}'}</code> and{' '}
                     <code className="rounded bg-muted px-1">{'{{context.pageUrl}}'}</code>.
                   </p>
@@ -190,6 +230,20 @@ export function Prompt({ me }: { me: Me }) {
                 onBack={() => setSelected(null)}
                 onRestore={(v) => void restore(v)}
               />
+            )}
+
+            {data.builtIn && (
+              <Card>
+                <details className="group">
+                  <summary className="cursor-pointer list-none px-4 py-3 text-[13px] font-medium marker:hidden">
+                    Murmur also adds these rules to every answer
+                    <span className="block text-xs font-normal text-muted-foreground">
+                      Read-only. They come from your settings; there is no need to repeat them above, and instructions that contradict them confuse the assistant.
+                    </span>
+                  </summary>
+                  <pre className="max-h-96 overflow-auto whitespace-pre-wrap border-t px-4 py-3 font-mono text-xs leading-relaxed text-muted-foreground scroll-thin">{data.builtIn}</pre>
+                </details>
+              </Card>
             )}
 
             <Card>

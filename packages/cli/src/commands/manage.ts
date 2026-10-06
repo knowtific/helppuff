@@ -264,6 +264,7 @@ export function pullSettings(loaded: LoadedProject, live: Settings): LoadedProje
     Object.assign(obj(widget, 'brand'), { agentName: applied.widget.brand.agentName, name: applied.widget.brand.name, accent: applied.widget.brand.accent });
     Object.assign(obj(widget, 'launcher'), { position: applied.widget.launcher.position, icon: applied.widget.launcher.icon });
     obj(widget, 'chat')['initialMessages'] = applied.widget.chat.initialMessages ?? [];
+    raw['assistant'] = { ...applied.assistant };
     obj(widget, 'home')['shortcuts'] = applied.widget.home.shortcuts ?? [];
     Object.assign(obj(widget, 'leadForm'), { enabled: applied.widget.leadForm.enabled, fields: applied.widget.leadForm.fields });
 

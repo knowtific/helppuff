@@ -24,7 +24,8 @@ leads only; see [[Leads]].
 | `message.received` | A visitor sent a message (including the pre-chat form's message) | `conversationId`, `kind` (`text` or `action`), `text`, `action` `{id,value}` for a button or form |
 | `message.sent` | The assistant replied | `conversationId`, `text` (the reply as plain text), `messages` (the rich messages as the widget showed them) |
 | `lead.captured` | Contact details arrived: the form, typed in the chat, or found by the assistant | `conversationId`, `source` (`form`, `chat`, `ai`), `name`, `email`, `phone`, `fields` (custom form fields), `message` |
-| `callback.requested` | The visitor asked to be called back | `conversationId`, `name`, `email`, `phone`, `message` |
+| `callback.requested` | The visitor asked to be called back: the assistant requested it with the details it had, or the visitor sent the callback form. Sent with `lead.captured`; see [Callbacks](#callbacks) | `callbackId`, `conversationId`, `name`, `email`, `phone`, `message`, `requestedAt` |
+| `callback.updated` | A callback request was marked done or dismissed, reopened, or its note changed (dashboard or `murmur callbacks`) | `callback` (`id`, `conversationId`, `status`, `note`, `name`, `phone`, `email`, `reason`, `closedBy`…), `previousStatus` |
 | `lead.updated` | A lead's status, notes or name changed in the dashboard | `leadId`, `conversationId`, `changed`, `lead` |
 | `feedback.received` | A visitor rated a reply | `conversationId`, `messageId`, `rating` (`up`, `down`, `cleared`) |
 | `conversation.completed` | A conversation went quiet: **5 minutes after its last message**. Sent once (again if the visitor comes back later) | `conversationId`, `startedAt`, `lastMessageAt`, `messageCount`, `page`, `country`, `summary`, `labels` `{intent, sentiment, leadQuality, outcome, topics}`, `unanswered` (questions it could not answer), `followUp`, `lead`, `transcript` `[{role, text, at}]` |
@@ -45,6 +46,66 @@ high-volume and mainly for mirroring chats live.
 A lead is a person keyed by email: `lead.captured` can arrive more than once
 for the same person (the form, then a phone number typed later). Upsert on
 `email` in your CRM.
+
+## Callbacks
+
+A callback request is a task with an id: `callback.requested` when it is
+made, `callback.updated` when the team works it (see [[Leads|Leads#callbacks]]).
+Match the two on **`callbackId`** = **`callback.id`**.
+
+```json
+{
+  "type": "callback.requested",
+  "data": {
+    "callbackId": "cb_mfx2k9a1b2c3",
+    "conversationId": "s_…",
+    "name": "Ada",
+    "email": "ada@example.com",
+    "phone": "0412 345 678",
+    "message": "A quote for two rooms",
+    "requestedAt": "2026-10-05T01:02:03.000Z"
+  }
+}
+```
+
+```json
+{
+  "type": "callback.updated",
+  "data": {
+    "previousStatus": "open",
+    "callback": {
+      "id": "cb_mfx2k9a1b2c3",
+      "conversationId": "s_…",
+      "leadId": "lead_s_…",
+      "name": "Ada",
+      "phone": "0412 345 678",
+      "email": "ada@example.com",
+      "reason": "A quote for two rooms",
+      "status": "done",
+      "note": "Booked a measure for Tuesday",
+      "requestedAt": 1791234567000,
+      "closedAt": 1791241767000,
+      "closedBy": "owner@acme.com",
+      "pageUrl": "https://acme.com/flooring"
+    }
+  }
+}
+```
+
+- **Asking again in the same chat** while the request is still waiting sends
+  `callback.requested` again with the **same `callbackId`** and the latest
+  details: update the task, do not create a second one.
+- **A new request after one was closed** has a new `callbackId`.
+- `status` is `open`, `done` or `dismissed`; `previousStatus` says what it was
+  (`open` → `done` is "called back"; `done` → `open` is reopened). A note
+  change alone sends `callback.updated` with the same status.
+- `message` in `callback.requested` is the same text as `reason` in
+  `callback.updated`: what the visitor wants.
+- `closedBy` is the dashboard user's email, or `cli` for `murmur callbacks`.
+
+In Zapier, Make or n8n: create a task (or a CRM activity) on
+`callback.requested`, keyed by `callbackId`, and complete it on
+`callback.updated` when `callback.status` is `done`.
 
 ## The request
 

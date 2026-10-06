@@ -1,5 +1,10 @@
 import { Hono, type Context } from 'hono';
 import { MurmurError } from '../core/errors.js';
+import { getConnector } from '../core/registry.js';
+import { guidanceFor } from '../core/guidance.js';
+import { promptOverlaps } from './overlaps.js';
+import type { SiteConfig } from '../config/schema.js';
+import { resolveSecrets } from '../config/load.js';
 import { hitWindow, rateLimited } from '../core/ratelimit.js';
 import { requireSecret, type HonoEnv } from '../core/request.js';
 import { issueSession, sessionCookie, verifyPassword } from './auth.js';
@@ -9,8 +14,8 @@ import { resolveSite } from '../config/site.js';
 import { knowledgeEnv, ownsKnowledge } from '../knowledge/env.js';
 import { settingsRoutes } from './settings.js';
 import { setupRoutes } from './setup.js';
-import { profileRoutes } from './profile.js';
 import { webhookRoutes } from './webhooks.js';
+import { callbackRoutes, callbackView } from './callbacks.js';
 import { versionRoutes } from './version.js';
 import { dbFrom, ensureSchema, type D1Like } from '../db/d1.js';
 import { emit } from '../webhooks/deliver.js';
@@ -179,8 +184,12 @@ adminRoutes.get('/admin/api/overview', async (c) => {
     return { date: new Date(day * DAY).toISOString().slice(0, 10), conversations: row?.conversations ?? 0, leads: row?.leads ?? 0 };
   });
 
+  // Waiting now, whatever the range: a callback is a task, not a statistic.
+  const openCallbacks = await d.prepare(`SELECT COUNT(*) AS n FROM callbacks WHERE status = 'open'${f.sql}`).bind(...f.params).first<{ n: number }>().catch(() => null);
+
   return c.json({
     range: { days, since },
+    openCallbacks: openCallbacks?.n ?? 0,
     totals: {
       conversations: current?.conversations ?? 0,
       messages: current?.messages ?? 0,
@@ -222,6 +231,7 @@ adminRoutes.get('/admin/api/conversations', async (c) => {
   }
   if (filter === 'leads') where.push('c.lead_id IS NOT NULL');
   if (filter === 'unsummarized') where.push('c.summary IS NULL');
+  if (filter === 'callbacks') where.push("EXISTS (SELECT 1 FROM callbacks cb WHERE cb.conversation_id = c.id AND cb.status = 'open')");
   if (before) {
     where.push('c.last_at < ?');
     params.push(before);
@@ -230,7 +240,8 @@ adminRoutes.get('/admin/api/conversations', async (c) => {
     .prepare(
       `SELECT c.id, c.site_id AS site, c.started_at AS startedAt, c.last_at AS lastAt, c.page_url AS pageUrl,
               c.country, c.first_message AS firstMessage, c.message_count AS messageCount, c.summary, c.intent,
-              l.name AS leadName, l.email AS leadEmail, l.phone AS leadPhone, l.status AS leadStatus
+              l.name AS leadName, l.email AS leadEmail, l.phone AS leadPhone, l.status AS leadStatus,
+              (SELECT cb.status FROM callbacks cb WHERE cb.conversation_id = c.id ORDER BY cb.status = 'open' DESC, cb.requested_at DESC LIMIT 1) AS callback
        FROM conversations c LEFT JOIN leads l ON l.id = c.lead_id
        WHERE ${where.join(' AND ')}${f.sql}
        ORDER BY c.last_at DESC LIMIT ?`,
@@ -245,16 +256,18 @@ adminRoutes.get('/admin/api/conversations', async (c) => {
 async function loadConversation(d: D1Like, id: string) {
   const conversation = await d.prepare('SELECT * FROM conversations WHERE id = ?').bind(id).first<Record<string, unknown>>();
   if (!conversation) throw new MurmurError('not_found', { message: 'No such conversation.', detail: 'admin_conversation_missing' });
-  const [messages, lead] = await Promise.all([
+  const [messages, lead, callbacks] = await Promise.all([
     d
       .prepare('SELECT id, role, type, text, payload, ts, feedback FROM messages WHERE conversation_id = ? ORDER BY ts, id')
       .bind(id)
       .all<{ id: string; role: string; type: string; text: string | null; payload: string | null; ts: number }>(),
     conversation['lead_id'] ? d.prepare('SELECT * FROM leads WHERE id = ?').bind(conversation['lead_id']).first() : null,
+    d.prepare('SELECT * FROM callbacks WHERE conversation_id = ? ORDER BY requested_at DESC').bind(id).all<Parameters<typeof callbackView>[0]>(),
   ]);
   return {
     conversation,
     lead,
+    callbacks: callbacks.results.map(callbackView),
     messages: messages.results.map((m) => ({ ...m, payload: m.payload ? (JSON.parse(m.payload) as unknown) : null })),
   };
 }
@@ -307,7 +320,8 @@ adminRoutes.get('/admin/api/leads', async (c) => {
       `SELECT id, site_id AS site, conversation_id AS conversationId, name, email, phone, fields, source, status, notes,
               created_at AS createdAt, updated_at AS updatedAt,
               (SELECT COUNT(*) FROM conversations c WHERE c.lead_id = leads.id) AS conversations,
-              (SELECT c.id FROM conversations c WHERE c.lead_id = leads.id ORDER BY c.last_at DESC LIMIT 1) AS lastConversationId
+              (SELECT c.id FROM conversations c WHERE c.lead_id = leads.id ORDER BY c.last_at DESC LIMIT 1) AS lastConversationId,
+              (SELECT COUNT(*) FROM callbacks cb JOIN conversations c ON c.id = cb.conversation_id WHERE c.lead_id = leads.id AND cb.status = 'open') AS openCallbacks
        FROM leads WHERE ${where.join(' AND ')}${f.sql} ORDER BY updated_at DESC LIMIT 500`,
     )
     .bind(...params, ...f.params)
@@ -421,6 +435,25 @@ function published(c: Context<HonoEnv>, result: PublishResult) {
   );
 }
 
+/**
+ * Everything the model is told besides the owner's prompt, in order, for the
+ * dashboard to show read-only: Murmur's settings and rules around it, then
+ * what the backend adds. Null when the backend owns its prompt.
+ */
+async function builtInView(c: Context<HonoEnv>, siteId: string, connector: { type: string; options?: unknown }): Promise<string | null> {
+  try {
+    const ctx = c.get('mm');
+    const site = { ...(await resolveSite(ctx, siteId)), connector } as SiteConfig;
+    const found = getConnector(connector.type);
+    const options = found.parseOptions(resolveSecrets(connector.options ?? {}, ctx.env));
+    if (!found.promptOption(options)) return null;
+    const { before, after } = guidanceFor(site);
+    return [before, '## Instructions from the business\n(your instructions, above)', after, found.builtInPrompt(options)].filter(Boolean).join('\n\n');
+  } catch {
+    return null;
+  }
+}
+
 adminRoutes.get('/admin/api/prompt', async (c) => {
   await currentAdmin(c);
   const site = siteParam(c, c.req.query('site'));
@@ -430,6 +463,8 @@ adminRoutes.get('/admin/api/prompt', async (c) => {
   return c.json({
     site,
     connector: state.connector,
+    builtIn: await builtInView(c, site, state.connectorConfig),
+    overlaps: promptOverlaps(state.text, state.connector),
     editable: state.editable,
     reason: state.reason,
     text: state.text,
@@ -497,6 +532,6 @@ adminRoutes.post('/admin/api/prompt/restore', async (c) => {
 adminRoutes.route('/', knowledgeRoutes);
 adminRoutes.route('/', settingsRoutes);
 adminRoutes.route('/', setupRoutes);
-adminRoutes.route('/', profileRoutes);
 adminRoutes.route('/', webhookRoutes);
+adminRoutes.route('/', callbackRoutes);
 adminRoutes.route('/', versionRoutes);

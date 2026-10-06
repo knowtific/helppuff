@@ -2,12 +2,14 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
-import { MIGRATIONS, promptHash } from '@murmur/server';
+import { MIGRATIONS, promptHash, promptOverlaps } from '@murmur/server';
 import type { CloudflareApi } from '../src/engine/cloudflare.js';
 import { parseProject } from '../src/engine/project.js';
 import { driftError, promptSync, pullPrompt, readLivePrompt, recordPublish, type Remote } from '../src/engine/prompt.js';
 import { readState, writeState } from '../src/engine/state.js';
 import { tempProject } from './helpers.js';
+import { promptFor } from '../src/engine/generate.js';
+import type { SiteInfo } from '../src/engine/site.js';
 
 describe('promptSync', () => {
   const live = { version: 3, hash: 'live' };
@@ -168,5 +170,21 @@ describe('pulling', () => {
     writeFileSync(join(loaded.dir, 'prompt.md'), 'Dashboard edit.\r\n');
     const result = await pullPrompt(loaded, d.remote);
     expect(result).toMatchObject({ changed: false, backup: null });
+  });
+});
+
+describe('the starting prompt', () => {
+  const site = { phone: '03 9876 5432', email: 'hello@acme.test', description: 'Plumbing in Melbourne.', pages: {} } as unknown as SiteInfo;
+
+  it('holds only what is specific to the business: no identity, tone, rules or form fields to repeat a setting', () => {
+    const text = promptFor('Acme', site, 'workers-ai', 'Quotes are free.');
+    expect(text).toBe('About Acme: Plumbing in Melbourne.\n\nQuotes are free.\n');
+    expect(promptOverlaps(text, 'workers-ai')).toEqual([]);
+  });
+
+  it('keeps contact details for backends that are not given the business details', () => {
+    const text = promptFor('Acme', site, 'openai');
+    expect(text).toContain('Contact: phone 03 9876 5432, email hello@acme.test.');
+    expect(promptOverlaps(text, 'openai')).toEqual([]);
   });
 });

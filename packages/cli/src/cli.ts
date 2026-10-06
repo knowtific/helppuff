@@ -23,6 +23,7 @@ import type { Ctx } from './commands/context.js';
 import { serveMcp } from './mcp.js';
 import { dashboardCommand, usersCommand } from './commands/users.js';
 import { webhooksCommand } from './commands/webhooks.js';
+import { callbacksCommand } from './commands/callbacks.js';
 import { upgradeCommand } from './commands/upgrade.js';
 import { skillCommand } from './commands/skill.js';
 import { promptCommand } from './commands/prompt.js';
@@ -49,6 +50,7 @@ const COMMANDS: Record<string, (ctx: Ctx) => Promise<number>> = {
   embed: embedCommand,
   users: usersCommand,
   webhooks: webhooksCommand,
+  callbacks: callbacksCommand,
   upgrade: upgradeCommand,
   dashboard: dashboardCommand,
   skill: skillCommand,

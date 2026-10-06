@@ -27,7 +27,7 @@ Cloudflare-first defaults, ask as few questions as possible.
 | `packages/server` | `@murmur/server` | Hono app on Workers. `src/index.ts` (entry, bundles `murmur.config.ts`) → `app.ts` (`createApp`) → `routes/` + `admin/`. `src/lib.ts` is the public entry the CLI bundles |
 | `packages/server/src/core` | | `registry.ts` (explicit connector/sink registration), `token.ts` (HMAC session tokens), `origin.ts` (CORS allowlist), `ratelimit.ts`, `turnstile.ts`, `stream.ts` (SSE), `sanitize.ts`, `run.ts`, `request.ts` (per-request ctx, the only allowed `console`), `errors.ts` (`MurmurError` → JSON envelope) |
 | `packages/server/src/config` | | `schema.ts` (server config), `load.ts` (`defineConfig`, secret refs), `site.ts` (KV `config:<siteId>` overrides) |
-| `packages/server/src/admin` | | Dashboard API under `/admin/api/*`: `guard.ts` (cookie session or `Bearer ADMIN_API_KEY`), `auth.ts`, `record.ts` (conversations, leads keyed by email, ratings), `routes.ts`, `knowledge.ts` (pages, files, facts, search), `settings.ts` (the flat settings object ↔ site config), `setup.ts` (one-time setup/sign-in links), `prompts.ts`, `webhooks.ts`, `version.ts` (running vs latest release) |
+| `packages/server/src/admin` | | Dashboard API under `/admin/api/*`: `guard.ts` (cookie session or `Bearer ADMIN_API_KEY`), `auth.ts`, `record.ts` (conversations, leads keyed by email, ratings), `routes.ts`, `knowledge.ts` (pages, files, facts, search), `settings.ts` (the flat settings object ↔ site config), `setup.ts` (one-time setup/sign-in links), `prompts.ts`, `webhooks.ts`, `callbacks.ts` (callback requests as tasks: list, done/dismiss), `overlaps.ts` (prompt lines a setting or rule already covers), `version.ts` (running vs latest release) |
 | `packages/server/src/webhooks` | | `deliver.ts` (signed delivery, retry, delivery log, `emit`/`emitTo`), `events.ts` (conversation → events). Endpoints live in D1 `webhooks`, managed by `admin/webhooks.ts`; event names and envelope in `protocol/src/webhooks.ts` |
 | `packages/server/src/conversations` | | `summary.ts` (AI summary + labels, shared by the dashboard button and the job), `complete.ts` (`runConversationJob`: sleeps until 5 min after the last message, then summarises and sends `conversation.completed`) |
 | `packages/server/src/db` | | `migrations.ts` (numbered, append-only D1 schema; applied by deploy and per isolate), `d1.ts` (binding helpers) |
@@ -71,6 +71,18 @@ see `wiki/Knowledge-Base.md`.
 - **CLI users**: `murmur.json` + `prompt.md` in their project
   (`packages/cli/src/engine/project.ts`), compiled into `.murmur/`. Every
   Cloudflare resource it creates is named `knowtific-murmur-<site>`.
+
+### How the system prompt is built
+
+Three parts, never mixed (`wiki/Prompts-and-Instructions.md`): **settings**
+(`assistant` section: goal, tone, length; brand names; lead form) rendered by
+`server/src/core/guidance.ts` as `ctx.guidance.before`; the **owner's prompt**
+(prompt.md / dashboard, versioned, only business-specific text); Murmur's
+**rules** (`guidance.after`, then a connector's own, e.g. workers-ai
+`rules()`), which come last and win. `resolvePrompt` composes them, so every
+connector with a `promptOption` gets them. Never write a setting or a rule
+into a prompt template; `admin/overlaps.ts` flags prompt lines that repeat
+one (dashboard and `murmur prompt`).
 
 ### Where the system prompt lives (CLI projects)
 

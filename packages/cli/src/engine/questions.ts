@@ -112,11 +112,11 @@ export const PROVIDER_KEYS: Partial<Record<BackendType, string>> = {
 };
 
 export const MODELS: Partial<Record<BackendType, Option[]>> = {
-  // Checked against developers.cloudflare.com/workers-ai/platform/pricing on 2026-10-04.
+  // Measured in Murmur on 2026-10-05 (wiki/AI-Models.md); prices from developers.cloudflare.com/workers-ai/platform/pricing.
   'workers-ai': [
-    { value: '@cf/zai-org/glm-4.7-flash', label: 'GLM-4.7 Flash', hint: 'default · free plan · ~300 answers a day free' },
-    { value: '@cf/openai/gpt-oss-120b', label: 'gpt-oss 120B', hint: 'free plan · steadier tool use · ~4× the cost per answer' },
-    { value: '@cf/zai-org/glm-5.3-flash', label: 'GLM-5.3 Flash', hint: 'needs Workers Paid or AI Gateway credits' },
+    { value: '@cf/zai-org/glm-4.7-flash', label: 'GLM-4.7 Flash', hint: 'default · best all-round · ~325 answers a day free' },
+    { value: '@cf/qwen/qwen3-30b-a3b-fp8', label: 'Qwen3 30B', hint: 'free plan · dependable · ~340 answers a day free' },
+    { value: '@cf/zai-org/glm-5.3-flash', label: 'GLM-5.3 Flash', hint: 'most capable · needs Workers Paid or AI Gateway credits' },
   ],
   cloudflare: [
     { value: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', label: 'Llama 3.3 70B', hint: 'Workers AI · fast, free tier' },

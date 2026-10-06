@@ -1,4 +1,4 @@
-import { runOptions, type AiOptions } from './ai.js';
+import { reasoningInputs, runOptions, type AiOptions } from './ai.js';
 import { categorise } from './categorise.js';
 import { extractPage, mergeFacts, type Fact, type FactKey } from './extract.js';
 import { fetchPage } from './fetch.js';
@@ -57,7 +57,7 @@ export async function factsFromText(
         ],
         max_tokens: 400,
         temperature: 0,
-        ...(/glm/i.test(model) ? { chat_template_kwargs: { enable_thinking: false } } : {}),
+        ...reasoningInputs(model, 'off'),
       },
       runOptions(options),
     )) as { choices?: { message?: { content?: string } }[]; response?: unknown };

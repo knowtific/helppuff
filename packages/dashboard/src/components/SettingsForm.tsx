@@ -126,19 +126,12 @@ function LeadFieldsEditor({ fields, onChange }: { fields: LeadField[]; onChange:
     </div>
   );
 }
+// Measured in Murmur on 2026-10-05; the wiki's AI models page has the numbers.
 const MODELS = [
-  {
-    value: '@cf/zai-org/glm-4.7-flash',
-    label: 'GLM-4.7 Flash — default, free plan',
-  },
-  {
-    value: '@cf/openai/gpt-oss-120b',
-    label: 'gpt-oss 120B — steadier, ~4× the cost',
-  },
-  {
-    value: '@cf/zai-org/glm-5.3-flash',
-    label: 'GLM-5.3 Flash — needs Workers Paid',
-  },
+  { value: '@cf/zai-org/glm-4.7-flash', label: 'GLM-4.7 Flash — default, best all-round' },
+  { value: '@cf/qwen/qwen3-30b-a3b-fp8', label: 'Qwen3 30B — dependable, about as cheap' },
+  { value: '@cf/zai-org/glm-5.3-flash', label: 'GLM-5.3 Flash — most capable, needs Workers Paid' },
+  { value: '@cf/deepseek-ai/deepseek-v4-flash-0731', label: 'DeepSeek V4 Flash — needs Workers Paid' },
 ];
 
 /** One settings page's fields; the page header above names and explains it. */
@@ -198,9 +191,11 @@ export function SettingsForm({ knowledge, section }: { knowledge: boolean; secti
     setBusy(true);
     setError(null);
     try {
+      // Behaviour belongs to the Instructions page; a stale copy here must not overwrite it.
+      const { behaviour: _behaviour, ...settings } = draft;
       const result = await api<SettingsView>('/settings', {
         method: 'PUT',
-        json: { settings: draft },
+        json: { settings },
       });
       setDraft(result.settings);
       setSaved(true);
@@ -367,6 +362,22 @@ export function SettingsForm({ knowledge, section }: { knowledge: boolean; secti
                       {m.label}
                     </option>
                   ))}
+                </Select>
+              </Field>
+            )}
+            {draft.assistant && (
+              <Field
+                label="Thinking"
+                hint="How long the model thinks before it answers. Thinking keeps answers safe: without it, assistants in testing leaked their instructions and agreed to false facts. Deeper helps with questions that need several steps; visitors wait longer for the first words."
+              >
+                <Select
+                  className="w-full"
+                  value={draft.assistant.reasoning}
+                  onChange={(e) => setAssistant({ reasoning: e.target.value as NonNullable<Settings['assistant']>['reasoning'] })}
+                >
+                  <option value="low">Low: fastest</option>
+                  <option value="medium">Medium (default)</option>
+                  <option value="high">High: best on multi-step questions, slowest</option>
                 </Select>
               </Field>
             )}

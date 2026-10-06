@@ -8,6 +8,7 @@ import {
   type SendResponse,
   type StreamedSendDone,
 } from '@murmur/protocol';
+import { isCallbackForm } from '@murmur/connector-types';
 import { resolveSite } from '../config/site.js';
 import { MurmurError } from '../core/errors.js';
 import { assertAllowedOrigin } from '../core/origin.js';
@@ -180,7 +181,8 @@ messageRoutes.post('/v1/sessions/messages', async (c) => {
     work = finish();
   }
   const submitted = formLead(input);
-  if (submitted) reportLead(submitted, 'form');
+  // The callback form is itself the request: recorded once, here, whatever the model says next.
+  if (submitted) reportLead(input.kind === 'action' && isCallbackForm(input.actionId) ? { ...submitted, request: 'callback' } : submitted, 'form');
 
   if (streaming) {
     // The headers are gone before the new state exists, so the token rides in `done`.

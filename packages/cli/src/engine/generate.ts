@@ -1,9 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { AGENTS_MARKER, AGENTS_SECTION, SKILL_MD, SKILL_NAME } from '../skill.js';
-import { buildPrompt, DEFAULT_PROFILE } from '@murmur/server';
 import { DEFAULT_BACKEND, PROMPT_FILE, resourceName, type Backend, type ProjectInput } from './project.js';
-import { DEFAULT_LEAD_FORM, PROVIDER_KEYS, defaultModel, guessName, type Answers, type Facts, type Goal } from './questions.js';
+import { DEFAULT_LEAD_FORM, PROVIDER_KEYS, defaultModel, guessName, type Answers, type Facts } from './questions.js';
 import { originsFor, normalizeUrl, siteIdFor, type SiteInfo } from './site.js';
 
 /** Answers + what was learned → murmur.json, prompt.md and the secrets to store. */
@@ -93,6 +92,11 @@ export function generateProject(answers: Answers, facts: Facts): Generated {
     prompt: PROMPT_FILE,
     knowledge: { website: Boolean(website), files: docs },
     widget: widgetFor(name, site),
+    // How it behaves is a setting, written around prompt.md on every answer (never into it).
+    assistant: {
+      goal: answers.goal === 'answer' || answers.goal === 'sell' ? 'answers' : answers.goal === 'book' ? 'bookings' : 'callbacks',
+      ...(answers.goal === 'book' && site?.pages.booking ? { bookingUrl: site.pages.booking.url } : {}),
+    },
     dashboard: answers.dashboard === false ? { enabled: false } : { enabled: true, ...(answers.adminEmail ? { adminEmail: answers.adminEmail } : {}) },
   };
 
@@ -109,28 +113,9 @@ export function generateProject(answers: Answers, facts: Facts): Generated {
         : `Hi {{name}}! I'm ${agentName} from ${name}. How can I help you today?`,
     ],
   };
-  // workers-ai: the same generator as the dashboard's instructions form, so the two agree.
-  const goal = answers.goal ?? 'leads';
-  const profilePrompt =
-    backendType === 'workers-ai'
-      ? buildPrompt(
-          {
-            ...DEFAULT_PROFILE,
-            goal: goal === 'answer' || goal === 'sell' ? 'answers' : goal === 'book' ? 'bookings' : 'callbacks',
-            mustKnow: answers.notes ?? '',
-            ...(goal === 'book' && site?.pages.booking ? { bookingUrl: site.pages.booking.url } : {}),
-          },
-          { businessName: name, website: website ?? null },
-        )
-      : null;
   return {
     project,
-    prompt: profilePrompt ? `${profilePrompt}\n` : promptFor(name, website, site, backendType, {
-      agentName,
-      goal: answers.goal ?? 'leads',
-      notes: answers.notes ?? '',
-      formFields: ((widget.leadForm['fields'] as { name: string }[] | undefined) ?? []).map((f) => f.name),
-    }),
+    prompt: promptFor(name, site, backendType, answers.notes ?? ''),
     secrets,
     assumed,
   };
@@ -193,43 +178,20 @@ function widgetFor(name: string, site: SiteInfo | null): Record<string, unknown>
 }
 
 /**
- * A starting prompt. Short on purpose: the knowledge base carries the facts,
- * and the prompt carries only behaviour. Edited freely afterwards.
+ * A starting prompt.md: only what is specific to the business. Who the
+ * assistant is, its goal, tone and length are settings (`assistant` in
+ * murmur.json), and Murmur adds its rules itself (`server/src/core/guidance.ts`),
+ * so none of that is written here to go stale or be contradicted. Backends
+ * that are not given the business details get the contact details here.
  */
-const GOAL_LINES: Record<Goal, (contact: string, site: SiteInfo | null) => string> = {
-  leads: (contact) =>
-    `Your main job: turn interested visitors into enquiries. Once you have helped, invite them to leave their name and the best way to reach them${contact ? `, or to contact us directly (${contact})` : ''}. Ask once, naturally — never before you have been useful.`,
-  answer: () => 'Your main job: answer questions about the business clearly and accurately, so visitors find what they need without digging.',
-  book: (contact, site) =>
-    `Your main job: help visitors book a call or appointment${site?.pages.booking ? ` — the booking page is ${site.pages.booking.url}` : contact ? ` — they can reach us on ${contact}` : ''}. Once you understand what they need, suggest booking.`,
-  sell: (_contact, site) =>
-    `Your main job: help visitors choose the right product, service or plan for them, explain the difference in plain words, and point them to the next step${site?.pages.pricing ? ` (pricing: ${site.pages.pricing.url})` : ''}.`,
-};
-
-export function promptFor(
-  name: string,
-  website: string | undefined,
-  site: SiteInfo | null,
-  backend: string,
-  custom: { agentName: string; goal: Goal; notes: string; formFields?: string[] } = { agentName: 'Assistant', goal: 'leads', notes: '' },
-): string {
-  const contact = [site?.phone && `phone ${site.phone}`, site?.email && `email ${site.email}`].filter(Boolean).join(' or ');
-  const grounded = ['cloudflare', 'openai', 'gemini', 'anthropic'].includes(backend);
-  const who = custom.agentName && custom.agentName !== 'Assistant' ? `${custom.agentName}, ` : '';
-  return `You are ${who}the website assistant for ${name}${website ? ` (${website})` : ''}.
-${site?.description ? `\nAbout the business: ${site.description}\n` : ''}
-${GOAL_LINES[custom.goal](contact, site)}
-${custom.formFields?.length ? `\nThe visitor filled in a form before chatting: ${custom.formFields.map((f) => `${f} {{lead.${f}}}`).join(', ')}. The chat has already greeted them by name, so do not greet again — use their first name only where it feels natural, and never ask for these details again: we already have them.\n` : ''}${custom.notes.trim() ? `\nThe owner's instructions — always follow these:\n${custom.notes.trim()}\n` : ''}
-How to answer:
-- Speak as part of the ${name} team: "we" and "our", never "they" or "contact ${name}".
-- Be warm, clear and brief: one to three short paragraphs, or a short list.
-${grounded ? "- Answer from the provided knowledge about the business. If it doesn't cover the question, say you're not sure rather than guessing.\n" : ''}- Never invent prices, availability, policies or promises.
-- When a page on the site answers the question, link to it.
-- If someone wants a person, a quote or a booking, ${contact ? `offer the contact details (${contact}) and ` : ''}ask for their name and the best way to reach them.
-- Use plain Markdown only: paragraphs, **bold**, lists and links. No headings or tables.
-
-The visitor is on {{context.pageUrl}}.
-`;
+export function promptFor(name: string, site: SiteInfo | null, backend: string, notes = ''): string {
+  const contact = backend === 'workers-ai' ? '' : [site?.phone && `phone ${site.phone}`, site?.email && `email ${site.email}`].filter(Boolean).join(', ');
+  const parts = [
+    site?.description ? `About ${name}: ${site.description}` : `About ${name}: (what you do, for whom, and where).`,
+    contact ? `Contact: ${contact}.` : '',
+    notes.trim(),
+  ].filter(Boolean);
+  return `${parts.join('\n\n')}\n`;
 }
 
 // ------------------------------------------------------------ agent files

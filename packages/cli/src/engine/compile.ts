@@ -221,7 +221,7 @@ export function compile(
     ? { ...project.security, limits: { ...project.security.limits, messagesPerIpPerMinute: 600, sessionsPerIpPerHour: 1000 } }
     : project.security;
   const knowledge = knowledgeFor(project);
-  const stored = { connector, sinks, security, widget, ...(knowledge ? { knowledge } : {}) };
+  const stored = { connector, sinks, security, widget, assistant: project.assistant, ...(knowledge ? { knowledge } : {}) };
   const site = { origins, ...stored };
   const serverConfig = { sites: { [project.site]: site } };
 

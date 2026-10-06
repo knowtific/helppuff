@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { discover } from '../src/discover.js';
 import { runCrawlPart, type CrawlParams } from '../src/crawl.js';
 import { queueRun, readFacts, recordDiscovered } from '../src/store.js';
-import { DEFAULT_RETRIEVAL, retrieve, rrf, standaloneQuery } from '../src/retrieve.js';
+import { DEFAULT_RETRIEVAL, retrieve, rrf, standaloneQuery, subQueries } from '../src/retrieve.js';
 import { neurons, usageDay } from '../src/pricing.js';
 import { fakeAi, fakeVectors, inlineSteps, site, sqliteD1 } from './helpers.js';
 
@@ -168,6 +168,14 @@ describe('retrieve', () => {
     expect(result.chunks.find((c) => c.url.endsWith('hot-water'))!.content).toContain('$1,450');
   });
 
+  it('finds the question inside a long message, by searching its sentences too', async () => {
+    const { db, ai, vectors } = await crawled();
+    const message = 'My partner and I just bought an older weatherboard house near the station with three bedrooms and a garden shed. Does anyone do Mooroolbark?';
+    const result = await retrieve({ db, ai, vectors }, 'acme', message);
+    expect(result.trace.parts).toBe(2);
+    expect(result.chunks[0]?.content).toContain('Mooroolbark, Montrose and Kilsyth');
+  });
+
   it('returns nothing when nothing is relevant', async () => {
     const { db, ai, vectors } = await crawled();
     const result = await retrieve({ db, ai, vectors }, 'acme', 'quantum chromodynamics lecture notes');
@@ -191,6 +199,14 @@ describe('helpers', () => {
       'What are your opening hours on public holidays?',
     );
     expect(standaloneQuery('hi there', [])).toBe('hi there');
+  });
+
+  it('splits only long messages into sentences to search', () => {
+    expect(subQueries('Do you service Mooroolbark?')).toEqual([]);
+    expect(subQueries('My living room is 4m x 5m and my bedroom is 3m x 3.5m. Roughly what would installation cost for both?')).toEqual([
+      'My living room is 4m x 5m and my bedroom is 3m x 3.5m.',
+      'Roughly what would installation cost for both?',
+    ]);
   });
 
   it('fuses rankings with RRF', () => {

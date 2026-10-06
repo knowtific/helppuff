@@ -1,6 +1,6 @@
 import { readSse } from '@murmur/protocol';
 import { CONNECTOR_TIMEOUT_MS } from '@murmur/connector-types';
-import type { AiLike } from '@murmur/rag';
+import { reasoningInputs, thinkingRoom, type AiLike, type Reasoning } from '@murmur/rag';
 
 /**
  * One chat completion through the Workers AI binding.
@@ -33,25 +33,85 @@ export type CompleteOptions = {
   gateway?: string | undefined;
   onText?: ((delta: string) => void) | undefined;
   temperature?: number;
+  /** How long the model thinks first. Background and helper calls leave it `off`. */
+  reasoning?: Reasoning;
 };
-
-/** GLM models think out loud by default; that costs output neurons and time a support answer does not need. */
-const templateKwargs = (model: string) => (/glm/i.test(model) ? { chat_template_kwargs: { enable_thinking: false } } : {});
 
 export async function complete(ai: AiLike, model: string, messages: ChatMessage[], options: CompleteOptions): Promise<Completion> {
   const stream = Boolean(options.onText);
   const inputs: Record<string, unknown> = {
     messages,
-    max_tokens: options.maxTokens,
+    // Thinking tokens count against the cap: room for them, on top of the answer's own.
+    max_tokens: options.maxTokens + thinkingRoom(model, options.reasoning ?? 'off'),
     temperature: options.temperature ?? 0.3,
     ...(options.tools?.length ? { tools: options.tools } : {}),
     ...(stream ? { stream: true, stream_options: { include_usage: true } } : {}),
-    ...templateKwargs(model),
+    ...reasoningInputs(model, options.reasoning ?? 'off'),
   };
   const raw = await ai.run(model, inputs, options.gateway ? { gateway: { id: options.gateway } } : undefined);
   const body = streamOf(raw);
-  if (body) return readStream(body, options.onText ?? (() => {}));
-  return readCompletion(raw);
+  const names = (options.tools ?? []).map((t) => t.function.name);
+  return withTextCalls(body ? await readStream(body, options.onText ?? (() => {})) : readCompletion(raw), names);
+}
+
+const TAG = '<tool_call>';
+
+/**
+ * Tool calls a model wrote into its text instead of the tool-call field:
+ * GLM's `<tool_call>name<arg_key>k</arg_key><arg_value>v</arg_value></tool_call>`
+ * (or JSON inside the tags), a bare `{"name": …, "parameters": …}` object, or
+ * `name(key="value")`. Calls to tools that were offered are made; the
+ * markup never reaches the visitor either way.
+ */
+export function textCalls(content: string, toolNames: string[]): { content: string; calls: ToolCall[] } {
+  const calls: ToolCall[] = [];
+  const offered = new Set(toolNames);
+  const add = (name: string, args: Record<string, unknown>) => {
+    if (offered.has(name)) calls.push({ id: `text_${calls.length}`, name, arguments: JSON.stringify(args) });
+  };
+  let text = content.replace(/<tool_call>([\s\S]*?)(?:<\/tool_call>|$)/g, (_all, body: string) => {
+    const inner = body.trim();
+    if (inner.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(inner) as { name?: unknown; arguments?: unknown; parameters?: unknown };
+        if (typeof parsed.name === 'string') add(parsed.name, (parsed.arguments ?? parsed.parameters ?? {}) as Record<string, unknown>);
+      } catch {
+        // Unreadable: dropped.
+      }
+      return '';
+    }
+    const name = /^[\w-]+/.exec(inner)?.[0] ?? '';
+    const args: Record<string, unknown> = {};
+    for (const [, key, value] of inner.matchAll(/<arg_key>([\s\S]*?)<\/arg_key>\s*<arg_value>([\s\S]*?)<\/arg_value>/g)) args[key!.trim()] = value!.trim();
+    if (name) add(name, args);
+    return '';
+  });
+  for (const name of offered) {
+    // `{"name": "request_callback", "parameters": {...}}`, fenced or bare.
+    text = text.replace(new RegExp(`(?:\`\`\`(?:json)?\\s*)?\\{\\s*"name"\\s*:\\s*"${name}"[\\s\\S]*\\}(?:\\s*\`\`\`)?`, 'g'), (json) => {
+      try {
+        const parsed = JSON.parse(json.replace(/^```(?:json)?|```$/g, '').trim()) as { arguments?: unknown; parameters?: unknown };
+        add(name, (parsed.arguments ?? parsed.parameters ?? {}) as Record<string, unknown>);
+        return '';
+      } catch {
+        return json;
+      }
+    });
+    // `[request_callback(name="Sam", phone="0400 111 222")]`
+    text = text.replace(new RegExp(`\\[?\\b${name}\\(((?:\\s*\\w+\\s*=\\s*"[^"]*"\\s*,?)*)\\)\\]?`, 'g'), (_all, body: string) => {
+      const args: Record<string, unknown> = {};
+      for (const [, key, value] of body.matchAll(/(\w+)\s*=\s*"([^"]*)"/g)) args[key!] = value;
+      add(name, args);
+      return '';
+    });
+  }
+  return { content: text.replace(/\n{3,}/g, '\n\n').trim(), calls };
+}
+
+function withTextCalls(completion: Completion, toolNames: string[]): Completion {
+  if (completion.toolCalls.length) return { ...completion, content: textCalls(completion.content, []).content };
+  const found = textCalls(completion.content, toolNames);
+  return { ...completion, content: found.content, toolCalls: found.calls };
 }
 
 function streamOf(raw: unknown): ReadableStream<Uint8Array> | null {
@@ -92,6 +152,32 @@ export function readCompletion(raw: unknown): Completion {
 
 export async function readStream(body: ReadableStream<Uint8Array>, onText: (delta: string) => void): Promise<Completion> {
   let content = '';
+  // Text is passed on as it comes, except from a `<tool_call>` onwards: held
+  // back while it might be one, dropped once it is.
+  let shown = 0;
+  let inCall = false;
+  const forward = () => {
+    if (inCall) return;
+    const at = content.indexOf(TAG, shown);
+    if (at !== -1) {
+      if (at > shown) onText(content.slice(shown, at));
+      shown = at;
+      inCall = true;
+      return;
+    }
+    let keep = 0;
+    for (let n = Math.min(TAG.length - 1, content.length - shown); n > 0; n--) {
+      if (TAG.startsWith(content.slice(content.length - n))) {
+        keep = n;
+        break;
+      }
+    }
+    const end = content.length - keep;
+    if (end > shown) {
+      onText(content.slice(shown, end));
+      shown = end;
+    }
+  };
   let usage: Completion['usage'] = null;
   const partial = new Map<number, { id: string; name: string; arguments: string }>();
   let whole: ToolCall[] = [];
@@ -112,7 +198,7 @@ export async function readStream(body: ReadableStream<Uint8Array>, onText: (delt
       const text = delta ? asString(delta['content']) : asString(frame['response']);
       if (text) {
         content += text;
-        onText(text);
+        forward();
       }
       const deltaCalls = delta?.['tool_calls'];
       if (Array.isArray(deltaCalls)) {
@@ -131,6 +217,9 @@ export async function readStream(body: ReadableStream<Uint8Array>, onText: (delt
     },
     CONNECTOR_TIMEOUT_MS,
   );
+
+  // A held-back `<tool` that never became a tag is ordinary text.
+  if (!inCall && shown < content.length) onText(content.slice(shown));
 
   const streamed = [...partial.entries()]
     .sort(([a], [b]) => a - b)

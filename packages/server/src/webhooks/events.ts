@@ -23,12 +23,10 @@ function contactOf(lead: Record<string, string>) {
 }
 
 export function leadCaptured(ctx: RequestCtx, input: { siteId: string; sessionId: string; lead: Record<string, string>; source: LeadSource }): void {
-  const { contact, message, request, fields } = contactOf(input.lead);
+  const { contact, message, fields } = contactOf(input.lead);
   if (!contact.name && !contact.email && !contact.phone && !Object.keys(fields).length) return;
   emit(ctx, input.siteId, 'lead.captured', { conversationId: input.sessionId, source: input.source, ...contact, fields, ...(message ? { message } : {}) });
-  if (request === 'callback') {
-    emit(ctx, input.siteId, 'callback.requested', { conversationId: input.sessionId, ...contact, ...(message ? { message } : {}) });
-  }
+  // callback.requested is sent once the request is saved, with its id (`admin/record.ts`).
 }
 
 function sent(ctx: RequestCtx, siteId: string, sessionId: string, messages: Message[]): void {

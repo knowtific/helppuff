@@ -33,7 +33,15 @@ unsummarised, or search.
 One row per **person**, keyed by email: a visitor who comes back gets their
 new chat added to the lead they already have. Each lead has a status (new →
 contacted → qualified → won / lost), notes, the form's answers and how many
-chats they have had. **Export CSV** for a spreadsheet or CRM. See [[Leads]].
+chats they have had. **Export CSV** for a spreadsheet or CRM. A person waiting
+for a callback is labelled **Callback requested**. See [[Leads]].
+
+## Callbacks
+
+Visitors who asked to be called back, as a to-do list: name, tap-to-call
+phone, email, what they want and a link to the conversation. Waiting ones
+come oldest first, and the menu shows how many. **Done** (with a note) or
+**Dismiss** closes one. See [[Leads|Leads#callbacks]].
 
 ## Knowledge
 
@@ -63,9 +71,9 @@ Opens as a menu in the sidebar:
 | **Chat** | The assistant's name, the business name, the welcome message, suggested questions (**Suggest from my site** writes them) |
 | **Appearance** | Colour (taken from your site), position, the button's icon |
 | **Lead form** | The form before the chat: on/off, its fields, which are required, your own extra fields |
-| **Instructions** | What it is mainly for, tone, answer length, must-know and never-say; they write the prompt for you. The full prompt and its version history are one click away |
+| **Instructions** | What it is mainly for, tone and answer length (settings Murmur adds around the prompt), and a box for anything specific to your business (the prompt itself). The full prompt, its version history and everything Murmur adds are one click away. See [[Prompt and instructions|Prompts-and-Instructions]] |
 | **Business details** | Phone, email, address, hours, service areas: read from your site, yours to correct (a crawl never overwrites your changes) |
-| **Advanced** | The AI model, "double-check answers before replying" (the reranker), how often the site is re-learned, time zone and language |
+| **Advanced** | The AI model (see [[AI models|AI-Models]]), thinking (low, medium, high), "double-check answers before replying" (the reranker), how often the site is re-learned, time zone and language |
 | **Webhooks** | Endpoints that receive every event as signed JSON; see [[Webhooks]] |
 | **Team & security** | Who can sign in, and what to do when locked out |
 | **Updates** | The version running and how to upgrade; see [[Upgrading]] |

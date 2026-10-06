@@ -212,8 +212,8 @@ export function markerFilter(onText: (delta: string) => void): { push(delta: str
 /** Instructions appended to a prompt so a tool-less model can still offer chips and links. */
 export const MARKER_INSTRUCTIONS = [
   'When the visitor is likely to pick from a few next steps, end your reply with one line',
-  '[[options: A | B | C]]',
-  'where A, B and C are two to four short next steps you write for this conversation, from what was just said.',
+  '[[options: <next step> | <next step> | <next step>]]',
+  'with two to four short next steps you write for this conversation, from what was just said, in the visitor\'s own words, without letters or numbers.',
   'Options are things the visitor might want to do or ask next — never facts, times or prices you were not given.',
   'When a web page answers the question, end with [[link: Page title | https://full-url]], using only https URLs',
   'that appear in the documents. Reference documents are not web pages: never link to them.',

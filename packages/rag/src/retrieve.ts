@@ -1,7 +1,7 @@
-import { classifyIntent, embedQuery, rerank, type AiOptions } from './ai.js';
+import { classifyIntent, embedQueries, embedQuery, rerank, type AiOptions } from './ai.js';
 import { intentCategories } from './categorise.js';
 import { chunksByIds, keywordSearch, vectorSearch, type ChunkRow } from './store.js';
-import type { AiLike, D1Like, Log, VectorIndexLike } from './types.js';
+import type { AiLike, D1Like, Log, VectorIndexLike, VectorMatch } from './types.js';
 
 /**
  * Retrieval for one visitor message:
@@ -107,6 +107,8 @@ export type Retrieval = {
     errors: string[];
     /** Milliseconds per stage: embed, vector, keyword, rows, rerank, intent, neighbour. */
     ms: Record<string, number>;
+    /** Sentences of a long message searched on their own (`subQueries`). */
+    parts?: number;
   };
 };
 
@@ -147,6 +149,21 @@ const toRetrieved = (row: ChunkRow, score: number): RetrievedChunk => ({
 });
 
 /** The passage the reranker reads: where it sits, then what it says. */
+/**
+ * The sentences of a long message, to search as well as the whole: a
+ * question wrapped in context ("My living room is 4m x 5m and the bedroom
+ * 3m x 3.5m. Roughly what would installation cost?") is drowned by the
+ * context when searched whole. Short messages are searched as they are.
+ */
+export function subQueries(query: string): string[] {
+  if (query.length < 60) return [];
+  const sentences = query
+    .split(/(?<=[.?!])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.split(/\s+/).length >= 3);
+  return sentences.length >= 2 ? sentences.slice(-3) : [];
+}
+
 export const rerankText = (row: Pick<ChunkRow, 'heading_path' | 'title' | 'content'>) => `${row.heading_path || row.title || ''}\n${row.content}`;
 
 export async function retrieve(deps: RetrieveDeps, siteId: string, query: string, options: RetrievalOptions = DEFAULT_RETRIEVAL): Promise<Retrieval> {
@@ -163,33 +180,44 @@ export async function retrieve(deps: RetrieveDeps, siteId: string, query: string
     }
   };
 
-  const [vectorHits, keywordHits] = await Promise.all([
-    (async () => {
+  // A long message's sentences are searched as well as the whole of it.
+  const parts = subQueries(query);
+  const [vectorLists, keywordLists] = await Promise.all([
+    (async (): Promise<VectorMatch[][]> => {
       if (!deps.vectors) return [];
       try {
         const early = options.precomputed?.text === query ? options.precomputed.embedding : null;
-        const embedded = await timed('embed', () =>
-          within(early ?? embedQuery(deps.ai, options.embeddingModel, query, ai), options.embedTimeoutMs ?? DEFAULT_RETRIEVAL.embedTimeoutMs, 'embedding'),
+        const [whole, more] = await timed('embed', () =>
+          within(
+            Promise.all([early ?? embedQuery(deps.ai, options.embeddingModel, query, ai), embedQueries(deps.ai, options.embeddingModel, parts, ai)]),
+            options.embedTimeoutMs ?? DEFAULT_RETRIEVAL.embedTimeoutMs,
+            'embedding',
+          ),
         );
-        neurons += embedded.neurons;
-        return await timed('vector', () => vectorSearch(deps.vectors!, siteId, embedded.vector, options.topKVector));
+        neurons += whole.neurons + more.neurons;
+        return await timed('vector', () =>
+          Promise.all([whole.vector, ...more.vectors].map((vector) => vectorSearch(deps.vectors!, siteId, vector, options.topKVector))),
+        );
       } catch (thrown) {
         errors.push(`vector: ${String((thrown as Error)?.message ?? thrown).slice(0, 120)}`);
         return [];
       }
     })(),
-    (async () => {
+    (async (): Promise<{ id: string; score: number }[][]> => {
       try {
-        return await timed('keyword', () => keywordSearch(deps.db, siteId, query, options.topKKeyword));
+        return await timed('keyword', () => Promise.all([query, ...parts].map((q) => keywordSearch(deps.db, siteId, q, options.topKKeyword))));
       } catch (thrown) {
         errors.push(`keyword: ${String((thrown as Error)?.message ?? thrown).slice(0, 120)}`);
         return [];
       }
     })(),
   ]);
+  const vectorHits = vectorLists.flat();
+  const keywordHits = keywordLists.flat();
 
-  const fused = rrf([vectorHits.map((h) => h.id), keywordHits.map((h) => h.id)]);
-  const vectorScore = new Map(vectorHits.map((h) => [h.id, h.score]));
+  const fused = rrf([...vectorLists.map((list) => list.map((h) => h.id)), ...keywordLists.map((list) => list.map((h) => h.id))]);
+  const vectorScore = new Map<string, number>();
+  for (const h of vectorHits) vectorScore.set(h.id, Math.max(vectorScore.get(h.id) ?? 0, h.score));
   const keywordIds = new Set(keywordHits.map((h) => h.id));
   const rows = await timed('rows', () => chunksByIds(deps.db, siteId, [...fused.keys()]));
 
@@ -213,13 +241,19 @@ export async function retrieve(deps: RetrieveDeps, siteId: string, query: string
   let threshold = options.minScore;
   if (options.rerankerModel && ranked.length) {
     try {
-      const result = await timed('rerank', () =>
-        within(rerank(deps.ai, options.rerankerModel!, query, ranked.map((r) => rerankText(r.row)), ai), options.rerankTimeoutMs ?? DEFAULT_RETRIEVAL.rerankTimeoutMs, 'rerank'),
+      // Each passage is judged against the whole message and each sentence, and keeps its best score.
+      const texts = ranked.map((r) => rerankText(r.row));
+      const results = await timed('rerank', () =>
+        within(
+          Promise.all([query, ...parts].map((q) => rerank(deps.ai, options.rerankerModel!, q, texts, ai))),
+          options.rerankTimeoutMs ?? DEFAULT_RETRIEVAL.rerankTimeoutMs,
+          'rerank',
+        ),
       );
-      neurons += result.neurons;
+      for (const result of results) neurons += result.neurons;
       reranked = true;
       chosen = ranked
-        .map((r, i) => ({ r, score: (result.scores[i] ?? 0) * (boost.has(r.row.category ?? '') ? 1.1 : 1) }))
+        .map((r, i) => ({ r, score: Math.max(...results.map((result) => result.scores[i] ?? 0)) * (boost.has(r.row.category ?? '') ? 1.1 : 1) }))
         .filter((x) => x.score >= options.minScore)
         .sort((a, b) => b.score - a.score)
         .slice(0, options.finalK)
@@ -244,7 +278,7 @@ export async function retrieve(deps: RetrieveDeps, siteId: string, query: string
     chunks: chosen,
     query,
     neurons,
-    trace: { vector: vectorHits.length, keyword: keywordHits.length, fused: fused.size, reranked, threshold, errors, ms },
+    trace: { vector: vectorHits.length, keyword: keywordHits.length, fused: fused.size, reranked, threshold, errors, ms, ...(parts.length ? { parts: parts.length } : {}) },
   };
 }
 

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { promptSourceSchema } from '@murmur/connector-types';
-import { DEFAULT_RETRIEVAL } from '@murmur/rag';
+import { ANSWER_REASONING, DEFAULT_RETRIEVAL } from '@murmur/rag';
 
 /**
  * Options for the `workers-ai` connector: Murmur's own RAG (Vectorize + D1
@@ -13,7 +13,12 @@ export const DEFAULT_MODEL = '@cf/zai-org/glm-4.7-flash';
 
 export const workersAiOptionsSchema = z
   .object({
-    model: z.string().min(1).max(200).default(DEFAULT_MODEL).describe('The Workers AI model that writes answers. GLM-4.7 Flash runs on the free plan; `@cf/openai/gpt-oss-120b` is steadier and costs about four times as much.'),
+    model: z.string().min(1).max(200).default(DEFAULT_MODEL).describe('The Workers AI model that writes answers. GLM-4.7 Flash is the best all-round on the Free plan; the wiki\'s AI models page compares the others for speed, quality and answers a day.'),
+    reasoning: z
+      // `off` was a choice once: answers without thinking proved unsafe, so it now means `low`.
+      .preprocess((value) => (value === 'off' ? 'low' : value), z.enum(ANSWER_REASONING))
+      .default('medium')
+      .describe('How long the model thinks before answering: `low`, `medium` or `high`. Deeper is better on multi-step questions, slower to start, and the thinking is billed. Models that only switch thinking on or off treat every level as on.'),
     fallbackModel: z.string().min(1).max(200).optional().describe('Tried once when the main model fails for any reason other than the budget.'),
     gateway: z.string().min(1).max(64).optional().describe('An AI Gateway id: caching, logs and rate limits in front of every model call.'),
     instructions: promptSourceSchema.optional(),

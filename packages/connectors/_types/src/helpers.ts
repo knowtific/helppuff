@@ -13,6 +13,14 @@ export function messageId(prefix = 'm'): string {
   return `${prefix}_${Date.now().toString(36)}${counter.toString(36)}${random}`;
 }
 
+/**
+ * The callback form's id starts with this. A submitted form comes back with
+ * its id as the action id, so the server can record it as a callback request
+ * (`callback.requested`) whichever backend showed it.
+ */
+export const CALLBACK_FORM = 'callback';
+export const isCallbackForm = (actionId: string | undefined): boolean => Boolean(actionId?.startsWith(`${CALLBACK_FORM}_`));
+
 type BaseInit = { id?: string; ts?: number; role?: Role };
 
 function base(init: BaseInit = {}): { id: string; ts: number; role: Role } {

@@ -246,6 +246,30 @@ describe('settings', () => {
     expect((await options()).retrieval).toBeUndefined();
   });
 
+  it('shows the rules Murmur adds to the prompt, read-only, next to it', async () => {
+    const w = world();
+    const view = (await (await get(w.api, '/admin/api/prompt')).json()) as { text: string; builtIn: string | null };
+    expect(view.text).toBe('You help Acme.');
+    expect(view.builtIn).toContain('## How to answer from the website');
+    expect(view.builtIn).toContain('Never promise discounts');
+  });
+
+  it('sets how long the model thinks: medium unless changed, stored only when not the default', async () => {
+    const w = world();
+    const read = async () => ((await (await get(w.api, '/admin/api/settings')).json()) as { settings: { assistant: { reasoning: string } } }).settings.assistant.reasoning;
+    const options = async () => (JSON.parse((await w.kv.get(siteConfigKey('acme')))!) as { connector: { options: Record<string, unknown> } }).connector.options;
+    expect(await read()).toBe('medium');
+
+    await send(w.api, 'PUT', '/admin/api/settings', { settings: { assistant: { reasoning: 'high' } } });
+    expect((await options())['reasoning']).toBe('high');
+    expect(await read()).toBe('high');
+
+    await send(w.api, 'PUT', '/admin/api/settings', { settings: { assistant: { reasoning: 'medium' } } });
+    expect((await options())['reasoning']).toBeUndefined();
+    // Off is not a choice: answers without thinking proved unsafe.
+    expect((await send(w.api, 'PUT', '/admin/api/settings', { settings: { assistant: { reasoning: 'off' } } })).status).toBe(400);
+  });
+
   it('rejects an invalid change with the field named', async () => {
     const w = world();
     const response = await send(w.api, 'PUT', '/admin/api/settings', { settings: { accent: 'teal' } });
@@ -337,24 +361,43 @@ describe('feedback and form leads', () => {
   });
 });
 
-describe('instructions form', () => {
-  it('turns a few choices into a published prompt version, and notices a hand edit', async () => {
+describe('instructions', () => {
+  const stored = async (w: ReturnType<typeof world>) => JSON.parse((await w.kv.get(siteConfigKey('acme')))!) as Record<string, any>;
+
+  it('keeps goal, tone and length as settings, around the owner\'s prompt and never in it', async () => {
     const w = world();
-    const first = (await (await get(w.api, '/admin/api/profile')).json()) as { profile: { goal: string; tone: string }; custom: boolean };
-    expect(first.profile).toMatchObject({ goal: 'callbacks', tone: 'friendly' });
-    // The deployed prompt ("You help Acme.") was not made by the form.
-    expect(first.custom).toBe(true);
+    const read = async () => ((await (await get(w.api, '/admin/api/settings')).json()) as { settings: { behaviour: Record<string, unknown> } }).settings.behaviour;
+    expect(await read()).toEqual({ goal: 'callbacks', tone: 'friendly', length: 'short', prices: 'share' });
 
-    const saved = await send(w.api, 'PUT', '/admin/api/profile', { profile: { goal: 'bookings', bookingUrl: 'https://acme.test/book', tone: 'professional', neverSay: 'quote prices' } });
+    const saved = await send(w.api, 'PUT', '/admin/api/settings', { settings: { behaviour: { goal: 'bookings', bookingUrl: 'https://acme.test/book', tone: 'professional' } } });
     expect(saved.status).toBe(200);
-    const stored = JSON.parse((await w.kv.get(siteConfigKey('acme')))!) as { connector: { options: { instructions: string } }; profile: { goal: string }; prompt: { version: number } };
-    expect(stored.connector.options.instructions).toContain('point them to booking at https://acme.test/book');
-    expect(stored.connector.options.instructions).toContain('Never:\nquote prices');
-    expect(stored.profile.goal).toBe('bookings');
-    expect(stored.prompt.version).toBeGreaterThanOrEqual(1);
+    expect((await stored(w)).assistant).toEqual({ goal: 'bookings', bookingUrl: 'https://acme.test/book', tone: 'professional', length: 'short', prices: 'share' });
+    // The owner's text is untouched, and no prompt version was made.
+    expect((await stored(w)).connector.options.instructions).toBe('You help Acme.');
+    expect((await stored(w)).prompt).toBeUndefined();
+    expect(await read()).toMatchObject({ goal: 'bookings', tone: 'professional' });
+  });
 
-    const again = (await (await get(w.api, '/admin/api/profile')).json()) as { custom: boolean };
-    expect(again.custom).toBe(false);
+  it('reads the choices a site saved with the retired instructions form', async () => {
+    const w = world();
+    await w.kv.put(siteConfigKey('acme'), JSON.stringify({ profile: { goal: 'answers', tone: 'casual', length: 'detailed', mustKnow: 'x', neverSay: '' } }));
+    const view = (await (await get(w.api, '/admin/api/settings')).json()) as { settings: { behaviour: Record<string, unknown> } };
+    expect(view.settings.behaviour).toEqual({ goal: 'answers', tone: 'casual', length: 'detailed', prices: 'share' });
+  });
+
+  it('shows everything Murmur adds around the prompt, and the lines of the prompt that repeat it', async () => {
+    const w = world();
+    const published = await send(w.api, 'POST', '/admin/api/prompt', {
+      text: 'You are the website assistant for Acme.\nBe warm and friendly.\nWe only work in the eastern suburbs.\nCall us on 03 9876 5432.',
+      baseVersion: 0,
+    });
+    expect(published.status).toBe(200);
+    const view = (await (await get(w.api, '/admin/api/prompt')).json()) as { builtIn: string; overlaps: { line: number; why: string }[] };
+    expect(view.builtIn).toMatch(/^You are the website assistant for Acme/);
+    expect(view.builtIn.indexOf('(your instructions, above)')).toBeLessThan(view.builtIn.indexOf('## Rules that always apply'));
+    expect(view.builtIn).toContain('## How to answer from the website');
+    expect(view.overlaps.map((o) => o.line)).toEqual([1, 2, 4]);
+    expect(view.overlaps[2]!.why).toContain('{{business.phone}}');
   });
 });
 

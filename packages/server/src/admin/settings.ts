@@ -2,7 +2,8 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { iconNames, type WidgetConfig } from '@murmur/protocol';
 import type { KvStore } from '@murmur/connector-types';
-import { storedSiteConfigSchema, type SiteConfig, type StoredSiteConfig } from '../config/schema.js';
+import { ANSWER_REASONING, answerReasoning } from '@murmur/rag';
+import { assistantConfigSchema, storedSiteConfigSchema, type SiteConfig, type StoredSiteConfig } from '../config/schema.js';
 import { resolveSite, siteConfigKey } from '../config/site.js';
 import { MurmurError } from '../core/errors.js';
 import type { HonoEnv } from '../core/request.js';
@@ -57,8 +58,10 @@ export function upgradeSettings(raw: unknown): unknown {
       fields: leads.fields.flatMap((f) => (typeof f === 'string' ? (LEGACY_FIELDS[f] ? [LEGACY_FIELDS[f]] : []) : [f])),
     };
   }
+  // Before behaviour was a setting: the defaults (a retired profile, if any, is read by resolveSite).
+  if (!s['behaviour']) s['behaviour'] = assistantConfigSchema.parse({});
   const assistant = s['assistant'] as Record<string, unknown> | null | undefined;
-  if (assistant) s['assistant'] = { model: assistant['model'], locale: assistant['locale'] ?? null, timezone: assistant['timezone'] ?? null, rerank: assistant['rerank'] ?? true };
+  if (assistant) s['assistant'] = { model: assistant['model'], locale: assistant['locale'] ?? null, timezone: assistant['timezone'] ?? null, rerank: assistant['rerank'] ?? true, reasoning: answerReasoning(assistant['reasoning']) };
   return s;
 }
 
@@ -89,9 +92,13 @@ export const settingsSchema = z
         timezone: z.string().max(64).nullable(),
         /** Re-score the passages search found before answering (`retrieval.rerankerModel`; null turns it off). */
         rerank: z.boolean(),
+        /** How long the model thinks before answering (`reasoning`). */
+        reasoning: z.enum(ANSWER_REASONING),
       })
       .strict()
       .nullable(),
+    /** How the assistant behaves (the `assistant` site section): Murmur writes it around the prompt, which never repeats it. */
+    behaviour: assistantConfigSchema,
     crawl: z
       .object({
         schedule: z.enum(['off', 'daily', 'weekly', 'monthly']),
@@ -107,12 +114,14 @@ export type Settings = z.infer<typeof settingsSchema>;
 /** A partial update: any top-level section may be left out; nested objects are merged one level deep. */
 export const settingsPatchSchema = settingsSchema.partial().extend({
   leads: settingsSchema.shape.leads.partial().optional(),
+  behaviour: assistantConfigSchema.partial().optional(),
   assistant: z
     .object({
       model: z.string().min(1).max(200).optional(),
       locale: z.string().max(35).nullable().optional(),
       timezone: z.string().max(64).nullable().optional(),
       rerank: z.boolean().optional(),
+      reasoning: z.enum(ANSWER_REASONING).optional(),
     })
     .strict()
     // Null (a backend other than workers-ai) changes nothing.
@@ -148,8 +157,9 @@ export function readSettings(site: SiteConfig): Settings {
     leads: { enabled: w.leadForm.enabled, fields },
     assistant:
       site.connector.type === 'workers-ai'
-        ? { model: str(o['model']) ?? '@cf/zai-org/glm-4.7-flash', locale: str(o['locale']), timezone: str(o['timezone']), rerank: obj(o['retrieval'])['rerankerModel'] !== null }
+        ? { model: str(o['model']) ?? '@cf/zai-org/glm-4.7-flash', locale: str(o['locale']), timezone: str(o['timezone']), rerank: obj(o['retrieval'])['rerankerModel'] !== null, reasoning: answerReasoning(o['reasoning']) }
         : null,
+    behaviour: site.assistant,
     crawl: { schedule: site.knowledge.schedule, include: site.knowledge.include, exclude: site.knowledge.exclude, renderJs: site.knowledge.renderJs },
   };
 }
@@ -159,12 +169,13 @@ const compact = (value: Record<string, unknown>) =>
   Object.fromEntries(Object.entries(value).filter(([, v]) => v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)));
 
 /** The site config sections that carry these settings, rewritten. */
-export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<SiteConfig, 'widget' | 'connector' | 'knowledge'> {
+export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<SiteConfig, 'widget' | 'connector' | 'knowledge' | 'assistant'> {
   const current = readSettings(site);
   const s: Settings = {
     ...current,
     ...patch,
     leads: { ...current.leads, ...patch.leads },
+    behaviour: assistantConfigSchema.parse({ ...current.behaviour, ...patch.behaviour }),
     assistant: current.assistant && { ...current.assistant, ...(patch.assistant ?? {}) },
     crawl: { ...current.crawl, ...patch.crawl },
   } as Settings;
@@ -184,7 +195,7 @@ export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<Site
 
   let connector = site.connector;
   if (s.assistant && site.connector.type === 'workers-ai') {
-    const { locale: _locale, timezone: _timezone, retrieval: _retrieval, ...rest } = obj(site.connector.options);
+    const { locale: _locale, timezone: _timezone, retrieval: _retrieval, reasoning: _reasoning, ...rest } = obj(site.connector.options);
     // Off is an explicit null; on keeps a chosen reranker, or drops the key for the default.
     const { rerankerModel, ...retrieval } = obj(_retrieval);
     if (!s.assistant.rerank) retrieval['rerankerModel'] = null;
@@ -195,12 +206,14 @@ export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<Site
         ...rest,
         model: s.assistant.model,
         ...compact({ locale: s.assistant.locale, timezone: s.assistant.timezone }),
+        // The default is left out, so a later default applies to sites that never chose.
+        ...(s.assistant.reasoning === 'medium' ? {} : { reasoning: s.assistant.reasoning }),
         ...(Object.keys(retrieval).length ? { retrieval } : {}),
       },
     };
   }
   const knowledge = { ...site.knowledge, ...s.crawl };
-  return { widget, connector, knowledge };
+  return { widget, connector, knowledge, assistant: s.behaviour };
 }
 
 export async function settingsHash(settings: Settings): Promise<string> {
@@ -256,6 +269,7 @@ settingsRoutes.put('/admin/api/settings', async (c) => {
     widget: next.widget,
     connector: next.connector,
     knowledge: next.knowledge,
+    assistant: next.assistant,
     settings: { at: ctx.platform.now(), by: admin.via === 'api-key' ? 'cli' : admin.email, hash },
   });
   await kv.put(siteConfigKey(siteId), JSON.stringify(record));

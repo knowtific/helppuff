@@ -314,6 +314,33 @@ export const MIGRATIONS: readonly Migration[] = [
       'ALTER TABLE usage_daily ADD COLUMN exhausted_at INTEGER',
     ],
   },
+  {
+    id: 7,
+    name: 'callbacks',
+    // A callback a visitor asked for, as a task: open until the team marks it
+    // done or dismissed. At most one open request per conversation (asking
+    // again updates it); a contact (lead) may have many over time.
+    statements: [
+      `CREATE TABLE IF NOT EXISTS callbacks (
+        id TEXT PRIMARY KEY,
+        site_id TEXT NOT NULL,
+        conversation_id TEXT NOT NULL,
+        lead_id TEXT,
+        name TEXT,
+        phone TEXT,
+        email TEXT,
+        reason TEXT,
+        status TEXT NOT NULL DEFAULT 'open',
+        note TEXT,
+        requested_at INTEGER NOT NULL,
+        closed_at INTEGER,
+        closed_by TEXT
+      )`,
+      'CREATE INDEX IF NOT EXISTS callbacks_site_status ON callbacks (site_id, status, requested_at DESC)',
+      "CREATE UNIQUE INDEX IF NOT EXISTS callbacks_open_conversation ON callbacks (conversation_id) WHERE status = 'open'",
+      'CREATE INDEX IF NOT EXISTS callbacks_lead ON callbacks (lead_id)',
+    ],
+  },
 ];
 
 export const LATEST_MIGRATION = MIGRATIONS[MIGRATIONS.length - 1]!.id;

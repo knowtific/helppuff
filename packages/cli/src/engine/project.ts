@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
 import { widgetConfigSchema } from '@murmur/protocol';
-import { securitySchema } from '@murmur/server';
+import { assistantConfigSchema, securitySchema } from '@murmur/server';
 import { workersAiOptionsSchema } from '@murmur/connector-workers-ai';
 import { CliError } from '../errors.js';
 
@@ -195,6 +195,9 @@ export const projectSchema = z
     prompt: z.string().min(1).default(PROMPT_FILE).describe('Path to the system prompt, relative to murmur.json.'),
     knowledge: knowledgeSchema.default({}).describe('What the assistant learns from: the website, and your own files.'),
     widget: widgetConfigSchema.default({}).describe('Brand, launcher, home screen, lead form, flows — see `murmur schema`.'),
+    assistant: assistantConfigSchema
+      .default({})
+      .describe('How the assistant behaves: goal, tone, answer length. Murmur writes these around prompt.md on every answer, so prompt.md holds only what is specific to the business.'),
     security: securitySchema.default({}).describe('Rate limits, daily cap, Turnstile. The defaults are safe for a public site.'),
     leads: z
       .object({

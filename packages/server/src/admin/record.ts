@@ -3,6 +3,7 @@ import { usageDay } from '@murmur/rag';
 import type { RequestCtx } from '../core/request.js';
 import { dbFrom, ensureSchema, type D1Like, type D1Statement } from '../db/d1.js';
 import { conversationStarted, leadCaptured, turn } from '../webhooks/events.js';
+import { emit } from '../webhooks/deliver.js';
 import { startConversationJob } from '../conversations/complete.js';
 
 /**
@@ -261,7 +262,9 @@ export function recordLead(
   leadCaptured(ctx, input);
   schedule(ctx, async (db) => {
     const now = ctx.platform.now();
-    const { name, email, phone, ...rest } = input.lead;
+    const { name, email, phone, request, ...rest } = input.lead;
+    // A callback request is its own record (the Callbacks page), not a field on the contact.
+    if (request === 'callback') delete rest['message'];
     await db.batch([
       db
         .prepare(
@@ -281,8 +284,66 @@ export function recordLead(
         input.source,
         now,
       ),
+      ...(request === 'callback'
+        ? [callbackStatement(db, input.siteId, input.sessionId, { name, email, phone, reason: input.lead['message'] }, now)]
+        : []),
     ]);
+    if (request === 'callback') {
+      // After the save, so the event carries the request's id: the same id as callback.updated,
+      // and the same again when the visitor asks twice in one chat (it is the same waiting request).
+      const saved = await db
+        .prepare("SELECT id, name, phone, email, reason, requested_at FROM callbacks WHERE conversation_id = ? AND status = 'open'")
+        .bind(input.sessionId)
+        .first<{ id: string; name: string | null; phone: string | null; email: string | null; reason: string | null; requested_at: number }>();
+      if (saved) {
+        emit(ctx, input.siteId, 'callback.requested', {
+          callbackId: saved.id,
+          conversationId: input.sessionId,
+          name: saved.name,
+          email: saved.email,
+          phone: saved.phone,
+          ...(saved.reason ? { message: saved.reason } : {}),
+          requestedAt: new Date(saved.requested_at).toISOString(),
+        });
+      }
+    }
   });
+}
+
+/**
+ * The conversation's open callback request: made, or (asked again) brought up
+ * to date. Runs after the lead statements, so it links the contact they settled on.
+ */
+export function callbackStatement(
+  db: D1Like,
+  siteId: string,
+  conversationId: string,
+  input: { name?: string | undefined; email?: string | undefined; phone?: string | undefined; reason?: string | undefined },
+  now: number,
+): D1Statement {
+  return db
+    .prepare(
+      `INSERT INTO callbacks (id, site_id, conversation_id, lead_id, name, phone, email, reason, status, requested_at)
+       VALUES (?, ?, ?, (SELECT lead_id FROM conversations WHERE id = ?), ?, ?, ?, ?, 'open', ?)
+       ON CONFLICT (conversation_id) WHERE status = 'open' DO UPDATE SET
+         lead_id = excluded.lead_id,
+         name = COALESCE(excluded.name, callbacks.name),
+         phone = COALESCE(excluded.phone, callbacks.phone),
+         email = COALESCE(excluded.email, callbacks.email),
+         reason = COALESCE(excluded.reason, callbacks.reason),
+         requested_at = excluded.requested_at`,
+    )
+    .bind(
+      `cb_${now.toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+      siteId,
+      conversationId,
+      conversationId,
+      input.name ?? null,
+      input.phone ?? null,
+      input.email?.toLowerCase() ?? null,
+      input.reason?.slice(0, 500) ?? null,
+      now,
+    );
 }
 
 /** Thumbs up (1) or down (-1) on one of the assistant's replies. Only messages of this conversation. */

@@ -433,6 +433,74 @@ describe('webhooks', () => {
     return { ...w, cookie, hook };
   }
 
+  it('counts a submitted callback form as one callback request, whatever the assistant says next', async () => {
+    const w = await withHook(['lead.captured', 'callback.requested']);
+    const started = await startSession(w.h);
+    await w.settle();
+    received = [];
+    const form = { kind: 'action', actionId: 'callback_abc123', label: 'Request callback', value: JSON.stringify({ name: 'Sam', phone: '0400 111 222', message: 'A quote' }), clientId: 'c1' };
+    expect((await w.h.post('/v1/sessions/messages', form, { headers: { Authorization: `Bearer ${started.sessionToken}` } })).status).toBe(200);
+    await w.settle();
+
+    expect(received.map((r) => r.body.type).sort()).toEqual(['callback.requested', 'lead.captured']);
+    expect(received.find((r) => r.body.type === 'callback.requested')!.body.data).toMatchObject({ callbackId: expect.stringMatching(/^cb_/), name: 'Sam', phone: '0400 111 222', message: 'A quote' });
+    // Any other form is a lead, not a callback request.
+    received = [];
+    await w.h.post('/v1/sessions/messages', { ...form, actionId: 'm_other', clientId: 'c2' }, { headers: { Authorization: `Bearer ${started.sessionToken}` } });
+    await w.settle();
+    expect(received.map((r) => r.body.type)).toEqual(['lead.captured']);
+  });
+
+  it('keeps callback requests as tasks: one waiting per conversation, labelled on the contact and the conversation, closed with a note', async () => {
+    const w = await withHook(['callback.requested', 'callback.updated']);
+    const started = await startSession(w.h);
+    const auth = { headers: { Authorization: `Bearer ${started.sessionToken}` } };
+    const form = (reason: string, clientId: string) => ({
+      kind: 'action',
+      actionId: `callback_${clientId}`,
+      label: 'Request callback',
+      value: JSON.stringify({ name: 'Ada', phone: '0400 111 222', message: reason }),
+      clientId,
+    });
+    await w.h.post('/v1/sessions/messages', form('A quote for two rooms', 'c1'), auth);
+    await w.settle();
+    // Asking again updates the waiting request rather than adding one.
+    await w.h.post('/v1/sessions/messages', form('A quote for three rooms', 'c2'), auth);
+    await w.settle();
+
+    type List = { items: { id: string; name: string; phone: string; reason: string; status: string; note: string | null; closedBy: string | null }[]; counts: Record<string, number> };
+    const list = async (status = 'open') => (await (await call(w, 'GET', `/admin/api/callbacks?status=${status}`)).json()) as List;
+    const waiting = await list();
+    expect(waiting.items).toHaveLength(1);
+    // Both requests name the one waiting task, so a CRM can match them, and later its update.
+    const requested = received.filter((r) => r.body.type === 'callback.requested').map((r) => r.body.data);
+    expect(requested.map((d) => d['callbackId'])).toEqual([waiting.items[0]!.id, waiting.items[0]!.id]);
+    expect(requested[1]).toMatchObject({ message: 'A quote for three rooms', name: 'Ada' });
+    received = [];
+    expect(waiting.items[0]).toMatchObject({ name: 'Ada', phone: '0400 111 222', reason: 'A quote for three rooms', status: 'open' });
+
+    const leads = (await (await call(w, 'GET', '/admin/api/leads')).json()) as { items: { openCallbacks: number }[] };
+    expect(leads.items[0]!.openCallbacks).toBe(1);
+    const flagged = (await (await call(w, 'GET', '/admin/api/conversations?filter=callbacks')).json()) as { items: { id: string; callback: string }[] };
+    expect(flagged.items).toEqual([expect.objectContaining({ id: started.sessionId, callback: 'open' })]);
+    const detail = (await (await call(w, 'GET', `/admin/api/conversations/${started.sessionId}`)).json()) as { callbacks: { status: string }[] };
+    expect(detail.callbacks.map((cb) => cb.status)).toEqual(['open']);
+
+    const done = await call(w, 'PATCH', `/admin/api/callbacks/${waiting.items[0]!.id}`, { status: 'done', note: 'Booked a measure for Tuesday' });
+    expect(done.status).toBe(200);
+    expect(await done.json()).toMatchObject({ status: 'done', note: 'Booked a measure for Tuesday', closedBy: OWNER });
+    await w.settle();
+    expect(received.map((r) => r.body.type)).toEqual(['callback.updated']);
+    expect(received[0]!.body.data).toMatchObject({ previousStatus: 'open', callback: { id: waiting.items[0]!.id, status: 'done', pageUrl: 'https://example.com/pricing', leadId: expect.any(String) } });
+    expect((await list()).counts).toEqual({ open: 0, done: 1, dismissed: 0 });
+
+    // A new request after that is a new task; the old one cannot reopen beside it.
+    await w.h.post('/v1/sessions/messages', form('Now about stairs', 'c3'), auth);
+    await w.settle();
+    expect((await list()).items.map((cb) => cb.reason)).toEqual(['Now about stairs']);
+    expect((await call(w, 'PATCH', `/admin/api/callbacks/${waiting.items[0]!.id}`, { status: 'open' })).status).toBe(400);
+  });
+
   it('signs every event of a conversation and sends it to the endpoint', async () => {
     const w = await withHook();
     expect(w.hook.events).toEqual(['*']);
@@ -742,10 +810,14 @@ describe('the reply waits for no write', () => {
 
   it("gives stateless backends their history from the record: the visitor's words, a form's fields, each reply", async () => {
     const w = await world();
+    // Turns are ordered by their millisecond: a person is never quicker than this, a test can be.
+    const pause = () => new Promise((resolve) => setTimeout(resolve, 5));
     const started = await startSession(w.h, { ...startBody, firstMessage: 'Do you work weekends?' });
     await w.settle();
+    await pause();
     await send(w.h, started.sessionToken, { kind: 'text', text: '/options', clientId: 'c1' });
     await w.settle();
+    await pause();
     await send(w.h, started.sessionToken, { kind: 'action', actionId: 'f', label: 'Send', value: '{"email":"ada@example.com"}', clientId: 'c2' });
     await w.settle();
 

@@ -62,11 +62,11 @@ export function hueOf(value: string): number {
 
 export type Route = {
   /** `setup` and `signin` carry a one-time token and work signed out; `onboarding` is the guided first run. */
-  page: 'home' | 'analytics' | 'conversations' | 'leads' | 'prompt' | 'settings' | 'knowledge' | 'onboarding' | 'setup' | 'signin';
+  page: 'home' | 'analytics' | 'conversations' | 'leads' | 'callbacks' | 'prompt' | 'settings' | 'knowledge' | 'onboarding' | 'setup' | 'signin';
   id?: string | undefined;
 };
 
-const PAGES: Route['page'][] = ['analytics', 'conversations', 'leads', 'prompt', 'settings', 'knowledge', 'onboarding', 'setup', 'signin'];
+const PAGES: Route['page'][] = ['analytics', 'conversations', 'leads', 'callbacks', 'prompt', 'settings', 'knowledge', 'onboarding', 'setup', 'signin'];
 
 function parseHash(): Route {
   const [page, id] = window.location.hash.replace(/^#\/?/, '').split('/');

@@ -12,8 +12,10 @@ Every Cloudflare limit that matters, and what happens when one runs out, is on
 **In practice**, a free account handles a few hundred conversations' worth of
 answers a day:
 
-- **Workers AI** is usually the first to run out. A typical answer is about
-  30 neurons, so about 300 answers a day fit.
+- **Workers AI** is usually the first to run out. With the default model a
+  typical answer is about 30 neurons, so about 300 answers a day fit; about
+  500 with thinking off. Other models range from about 20 to 180 neurons an
+  answer: see [[AI models|AI-Models]].
 - **KV writes** are not a limit: a message writes nothing to KV. The
   per-visitor limit is counted by Cloudflare's Rate Limiting binding, and the
   per-conversation and daily limits and the conversation's history are read

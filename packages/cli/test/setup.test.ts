@@ -216,16 +216,18 @@ describe('runInit for an agent', () => {
     expect(asked).toEqual(['website']);
     expect(result.status).toBe('created');
     if (result.status === 'created') expect(result.project.backend).toEqual({ type: 'workers-ai' });
-    // The prompt comes from the same generator as the dashboard's instructions form.
-    expect(readFileSync(join(dir, 'prompt.md'), 'utf8')).toContain('arrange a callback from the team');
+    // How it behaves is a setting; prompt.md holds only what is specific to the business.
+    if (result.status === 'created') expect(result.project.assistant).toMatchObject({ goal: 'callbacks' });
+    const prompt = readFileSync(join(dir, 'prompt.md'), 'utf8');
+    expect(prompt).toMatch(/^About Acme Plumbing: /);
+    expect(prompt).not.toContain('You are');
   });
 
   it('still takes the old flags from an agent', async () => {
     const dir = tempProject();
-    await runInit({ cwd: dir, answers: { website: 'acme.com.au', cfToken: 't', goal: 'book', notes: 'We never work on Sundays.' }, yes: true, fetch: world().fetch });
-    const prompt = readFileSync(join(dir, 'prompt.md'), 'utf8');
-    expect(prompt).toContain('help visitors book');
-    expect(prompt).toContain('We never work on Sundays.');
+    const result = await runInit({ cwd: dir, answers: { website: 'acme.com.au', cfToken: 't', goal: 'book', notes: 'We never work on Sundays.' }, yes: true, fetch: world().fetch });
+    if (result.status === 'created') expect(result.project.assistant).toMatchObject({ goal: 'bookings' });
+    expect(readFileSync(join(dir, 'prompt.md'), 'utf8')).toContain('We never work on Sundays.');
   });
 
   it('asks for details up front when told to, and greets by name', async () => {
@@ -244,9 +246,8 @@ describe('runInit for an agent', () => {
       ['phone', 'tel', false],
     ]);
     expect(widget.chat.initialMessages).toEqual(["Hi {{name}}! I'm Kai from Acme Plumbing. How can I help you today?"]);
-    const prompt = readFileSync(join(dir, 'prompt.md'), 'utf8');
-    expect(prompt).toContain('name {{lead.name}}, email {{lead.email}}, phone {{lead.phone}}');
-    expect(prompt).toContain('do not greet again');
+    // The form and the greeting are settings: Murmur tells the model about them, prompt.md does not repeat them.
+    expect(readFileSync(join(dir, 'prompt.md'), 'utf8')).not.toContain('{{lead.');
   });
 
   it('asks for name, email, an optional phone and the question by default', async () => {

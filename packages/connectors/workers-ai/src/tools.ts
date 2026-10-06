@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { message, type ConnectorContext } from '@murmur/connector-types';
+import { CALLBACK_FORM, message, messageId, type ConnectorContext } from '@murmur/connector-types';
 import type { Message } from '@murmur/protocol';
 import { localTime, openNow } from './hours.js';
 import type { ToolCall, ToolDef } from './chat.js';
@@ -87,7 +87,7 @@ export function callbackForm(contact: Contact = {}): Message {
     { name: 'email', label: 'Email', type: 'email' as const, autocomplete: 'email' },
     { name: 'message', label: 'What can we help with?', type: 'textarea' as const },
   ];
-  return message({ type: 'form', title: 'Request a callback', fields, submitLabel: 'Request callback' });
+  return message({ type: 'form', title: 'Request a callback', fields, submitLabel: 'Request callback' }, { id: messageId(CALLBACK_FORM) });
 }
 
 function parseArgs(raw: string): unknown {

@@ -1,6 +1,6 @@
-import { ArrowUpCircle, BookOpen, ChartColumn, ChevronDown, House, LogOut, MessagesSquare, Moon, Settings, Sun, Users } from 'lucide-react';
+import { ArrowUpCircle, BookOpen, ChartColumn, ChevronDown, House, LogOut, MessagesSquare, Moon, PhoneCall, Settings, Sun, Users } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
-import type { Me, Site } from '../lib/api';
+import { api, type CallbackList, type Me, type Site } from '../lib/api';
 import { cn, href, useTheme, type Route } from '../lib/utils';
 import { Avatar, Button } from './ui';
 import { useVersion } from './Updates';
@@ -14,6 +14,7 @@ const ALL_NAV: {
   { page: 'home', label: 'Home', icon: <House /> },
   { page: 'conversations', label: 'Conversations', icon: <MessagesSquare /> },
   { page: 'leads', label: 'Leads', icon: <Users /> },
+  { page: 'callbacks', label: 'Callbacks', icon: <PhoneCall /> },
   {
     page: 'knowledge',
     label: 'Knowledge',
@@ -48,6 +49,14 @@ export function Shell({ me, route, onLogout, children }: { me: Me; route: Route;
   const inSettings = route.page === 'settings' || route.page === 'prompt';
   const sections = settingsSections(site);
   const version = useVersion();
+  // Callbacks waiting, on the menu: refreshed whenever the page changes.
+  const [waiting, setWaiting] = useState(0);
+  useEffect(() => {
+    api<CallbackList>('/callbacks?status=open').then(
+      (list) => setWaiting(list.counts.open),
+      () => {},
+    );
+  }, [route.page, route.id]);
   const [settingsOpen, setSettingsOpen] = useState(inSettings);
   useEffect(() => {
     if (inSettings) setSettingsOpen(true);
@@ -125,7 +134,12 @@ export function Shell({ me, route, onLogout, children }: { me: Me; route: Route;
                 )}
               >
                 {item.icon}
-                {item.label}
+                <span className="flex-1">{item.label}</span>
+                {item.page === 'callbacks' && waiting > 0 && (
+                  <span className="rounded-full bg-primary px-1.5 text-[11px] font-medium tabular-nums text-primary-foreground" aria-label={`${waiting} waiting`}>
+                    {waiting}
+                  </span>
+                )}
               </a>
             ),
           )}

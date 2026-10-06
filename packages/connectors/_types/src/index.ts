@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import type { Capabilities, Message, SendRequest, StartSessionRequest } from '@murmur/protocol';
 import type { Turn } from './history.js';
+import type { PromptGuidance } from './prompt.js';
 
 export * from './errors.js';
 export * from './helpers.js';
@@ -52,6 +53,12 @@ export type ConnectorContext<Opts> = {
    * it and `appendHistory` writes nothing: the record is already kept.
    */
   history?: () => Promise<Turn[]>;
+  /**
+   * What Murmur says around the owner's prompt, from the site's settings:
+   * `resolvePrompt` puts the owner's text between `before` and `after`.
+   * Present when Murmur owns this connector's prompt.
+   */
+  guidance?: PromptGuidance;
   /** Report how long a stage took (`rag.embed`, `llm.first_token`…), for the request's Server-Timing. */
   time?: (stage: string, ms: number) => void;
   /**
@@ -81,6 +88,12 @@ export interface Connector<Opts = unknown, State = unknown> {
    * the owner's own API.
    */
   promptOption?(options: Opts): string | null;
+  /**
+   * What the connector adds to the owner's prompt on every answer (its own
+   * rules), shown read-only next to the prompt so the owner sees everything
+   * the model is told and does not write rules that fight it.
+   */
+  builtInPrompt?(options: Opts): string | null;
 
   start(
     ctx: ConnectorContext<Opts>,
@@ -118,6 +131,7 @@ export interface ErasedConnector {
   streams(options: unknown): boolean;
   /** Which option holds the prompt for these (already parsed) options, if Murmur owns it. */
   promptOption(options: unknown): string | null;
+  builtInPrompt(options: unknown): string | null;
   start(
     ctx: ConnectorContext<unknown>,
     input: StartSessionRequest,
@@ -151,6 +165,7 @@ export function defineConnector<Opts, State>(connector: Connector<Opts, State>):
     parseOptions: (input) => connector.optionsSchema.parse(input),
     streams: (options) => connector.streams?.(options as Opts) ?? false,
     promptOption: (options) => connector.promptOption?.(options as Opts) ?? null,
+    builtInPrompt: (options) => connector.builtInPrompt?.(options as Opts) ?? null,
     start: (ctx, input) => connector.start(asOpts(ctx), input),
     send: (ctx, state, input) => connector.send(asOpts(ctx), asState(state), input),
   };

@@ -71,6 +71,25 @@ export const knowledgeConfigSchema = z
   .strict();
 export type KnowledgeConfig = z.infer<typeof knowledgeConfigSchema>;
 
+/**
+ * How the assistant behaves: settings, not prompt text. Murmur writes them
+ * into the instructions it adds around the owner's prompt (`core/guidance.ts`),
+ * so the prompt the owner edits never has to repeat them, or fight them.
+ */
+export const assistantConfigSchema = z
+  .object({
+    goal: z.enum(['callbacks', 'answers', 'bookings']).default('callbacks').describe('What the assistant is for: `callbacks` (help, then get the team in touch), `answers`, or `bookings`.'),
+    tone: z.enum(['friendly', 'professional', 'casual']).default('friendly').describe('How it sounds.'),
+    length: z.enum(['short', 'detailed']).default('short').describe('`short`: a few sentences; `detailed`: complete answers with short lists.'),
+    prices: z
+      .enum(['share', 'quote'])
+      .default('share')
+      .describe('`share`: give prices exactly as the site and documents state them; `quote`: never give a price or estimate, offer a quote from the team instead.'),
+    bookingUrl: z.string().url().max(2000).optional().describe('Where visitors book, for the `bookings` goal.'),
+  })
+  .strict();
+export type AssistantConfig = z.infer<typeof assistantConfigSchema>;
+
 export const siteConfigSchema = z.object({
   origins: z.array(z.string().min(1).max(300)).min(1),
   connector: connectorConfigSchema,
@@ -78,6 +97,7 @@ export const siteConfigSchema = z.object({
   security: securitySchema.default({}),
   widget: widgetConfigSchema.default({}),
   knowledge: knowledgeConfigSchema.default({}),
+  assistant: assistantConfigSchema.default({}),
 });
 export type SiteConfig = z.infer<typeof siteConfigSchema>;
 
@@ -118,8 +138,10 @@ export const storedSiteConfigSchema = z
     security: securitySchema.optional(),
     widget: widgetConfigSchema.optional(),
     knowledge: knowledgeConfigSchema.optional(),
+    assistant: assistantConfigSchema.optional(),
     prompt: promptMetaSchema.optional(),
-    profile: z.record(z.string(), z.unknown()).optional().describe('The instructions form\'s choices (validated in `admin/profile.ts`); the prompt they made is in the connector options.'),
+    /** Retired: the instructions form's choices, from when it wrote them into the prompt. Read as `assistant` when that is missing. */
+    profile: z.record(z.string(), z.unknown()).optional(),
     /** Who last changed settings from the dashboard, so `murmur deploy` does not overwrite them unseen. */
     settings: z
       .object({ at: z.number().int().nonnegative(), by: z.string().max(200).nullable().default(null), hash: z.string().max(64) })

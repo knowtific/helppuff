@@ -7,6 +7,7 @@ import { api, onUnauthorized, type Me } from './lib/api';
 import { useRoute } from './lib/utils';
 import { Conversations } from './pages/Conversations';
 import { Leads } from './pages/Leads';
+import { Callbacks } from './pages/Callbacks';
 import { Login } from './pages/Login';
 import { Overview } from './pages/Overview';
 import { Home } from './pages/Home';
@@ -52,6 +53,7 @@ function App() {
       {route.page === 'analytics' && <Overview me={me} />}
       {route.page === 'conversations' && <Conversations id={route.id} me={me} />}
       {route.page === 'leads' && <Leads />}
+      {route.page === 'callbacks' && <Callbacks />}
       {route.page === 'prompt' && <Prompt me={me} />}
       {route.page === 'settings' && <Settings me={me} section={route.id} />}
       {route.page === 'knowledge' && <Knowledge me={me} />}

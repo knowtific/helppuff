@@ -1,4 +1,5 @@
-import { isConnectorError, type ConnectorContext, type ErasedConnector } from '@murmur/connector-types';
+import { isConnectorError, type ConnectorContext, type ErasedConnector, type PromptGuidance } from '@murmur/connector-types';
+import { guidanceFor } from './guidance.js';
 import type { Capabilities } from '@murmur/protocol';
 import type { SiteConfig } from '../config/schema.js';
 import { resolveSecrets } from '../config/load.js';
@@ -9,7 +10,12 @@ import { recordedHistory } from '../conversations/history.js';
 import { dbFrom } from '../db/d1.js';
 import { emit } from '../webhooks/deliver.js';
 
-export type PreparedConnector = { connector: ErasedConnector; options: unknown };
+export type PreparedConnector = {
+  connector: ErasedConnector;
+  options: unknown;
+  /** Murmur's words around the owner's prompt; absent when the backend owns its prompt (Retell, OpenAI `promptId`…). */
+  guidance?: PromptGuidance;
+};
 
 /**
  * Resolve the site's connector and validate its options against the
@@ -19,7 +25,8 @@ export function prepareConnector(ctx: RequestCtx, site: SiteConfig): PreparedCon
   const connector = getConnector(site.connector.type);
   const resolved = resolveSecrets(site.connector.options ?? {}, ctx.env);
   try {
-    return { connector, options: connector.parseOptions(resolved) };
+    const options = connector.parseOptions(resolved);
+    return { connector, options, ...(connector.promptOption(options) ? { guidance: guidanceFor(site) } : {}) };
   } catch (thrown) {
     if (thrown instanceof MurmurError) throw thrown;
     ctx.platform.log('connector.bad_options', { type: site.connector.type });
@@ -48,6 +55,7 @@ export function connectorContext(
   const db = dbFrom(ctx.env);
   return {
     ...(db ? { history: () => recordedHistory(db, sessionId) } : {}),
+    ...(prepared.guidance ? { guidance: prepared.guidance } : {}),
     ...(onText ? { onText } : {}),
     ...(reportLead ? { reportLead } : {}),
     time: (stage, ms) => ctx.timing.add(stage, ms),

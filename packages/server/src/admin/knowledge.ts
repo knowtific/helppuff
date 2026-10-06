@@ -11,6 +11,7 @@ import {
   manualUrl,
   pageIdFor,
   readFacts,
+  reasoningInputs,
   retrieve,
   DEFAULT_RETRIEVAL,
   MAX_FILE_BYTES,
@@ -482,7 +483,7 @@ knowledgeRoutes.post('/admin/api/knowledge/suggest-questions', async (c) => {
         ],
         max_tokens: 200,
         temperature: 0.4,
-        ...(/glm/i.test(model) ? { chat_template_kwargs: { enable_thinking: false } } : {}),
+        ...reasoningInputs(model, 'off'),
       },
       typeof options.gateway === 'string' ? { gateway: { id: options.gateway } } : undefined,
     )) as { choices?: { message?: { content?: string } }[]; response?: string };
@@ -536,7 +537,7 @@ knowledgeRoutes.post('/admin/api/diagnostics/models', async (c) => {
       messages: [{ role: 'user', content: query }],
       max_tokens: 20,
       stream: true,
-      ...(/glm/i.test(chatModel) ? { chat_template_kwargs: { enable_thinking: false } } : {}),
+      ...reasoningInputs(chatModel, 'off'),
     })) as ReadableStream<Uint8Array>;
     const reader = stream.getReader();
     await reader.read();

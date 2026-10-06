@@ -68,6 +68,14 @@ export async function embedQuery(ai: AiLike, model: string, query: string, optio
   return { vector: vector!, neurons: neurons(model, Math.ceil(query.length / 4)) };
 }
 
+/** Several search queries in one embedding call. */
+export async function embedQueries(ai: AiLike, model: string, queries: string[], options: AiOptions = {}): Promise<{ vectors: number[][]; neurons: number }> {
+  if (!queries.length) return { vectors: [], neurons: 0 };
+  const batch = queries.map((q) => q.slice(0, 4000));
+  const vectors = vectorsFrom(await ai.run(model, inputFor(model, 'queries', batch), runOptions(options)), batch.length);
+  return { vectors, neurons: neurons(model, batch.reduce((n, q) => n + Math.ceil(q.length / 4), 0)) };
+}
+
 /** Relevance of each passage to the query, in the passages' order. */
 export async function rerank(
   ai: AiLike,
@@ -163,4 +171,43 @@ export async function classifyIntent(ai: AiLike, model: string, query: string, o
     .sort((a, b) => b[1] - a[1])
     .map(([key]) => key);
   return { categories, neurons: neurons(model, Math.ceil((query.length + 600) / 4)) };
+}
+
+/**
+ * How long a chat model thinks before it answers. Deeper thinking helps
+ * multi-step questions; it is slower, and the thinking tokens are billed.
+ */
+export const REASONING_LEVELS = ['off', 'low', 'medium', 'high'] as const;
+export type Reasoning = (typeof REASONING_LEVELS)[number];
+/**
+ * What an owner may choose. `off` is only for work nobody reads as a reply
+ * (summaries, facts): answers without thinking leaked their instructions,
+ * promised discounts and agreed to false facts in testing (wiki: AI models).
+ */
+export const ANSWER_REASONING = ['low', 'medium', 'high'] as const;
+export type AnswerReasoning = (typeof ANSWER_REASONING)[number];
+/** An older config's `off` is read as the lowest level a reply may use. */
+export const answerReasoning = (value: unknown): AnswerReasoning =>
+  value === 'off' ? 'low' : ANSWER_REASONING.includes(value as AnswerReasoning) ? (value as AnswerReasoning) : 'medium';
+
+/**
+ * The inputs that set a model's thinking, by family, from each model's
+ * Workers AI schema (checked 2026-10-05). Families with only on/off treat
+ * every level above `off` as on; GLM-5.3 cannot stop thinking, so `off` is
+ * its lowest level. A family not listed here (Qwen, Llama, Kimi, Mistral,
+ * and gpt-oss until its parameter is confirmed) thinks as it does by
+ * default: an unknown field could make every call fail.
+ */
+export function reasoningInputs(model: string, level: Reasoning): Record<string, unknown> {
+  if (/zai-org\/glm-5/i.test(model)) return { reasoning_effort: ({ off: 'low', low: 'low', medium: 'high', high: 'max' } as const)[level] };
+  if (/deepseek-v4/i.test(model)) return { reasoning_effort: ({ off: 'none', low: 'low', medium: 'high', high: 'max' } as const)[level] };
+  if (/nemotron-3/i.test(model)) return { chat_template_kwargs: level === 'off' ? { enable_thinking: false } : { enable_thinking: true, low_effort: level === 'low' } };
+  if (/zai-org\/glm-4|gemma-4/i.test(model)) return { chat_template_kwargs: { enable_thinking: level !== 'off' } };
+  return {};
+}
+
+/** Room for the thinking, on top of the answer's own token cap: thinking tokens count against `max_tokens`. */
+export function thinkingRoom(model: string, level: Reasoning): number {
+  if (level === 'off' && !/zai-org\/glm-5/i.test(model)) return 0;
+  return { off: 1024, low: 1024, medium: 2048, high: 4096 }[level];
 }

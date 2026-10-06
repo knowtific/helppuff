@@ -1,7 +1,7 @@
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { FactsForm } from '../components/FactsForm';
-import { GoalPicker, saveProfile, type Profile } from '../components/InstructionsForm';
+import { GoalPicker, loadBehaviour, saveBehaviour, type Behaviour } from '../components/InstructionsForm';
 import { PagePicker } from '../components/knowledge';
 import { Button, Card, ErrorNote } from '../components/ui';
 import { api, type Discovery, type Me, type SearchResult } from '../lib/api';
@@ -101,12 +101,12 @@ function Pages({ onStarted }: { onStarted: () => void }) {
 }
 
 function Details() {
-  const [goal, setGoal] = useState<Profile['goal']>('callbacks');
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [goal, setGoal] = useState<Behaviour['goal']>('callbacks');
+  const [profile, setProfile] = useState<Behaviour | null>(null);
   useEffect(() => {
-    api<{ profile: Profile }>('/profile').then((v) => {
-      setProfile(v.profile);
-      setGoal(v.profile.goal);
+    loadBehaviour().then((v) => {
+      setProfile(v);
+      setGoal(v.goal);
     }, () => {});
   }, []);
 
@@ -125,7 +125,7 @@ function Details() {
         saveLabel="Finish"
         onSaved={() => {
           const done = () => (window.location.hash = href({ page: 'home' }));
-          if (profile && goal !== profile.goal) void saveProfile({ ...profile, goal }).finally(done);
+          if (profile && goal !== profile.goal) void saveBehaviour({ goal }).finally(done);
           else done();
         }}
       />

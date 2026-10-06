@@ -1,5 +1,5 @@
 import { relative } from 'node:path';
-import { promptHash } from '@murmur/server';
+import { promptHash, promptOverlaps } from '@murmur/server';
 import { assertKnown, str } from '../args.js';
 import { CliError } from '../errors.js';
 import { c } from '../output.js';
@@ -84,6 +84,8 @@ export async function promptCommand(ctx: Ctx): Promise<number> {
       file,
       live: live ? { version: live.version, publishedBy: live.meta?.by ?? null, source: live.meta?.source ?? null, at: live.meta?.at ?? null } : null,
       basedOn: base?.version ?? null,
+      // Lines of prompt.md that a setting or a built-in rule already covers.
+      overlaps: promptOverlaps(readLocalPrompt(loaded), loaded.project.backend.type),
       next: NEXT[status],
     };
     ctx.out.result(data, () => {
@@ -92,6 +94,10 @@ export async function promptCommand(ctx: Ctx): Promise<number> {
       if (live) ctx.out.info(`  live      version ${live.version}${live.meta?.by ? c.dim(` · ${live.meta.by}`) : ''}${live.meta ? c.dim(` · ${live.meta.source}`) : ''}`);
       if (base) ctx.out.info(`  based on  version ${base.version}`);
       ctx.out.info(`  next      ${c.cyan(NEXT[status])}`);
+      if (data.overlaps.length) {
+        ctx.out.info(c.yellow(`\n${data.overlaps.length} line${data.overlaps.length === 1 ? '' : 's'} of ${file} repeat what Murmur already adds (keep only what is specific to the business):`));
+        for (const o of data.overlaps) ctx.out.info(`  line ${o.line}  ${c.dim(o.text.slice(0, 70))}\n           ${o.why}`);
+      }
     });
     return 0;
   }

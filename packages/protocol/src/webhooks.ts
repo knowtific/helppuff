@@ -20,6 +20,7 @@ export const WEBHOOK_EVENTS = {
   'message.sent': 'The assistant replied.',
   'lead.captured': 'Contact details arrived: the pre-chat form, typed in the chat, or found by the assistant.',
   'callback.requested': 'The visitor asked to be called back.',
+  'callback.updated': 'A callback request was marked done or dismissed (or reopened), or its note changed, in the dashboard or with `murmur callbacks`.',
   'lead.updated': 'A lead’s status, notes or name changed in the dashboard.',
   'feedback.received': 'A visitor rated a reply (thumbs up or down).',
   'conversation.summarized': 'The dashboard summarised a conversation.',

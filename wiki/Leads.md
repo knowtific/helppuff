@@ -37,6 +37,27 @@ number is merged into the person as soon as their email turns up.
 - **Export CSV** for a spreadsheet or CRM. Cells that start with `=`, `+`, `-`
   or `@` are escaped, so a lead cannot plant a formula in your spreadsheet.
 
+## Callbacks
+
+A visitor asking to be called back is a task, not just a lead. Each request
+becomes a **callback** (the assistant requested it with the details it had,
+or the visitor sent the callback form) with how to reach them, why, and the
+conversation it came from.
+
+- **Callbacks** in the dashboard lists the waiting ones, oldest first, with
+  the count on the menu. **Done** (with a note of what happened, e.g. "Booked
+  a measure for Tuesday") or **Dismiss** closes one; **Reopen** brings it back.
+- The contact (Leads) and the conversation (Conversations, and its
+  **Callback waiting** filter) are labelled **Callback requested** while one
+  waits.
+- A conversation has at most one waiting request: asking again updates it.
+  A request after one was closed is a new task. A person can have several
+  over time, from different chats.
+- Webhooks: `callback.requested` when one is made, `callback.updated` when it
+  is closed, reopened or its note changes.
+- In the terminal: `murmur callbacks` lists them; `murmur callbacks done <id>
+  --note "…"` closes one.
+
 ## Sending leads elsewhere
 
 - **[[Webhooks]]** (Settings → Webhooks): every event as signed JSON, including

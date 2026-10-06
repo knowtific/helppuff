@@ -73,6 +73,8 @@ export type ConversationRow = {
   leadEmail: string | null;
   leadPhone: string | null;
   leadStatus: LeadStatus | null;
+  /** This conversation's callback request: the open one if any, else the latest. */
+  callback: 'open' | 'done' | 'dismissed' | null;
 };
 
 /** A conversation's AI summary and labels: written when it goes quiet (or by the Summarise button). */
@@ -117,11 +119,14 @@ export type Lead = {
   /** One person can have several chats (the email is the key); the latest is linked. */
   conversations?: number;
   lastConversationId?: string | null;
+  /** Callback requests from this person still waiting. */
+  openCallbacks?: number;
 };
 
 export type ConversationDetail = {
   conversation: Record<string, unknown> & { id: string; summary: string | null; started_at: number; last_at: number };
   lead: Lead | null;
+  callbacks: Callback[];
   messages: StoredMessage[];
 };
 
@@ -160,6 +165,10 @@ export type PromptView = {
   meta: { version: number; at: number; by: string | null; source: PromptSource } | null;
   limit: number;
   versions: PromptVersion[];
+  /** What Murmur adds to this prompt on every answer (read-only); null when it adds nothing. */
+  builtIn: string | null;
+  /** Lines of the live prompt that settings or built-in rules already cover. */
+  overlaps: { line: number; text: string; why: string }[];
 };
 export type PublishResult = { status: 'published' | 'unchanged'; version: number };
 
@@ -271,7 +280,27 @@ export type Settings = {
   position: 'bottom-right' | 'bottom-left';
   launcherIcon: string;
   leads: { enabled: boolean; fields: LeadField[] };
-  assistant: { model: string; locale: string | null; timezone: string | null; rerank: boolean } | null;
+  assistant: { model: string; locale: string | null; timezone: string | null; rerank: boolean; reasoning: 'low' | 'medium' | 'high' } | null;
+  /** How the assistant behaves; Murmur writes it around the prompt. */
+  behaviour: { goal: 'callbacks' | 'answers' | 'bookings'; tone: 'friendly' | 'professional' | 'casual'; length: 'short' | 'detailed'; prices: 'share' | 'quote'; bookingUrl?: string };
   crawl: { schedule: 'off' | 'daily' | 'weekly' | 'monthly'; include: string[]; exclude: string[]; renderJs: 'auto' | 'always' | 'never' };
 };
 export type SettingsView = { site: string; connector: string; settings: Settings; hash: string; meta: { at: number; by: string | null } | null };
+
+export type CallbackStatus = 'open' | 'done' | 'dismissed';
+export type Callback = {
+  id: string;
+  conversationId: string;
+  leadId: string | null;
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+  reason: string | null;
+  status: CallbackStatus;
+  note: string | null;
+  requestedAt: number;
+  closedAt: number | null;
+  closedBy: string | null;
+  pageUrl: string | null;
+};
+export type CallbackList = { items: Callback[]; counts: Record<CallbackStatus, number> };

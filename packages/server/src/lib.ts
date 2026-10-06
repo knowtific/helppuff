@@ -29,4 +29,4 @@ export {
 } from './admin/prompts.js';
 export { settingsSchema, settingsPatchSchema, readSettings, applySettings, settingsHash, upgradeSettings, type Settings, type SettingsPatch } from './admin/settings.js';
 export { knowledgeConfigSchema, DEFAULT_CRAWL_EXCLUDE, type KnowledgeConfig } from './config/schema.js';
-export { buildPrompt, profileSchema, DEFAULT_PROFILE, type Profile } from './admin/profile.js';
+export { promptOverlaps, type Overlap } from './admin/overlaps.js';

@@ -47,7 +47,16 @@ export type PromptScope = {
   lead?: Record<string, string> | undefined;
   context?: VisitorContext | undefined;
   site?: { id: string } | undefined;
+  /** The business details (`{{business.phone}}`), where the backend has them: always current, never copied into the prompt. */
+  business?: Record<string, string> | undefined;
 };
+
+/**
+ * What Murmur says around the owner's prompt (`server/src/core/guidance.ts`):
+ * `before` from settings (who, goal, tone, length), `after` the rules every
+ * answer follows. Both may use the same `{{…}}` placeholders.
+ */
+export type PromptGuidance = { before: string; after: string };
 
 const CACHE_PREFIX = 'prompt:cache:';
 
@@ -60,17 +69,16 @@ const CACHE_PREFIX = 'prompt:cache:';
  * answers nothing. The miss is logged so it is visible to the operator.
  */
 export async function resolvePrompt(
-  ctx: Pick<ConnectorContext<unknown>, 'kv' | 'env' | 'fetch' | 'log'> & Partial<Pick<ConnectorContext<unknown>, 'waitUntil'>>,
+  ctx: Pick<ConnectorContext<unknown>, 'kv' | 'env' | 'fetch' | 'log'> & Partial<Pick<ConnectorContext<unknown>, 'waitUntil' | 'guidance'>>,
   source: PromptSource | undefined,
   scope: PromptScope,
 ): Promise<string | undefined> {
-  if (source === undefined) return undefined;
-
-  const template = await readSource(ctx, source);
-  if (template === null) return undefined;
-
-  const rendered = renderTemplate(template, scope as Record<string, unknown>).trim();
-  return rendered || undefined;
+  const template = source === undefined ? null : await readSource(ctx, source);
+  const owner = template === null ? '' : renderTemplate(template, scope as Record<string, unknown>).trim();
+  if (!ctx.guidance) return owner || undefined;
+  // The owner's words sit between Murmur's settings and its rules, so the rules have the last word.
+  const render = (text: string) => renderTemplate(text, scope as Record<string, unknown>).trim();
+  return [render(ctx.guidance.before), owner ? `## Instructions from the business\n${owner}` : '', render(ctx.guidance.after)].filter(Boolean).join('\n\n');
 }
 
 async function readSource(
@@ -159,4 +167,28 @@ export function promptVariables(scope: PromptScope): Record<string, string> {
 
   if (scope.site) out['site_id'] = scope.site.id;
   return out;
+}
+
+/**
+ * Whether a reply gives away the system prompt. A visitor can talk a model
+ * into printing its instructions; this check cannot be talked out of. Pass
+ * what must not be repeated (the owner's instructions and the built-in
+ * rules, never the website passages, which are public). Lines of 40
+ * characters or more are compared ignoring case, spacing and Markdown; a
+ * reply that repeats `minLines` of them is a leak.
+ */
+export function promptLeak(secret: string, minLines = 2): (reply: string) => boolean {
+  const plain = (text: string) =>
+    text
+      .toLowerCase()
+      .replace(/[*_`#>|[\]-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  const lines = [...new Set(secret.split('\n').map(plain).filter((line) => line.length >= 40))];
+  return (reply) => {
+    const text = plain(reply);
+    let found = 0;
+    for (const line of lines) if (text.includes(line) && ++found >= minLines) return true;
+    return false;
+  };
 }

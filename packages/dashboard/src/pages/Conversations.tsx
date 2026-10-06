@@ -1,4 +1,4 @@
-import { ArrowLeft, ExternalLink, Loader2, Mail, MessagesSquare, Phone, Search, Sparkles, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Loader2, Mail, MessagesSquare, Phone, PhoneCall, Search, Sparkles, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { useState } from 'react';
 import { PageHeader } from '../components/Shell';
 import { Avatar, Badge, Button, Card, Empty, ErrorNote, Input, Segmented, Skeleton, StatusBadge } from '../components/ui';
@@ -14,7 +14,7 @@ const OUTCOME_LABEL = {
   abandoned: 'left early',
 } as const;
 
-type Filter = 'all' | 'leads' | 'unsummarized';
+type Filter = 'all' | 'leads' | 'callbacks' | 'unsummarized';
 
 function Row({ row, active }: { row: ConversationRow; active: boolean }) {
   const who = row.leadName ?? row.leadEmail ?? row.leadPhone;
@@ -36,6 +36,8 @@ function Row({ row, active }: { row: ConversationRow; active: boolean }) {
           {row.intent && <Badge>{row.intent}</Badge>}
           {summary?.leadQuality === 'hot' && <Badge dot={QUALITY_DOT.hot}>hot lead</Badge>}
           {row.leadStatus && <StatusBadge status={row.leadStatus} />}
+          {row.callback === 'open' && <Badge dot="#d97706">Callback requested</Badge>}
+          {row.callback === 'done' && <Badge>Called back</Badge>}
           <span className="text-[11px] text-muted-foreground">
             {row.messageCount} msgs{row.country ? ` · ${flag(row.country)} ${row.country}` : ''}
           </span>
@@ -226,6 +228,19 @@ function Detail({ id, me }: { id: string; me: Me }) {
                 <a href={href({ page: 'leads' })} className="block pt-1 text-xs text-muted-foreground hover:text-foreground">
                   Manage in Leads →
                 </a>
+                {data.callbacks.map((cb) => (
+                  <div key={cb.id} className="mt-2 rounded-md border px-2.5 py-2">
+                    <p className="flex items-center gap-1.5 text-xs font-medium">
+                      <PhoneCall className="size-3.5" aria-hidden />
+                      {cb.status === 'open' ? 'Callback requested' : cb.status === 'done' ? 'Called back' : 'Callback dismissed'}
+                    </p>
+                    {cb.reason && <p className="mt-1 text-xs text-muted-foreground">“{cb.reason}”</p>}
+                    {cb.note && <p className="mt-1 text-xs">{cb.note}</p>}
+                    <a href={href({ page: 'callbacks' })} className="mt-1 block text-xs text-muted-foreground hover:text-foreground">
+                      {cb.status === 'open' ? 'Mark done in Callbacks →' : 'Callbacks →'}
+                    </a>
+                  </div>
+                ))}
               </div>
             ) : (
               <p className="text-muted-foreground">No contact details shared.</p>
@@ -297,6 +312,7 @@ export function Conversations({ id, me }: { id?: string | undefined; me: Me }) {
               options={[
                 { value: 'all', label: 'All' },
                 { value: 'leads', label: 'With contact' },
+                { value: 'callbacks', label: 'Callback waiting' },
                 { value: 'unsummarized', label: 'Not summarised' },
               ]}
             />

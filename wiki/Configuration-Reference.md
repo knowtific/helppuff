@@ -20,6 +20,12 @@ variable, e.g. `{ "env": "OPENAI_API_KEY" }`, whose value lives in `.env` and on
 | `website` | string |  | The website the assistant is for, and learns from. · URL |
 | `origins` **(required)** | string[] |  | Every origin the widget may be embedded on. The preview page is added automatically. · ≥ 1 items |
 | `prompt` | string | `"prompt.md"` | Path to the system prompt, relative to murmur.json. |
+| `assistant` | object | `{}` | How the assistant behaves: goal, tone, answer length. Murmur writes these around prompt.md on every answer, so prompt.md holds only what is specific to the business. |
+| `assistant.goal` | `"callbacks"` \| `"answers"` \| `"bookings"` | `"callbacks"` | What the assistant is for: `callbacks` (help, then get the team in touch), `answers`, or `bookings`. |
+| `assistant.tone` | `"friendly"` \| `"professional"` \| `"casual"` | `"friendly"` | How it sounds. |
+| `assistant.length` | `"short"` \| `"detailed"` | `"short"` | `short`: a few sentences; `detailed`: complete answers with short lists. |
+| `assistant.prices` | `"share"` \| `"quote"` | `"share"` | `share`: give prices exactly as the site and documents state them; `quote`: never give a price or estimate, offer a quote from the team instead. |
+| `assistant.bookingUrl` | string |  | Where visitors book, for the `bookings` goal. · ≤ 2000 chars, URL |
 
 ## `backend`
 
@@ -31,7 +37,8 @@ Workers AI with Murmur's own knowledge base. The default; runs on the Workers Fr
 
 | Field | Type | Default | Description |
 | --- | --- | --- | --- |
-| `backend.model` | string | `"@cf/zai-org/glm-4.7-flash"` | The Workers AI model that writes answers. GLM-4.7 Flash runs on the free plan; `@cf/openai/gpt-oss-120b` is steadier and costs about four times as much. · 1–200 chars |
+| `backend.model` | string | `"@cf/zai-org/glm-4.7-flash"` | The Workers AI model that writes answers. GLM-4.7 Flash is the best all-round on the Free plan; the wiki's AI models page compares the others for speed, quality and answers a day. · 1–200 chars |
+| `backend.reasoning` | `"low"` \| `"medium"` \| `"high"` | `"medium"` | How long the model thinks before answering: `low`, `medium` or `high`. Deeper is better on multi-step questions, slower to start, and the thinking is billed. Models that only switch thinking on or off treat every level as on. |
 | `backend.fallbackModel` | string |  | Tried once when the main model fails for any reason other than the budget. · 1–200 chars |
 | `backend.gateway` | string |  | An AI Gateway id: caching, logs and rate limits in front of every model call. · 1–64 chars |
 | `backend.locale` | string |  | BCP 47, e.g. `en-AU`: spelling and date style of answers. · ≤ 35 chars |

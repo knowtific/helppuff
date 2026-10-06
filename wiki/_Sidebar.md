@@ -18,6 +18,7 @@
 **Providers**
 - [[Overview|Providers]]
 - [[Workers AI (default)|Provider-Workers-AI]]
+- [[AI models: speed, quality, cost|AI-Models]]
 - [[Cloudflare AI Search|Provider-Cloudflare-AI-Search]]
 - [[OpenAI|Provider-OpenAI]]
 - [[Gemini|Provider-Gemini]]

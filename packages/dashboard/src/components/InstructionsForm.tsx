@@ -1,26 +1,32 @@
 import { Check, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { api } from '../lib/api';
+import { api, type PromptView, type PublishResult, type SettingsView } from '../lib/api';
 import { cn, href } from '../lib/utils';
 import { Button, ErrorNote, Input, Skeleton, Textarea } from './ui';
 
 /**
- * How the assistant behaves, as a few choices instead of a prompt to write.
- * Saving writes the prompt from them and publishes it as a new version (the
- * full text and its history stay under Advanced).
+ * How the assistant behaves. Two different things, kept apart so they never
+ * repeat or contradict each other:
+ *
+ *  - choices (goal, tone, length): settings, which Murmur writes around the
+ *    prompt on every answer, with its built-in rules;
+ *  - "Anything specific to your business": the owner's own text, the prompt,
+ *    versioned (its history is on the full prompt page).
+ *
+ * Saving changes the settings, and publishes the text only if it changed.
  */
 
-export type Profile = {
+export type Behaviour = {
   goal: 'callbacks' | 'answers' | 'bookings';
   tone: 'friendly' | 'professional' | 'casual';
   length: 'short' | 'detailed';
-  mustKnow: string;
-  neverSay: string;
+  prices: 'share' | 'quote';
   bookingUrl?: string;
 };
-type ProfileView = { profile: Profile; editable: boolean; custom: boolean };
+/** Kept for the onboarding page's goal question. */
+export type Profile = Behaviour;
 
-export const GOALS: { value: Profile['goal']; label: string; hint: string }[] = [
+export const GOALS: { value: Behaviour['goal']; label: string; hint: string }[] = [
   { value: 'callbacks', label: 'Get enquiries', hint: 'Answer questions, then offer a callback from your team' },
   { value: 'answers', label: 'Answer questions', hint: 'Help visitors find what they need on your site' },
   { value: 'bookings', label: 'Get bookings', hint: 'Steer visitors towards booking with you' },
@@ -44,38 +50,52 @@ function Choice<T extends string>({ name, value, options, onChange }: { name: st
 }
 
 /** Only the main goal: what onboarding asks. */
-export function GoalPicker({ value, onChange }: { value: Profile['goal']; onChange: (v: Profile['goal']) => void }) {
+export function GoalPicker({ value, onChange }: { value: Behaviour['goal']; onChange: (v: Behaviour['goal']) => void }) {
   return <Choice name="What should it mainly do?" value={value} options={GOALS} onChange={onChange} />;
 }
 
-export async function saveProfile(profile: Profile): Promise<void> {
-  await api('/profile', { method: 'PUT', json: { profile } });
+export async function loadBehaviour(): Promise<Behaviour> {
+  return (await api<SettingsView>('/settings')).settings.behaviour;
+}
+
+export async function saveBehaviour(behaviour: Partial<Behaviour>): Promise<void> {
+  await api('/settings', { method: 'PUT', json: { settings: { behaviour } } });
 }
 
 export function InstructionsForm() {
-  const [view, setView] = useState<ProfileView | null>(null);
-  const [draft, setDraft] = useState<Profile | null>(null);
+  const [prompt, setPrompt] = useState<PromptView | null>(null);
+  const [draft, setDraft] = useState<Behaviour | null>(null);
+  const [text, setText] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    api<ProfileView>('/profile').then(
-      (v) => {
-        setView(v);
-        setDraft(v.profile);
+    Promise.all([loadBehaviour(), api<PromptView>('/prompt')]).then(
+      ([behaviour, view]) => {
+        setDraft(behaviour);
+        setPrompt(view);
+        setText(view.text);
       },
       (thrown: Error) => setError(thrown),
     );
   }, []);
 
-  if (!draft || !view) return error ? <div className="p-4"><ErrorNote error={error} /></div> : <Skeleton className="m-4 h-48" />;
-  if (!view.editable) {
+  if (!draft || !prompt || text === null) return error ? <div className="p-4"><ErrorNote error={error} /></div> : <Skeleton className="m-4 h-48" />;
+  if (!prompt.editable) {
     return <p className="px-4 py-4 text-[13px] text-muted-foreground md:px-5">This backend keeps its instructions on the provider’s side.</p>;
   }
-  const set = (patch: Partial<Profile>) => {
+  const set = (patch: Partial<Behaviour>) => {
     setDraft({ ...draft, ...patch });
     setSaved(false);
+  };
+  const save = async () => {
+    await saveBehaviour(draft);
+    // The owner's text is a new prompt version only when it changed.
+    if (text.trim() !== prompt.text.trim()) {
+      const result = await api<PublishResult>('/prompt', { method: 'POST', json: { site: prompt.site, text, note: 'From the instructions page', baseVersion: prompt.version } });
+      setPrompt({ ...prompt, text, version: result.version });
+    }
   };
 
   return (
@@ -84,20 +104,12 @@ export function InstructionsForm() {
         e.preventDefault();
         setBusy(true);
         setError(null);
-        saveProfile(draft)
-          .then(() => {
-            setSaved(true);
-            setView({ ...view, custom: false });
-          }, (thrown: Error) => setError(thrown))
+        save()
+          .then(() => setSaved(true), (thrown: Error) => setError(thrown))
           .finally(() => setBusy(false));
       }}
     >
       <div className="space-y-4 px-4 py-4 md:px-5">
-        {view.custom && (
-          <p className="rounded-md border bg-subtle px-3 py-2 text-xs text-muted-foreground">
-            The current instructions were written by hand. Saving these choices replaces them — the old text stays in the history.
-          </p>
-        )}
         <div className="space-y-1.5">
           <span className="text-xs font-medium">Main goal</span>
           <GoalPicker value={draft.goal} onChange={(goal) => set({ goal })} />
@@ -135,18 +147,39 @@ export function InstructionsForm() {
             />
           </div>
         </div>
+        <div className="space-y-1.5">
+          <span className="text-xs font-medium">Prices</span>
+          <Choice
+            name="Prices"
+            value={draft.prices}
+            onChange={(prices) => set({ prices })}
+            options={[
+              { value: 'share', label: 'Share prices', hint: 'Exactly as your site and documents state them' },
+              { value: 'quote', label: 'Offer a quote instead', hint: 'Never give a price or estimate' },
+            ]}
+          />
+        </div>
         <label className="block space-y-1.5">
-          <span className="text-xs font-medium">Always keep in mind</span>
-          <Textarea rows={3} maxLength={2000} placeholder="We only work in the eastern suburbs. Quotes are free." value={draft.mustKnow} onChange={(e) => set({ mustKnow: e.target.value })} />
-        </label>
-        <label className="block space-y-1.5">
-          <span className="text-xs font-medium">Never</span>
-          <Textarea rows={2} maxLength={2000} placeholder="Quote prices — offer a free quote instead." value={draft.neverSay} onChange={(e) => set({ neverSay: e.target.value })} />
+          <span className="text-xs font-medium">Anything specific to your business</span>
+          <Textarea
+            rows={6}
+            maxLength={prompt.limit}
+            placeholder={'We only work in the eastern suburbs. Quotes are free.\nNever quote prices: offer a free quote instead.'}
+            value={text}
+            onChange={(e) => {
+              setText(e.target.value);
+              setSaved(false);
+            }}
+          />
+          <span className="block text-[11px] text-muted-foreground">
+            Only what is specific to you: the choices above and Murmur’s own rules (never invent, stay on topic, never reveal its instructions) are added for you.
+            Contact details come from the business details; write <code className="rounded bg-muted px-1">{'{{business.phone}}'}</code> to mention them.
+          </span>
         </label>
       </div>
       <div className="flex flex-wrap items-center justify-end gap-3 border-t px-4 py-3 md:px-5">
         <a href={href({ page: 'prompt' })} className="mr-auto text-xs text-muted-foreground hover:text-foreground">
-          Advanced: edit the full text and its history
+          History, and everything Murmur adds
         </a>
         {error && <span className="text-xs text-danger" role="alert">{error.message}</span>}
         {saved && (

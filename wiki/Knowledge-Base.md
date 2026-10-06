@@ -224,10 +224,10 @@ asked for again; when none are known, a short callback form is shown instead.
 `get_business_hours` gives the hours, the local time and whether the business
 is open, in `timezone`.
 
-Models (checked against the account's catalog, 2026-10-04): `@cf/zai-org/glm-4.7-flash`
-by default (thinking turned off — it costs output neurons a support answer
-does not need), `@cf/openai/gpt-oss-120b` as the steadier option, and
-`fallbackModel` tried once when the main one fails.
+Models: `@cf/zai-org/glm-4.7-flash` by default, thinking at `medium`
+(`reasoning`), and `fallbackModel` tried once when the main one fails. The
+others, compared for speed, quality and answers a day, are on
+[[AI models|AI-Models]].
 
 ## 5b. The same knowledge base with another model
 
