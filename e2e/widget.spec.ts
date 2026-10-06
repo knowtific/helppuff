@@ -3,6 +3,7 @@ import {
   agentMessages,
   captureConsole,
   composer,
+  fillLeadForm,
   hostFingerprint,
   launcher,
   openWidget,
@@ -81,9 +82,7 @@ test.describe('the conversation', () => {
   test("the lead form's first message appears in the thread", async ({ page }) => {
     await openWidget(page);
     await page.locator('helppuff-widget .hp-btn').first().click();
-    await page.locator('helppuff-widget #hp-f-name').fill('Ada');
-    await page.locator('helppuff-widget #hp-f-email').fill('ada@example.com');
-    await page.locator('helppuff-widget #hp-f-phone').fill('0400 000 000');
+    await fillLeadForm(page);
     await page.locator('helppuff-widget #hp-f-first').fill('a question asked up front');
     await page.locator('helppuff-widget button[type="submit"]').click();
 
@@ -208,9 +207,7 @@ test.describe('the JavaScript API', () => {
 
     // The site requires a lead, so the form comes first — but the visitor's
     // intent is not discarded.
-    await page.locator('helppuff-widget #hp-f-name').fill('Ada');
-    await page.locator('helppuff-widget #hp-f-email').fill('ada@example.com');
-    await page.locator('helppuff-widget #hp-f-phone').fill('0400 000 000');
+    await fillLeadForm(page);
     await page.locator('helppuff-widget button[type="submit"]').click();
 
     await expect(thread(page)).toContainText('quote', { timeout: 10_000 });

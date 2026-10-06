@@ -33,18 +33,8 @@ export async function openWidget(page: Page): Promise<void> {
 export async function startConversation(page: Page, lead: Record<string, string> = {}): Promise<void> {
   await page.locator('helppuff-widget .hp-btn').first().click();
 
-  const fields = page.locator('helppuff-widget .hp-form input');
-  if (await fields.first().isVisible().catch(() => false)) {
-    const count = await fields.count();
-    for (let i = 0; i < count; i += 1) {
-      const field = fields.nth(i);
-      const name = (await field.getAttribute('id'))?.replace('hp-f-', '') ?? '';
-      const type = await field.getAttribute('type');
-      const value =
-        lead[name] ??
-        (type === 'email' ? 'ada@example.com' : type === 'tel' ? '0400 000 000' : 'Ada');
-      await field.fill(value);
-    }
+  if (await leadFields(page).first().isVisible().catch(() => false)) {
+    await fillLeadForm(page, lead);
     await page.locator('helppuff-widget button[type="submit"]').click();
   }
 
@@ -52,6 +42,28 @@ export async function startConversation(page: Page, lead: Record<string, string>
   // is still starting. Wait for the greeting so callers get a live session.
   await expect(composer(page)).toBeVisible();
   await expect(agentMessages(page).first()).toBeVisible();
+}
+
+const leadFields = (page: Page) => page.locator('helppuff-widget .hp-form input');
+
+/**
+ * Fill every field the lead form renders (not the first-message box, a
+ * textarea), for a test that must submit the form itself. Values come from
+ * `lead` by field name, else a valid one for the field's type.
+ */
+export async function fillLeadForm(page: Page, lead: Record<string, string> = {}): Promise<void> {
+  const fields = leadFields(page);
+  await expect(fields.first()).toBeVisible();
+  const count = await fields.count();
+  for (let i = 0; i < count; i += 1) {
+    const field = fields.nth(i);
+    const name = (await field.getAttribute('id'))?.replace('hp-f-', '') ?? '';
+    const type = await field.getAttribute('type');
+    const value =
+      lead[name] ??
+      (type === 'email' ? 'ada@example.com' : type === 'tel' ? '0400 000 000' : 'Ada');
+    await field.fill(value);
+  }
 }
 
 export async function send(page: Page, text: string): Promise<void> {

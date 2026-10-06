@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { launcher, openWidget, panel } from './helpers.js';
+import { fillLeadForm, launcher, openWidget, panel } from './helpers.js';
 
 /** The configurable launcher (icon, label, shape) and the teaser triggers. */
 
@@ -81,9 +81,7 @@ test.describe('the teaser', () => {
   test('never appears once a conversation is under way', async ({ page }) => {
     await openWidget(page);
     await page.locator('helppuff-widget .hp-btn').first().click();
-    await page.locator('helppuff-widget #hp-f-name').fill('Ada');
-    await page.locator('helppuff-widget #hp-f-email').fill('ada@example.com');
-    await page.locator('helppuff-widget #hp-f-phone').fill('0400 000 000');
+    await fillLeadForm(page);
     await page.locator('helppuff-widget button[type="submit"]').click();
     await expect(page.locator('helppuff-widget .hp-agent').first()).toBeVisible();
 

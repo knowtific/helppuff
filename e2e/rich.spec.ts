@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { agentMessages, composer, openWidget, panel, send, startConversation, thread, userMessages } from './helpers.js';
+import { agentMessages, composer, fillLeadForm, openWidget, panel, send, startConversation, thread, userMessages } from './helpers.js';
 
 /** M4: the rich message types, shortcuts and client-side flows. */
 
@@ -278,9 +278,7 @@ test.describe('client-side flows', () => {
     await page.locator('helppuff-widget .hp-chips .hp-chip', { hasText: 'Today' }).click();
 
     // No session yet, so the lead form collects one — the answer is not lost.
-    await page.locator('helppuff-widget #hp-f-name').fill('Ada');
-    await page.locator('helppuff-widget #hp-f-email').fill('ada@example.com');
-    await page.locator('helppuff-widget #hp-f-phone').fill('0400 000 000');
+    await fillLeadForm(page);
     // The flow's summary is shown in the first-message box, where it can be
     // edited, rather than riding along unseen.
     await expect(page.locator('helppuff-widget #hp-f-first')).toHaveValue(
