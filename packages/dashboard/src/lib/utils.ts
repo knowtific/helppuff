@@ -138,7 +138,7 @@ export function useTheme(): [boolean, () => void] {
     const next = !dark;
     document.documentElement.classList.toggle('dark', next);
     try {
-      localStorage.setItem('mm-theme', next ? 'dark' : 'light');
+      localStorage.setItem('hp-theme', next ? 'dark' : 'light');
     } catch {
       // Private mode: the choice lasts for this page only.
     }

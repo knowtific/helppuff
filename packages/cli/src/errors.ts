@@ -32,7 +32,7 @@ export class CliError extends Error {
   }
 }
 
-/** Exit codes, documented in `murmur --help`. */
+/** Exit codes, documented in `helppuff --help`. */
 export const EXIT = {
   ok: 0,
   error: 1,

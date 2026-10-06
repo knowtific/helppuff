@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { errorEnvelopeSchema, startSessionResponseSchema, configResponseSchema, TOKEN_HEADER } from '@murmur/protocol';
+import { errorEnvelopeSchema, startSessionResponseSchema, configResponseSchema, TOKEN_HEADER } from '@helppuff/protocol';
 import { FALLBACK_NOTICE_TEXT } from '../src/core/sanitize.js';
 import { ORIGIN, harness, startBody, startSession, testConfig, testEnv } from './helpers.js';
 
@@ -114,8 +114,8 @@ describe('POST /v1/sites/:siteId/sessions', () => {
     expect(response.headers.get('Cache-Control')).toBe('no-store');
   });
 
-  it('returns internal, not a crash, when MURMUR_SECRET is missing', async () => {
-    const h = harness(testConfig(), testEnv({ MURMUR_SECRET: undefined }));
+  it('returns internal, not a crash, when HELPPUFF_SECRET is missing', async () => {
+    const h = harness(testConfig(), testEnv({ HELPPUFF_SECRET: undefined }));
     const response = await h.post('/v1/sites/demo/sessions', startBody);
     expect(response.status).toBe(500);
     expect((await envelope(response))?.code).toBe('internal');
@@ -274,7 +274,7 @@ describe('CORS and transport', () => {
   it('answers the health check', async () => {
     const response = await harness().fetch('/healthz');
     expect(response.status).toBe(200);
-    // No MURMUR_VERSION in development: a release stamps it in.
+    // No HELPPUFF_VERSION in development: a release stamps it in.
     expect(await response.json()).toEqual({ ok: true, protocol: 'v1', version: null, schema: expect.any(Number) });
   });
 });

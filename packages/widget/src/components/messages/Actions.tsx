@@ -1,4 +1,4 @@
-import type { Action } from '@murmur/protocol';
+import type { Action } from '@helppuff/protocol';
 import { Icon } from '../Icon.js';
 
 /**
@@ -18,13 +18,13 @@ export function ActionButtons({
   if (actions.length === 0) return null;
 
   return (
-    <div class="mm-actions">
+    <div class="hp-actions">
       {actions.map((action) => {
         if (action.kind === 'url') {
           return (
             <a
               key={action.id}
-              class="mm-chip"
+              class="hp-chip"
               href={action.url}
               {...(action.newTab === false ? {} : { target: '_blank' })}
               rel="noopener noreferrer nofollow"
@@ -36,7 +36,7 @@ export function ActionButtons({
         }
         if (action.kind === 'tel') {
           return (
-            <a key={action.id} class="mm-chip" href={`tel:${action.phone}`}>
+            <a key={action.id} class="hp-chip" href={`tel:${action.phone}`}>
               <Icon name="phone" size={14} />
               {action.label}
             </a>
@@ -44,7 +44,7 @@ export function ActionButtons({
         }
         if (action.kind === 'email') {
           return (
-            <a key={action.id} class="mm-chip" href={`mailto:${action.email}`}>
+            <a key={action.id} class="hp-chip" href={`mailto:${action.email}`}>
               <Icon name="mail" size={14} />
               {action.label}
             </a>
@@ -54,7 +54,7 @@ export function ActionButtons({
           <button
             key={action.id}
             type="button"
-            class="mm-chip"
+            class="hp-chip"
             disabled={disabled}
             onClick={() => onAction(action)}
           >

@@ -4,16 +4,16 @@ import { expect, type Locator, type Page } from '@playwright/test';
  * The widget lives entirely inside a shadow root. Playwright pierces open
  * shadow roots automatically, so these helpers just name the parts.
  */
-export const widget = (page: Page) => page.locator('murmur-widget');
-export const launcher = (page: Page) => page.locator('murmur-widget .mm-orb');
-export const panel = (page: Page) => page.locator('murmur-widget .mm-panel');
-export const thread = (page: Page) => page.locator('murmur-widget .mm-thread');
-export const composer = (page: Page) => page.locator('murmur-widget .mm-composer textarea');
-export const sendButton = (page: Page) => page.locator('murmur-widget .mm-send');
+export const widget = (page: Page) => page.locator('helppuff-widget');
+export const launcher = (page: Page) => page.locator('helppuff-widget .hp-orb');
+export const panel = (page: Page) => page.locator('helppuff-widget .hp-panel');
+export const thread = (page: Page) => page.locator('helppuff-widget .hp-thread');
+export const composer = (page: Page) => page.locator('helppuff-widget .hp-composer textarea');
+export const sendButton = (page: Page) => page.locator('helppuff-widget .hp-send');
 
 /** Agent messages, in order. */
-export const agentMessages = (page: Page) => page.locator('murmur-widget .mm-agent');
-export const userMessages = (page: Page) => page.locator('murmur-widget .mm-user');
+export const agentMessages = (page: Page) => page.locator('helppuff-widget .hp-agent');
+export const userMessages = (page: Page) => page.locator('helppuff-widget .hp-user');
 
 export async function openWidget(page: Page): Promise<void> {
   await expect(launcher(page)).toBeVisible();
@@ -31,21 +31,21 @@ export async function openWidget(page: Page): Promise<void> {
  * helper has to read it.
  */
 export async function startConversation(page: Page, lead: Record<string, string> = {}): Promise<void> {
-  await page.locator('murmur-widget .mm-btn').first().click();
+  await page.locator('helppuff-widget .hp-btn').first().click();
 
-  const fields = page.locator('murmur-widget .mm-form input');
+  const fields = page.locator('helppuff-widget .hp-form input');
   if (await fields.first().isVisible().catch(() => false)) {
     const count = await fields.count();
     for (let i = 0; i < count; i += 1) {
       const field = fields.nth(i);
-      const name = (await field.getAttribute('id'))?.replace('mm-f-', '') ?? '';
+      const name = (await field.getAttribute('id'))?.replace('hp-f-', '') ?? '';
       const type = await field.getAttribute('type');
       const value =
         lead[name] ??
         (type === 'email' ? 'ada@example.com' : type === 'tel' ? '0400 000 000' : 'Ada');
       await field.fill(value);
     }
-    await page.locator('murmur-widget button[type="submit"]').click();
+    await page.locator('helppuff-widget button[type="submit"]').click();
   }
 
   // The composer appears as soon as the form is submitted, while the session
@@ -93,20 +93,20 @@ export async function hostFingerprint(page: Page) {
       // here; the host element itself is expected and excluded.
       bodyChildTags: [...body.children]
         .map((c) => c.tagName.toLowerCase())
-        .filter((tag) => tag !== 'murmur-widget')
+        .filter((tag) => tag !== 'helppuff-widget')
         .join(','),
     };
   });
 }
 
 export async function expectNoWidgetInDom(page: Page): Promise<void> {
-  await expect(page.locator('murmur-widget')).toHaveCount(0);
+  await expect(page.locator('helppuff-widget')).toHaveCount(0);
 }
 
-/** `window.Murmur` must stay callable and inert after a fatal error. */
+/** `window.HelpPuff` must stay callable and inert after a fatal error. */
 export async function expectInertApi(page: Page): Promise<void> {
   const result = await page.evaluate(() => {
-    const api = (window as unknown as { Murmur?: Record<string, unknown> }).Murmur;
+    const api = (window as unknown as { HelpPuff?: Record<string, unknown> }).HelpPuff;
     if (!api) return { present: false, threw: 'no global' };
     try {
       for (const name of ['open', 'close', 'toggle', 'reset', 'destroy']) {
@@ -120,8 +120,8 @@ export async function expectInertApi(page: Page): Promise<void> {
     }
   });
 
-  expect(result.present, 'window.Murmur must remain defined').toBe(true);
-  expect(result.threw, 'window.Murmur methods must never throw').toBeNull();
+  expect(result.present, 'window.HelpPuff must remain defined').toBe(true);
+  expect(result.threw, 'window.HelpPuff methods must never throw').toBeNull();
 }
 
 export async function pixelBox(locator: Locator) {

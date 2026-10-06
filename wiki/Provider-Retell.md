@@ -3,13 +3,13 @@
 `"backend": { "type": "retell" }`
 
 Connects the widget to a [Retell](https://retellai.com) **chat agent**. The
-agent is built in Retell (its prompt, model, tools and all), so Murmur carries
+agent is built in Retell (its prompt, model, tools and all), so HelpPuff carries
 the messages and adds the widget, dashboard, leads and webhooks around it.
 
 ## Set up
 
 ```bash
-npx @knowtific/murmur init --url acme.com --backend retell --retell-agent agent_abc123 --api-key "$RETELL_API_KEY"
+npx @knowtific/helppuff init --url acme.com --backend retell --retell-agent agent_abc123 --api-key "$RETELL_API_KEY"
 ```
 
 ```json
@@ -24,15 +24,15 @@ npx @knowtific/murmur init --url acme.com --backend retell --retell-agent agent_
 | --- | --- | --- |
 | `agentId` | required | The Retell chat agent |
 | `apiKey` | `{ "env": "RETELL_API_KEY" }` | By environment variable name |
-| `retrieval` | — | `"murmur"`: give the agent Murmur's knowledge base as a custom function (below) |
+| `retrieval` | — | `"helppuff"`: give the agent HelpPuff's knowledge base as a custom function (below) |
 
-There is no prompt setting: with Retell, the agent *is* the prompt. Murmur
+There is no prompt setting: with Retell, the agent *is* the prompt. HelpPuff
 passes the visitor's name (`{{customer_name}}`) and the page they are on
 (`{{page_url}}`) as dynamic variables your agent's prompt can use.
 
 ## Giving the agent your website's knowledge
 
-With `"retrieval": "murmur"`, your site and files are learned into Vectorize
+With `"retrieval": "helppuff"`, your site and files are learned into Vectorize
 and D1 on your Cloudflare account (as with the default backend), and the
 Worker answers a Retell **custom function**:
 
@@ -42,14 +42,14 @@ Worker answers a Retell **custom function**:
   the Worker checks it and refuses anything unsigned or older than five minutes.
 
 Add it to the agent in Retell's dashboard and tell the agent to use it for
-questions about the business. `murmur status` prints the exact URL. It works
+questions about the business. `helppuff status` prints the exact URL. It works
 for Retell voice agents too.
 
 ## Rich messages
 
 Agents can show option chips, cards and link lists by calling custom tools
 named `show_options`, `show_card` or `show_links`. Their JSON schemas are
-exported as `RICH_TOOL_SCHEMAS` from `@murmur/connector-types`; paste them
+exported as `RICH_TOOL_SCHEMAS` from `@helppuff/connector-types`; paste them
 into the agent's tools so what the agent sends and what the widget accepts
 match.
 

@@ -10,7 +10,7 @@ import { loadProject } from '../engine/project.js';
 import type { Ctx } from './context.js';
 
 /**
- * `murmur eval golden.json` — the retrieval check: ask a
+ * `helppuff eval golden.json` — the retrieval check: ask a
  * set of real visitor questions of the deployed assistant and score each.
  *
  *   [
@@ -56,14 +56,14 @@ function readGolden(path: string): Golden[] {
 export async function evalCommand(ctx: Ctx): Promise<number> {
   assertKnown(ctx.flags, ['min', 'url'], 'eval');
   const file = ctx.positionals[0];
-  if (!file) throw new CliError('usage', 'Usage: murmur eval <golden.json> [--min 0.8]', { exitCode: EXIT.usage });
+  if (!file) throw new CliError('usage', 'Usage: helppuff eval <golden.json> [--min 0.8]', { exitCode: EXIT.usage });
   const loaded = loadProject(ctx.cwd);
   const golden = readGolden(resolve(ctx.cwd, file));
   const url = str(ctx.flags, 'url') ?? loaded.project.cloudflare.url;
-  if (!url) throw new CliError('not_deployed', 'Deploy first.', { hint: 'murmur deploy' });
+  if (!url) throw new CliError('not_deployed', 'Deploy first.', { hint: 'helppuff deploy' });
   const min = Number(str(ctx.flags, 'min') ?? 0.8);
   const api = loaded.project.backend.type === 'workers-ai' ? adminApi(loaded, { url }) : null;
-  const secret = loadEnv(loaded.dir)['MURMUR_SECRET'];
+  const secret = loadEnv(loaded.dir)['HELPPUFF_SECRET'];
 
   const results: Scored[] = [];
   for (const [i, q] of golden.entries()) {

@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
-import { MIGRATIONS, promptHash, promptOverlaps } from '@murmur/server';
+import { MIGRATIONS, promptHash, promptOverlaps } from '@helppuff/server';
 import type { CloudflareApi } from '../src/engine/cloudflare.js';
 import { parseProject } from '../src/engine/project.js';
 import { driftError, promptSync, pullPrompt, readLivePrompt, recordPublish, type Remote } from '../src/engine/prompt.js';
@@ -37,7 +37,7 @@ describe('promptSync', () => {
     );
     expect(error.code).toBe('prompt_behind');
     expect(error.message).toContain('version 4 (published in the dashboard by owner@acme.com, 2026-09-27 09:30 UTC)');
-    expect(error.hint).toContain('murmur prompt pull');
+    expect(error.hint).toContain('helppuff prompt pull');
   });
 });
 
@@ -66,7 +66,7 @@ function deployment(options: { dashboard?: boolean } = {}) {
 function project(prompt: string) {
   const dir = tempProject({ 'prompt.md': `${prompt}\n` });
   const raw = { site: 'acme', name: 'Acme', origins: ['https://acme.com'], backend: { type: 'cloudflare' } };
-  return { dir, file: join(dir, 'murmur.json'), raw, project: parseProject(raw) };
+  return { dir, file: join(dir, 'helppuff.json'), raw, project: parseProject(raw) };
 }
 
 describe('publishing from the CLI', () => {

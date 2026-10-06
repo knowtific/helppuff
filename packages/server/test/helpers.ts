@@ -2,12 +2,12 @@ import { defineConfig } from '../src/config/load.js';
 import { createApp } from '../src/app.js';
 import { memoryKv } from '../src/core/platform.js';
 import type { Bindings } from '../src/core/request.js';
-import type { MurmurConfigInput } from '../src/config/schema.js';
+import type { HelpPuffConfigInput } from '../src/config/schema.js';
 
 export const SECRET = 'test-secret-that-is-at-least-32-bytes-long';
 export const ORIGIN = 'https://example.com';
 
-export function testConfig(overrides: Partial<MurmurConfigInput['sites'][string]> = {}) {
+export function testConfig(overrides: Partial<HelpPuffConfigInput['sites'][string]> = {}) {
   return defineConfig({
     sites: {
       demo: {
@@ -29,7 +29,7 @@ export function testConfig(overrides: Partial<MurmurConfigInput['sites'][string]
 }
 
 export function testEnv(overrides: Partial<Bindings> = {}): Bindings {
-  return { MURMUR_SECRET: SECRET, MURMUR_KV: memoryKv(), ...overrides };
+  return { HELPPUFF_SECRET: SECRET, HELPPUFF_KV: memoryKv(), ...overrides };
 }
 
 export type Harness = {

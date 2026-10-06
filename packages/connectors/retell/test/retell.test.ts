@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { messageSchema } from '@murmur/protocol';
-import { isConnectorError, type ConnectorContext } from '@murmur/connector-types';
+import { messageSchema } from '@helppuff/protocol';
+import { isConnectorError, type ConnectorContext } from '@helppuff/connector-types';
 import retell, { mapRetellMessages } from '../src/index.js';
 
 /**

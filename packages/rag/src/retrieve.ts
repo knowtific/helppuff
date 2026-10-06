@@ -97,7 +97,7 @@ export type Retrieval = {
   chunks: RetrievedChunk[];
   query: string;
   neurons: number;
-  /** Which stages ran, for `murmur ask --json` and debugging. */
+  /** Which stages ran, for `helppuff ask --json` and debugging. */
   trace: {
     vector: number;
     keyword: number;

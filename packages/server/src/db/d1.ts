@@ -1,12 +1,12 @@
 import { migrate } from './migrations.js';
 
 /**
- * Cloudflare D1, bound as `MURMUR_DB`: the dashboard's store (conversations,
+ * Cloudflare D1, bound as `HELPPUFF_DB`: the dashboard's store (conversations,
  * messages, leads) and the knowledge base's text side (pages, chunks, FTS).
  *
  * Optional for the dashboard. With no binding, nothing is recorded and the
  * Worker behaves exactly as before — no lead data, no transcripts. The schema
- * (see `migrations.ts`) is applied by `murmur deploy` and, as a fallback,
+ * (see `migrations.ts`) is applied by `helppuff deploy` and, as a fallback,
  * once per isolate on first use.
  */
 
@@ -43,6 +43,6 @@ export function resetSchemaMemo(): void {
 }
 
 export function dbFrom(env: Record<string, unknown>): D1Like | null {
-  const db = env['MURMUR_DB'] as Partial<D1Like> | undefined;
+  const db = env['HELPPUFF_DB'] as Partial<D1Like> | undefined;
   return db && typeof db.prepare === 'function' && typeof db.batch === 'function' ? (db as D1Like) : null;
 }

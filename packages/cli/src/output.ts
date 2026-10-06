@@ -57,9 +57,9 @@ export class Output {
       error instanceof CliError
         ? error
         : new CliError('unexpected', error instanceof Error ? error.message : String(error), {
-            hint: 'This looks like a bug in murmur. Run with DEBUG=murmur for the stack trace.',
+            hint: 'This looks like a bug in helppuff. Run with DEBUG=helppuff for the stack trace.',
           });
-    if (process.env['DEBUG']?.includes('murmur') && error instanceof Error) process.stderr.write(`${error.stack}\n`);
+    if (process.env['DEBUG']?.includes('helppuff') && error instanceof Error) process.stderr.write(`${error.stack}\n`);
 
     if (this.json) {
       process.stdout.write(`${JSON.stringify({ ok: false, error: cliError.toJSON() }, null, 2)}\n`);

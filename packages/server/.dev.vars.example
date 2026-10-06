@@ -3,23 +3,23 @@
 # In production none of these live in a file: each is a Worker secret, set
 # with `wrangler secret put NAME` (and `scripts/setup.sh` prompts for the
 # ones your chosen connector and sinks declare). The names here are the ones
-# `murmur.config.ts` refers to via `{ env: 'NAME' }` — change them there and
+# `helppuff.config.ts` refers to via `{ env: 'NAME' }` — change them there and
 # change them here.
 
 # ---------------------------------------------------------------- required
 
 # Signs session tokens. At least 32 bytes; `setup.sh` generates one.
 #   openssl rand -base64 32
-MURMUR_SECRET=dev-secret-please-replace-at-least-32-bytes
+HELPPUFF_SECRET=dev-secret-please-replace-at-least-32-bytes
 
 # "1" prints structured, PII-free events to the console. Off in production.
-MURMUR_LOG=1
+HELPPUFF_LOG=1
 
 # ------------------------------------------------- one per connector in use
 
 # Gemini — https://aistudio.google.com/apikey
 # Used by `connector: { type: 'gemini', options: { apiKey: { env: 'GEMINI_API_KEY' } } }`
-# The File Search store name is not a secret and goes in murmur.config.ts.
+# The File Search store name is not a secret and goes in helppuff.config.ts.
 # GEMINI_API_KEY=AIza...
 
 # OpenAI — https://platform.openai.com/api-keys
@@ -27,7 +27,7 @@ MURMUR_LOG=1
 
 # Retell — https://dashboard.retellai.com
 # Only the key is a secret. `agentId` is per-site configuration and belongs
-# in murmur.config.ts: one deployment can serve several sites, each talking
+# in helppuff.config.ts: one deployment can serve several sites, each talking
 # to a different agent, so it cannot be a single environment variable.
 # RETELL_API_KEY=key_...
 
@@ -38,7 +38,7 @@ MURMUR_LOG=1
 # ---------------------------------------------------------------- optional
 
 # Turnstile's server-side secret. The site key is public and goes in
-# murmur.config.ts under `security.captcha`; this one never leaves the Worker.
+# helppuff.config.ts under `security.captcha`; this one never leaves the Worker.
 #
 # For local development, pair Cloudflare's always-passing test keys instead of
 # registering localhost on your real widget:
@@ -58,7 +58,7 @@ MURMUR_LOG=1
 # credential, whose Name must be `api_key` and whose Value is this. A
 # mismatch answers 403 "Authorization data is wrong!" and runs nothing.
 #
-# Referenced from murmur.config.ts as
+# Referenced from helppuff.config.ts as
 # `headers: { api_key: { env: 'LEAD_WEBHOOK_API_KEY' } }`, so the key never
 # enters that file or the deployed Worker bundle.
 # LEAD_WEBHOOK_API_KEY=a-shared-secret

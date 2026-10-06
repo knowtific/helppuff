@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { applySettings, murmurConfigSchema, readSettings, settingsHash } from '@murmur/server';
+import { applySettings, helppuffConfigSchema, readSettings, settingsHash } from '@helppuff/server';
 import { compile, knowledgeFor } from '../src/engine/compile.js';
 import { loadProject, parseProject, saveProject, type ProjectInput } from '../src/engine/project.js';
 import { pullSettings } from '../src/commands/manage.js';
@@ -20,25 +20,25 @@ const BASE: ProjectInput = {
 };
 
 function project(extra: Partial<ProjectInput> = {}) {
-  const dir = tempProject({ 'prompt.md': 'You help Acme customers.', '.env': 'ADMIN_API_KEY=mm_test_key_that_is_long_enough_0000000\n' });
+  const dir = tempProject({ 'prompt.md': 'You help Acme customers.', '.env': 'ADMIN_API_KEY=hp_test_key_that_is_long_enough_0000000\n' });
   saveProject(dir, { ...BASE, ...extra });
   return loadProject(dir);
 }
 
-const siteOf = (loaded: ReturnType<typeof project>) => murmurConfigSchema.parse(compile(loaded).serverConfig).sites['acme']!;
+const siteOf = (loaded: ReturnType<typeof project>) => helppuffConfigSchema.parse(compile(loaded).serverConfig).sites['acme']!;
 
 describe('workers-ai projects', () => {
   it('compile to the RAG bindings: AI, Vectorize, D1, the crawl Workflow, a cron and Browser Rendering', () => {
-    const compiled = compile(project(), { workerUrl: 'https://knowtific-murmur-acme.me.workers.dev', d1DatabaseId: 'db1', kvNamespaceId: 'kv1' });
+    const compiled = compile(project(), { workerUrl: 'https://knowtific-helppuff-acme.me.workers.dev', d1DatabaseId: 'db1', kvNamespaceId: 'kv1' });
     expect(compiled.wrangler).toMatchObject({
       ai: { binding: 'AI' },
-      vectorize: [{ binding: 'VECTORS', index_name: 'knowtific-murmur-acme' }],
-      d1_databases: [{ binding: 'MURMUR_DB', database_id: 'db1' }],
-      workflows: [{ name: 'knowtific-murmur-acme-crawl', binding: 'CRAWL_WORKFLOW', class_name: 'CrawlWorkflow' }],
+      vectorize: [{ binding: 'VECTORS', index_name: 'knowtific-helppuff-acme' }],
+      d1_databases: [{ binding: 'HELPPUFF_DB', database_id: 'db1' }],
+      workflows: [{ name: 'knowtific-helppuff-acme-crawl', binding: 'CRAWL_WORKFLOW', class_name: 'CrawlWorkflow' }],
       triggers: { crons: ['23 3 * * *'] },
       browser: { binding: 'BROWSER' },
     });
-    expect(compiled.secrets).toEqual(['MURMUR_SECRET', 'ADMIN_API_KEY']);
+    expect(compiled.secrets).toEqual(['HELPPUFF_SECRET', 'ADMIN_API_KEY']);
     const site = siteOf(project());
     expect(site.connector).toMatchObject({ type: 'workers-ai', options: { instructions: 'You help Acme customers.', stream: true } });
     expect(readSettings(site).assistant?.model).toBe('@cf/zai-org/glm-4.7-flash');
@@ -65,7 +65,7 @@ describe('workers-ai projects', () => {
 });
 
 describe('config pull', () => {
-  it('writes the live settings into murmur.json so the next deploy compiles to exactly them', async () => {
+  it('writes the live settings into helppuff.json so the next deploy compiles to exactly them', async () => {
     const loaded = project();
     const changed = applySettings(siteOf(loaded), {
       botName: 'Ava',
@@ -83,7 +83,7 @@ describe('config pull', () => {
     expect(again).toEqual(live);
     expect(await settingsHash(again)).toBe(await settingsHash(live));
 
-    const raw = JSON.parse(readFileSync(join(loaded.dir, 'murmur.json'), 'utf8')) as Record<string, any>;
+    const raw = JSON.parse(readFileSync(join(loaded.dir, 'helppuff.json'), 'utf8')) as Record<string, any>;
     expect(raw['backend']).toEqual({ type: 'workers-ai', model: '@cf/zai-org/glm-4.7-flash', timezone: 'Australia/Melbourne', locale: 'en-AU', retrieval: { rerankerModel: null } });
     expect(again.assistant!.rerank).toBe(false);
     expect(raw['widget']['brand']).toMatchObject({ agentName: 'Ava', accent: '#0f766e' });
@@ -97,7 +97,7 @@ describe('admin API client', () => {
     const { fetch, calls } = fakeFetch([
       (url, init) => {
         if (url.pathname === '/admin/api/knowledge/status') {
-          return new Headers(init.headers).get('Authorization') === 'Bearer mm_test_key_that_is_long_enough_0000000'
+          return new Headers(init.headers).get('Authorization') === 'Bearer hp_test_key_that_is_long_enough_0000000'
             ? Response.json({ chunks: 3 })
             : undefined;
         }
@@ -179,7 +179,7 @@ describe('onboarding without a person (an AI agent)', () => {
   });
 });
 
-describe('murmur eval scoring', () => {
+describe('helppuff eval scoring', () => {
   it('passes a grounded answer, fails a wrong source, and checks refusals', async () => {
     const { score } = await import('../src/commands/eval.js');
     expect(score({ question: 'phone?', source: '/contact', contains: ['9876'] }, 'Call us on 03 9876 5432.', ['https://acme.com.au/contact']).pass).toBe(true);
@@ -189,19 +189,19 @@ describe('murmur eval scoring', () => {
   });
 });
 
-describe('retrieval: murmur on another backend', () => {
+describe('retrieval: helppuff on another backend', () => {
   it('deploys the knowledge base next to OpenAI, and drops the vector store', () => {
-    const loaded = project({ backend: { type: 'openai', vectorStoreId: 'vs_1', retrieval: 'murmur' } });
+    const loaded = project({ backend: { type: 'openai', vectorStoreId: 'vs_1', retrieval: 'helppuff' } });
     const compiled = compile(loaded);
     expect(compiled.wrangler).toMatchObject({ vectorize: [{ binding: 'VECTORS' }], workflows: [{ class_name: 'CrawlWorkflow' }], ai: { binding: 'AI' } });
     const site = siteOf(loaded);
-    expect(site.connector.options).toMatchObject({ retrieval: 'murmur' });
+    expect(site.connector.options).toMatchObject({ retrieval: 'helppuff' });
     expect((site.connector.options as Record<string, unknown>)['vectorStoreIds']).toBeUndefined();
     expect(site.knowledge).toMatchObject({ website: 'https://acme.com.au' });
   });
 
-  it('keeps Claude off AI Search when it uses Murmur’s knowledge', () => {
-    const compiled = compile(project({ backend: { type: 'anthropic', retrieval: 'murmur' } }));
+  it('keeps Claude off AI Search when it uses HelpPuff’s knowledge', () => {
+    const compiled = compile(project({ backend: { type: 'anthropic', retrieval: 'helppuff' } }));
     expect(compiled.wrangler['ai_search']).toBeUndefined();
     expect(compiled.wrangler['vectorize']).toBeDefined();
   });
@@ -249,10 +249,10 @@ describe('upgrading', () => {
   it('stamps this release into the Worker it deploys', async () => {
     const { VERSION } = await import('../src/engine/version.js');
     expect(VERSION).toBe((JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8')) as { version: string }).version);
-    expect(compile(project()).wrangler['vars']).toMatchObject({ MURMUR_VERSION: VERSION });
+    expect(compile(project()).wrangler['vars']).toMatchObject({ HELPPUFF_VERSION: VERSION });
   });
 
-  it('reads an older murmur.json as the current format, and refuses one from a newer CLI', async () => {
+  it('reads an older helppuff.json as the current format, and refuses one from a newer CLI', async () => {
     const { upgradeProjectFile } = await import('../src/engine/project.js');
     const steps = [
       { to: 2, describe: 'leads.webhook moved to webhooks', apply: (raw: Record<string, unknown>) => void (raw['moved'] = true) },

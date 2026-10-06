@@ -1,4 +1,4 @@
-# The Murmur protocol
+# The HelpPuff protocol
 
 Version `v1`. JSON in, JSON out, over HTTPS.
 
@@ -136,7 +136,7 @@ deduplication. An `action` carries both the `label` (for display and history)
 and the `value` (for the backend).
 
 When the connector's state changes, the response carries a refreshed token in
-the `X-Murmur-Token` header. **A client must use it for the next request.** The
+the `X-HelpPuff-Token` header. **A client must use it for the next request.** The
 header is listed in `Access-Control-Expose-Headers` so a browser can read it.
 
 A refreshed token keeps the original expiry: a conversation cannot extend itself
@@ -262,7 +262,7 @@ and spend the site owner's AI budget.
   rejected with `forbidden_origin`.
 - The server reflects an allowlisted origin only, sends
   `Access-Control-Allow-Headers: content-type, authorization`, and exposes
-  `X-Murmur-Token` and `Retry-After`.
+  `X-HelpPuff-Token` and `Retry-After`.
 - CORS reflection decides only what a browser may read. Authorization is
   enforced separately, per site, inside each route.
 
@@ -270,7 +270,7 @@ and spend the site owner's AI budget.
 
 ## Implementing your own server
 
-Implement the five endpoints above and any Murmur widget can point at you with
+Implement the five endpoints above and any HelpPuff widget can point at you with
 `data-api`. The checklist:
 
 1. Return the error envelope for every failure, including 404 and 500. Never
@@ -278,7 +278,7 @@ Implement the five endpoints above and any Murmur widget can point at you with
 2. Enforce an origin allowlist on session endpoints.
 3. Validate every outbound message against the schema — drop what fails.
 4. Send `Cache-Control: no-store` on session endpoints.
-5. Expose `X-Murmur-Token` when you rotate tokens.
+5. Expose `X-HelpPuff-Token` when you rotate tokens.
 
 The Zod schemas in `packages/protocol` are what the reference server
 validates with; copy them (MIT) rather than re-deriving the shapes.

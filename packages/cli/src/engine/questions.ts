@@ -14,7 +14,7 @@ import { TOKEN_HELP } from './cloudflare.js';
  *
  * Only what cannot be worked out is *required*. Everything else has a
  * default, is listed back as an assumption, and can be changed later in
- * murmur.json.
+ * helppuff.json.
  */
 
 export type Answers = {
@@ -24,13 +24,13 @@ export type Answers = {
   defaults?: boolean;
   backend?: BackendType;
   model?: string;
-  /** Provider API key (OpenAI / Gemini / Anthropic / Retell) — goes to .env, never murmur.json. */
+  /** Provider API key (OpenAI / Gemini / Anthropic / Retell) — goes to .env, never helppuff.json. */
   apiKey?: string;
   /** `new`, an existing instance id, or `endpoint`. */
   aiSearch?: string;
   endpoint?: string;
   httpUrl?: string;
-  httpMode?: 'murmur' | 'openai';
+  httpMode?: 'helppuff' | 'openai';
   httpToken?: string;
   retellAgent?: string;
   docs?: string[];
@@ -112,7 +112,7 @@ export const PROVIDER_KEYS: Partial<Record<BackendType, string>> = {
 };
 
 export const MODELS: Partial<Record<BackendType, Option[]>> = {
-  // Measured in Murmur on 2026-10-05 (wiki/AI-Models.md); prices from developers.cloudflare.com/workers-ai/platform/pricing.
+  // Measured in HelpPuff on 2026-10-05 (wiki/AI-Models.md); prices from developers.cloudflare.com/workers-ai/platform/pricing.
   'workers-ai': [
     { value: '@cf/zai-org/glm-4.7-flash', label: 'GLM-4.7 Flash', hint: 'default · best all-round · ~325 answers a day free' },
     { value: '@cf/qwen/qwen3-30b-a3b-fp8', label: 'Qwen3 30B', hint: 'free plan · dependable · ~340 answers a day free' },
@@ -149,7 +149,7 @@ function backendOptions(facts: Facts): Option[] {
     {
       value: 'workers-ai',
       label: 'Workers AI + your own knowledge base',
-      hint: 'recommended · free plan · Murmur crawls your site into Vectorize and D1 on your account',
+      hint: 'recommended · free plan · HelpPuff crawls your site into Vectorize and D1 on your account',
     },
     {
       value: 'cloudflare',
@@ -159,7 +159,7 @@ function backendOptions(facts: Facts): Option[] {
     { value: 'openai', label: 'OpenAI + File Search', hint: `GPT models${found('openai')}` },
     { value: 'gemini', label: 'Gemini + File Search', hint: `Google models${found('gemini')}` },
     { value: 'anthropic', label: 'Anthropic Claude', hint: `knowledge via Cloudflare AI Search${found('anthropic')}` },
-    { value: 'http', label: 'Your own API', hint: 'any URL: Murmur protocol or OpenAI-compatible, JSON or streaming' },
+    { value: 'http', label: 'Your own API', hint: 'any URL: HelpPuff protocol or OpenAI-compatible, JSON or streaming' },
     { value: 'retell', label: 'Retell agent', hint: `an agent you built in Retell${found('retell')}` },
   ];
 }
@@ -245,7 +245,7 @@ export function pendingQuestions(answers: Answers, facts: Facts): Question[] {
         flag: '--http-url',
         kind: 'text',
         ask: 'Your API base URL',
-        help: 'Murmur protocol: we POST {url}/start and {url}/message. OpenAI-compatible: we POST {url}/chat/completions.',
+        help: 'HelpPuff protocol: we POST {url}/start and {url}/message. OpenAI-compatible: we POST {url}/chat/completions.',
         required: true,
       });
     }
@@ -256,15 +256,15 @@ export function pendingQuestions(answers: Answers, facts: Facts): Question[] {
         kind: 'select',
         ask: 'What does your API speak?',
         options: [
-          { value: 'murmur', label: 'Murmur protocol', hint: 'your API owns prompt, retrieval and model; JSON or SSE' },
+          { value: 'helppuff', label: 'HelpPuff protocol', hint: 'your API owns prompt, retrieval and model; JSON or SSE' },
           { value: 'openai', label: 'OpenAI Chat Completions', hint: 'vLLM, Ollama, LiteLLM, OpenRouter, DeepSeek…' },
         ],
-        default: answers.httpUrl && /\/v\d+\/?$|chat\/completions|openai|ollama|:11434/.test(answers.httpUrl) ? 'openai' : 'murmur',
+        default: answers.httpUrl && /\/v\d+\/?$|chat\/completions|openai|ollama|:11434/.test(answers.httpUrl) ? 'openai' : 'helppuff',
         required: false,
         wizard: true,
       });
     }
-    if (answers.httpToken === undefined && !hasKey(facts, 'MURMUR_BACKEND_TOKEN')) {
+    if (answers.httpToken === undefined && !hasKey(facts, 'HELPPUFF_BACKEND_TOKEN')) {
       out.push({
         id: 'httpToken',
         flag: '--http-token',
@@ -272,7 +272,7 @@ export function pendingQuestions(answers: Answers, facts: Facts): Question[] {
         ask: 'Bearer token for your API (Enter to skip)',
         required: false,
         wizard: true,
-        envVar: 'MURMUR_BACKEND_TOKEN',
+        envVar: 'HELPPUFF_BACKEND_TOKEN',
       });
     }
   }
@@ -289,7 +289,7 @@ export function pendingQuestions(answers: Answers, facts: Facts): Question[] {
       ask: 'Which AI Search instance should hold the knowledge?',
       options: [
         ...(crawlsThisSite ? [{ value: crawlsThisSite, label: `Use "${crawlsThisSite}"`, hint: `already crawls ${siteHost ?? 'this site'} — ready now` }] : []),
-        { value: 'new', label: 'Create a new one', hint: 'murmur sets it up and indexes your site and files' },
+        { value: 'new', label: 'Create a new one', hint: 'helppuff sets it up and indexes your site and files' },
         ...reusable
           .filter((instance) => instance.id !== crawlsThisSite)
           .map((instance) => ({
@@ -445,7 +445,7 @@ export function matchingInstance(facts: Facts): string | null {
 }
 
 /**
- * Instances worth offering. One murmur created for another site is that
+ * Instances worth offering. One helppuff created for another site is that
  * site's knowledge, never a sensible choice here, so it is not listed.
  */
 export function reusableInstances(facts: Facts): AiSearchInstance[] {

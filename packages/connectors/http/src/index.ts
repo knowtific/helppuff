@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { readSse, type Message, type SendRequest, type StartSessionRequest } from '@murmur/protocol';
+import { readSse, type Message, type SendRequest, type StartSessionRequest } from '@helppuff/protocol';
 import {
   CONNECTOR_TIMEOUT_MS,
   ConnectorError,
@@ -19,12 +19,12 @@ import {
   type Connector,
   type ConnectorContext,
   type PromptScope,
-} from '@murmur/connector-types';
+} from '@helppuff/connector-types';
 
 /**
  * Your own backend. Two shapes, picked by `mode`:
  *
- * **`murmur`** — your service speaks a two-endpoint version of the protocol,
+ * **`helppuff`** — your service speaks a two-endpoint version of the protocol,
  * and owns everything AI-shaped (prompt, retrieval, model, tools):
  *
  *   POST {url}/start    { siteId, sessionId, lead?, context, firstMessage? }
@@ -44,15 +44,15 @@ import {
  *
  * With `signingSecret`, every request is signed so your service can check
  * it came from this Worker:
- *   X-Murmur-Timestamp: <unix seconds>
- *   X-Murmur-Signature: sha256=<hex HMAC-SHA256 of `${timestamp}.${body}`>
+ *   X-HelpPuff-Timestamp: <unix seconds>
+ *   X-HelpPuff-Signature: sha256=<hex HMAC-SHA256 of `${timestamp}.${body}`>
  */
 
 const secretOrString = z.union([z.string().min(1), z.object({ env: z.string().min(1) })]);
 
 export const httpOptionsSchema = z.object({
   url: z.string().url(),
-  mode: z.enum(['murmur', 'openai']).default('murmur'),
+  mode: z.enum(['helppuff', 'openai']).default('helppuff'),
   /** Extra headers, e.g. `{ Authorization: { env: 'BACKEND_TOKEN' } }` resolved to a string. */
   headers: z.record(z.string().min(1).max(100), secretOrString).default({}),
   /** Sent as `Authorization: Bearer …`, in either mode. */
@@ -67,7 +67,7 @@ export const httpOptionsSchema = z.object({
 });
 
 export type HttpOptions = z.infer<typeof httpOptionsSchema>;
-/** In `murmur` mode, whatever your backend returned; opaque and under 1 kb. */
+/** In `helppuff` mode, whatever your backend returned; opaque and under 1 kb. */
 export type HttpState = { backend?: unknown };
 
 function resolved(value: string | { env: string }, what: string): string {
@@ -99,7 +99,7 @@ async function headersFor(options: HttpOptions, body: string, stream: boolean): 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Accept: stream ? 'text/event-stream, application/json' : 'application/json',
-    'User-Agent': 'Murmur/1 (+https://github.com/murmur)',
+    'User-Agent': 'HelpPuff/1 (+https://github.com/helppuff)',
   };
   for (const [name, value] of Object.entries(options.headers)) headers[name] = resolved(value, name);
   if (options.apiKey) {
@@ -107,8 +107,8 @@ async function headersFor(options: HttpOptions, body: string, stream: boolean): 
   }
   if (options.signingSecret) {
     const timestamp = Math.floor(Date.now() / 1000);
-    headers['X-Murmur-Timestamp'] = String(timestamp);
-    headers['X-Murmur-Signature'] = await signBody(resolved(options.signingSecret, 'signingSecret'), body, timestamp);
+    headers['X-HelpPuff-Timestamp'] = String(timestamp);
+    headers['X-HelpPuff-Signature'] = await signBody(resolved(options.signingSecret, 'signingSecret'), body, timestamp);
   }
   return headers;
 }
@@ -156,7 +156,7 @@ export function normalizeBackendReply(raw: unknown): { messages: Message[]; stat
   return { messages, ...(body.state === undefined ? {} : { state: body.state }) };
 }
 
-async function readMurmurStream(response: Response, onText: (delta: string) => void): Promise<unknown> {
+async function readHelpPuffStream(response: Response, onText: (delta: string) => void): Promise<unknown> {
   let done: unknown = null;
   await readJsonEvents(response, (data, event) => {
     if (event === 'delta' && typeof data['text'] === 'string') onText(data['text']);
@@ -177,7 +177,7 @@ async function readMurmurStream(response: Response, onText: (delta: string) => v
   return done;
 }
 
-async function callMurmur(
+async function callHelpPuff(
   ctx: ConnectorContext<HttpOptions>,
   path: 'start' | 'message',
   payload: object,
@@ -194,7 +194,7 @@ async function callMurmur(
   if (!response.ok) await fail(response);
 
   const raw = isStream(response)
-    ? await readMurmurStream(response, (delta) => ctx.onText?.(delta))
+    ? await readHelpPuffStream(response, (delta) => ctx.onText?.(delta))
     : await readJson(response);
   return normalizeBackendReply(raw);
 }
@@ -276,7 +276,7 @@ const http: Connector<HttpOptions, HttpState> = {
   optionsSchema: httpOptionsSchema,
   capabilities: { poll: false, end: false },
   streams: (options) => options.stream,
-  // In `murmur` mode the owner's API builds its own prompt.
+  // In `helppuff` mode the owner's API builds its own prompt.
   promptOption: (options) => (options.mode === 'openai' ? 'instructions' : null),
 
   async start(ctx, input) {
@@ -286,7 +286,7 @@ const http: Connector<HttpOptions, HttpState> = {
       const messages = input.firstMessage ? await callOpenAi(ctx, input.firstMessage, scope) : [];
       return { state: {}, messages };
     }
-    const result = await callMurmur(ctx, 'start', startPayload(ctx, input));
+    const result = await callHelpPuff(ctx, 'start', startPayload(ctx, input));
     return { state: result.state === undefined ? {} : { backend: result.state }, messages: result.messages };
   },
 
@@ -294,7 +294,7 @@ const http: Connector<HttpOptions, HttpState> = {
     if (ctx.options.mode === 'openai') {
       return { messages: await callOpenAi(ctx, inputFor(input), loadScope(ctx)) };
     }
-    const result = await callMurmur(ctx, 'message', {
+    const result = await callHelpPuff(ctx, 'message', {
       siteId: ctx.siteId,
       sessionId: ctx.sessionId,
       state: state.backend ?? null,

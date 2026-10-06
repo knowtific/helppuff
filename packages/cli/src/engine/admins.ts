@@ -1,6 +1,6 @@
 import { pbkdf2Sync, randomBytes } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { OWNER_HEADER, ownerToken } from '@murmur/server';
+import { OWNER_HEADER, ownerToken } from '@helppuff/server';
 import { CliError } from '../errors.js';
 import type { CloudflareSession } from './credentials.js';
 import { writeEnvVar } from './env.js';
@@ -89,10 +89,10 @@ export async function waitForSignIn(
 export function requireDashboardDb(loaded: LoadedProject): string {
   if (!dashboardEnabled(loaded.project)) {
     throw new CliError('dashboard_disabled', 'The dashboard is not enabled for this project.', {
-      hint: 'Set dashboard.adminEmail in murmur.json (murmur config set dashboard.adminEmail you@example.com), then murmur deploy.',
+      hint: 'Set dashboard.adminEmail in helppuff.json (helppuff config set dashboard.adminEmail you@example.com), then helppuff deploy.',
     });
   }
   const id = loaded.project.cloudflare.d1DatabaseId;
-  if (!id) throw new CliError('not_deployed', 'The dashboard database does not exist yet.', { hint: 'murmur deploy' });
+  if (!id) throw new CliError('not_deployed', 'The dashboard database does not exist yet.', { hint: 'helppuff deploy' });
   return id;
 }

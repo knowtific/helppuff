@@ -6,7 +6,7 @@ import { loadProject } from '../engine/project.js';
 import type { Ctx } from './context.js';
 
 /**
- * `murmur callbacks` — the requests to be called back, the same as the
+ * `helppuff callbacks` — the requests to be called back, the same as the
  * dashboard's Callbacks page.
  *
  *   list [--status open|done|dismissed|all]     waiting ones by default, oldest first
@@ -26,7 +26,7 @@ type Callback = {
 };
 type Listed = { items: Callback[]; counts: Record<string, number> };
 
-const USAGE = 'Usage: murmur callbacks list [--status open|done|dismissed|all] | done <id> [--note …] | dismiss <id> [--note …] | reopen <id>';
+const USAGE = 'Usage: helppuff callbacks list [--status open|done|dismissed|all] | done <id> [--note …] | dismiss <id> [--note …] | reopen <id>';
 
 export async function callbacksCommand(ctx: Ctx): Promise<number> {
   assertKnown(ctx.flags, ['status', 'note'], 'callbacks');

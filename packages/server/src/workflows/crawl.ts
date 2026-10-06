@@ -1,5 +1,5 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from 'cloudflare:workers';
-import { runCrawlPart, runFileJob, type CrawlParams, type FileParams, type Notify, type StepLike } from '@murmur/rag';
+import { runCrawlPart, runFileJob, type CrawlParams, type FileParams, type Notify, type StepLike } from '@helppuff/rag';
 import { runConversationJob, type ConversationParams } from '../conversations/complete.js';
 import type { AiRunner } from '../conversations/summary.js';
 import { dbFrom } from '../db/d1.js';

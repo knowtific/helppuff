@@ -1,5 +1,5 @@
 {
-  "name": "@murmur/connector-openai",
+  "name": "@helppuff/connector-openai",
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
@@ -12,9 +12,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@murmur/connector-types": "workspace:*",
-    "@murmur/protocol": "workspace:*",
-    "@murmur/rag": "workspace:*",
+    "@helppuff/connector-types": "workspace:*",
+    "@helppuff/protocol": "workspace:*",
+    "@helppuff/rag": "workspace:*",
     "zod": "^3.25.76"
   }
 }

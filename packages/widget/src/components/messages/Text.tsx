@@ -6,9 +6,9 @@ import { renderMarkdown } from '../../lib/markdown.js';
  * of tags, and is covered by the XSS suite in `test/markdown.test.ts`.
  */
 export function TextMessage({ text }: { text: string }) {
-  return <div class="mm-agent" dangerouslySetInnerHTML={{ __html: renderMarkdown(text) }} />;
+  return <div class="hp-agent" dangerouslySetInnerHTML={{ __html: renderMarkdown(text) }} />;
 }
 
 export function UserMessage({ text }: { text: string }) {
-  return <div class="mm-user">{text}</div>;
+  return <div class="hp-user">{text}</div>;
 }

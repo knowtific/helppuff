@@ -1,4 +1,4 @@
-import type { Message, Shortcut, WidgetConfig } from '@murmur/protocol';
+import type { Message, Shortcut, WidgetConfig } from '@helppuff/protocol';
 import { stripMarkdown } from '../lib/markdown.js';
 import { Icon } from './Icon.js';
 import { Links } from './messages/Links.js';
@@ -31,30 +31,30 @@ export function Home({
       : '';
 
   return (
-    <div class="mm-screen">
-      <div class="mm-scroll">
-        <div class="mm-home-wash">
-          <h1 class="mm-home-title">{config.home.title}</h1>
-          <p class="mm-home-sub">{config.home.subtitle}</p>
+    <div class="hp-screen">
+      <div class="hp-scroll">
+        <div class="hp-home-wash">
+          <h1 class="hp-home-title">{config.home.title}</h1>
+          <p class="hp-home-sub">{config.home.subtitle}</p>
         </div>
 
-        <div class="mm-home-body">
+        <div class="hp-home-body">
           <ShortcutTiles shortcuts={shortcuts} onPick={onShortcut} />
 
-          <button type="button" class="mm-btn" disabled={busy} onClick={onStart}>
+          <button type="button" class="hp-btn" disabled={busy} onClick={onStart}>
             {hasSession ? t('resume') : t('start')}
             <Icon name="arrow-right" size={18} />
           </button>
 
           {hasSession && preview ? (
-            <button type="button" class="mm-resume" onClick={onStart}>
-              <div class="mm-resume-label">{t('resumeLabel')}</div>
-              <div class="mm-resume-preview">{preview}</div>
+            <button type="button" class="hp-resume" onClick={onStart}>
+              <div class="hp-resume-label">{t('resumeLabel')}</div>
+              <div class="hp-resume-preview">{preview}</div>
             </button>
           ) : null}
 
           {config.home.links ? (
-            <div class="mm-home-links">
+            <div class="hp-home-links">
               <Links title={config.home.links.title} links={config.home.links.items} />
             </div>
           ) : null}

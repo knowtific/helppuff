@@ -4,7 +4,7 @@
   "metadata": { "description": "Knowtific tools for AI coding agents." },
   "plugins": [
     {
-      "name": "knowtific-murmur",
+      "name": "knowtific-helppuff",
       "source": "./plugin",
       "description": "Add an AI chat assistant with a leads dashboard to any website, deployed to your own Cloudflare account."
     }

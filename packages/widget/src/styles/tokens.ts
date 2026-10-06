@@ -1,4 +1,4 @@
-import type { WidgetConfig } from '@murmur/protocol';
+import type { WidgetConfig } from '@helppuff/protocol';
 import { foregroundFor, rotateHue } from '../lib/color.js';
 
 /**
@@ -10,73 +10,73 @@ import { foregroundFor, rotateHue } from '../lib/color.js';
  */
 export const BASE_TOKENS = `
 :host {
-  --mm-accent: #5B5BF7;
-  --mm-accent-fg: #FFFFFF;
-  --mm-accent-2: #7B5BF7;
-  --mm-accent-3: #A48BFA;
-  --mm-accent-soft: rgba(91, 91, 247, 0.12);
+  --hp-accent: #5B5BF7;
+  --hp-accent-fg: #FFFFFF;
+  --hp-accent-2: #7B5BF7;
+  --hp-accent-3: #A48BFA;
+  --hp-accent-soft: rgba(91, 91, 247, 0.12);
 
-  --mm-bg: #FFFFFF;
-  --mm-surface: #F7F7F8;
-  --mm-surface-2: #EFEFF1;
-  --mm-border: rgba(15, 15, 20, 0.08);
-  --mm-text: #111114;
-  --mm-text-2: #5C5C66;
-  --mm-text-3: #8E8E98;
-  --mm-danger: #D93F3F;
+  --hp-bg: #FFFFFF;
+  --hp-surface: #F7F7F8;
+  --hp-surface-2: #EFEFF1;
+  --hp-border: rgba(15, 15, 20, 0.08);
+  --hp-text: #111114;
+  --hp-text-2: #5C5C66;
+  --hp-text-3: #8E8E98;
+  --hp-danger: #D93F3F;
 
-  --mm-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Roboto, sans-serif;
-  --mm-text-xs: 12px;
-  --mm-text-sm: 13px;
-  --mm-text-md: 15px;
-  --mm-text-lg: 20px;
-  --mm-text-xl: 26px;
-  --mm-leading: 1.5;
-  --mm-tracking-tight: -0.02em;
+  --hp-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Roboto, sans-serif;
+  --hp-text-xs: 12px;
+  --hp-text-sm: 13px;
+  --hp-text-md: 15px;
+  --hp-text-lg: 20px;
+  --hp-text-xl: 26px;
+  --hp-leading: 1.5;
+  --hp-tracking-tight: -0.02em;
 
-  --mm-radius-sm: 10px;
-  --mm-radius-md: 16px;
-  --mm-radius-lg: 24px;
-  --mm-radius-panel: 28px;
+  --hp-radius-sm: 10px;
+  --hp-radius-md: 16px;
+  --hp-radius-lg: 24px;
+  --hp-radius-panel: 28px;
 
-  --mm-shadow-panel: 0 24px 80px -20px rgba(15, 15, 30, 0.28), 0 0 0 1px var(--mm-border);
-  --mm-shadow-orb: 0 10px 30px -8px rgba(91, 91, 247, 0.55);
+  --hp-shadow-panel: 0 24px 80px -20px rgba(15, 15, 30, 0.28), 0 0 0 1px var(--hp-border);
+  --hp-shadow-orb: 0 10px 30px -8px rgba(91, 91, 247, 0.55);
 
-  --mm-ease-out: cubic-bezier(.22, 1, .36, 1);
-  --mm-ease-spring: cubic-bezier(.34, 1.56, .64, 1);
-  --mm-dur-fast: 140ms;
-  --mm-dur: 220ms;
-  --mm-dur-slow: 360ms;
+  --hp-ease-out: cubic-bezier(.22, 1, .36, 1);
+  --hp-ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+  --hp-dur-fast: 140ms;
+  --hp-dur: 220ms;
+  --hp-dur-slow: 360ms;
 
-  --mm-panel-w: 400px;
-  --mm-panel-h: min(680px, calc(100vh - 120px));
-  --mm-z: 2147483000;
+  --hp-panel-w: 400px;
+  --hp-panel-h: min(680px, calc(100vh - 120px));
+  --hp-z: 2147483000;
 
-  --mm-gap: 12px;
-  --mm-pad: 20px;
+  --hp-gap: 12px;
+  --hp-pad: 20px;
 }
 
 :host([data-theme="dark"]) {
-  --mm-bg: #0E0E12;
-  --mm-surface: #17171C;
-  --mm-surface-2: #202027;
-  --mm-border: rgba(255, 255, 255, 0.08);
-  --mm-text: #F4F4F6;
-  --mm-text-2: #A6A6B0;
-  --mm-text-3: #74747E;
-  --mm-shadow-panel: 0 24px 80px -20px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--mm-border);
+  --hp-bg: #0E0E12;
+  --hp-surface: #17171C;
+  --hp-surface-2: #202027;
+  --hp-border: rgba(255, 255, 255, 0.08);
+  --hp-text: #F4F4F6;
+  --hp-text-2: #A6A6B0;
+  --hp-text-3: #74747E;
+  --hp-shadow-panel: 0 24px 80px -20px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--hp-border);
 }
 
 @media (prefers-color-scheme: dark) {
   :host([data-theme="auto"]) {
-    --mm-bg: #0E0E12;
-    --mm-surface: #17171C;
-    --mm-surface-2: #202027;
-    --mm-border: rgba(255, 255, 255, 0.08);
-    --mm-text: #F4F4F6;
-    --mm-text-2: #A6A6B0;
-    --mm-text-3: #74747E;
-    --mm-shadow-panel: 0 24px 80px -20px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--mm-border);
+    --hp-bg: #0E0E12;
+    --hp-surface: #17171C;
+    --hp-surface-2: #202027;
+    --hp-border: rgba(255, 255, 255, 0.08);
+    --hp-text: #F4F4F6;
+    --hp-text-2: #A6A6B0;
+    --hp-text-3: #74747E;
+    --hp-shadow-panel: 0 24px 80px -20px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--hp-border);
   }
 }
 `;
@@ -91,37 +91,37 @@ export const RESET = `
   display: block;
   position: fixed;
   inset: 0;
-  z-index: var(--mm-z);
+  z-index: var(--hp-z);
   pointer-events: none;
 }
 
 /*
- * Typography is established on '.mm-root', inside the shadow root — see the
+ * Typography is established on '.hp-root', inside the shadow root — see the
  * note in 'launcher-shell.ts'. A host page can outrank ':host'; it cannot
  * match anything in here.
  */
-.mm-root {
-  font-family: var(--mm-font);
-  font-size: var(--mm-text-md);
+.hp-root {
+  font-family: var(--hp-font);
+  font-size: var(--hp-text-md);
   font-weight: 400;
   font-style: normal;
-  line-height: var(--mm-leading);
+  line-height: var(--hp-leading);
   letter-spacing: normal;
   text-align: start;
   text-transform: none;
   text-indent: 0;
   white-space: normal;
   word-spacing: normal;
-  color: var(--mm-text);
+  color: var(--hp-text);
   direction: ltr;
   -webkit-font-smoothing: antialiased;
   -webkit-text-size-adjust: 100%;
   pointer-events: none;
 }
 
-.mm-launcher, .mm-panel, .mm-teaser { pointer-events: auto; }
+.hp-launcher, .hp-panel, .hp-teaser { pointer-events: auto; }
 
-:host([dir="rtl"]) .mm-root { direction: rtl; }
+:host([dir="rtl"]) .hp-root { direction: rtl; }
 
 *, *::before, *::after {
   box-sizing: border-box;
@@ -149,7 +149,7 @@ a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 svg { display: block; fill: none; }
 
 :focus-visible {
-  outline: 2px solid var(--mm-accent);
+  outline: 2px solid var(--hp-accent);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -163,16 +163,16 @@ svg { display: block; fill: none; }
 export function themeOverrides(config: WidgetConfig): string {
   const accent = config.brand.accent;
   const declarations: string[] = [
-    `--mm-accent:${accent}`,
-    `--mm-accent-fg:${foregroundFor(accent)}`,
-    `--mm-accent-2:${rotateHue(accent, 30)}`,
-    `--mm-accent-3:${rotateHue(accent, -20, 0.18)}`,
-    `--mm-accent-soft:${hexToRgba(accent, 0.12)}`,
-    `--mm-shadow-orb:0 10px 30px -8px ${hexToRgba(accent, 0.55)}`,
+    `--hp-accent:${accent}`,
+    `--hp-accent-fg:${foregroundFor(accent)}`,
+    `--hp-accent-2:${rotateHue(accent, 30)}`,
+    `--hp-accent-3:${rotateHue(accent, -20, 0.18)}`,
+    `--hp-accent-soft:${hexToRgba(accent, 0.12)}`,
+    `--hp-shadow-orb:0 10px 30px -8px ${hexToRgba(accent, 0.55)}`,
   ];
 
   for (const [name, value] of Object.entries(config.brand.tokens ?? {})) {
-    declarations.push(`--mm-${name}:${value}`);
+    declarations.push(`--hp-${name}:${value}`);
   }
 
   return `:host{${declarations.join(';')}}`;

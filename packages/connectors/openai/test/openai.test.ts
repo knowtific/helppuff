@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { messageSchema } from '@murmur/protocol';
-import { isConnectorError, type ConnectorContext } from '@murmur/connector-types';
+import { messageSchema } from '@helppuff/protocol';
+import { isConnectorError, type ConnectorContext } from '@helppuff/connector-types';
 import openai, { mapOpenAiOutput } from '../src/index.js';
 
 /** Built against the official openai-openapi spec — see `src/index.ts`. */
@@ -315,17 +315,17 @@ describe('streaming', () => {
   });
 });
 
-describe('retrieval: murmur', () => {
+describe('retrieval: helppuff', () => {
   it('answers from the site’s own knowledge base and lists the sources', async () => {
-    const { indexDocument } = await import('@murmur/rag');
+    const { indexDocument } = await import('@helppuff/rag');
     const { fakeAi, fakeVectors, sqliteD1 } = await import('../../../rag/test/helpers.js');
     const db = sqliteD1();
     const ai = fakeAi();
     const vectors = fakeVectors();
     await indexDocument({ db, ai, vectors }, { siteId: 'demo', url: 'https://acme.test/areas', title: 'Areas | Acme', category: 'location', markdown: '## Areas\n\nWe service Mooroolbark, Montrose and Kilsyth.' }, { embeddingModel: '@cf/qwen/qwen3-embedding-0.6b' });
 
-    const { ctx: c, calls } = ctx({ retrieval: 'murmur', instructions: 'You help Acme.' }, [reply('Yes, we do.')]);
-    const result = await openai.send({ ...c, env: { AI: ai, VECTORS: vectors, MURMUR_DB: db } }, { responseId: null }, { kind: 'text', text: 'Do you service Mooroolbark?', clientId: 'c' });
+    const { ctx: c, calls } = ctx({ retrieval: 'helppuff', instructions: 'You help Acme.' }, [reply('Yes, we do.')]);
+    const result = await openai.send({ ...c, env: { AI: ai, VECTORS: vectors, HELPPUFF_DB: db } }, { responseId: null }, { kind: 'text', text: 'Do you service Mooroolbark?', clientId: 'c' });
 
     const sent = body(calls[0]!);
     expect(sent.instructions).toContain('You help Acme.');
@@ -335,7 +335,7 @@ describe('retrieval: murmur', () => {
   });
 
   it('still answers, without passages, when the knowledge base is not bound', async () => {
-    const { ctx: c, calls } = ctx({ retrieval: 'murmur', instructions: 'You help Acme.' }, [reply('Hello.')]);
+    const { ctx: c, calls } = ctx({ retrieval: 'helppuff', instructions: 'You help Acme.' }, [reply('Hello.')]);
     await openai.send(c, { responseId: null }, { kind: 'text', text: 'hi', clientId: 'c' });
     expect(body(calls[0]!).instructions).toBe('You help Acme.');
   });

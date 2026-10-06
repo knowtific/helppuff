@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { STREAM_MEDIA_TYPE, sseFrame } from '@murmur/protocol/sse';
+import { STREAM_MEDIA_TYPE, sseFrame } from '@helppuff/protocol/sse';
 import { Api, ApiError } from '../src/app/api.js';
 
 /**
@@ -48,7 +48,7 @@ describe('Api.send, streamed', () => {
   });
 
   it('reads plain JSON when the server chose not to stream', async () => {
-    stubFetch(new Response(JSON.stringify({ messages: [reply] }), { headers: { 'Content-Type': 'application/json', 'X-Murmur-Token': 'tok-3' } }));
+    stubFetch(new Response(JSON.stringify({ messages: [reply] }), { headers: { 'Content-Type': 'application/json', 'X-HelpPuff-Token': 'tok-3' } }));
     const result = await new Api('https://api.test', 'demo').send('tok', input, () => {});
     expect(result.token).toBe('tok-3');
     expect(result.messages).toHaveLength(1);

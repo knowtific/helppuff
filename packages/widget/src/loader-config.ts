@@ -1,4 +1,4 @@
-import type { LauncherIconName } from '@murmur/protocol';
+import type { LauncherIconName } from '@helppuff/protocol';
 import { ICON_PATHS } from './lib/icons.js';
 import { fetchWithTimeout } from './lib/safe.js';
 

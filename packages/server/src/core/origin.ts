@@ -1,5 +1,5 @@
-import { TOKEN_HEADER } from '@murmur/protocol';
-import { MurmurError } from './errors.js';
+import { TOKEN_HEADER } from '@helppuff/protocol';
+import { HelpPuffError } from './errors.js';
 
 /**
  * The origin allowlist is mandatory. Without it anyone can copy the
@@ -28,7 +28,7 @@ export function isAllowedOrigin(origin: string | null | undefined, allowlist: re
  */
 export function assertAllowedOrigin(origin: string | null | undefined, allowlist: readonly string[]): string {
   if (!isAllowedOrigin(origin, allowlist)) {
-    throw new MurmurError('forbidden_origin', { detail: 'origin_not_allowed' });
+    throw new HelpPuffError('forbidden_origin', { detail: 'origin_not_allowed' });
   }
   return normalizeOrigin(origin as string) as string;
 }

@@ -19,7 +19,7 @@ describe('the agent skill', () => {
 
   it('only tells agents to run commands the CLI has', async () => {
     const { COMMAND_HELP } = await import('../src/help.js');
-    const used = [...SKILL_MD.matchAll(/@knowtific\/murmur (\w+)/g)].map((m) => m[1]!);
+    const used = [...SKILL_MD.matchAll(/@knowtific\/helppuff (\w+)/g)].map((m) => m[1]!);
     for (const command of new Set(used)) expect(Object.keys(COMMAND_HELP), command).toContain(command);
   });
 });
@@ -45,7 +45,7 @@ describe('the package AGENTS.md', () => {
   it('documents every command and exit code', async () => {
     const { agentsGuide, COMMAND_HELP } = await import('../src/help.js');
     const guide = agentsGuide();
-    for (const name of Object.keys(COMMAND_HELP)) expect(guide).toContain(`### \`murmur ${name}\``);
+    for (const name of Object.keys(COMMAND_HELP)) expect(guide).toContain(`### \`helppuff ${name}\``);
     for (const code of ['`0` ok', '`2` bad usage', '`3` auth', '`4` Cloudflare quota', '`10` needs_input']) expect(guide).toContain(code);
   });
 });

@@ -1,5 +1,5 @@
 import { useRef } from 'preact/hooks';
-import type { Action, CardItem } from '@murmur/protocol';
+import type { Action, CardItem } from '@helppuff/protocol';
 import { ActionButtons } from './Actions.js';
 import { Icon } from '../Icon.js';
 import { useScrollEdges } from '../../lib/scroll-edges.js';
@@ -16,10 +16,10 @@ export function Card({
   onAction: (action: Action) => void;
 }) {
   return (
-    <article class="mm-card">
+    <article class="hp-card">
       {card.image ? (
         <img
-          class="mm-card-img"
+          class="hp-card-img"
           src={card.image.src}
           alt={card.image.alt}
           loading="lazy"
@@ -29,9 +29,9 @@ export function Card({
           onError={(event) => (event.currentTarget as HTMLImageElement).remove()}
         />
       ) : null}
-      <div class="mm-card-body">
-        <h3 class="mm-card-title">{card.title}</h3>
-        {card.body ? <p class="mm-card-text">{card.body}</p> : null}
+      <div class="hp-card-body">
+        <h3 class="hp-card-title">{card.title}</h3>
+        {card.body ? <p class="hp-card-text">{card.body}</p> : null}
         <ActionButtons actions={card.actions ?? []} disabled={consumed} onAction={onAction} />
       </div>
     </article>
@@ -59,10 +59,10 @@ export function Carousel({
   const { edges, scrollByStep } = useScrollEdges(track, [cards.length]);
 
   return (
-    <div class="mm-carousel-wrap" data-scrollable={edges.fits ? undefined : ''}>
-      <div class="mm-carousel" ref={track} role="group" aria-label={`${cards.length} options`}>
+    <div class="hp-carousel-wrap" data-scrollable={edges.fits ? undefined : ''}>
+      <div class="hp-carousel" ref={track} role="group" aria-label={`${cards.length} options`}>
         {cards.map((card, index) => (
-          <div class="mm-carousel-item" key={`${card.title}-${index}`}>
+          <div class="hp-carousel-item" key={`${card.title}-${index}`}>
             <Card card={card} consumed={consumed} onAction={onAction} />
           </div>
         ))}
@@ -72,21 +72,21 @@ export function Carousel({
         <>
           <button
             type="button"
-            class="mm-carousel-nav"
+            class="hp-carousel-nav"
             data-dir="prev"
             aria-label="Previous"
             disabled={edges.atStart}
-            onClick={() => scrollByStep(-1, '.mm-carousel-item')}
+            onClick={() => scrollByStep(-1, '.hp-carousel-item')}
           >
             <Icon name="arrow-left" size={18} />
           </button>
           <button
             type="button"
-            class="mm-carousel-nav"
+            class="hp-carousel-nav"
             data-dir="next"
             aria-label="Next"
             disabled={edges.atEnd}
-            onClick={() => scrollByStep(1, '.mm-carousel-item')}
+            onClick={() => scrollByStep(1, '.hp-carousel-item')}
           >
             <Icon name="arrow-right" size={18} />
           </button>

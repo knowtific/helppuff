@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/preact';
-import type { Message } from '@murmur/protocol';
+import type { Message } from '@helppuff/protocol';
 import { App, Boundary, type AppCommands, type AppHandleRef } from '../src/app/App.js';
 import { ApiError, type Api } from '../src/app/api.js';
 import { parseConfig } from '../src/app/validate.js';
@@ -58,7 +58,7 @@ function fakeApi(overrides: { startSession?: AnyFn; send?: AnyFn } = {}): FakeAp
 function setup(
   options: { config?: Record<string, unknown>; api?: FakeApi; siteId?: string; stream?: boolean } = {},
 ) {
-  const host = document.createElement('murmur-widget');
+  const host = document.createElement('helppuff-widget');
   document.body.appendChild(host);
 
   const hide = vi.fn();
@@ -90,7 +90,7 @@ function setup(
  * one to read, one to announce. Assertions scope to the thread so they
  * are not ambiguous.
  */
-const inThread = () => within(document.querySelector('.mm-thread') as HTMLElement);
+const inThread = () => within(document.querySelector('.hp-thread') as HTMLElement);
 
 const seeMessage = async (text: string) =>
   waitFor(() => expect(inThread().getByText(text)).toBeTruthy());
@@ -201,7 +201,7 @@ describe('the lead form path', () => {
     // Regression: the first message rides along with the session, so nothing
     // else would put it in the thread — the visitor saw an answer to a
     // question that was never shown.
-    const rows = [...document.querySelectorAll('.mm-row')];
+    const rows = [...document.querySelectorAll('.hp-row')];
     expect(rows[0]?.hasAttribute('data-user'), 'the visitor spoke first').toBe(true);
     expect(rows[0]?.textContent).toContain('qwedae');
     expect(api.startSession.mock.calls[0]?.[0]).toMatchObject({ firstMessage: 'qwedae' });
@@ -264,7 +264,7 @@ describe('the lead form path', () => {
       fireEvent.submit(document.querySelector('form') as HTMLFormElement);
     });
     expect(startSession).not.toHaveBeenCalled();
-    expect(document.querySelector('.mm-error-text')?.textContent).toMatch(/required/i);
+    expect(document.querySelector('.hp-error-text')?.textContent).toMatch(/required/i);
   });
 
   it('skips the form entirely when it is disabled', async () => {
@@ -372,12 +372,12 @@ describe('sending and receiving', () => {
       fireEvent.keyDown(box, { key: 'Enter' });
     });
 
-    expect(harness.container.querySelector('.mm-typing')).toBeTruthy();
+    expect(harness.container.querySelector('.hp-typing')).toBeTruthy();
 
     await act(async () => {
       release({ messages: [agentText('Done')] });
     });
-    await waitFor(() => expect(harness.container.querySelector('.mm-typing')).toBeNull());
+    await waitFor(() => expect(harness.container.querySelector('.hp-typing')).toBeNull());
   });
 
   it('adopts a refreshed session token for the next request', async () => {
@@ -531,7 +531,7 @@ describe('persistence across a reload', () => {
       fireEvent.click(screen.getByRole('button', { name: /start a conversation/i }));
     });
     await seeMessage('Hi — how can I help?');
-    await waitFor(() => expect(localStorage.getItem('mm:demo')).toBeTruthy());
+    await waitFor(() => expect(localStorage.getItem('hp:demo')).toBeTruthy());
 
     first.unmount();
 
@@ -542,14 +542,14 @@ describe('persistence across a reload', () => {
     expect(screen.getByRole('textbox')).toBeTruthy();
   });
 
-  it('writes under one mm:-prefixed key and sets no cookies', async () => {
+  it('writes under one hp:-prefixed key and sets no cookies', async () => {
     const { handle } = setup({ config: { leadForm: { enabled: false } }, siteId: 'acme' });
     await openPanel(handle);
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /start a conversation/i }));
     });
-    await waitFor(() => expect(localStorage.getItem('mm:acme')).toBeTruthy());
-    expect(Object.keys(localStorage).every((key) => key.startsWith('mm:'))).toBe(true);
+    await waitFor(() => expect(localStorage.getItem('hp:acme')).toBeTruthy());
+    expect(Object.keys(localStorage).every((key) => key.startsWith('hp:'))).toBe(true);
     expect(document.cookie).toBe('');
   });
 
@@ -559,12 +559,12 @@ describe('persistence across a reload', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /start a conversation/i }));
     });
-    await waitFor(() => expect(localStorage.getItem('mm:demo')).toBeTruthy());
+    await waitFor(() => expect(localStorage.getItem('hp:demo')).toBeTruthy());
 
     await act(async () => {
       commands(handle).reset();
     });
-    expect(localStorage.getItem('mm:demo')).toBeNull();
+    expect(localStorage.getItem('hp:demo')).toBeNull();
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Hi there' })).toBeTruthy());
   });
 
@@ -615,7 +615,7 @@ describe('streamed replies', () => {
       commands(handle).send('How much?');
     });
     // Nothing written yet — a reasoning model is still thinking.
-    await waitFor(() => expect(document.querySelector('.mm-typing')).not.toBeNull());
+    await waitFor(() => expect(document.querySelector('.hp-typing')).not.toBeNull());
     expect(api.send.mock.calls[0]?.[2]).toBeTypeOf('function');
 
     await act(async () => {
@@ -625,15 +625,15 @@ describe('streamed replies', () => {
     const streaming = document.querySelector('[data-streaming]');
     expect(streaming?.textContent).toBe('Plans start from $90');
     expect(streaming?.querySelector('strong')).not.toBeNull();
-    expect(document.querySelector('.mm-typing')).toBeNull();
+    expect(document.querySelector('.hp-typing')).toBeNull();
 
     await act(async () => {
       release({ messages: [agentText('Plans start from **$90/month**.', 'final')] });
     });
     await waitFor(() => expect(document.querySelector('[data-streaming]')).toBeNull());
     // The preview is display only: the transcript holds the real message.
-    expect(document.querySelector('.mm-thread')?.textContent).toContain('Plans start from $90/month.');
-    expect(document.querySelector('.mm-thread')?.textContent).not.toContain('from $90Plans');
+    expect(document.querySelector('.hp-thread')?.textContent).toContain('Plans start from $90/month.');
+    expect(document.querySelector('.hp-thread')?.textContent).not.toContain('from $90Plans');
   });
 
   it('does not ask for a stream on a site that does not stream', async () => {
@@ -651,7 +651,7 @@ describe('streamed replies', () => {
   });
 });
 
-describe('the window.Murmur surface', () => {
+describe('the window.HelpPuff surface', () => {
   it('publishes a handle with every command', async () => {
     const { handle } = setup();
     await waitFor(() => expect(handle.current).not.toBeNull());
@@ -756,7 +756,7 @@ describe('keyboard and focus', () => {
     const { handle, container } = setup();
     await openPanel(handle);
     await waitFor(() => {
-      const panel = container.querySelector('.mm-panel');
+      const panel = container.querySelector('.hp-panel');
       expect(panel?.contains(document.activeElement)).toBe(true);
     });
   });

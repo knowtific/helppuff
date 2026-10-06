@@ -27,7 +27,7 @@ export const DEFAULT_STRINGS = {
   captchaFailed: 'We could not verify your browser. Please try again.',
   soundOn: 'Turn sound on',
   soundOff: 'Turn sound off',
-  poweredBy: 'Powered by Murmur',
+  poweredBy: 'Powered by HelpPuff',
   callUs: 'Call us',
   emailUs: 'Email us',
   agentSaid: 'Assistant said',

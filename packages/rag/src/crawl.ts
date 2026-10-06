@@ -19,7 +19,7 @@ import { canonicalUrl } from './url.js';
  * who started it closes the dashboard or the terminal, and a step that fails
  * (a timeout, a Workers AI hiccup) is retried on its own without redoing the
  * pages before it. Progress lives in D1 (`crawl_runs`, `pages`), which is
- * all the dashboard and `murmur status` read.
+ * all the dashboard and `helppuff status` read.
  *
  * Shaped for the Workers Free plan:
  *  - one page per step, so each step stays well inside the CPU limit;

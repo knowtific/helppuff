@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { TOKEN_HEADER, errorEnvelopeSchema } from '@murmur/protocol';
+import { TOKEN_HEADER, errorEnvelopeSchema } from '@helppuff/protocol';
 import { memoryKv } from '../src/core/platform.js';
 import { dailyKey, hitDaily, hitTotal, hitWindow, sessionMessageKey } from '../src/core/ratelimit.js';
 import { verifyTurnstile } from '../src/core/turnstile.js';

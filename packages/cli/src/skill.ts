@@ -1,36 +1,36 @@
 /**
  * The agent skill: how an AI coding agent (Claude Code, Codex, Cursor…) sets
- * up and runs a Murmur assistant for its user. One text, three homes:
+ * up and runs a HelpPuff assistant for its user. One text, three homes:
  *
  *  - the Claude Code plugin (`plugin/skills/website-chatbot/SKILL.md`),
  *    installed before any project exists, so "add a chatbot to my site"
  *    finds it;
- *  - `murmur skill install`, which writes it to ~/.claude/skills;
- *  - every project `murmur init` creates.
+ *  - `helppuff skill install`, which writes it to ~/.claude/skills;
+ *  - every project `helppuff init` creates.
  *
  * A test keeps the plugin's copy identical to this one.
  */
 
 export const SKILL_NAME = 'website-chatbot';
 
-const CLI = 'npx -y @knowtific/murmur';
+const CLI = 'npx -y @knowtific/helppuff';
 
 export const SKILL_MD = `---
 name: ${SKILL_NAME}
-description: Add, change, test or deploy an AI chat assistant (chatbot, chat widget, support or sales bot, lead capture) on a website — answering from the site's own pages and documents, with a leads dashboard — on the user's own Cloudflare account, using the Knowtific Murmur CLI (${CLI}). Use when the user wants a chatbot or AI assistant on their website, or wants to change what an existing one (murmur.json) says, knows or looks like.
+description: Add, change, test or deploy an AI chat assistant (chatbot, chat widget, support or sales bot, lead capture) on a website — answering from the site's own pages and documents, with a leads dashboard — on the user's own Cloudflare account, using the Knowtific HelpPuff CLI (${CLI}). Use when the user wants a chatbot or AI assistant on their website, or wants to change what an existing one (helppuff.json) says, knows or looks like.
 ---
 
-# Website chat assistant (Knowtific Murmur)
+# Website chat assistant (Knowtific HelpPuff)
 
 Everything runs through one CLI: \`${CLI} <command> --json\`. Its \`--help\` is written
 for you; read it once. Every command with \`--json\` prints one JSON object:
 \`{"ok":true,…}\`, or \`{"ok":false,"error":{code,message,hint}}\` — follow \`hint\`.
-(If \`murmur_*\` MCP tools are available you may use them instead; the steps are the same.)
+(If \`helppuff_*\` MCP tools are available you may use them instead; the steps are the same.)
 
 ## Setting one up
 
-1. **Where.** If there is a \`murmur.json\` here, it is already set up — go to *Changing it*.
-   If this repository is the user's website, set up here (murmur.json sits beside their
+1. **Where.** If there is a \`helppuff.json\` here, it is already set up — go to *Changing it*.
+   If this repository is the user's website, set up here (helppuff.json sits beside their
    code). Otherwise make a folder such as \`chat-assistant/\` and work in it.
 
 2. **Ask once, briefly.** The only thing you must have is the **website URL** — never guess
@@ -47,8 +47,8 @@ for you; read it once. Every command with \`--json\` prints one JSON object:
      \`questions\` (use \`ask\`, \`options\`, \`default\`), then re-run with each \`flag\` added.
    - You are the onboarding: init starts learning the suggested pages and reads the business
      details itself, in the background on Cloudflare (a Workflow) — nothing waits for it.
-     \`--crawl "**/services/**,**/faq/**"\` (or \`knowledge.website.include\` in murmur.json)
-     chooses pages; \`murmur discover\` lists what it found. Documents the user gives you:
+     \`--crawl "**/services/**,**/faq/**"\` (or \`knowledge.website.include\` in helppuff.json)
+     chooses pages; \`helppuff discover\` lists what it found. Documents the user gives you:
      \`${CLI} knowledge upload <file…> --json\`.
 
 4. **Cloudflare access** — the one real prerequisite. If init asks for \`cfToken\`, this
@@ -92,10 +92,10 @@ for you; read it once. Every command with \`--json\` prints one JSON object:
 - Undo a prompt change → \`${CLI} prompt history --json\`, then
   \`${CLI} prompt pull --version <n> --json\` and deploy (or restore it in the dashboard).
 - Look, greeting, pre-chat form, backend →
-  \`murmur.json\` (\`${CLI} schema\` lists every field) or \`${CLI} config set <path> <value>\`.
+  \`helppuff.json\` (\`${CLI} schema\` lists every field) or \`${CLI} config set <path> <value>\`.
   Then \`${CLI} deploy --json\` — content changes are live in seconds.
 - Deploy fails with \`settings_changed\` → the owner changed settings in the dashboard. Run
-  \`${CLI} config pull --json\`, review the murmur.json diff, deploy again.
+  \`${CLI} config pull --json\`, review the helppuff.json diff, deploy again.
 - New pages or site changes → \`${CLI} crawl --json\` (re-crawls the selected pages; unchanged
   pages cost nothing). New documents → \`${CLI} knowledge upload <file…> --wait --json\`
   (PDF, Word, Markdown or text, read on the Worker), or list them in \`knowledge.files\`
@@ -112,8 +112,8 @@ for you; read it once. Every command with \`--json\` prints one JSON object:
 `;
 
 /** The section `init` appends to a project's AGENTS.md (read by Codex and others). */
-export const AGENTS_MARKER = '<!-- murmur:agents -->';
+export const AGENTS_MARKER = '<!-- helppuff:agents -->';
 export const AGENTS_SECTION = `${AGENTS_MARKER}
-## Website chat assistant (Knowtific Murmur)
+## Website chat assistant (Knowtific HelpPuff)
 
 ${SKILL_MD.replace(/^---[\s\S]*?---\n+/, '').replace(/^# .*\n+/, '')}`;

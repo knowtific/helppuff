@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import type { Field, Message } from '@murmur/protocol';
+import type { Field, Message } from '@helppuff/protocol';
 import { FieldRow, collectValues, validateFields } from '../Fields.js';
 
 type FormMsg = Extract<Message, { type: 'form' }>;
@@ -47,14 +47,14 @@ export function FormMessage({
   };
 
   return (
-    <form class="mm-inline-form" onSubmit={submit} noValidate>
-      {message.title ? <h3 class="mm-card-title">{message.title}</h3> : null}
+    <form class="hp-inline-form" onSubmit={submit} noValidate>
+      {message.title ? <h3 class="hp-card-title">{message.title}</h3> : null}
 
       {message.fields.map((field) => (
         <FieldRow
           key={field.name}
           field={field}
-          idPrefix={`mm-i-${message.id}`}
+          idPrefix={`hp-i-${message.id}`}
           value={values[field.name] ?? ''}
           error={touched[field.name] ? (errors[field.name] ?? '') : ''}
           requiredLabel="required"
@@ -69,7 +69,7 @@ export function FormMessage({
         />
       ))}
 
-      <button type="submit" class="mm-btn" disabled={consumed}>
+      <button type="submit" class="hp-btn" disabled={consumed}>
         {message.submitLabel ?? 'Submit'}
       </button>
     </form>

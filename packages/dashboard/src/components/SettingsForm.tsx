@@ -7,7 +7,7 @@ import { Button, ErrorNote, Input, Select, Skeleton, Textarea } from './ui';
  * The settings object, one topic at a time: what the chat says, how it looks,
  * the pre-chat form, and the advanced model and crawl options. Each page saves
  * the whole object, so nothing on another page is lost. Live within a minute;
- * `murmur config pull` brings it into murmur.json.
+ * `helppuff config pull` brings it into helppuff.json.
  */
 export type FormSection = 'chat' | 'appearance' | 'leads' | 'advanced';
 
@@ -126,7 +126,7 @@ function LeadFieldsEditor({ fields, onChange }: { fields: LeadField[]; onChange:
     </div>
   );
 }
-// Measured in Murmur on 2026-10-05; the wiki's AI models page has the numbers.
+// Measured in HelpPuff on 2026-10-05; the wiki's AI models page has the numbers.
 const MODELS = [
   { value: '@cf/zai-org/glm-4.7-flash', label: 'GLM-4.7 Flash — default, best all-round' },
   { value: '@cf/qwen/qwen3-30b-a3b-fp8', label: 'Qwen3 30B — dependable, about as cheap' },

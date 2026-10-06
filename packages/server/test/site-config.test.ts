@@ -4,7 +4,7 @@ import { resolveSite, siteConfigKey } from '../src/config/site.js';
 import { ORIGIN, harness, startSession, testConfig, testEnv } from './helpers.js';
 
 /**
- * The bundled `murmur.config.ts` is compiled into the Worker, so changing it
+ * The bundled `helppuff.config.ts` is compiled into the Worker, so changing it
  * is a deploy. A `config:<siteId>` key in KV overrides it at runtime.
  *
  * The tests that matter most here are the failure ones: a bad paste into KV
@@ -14,7 +14,7 @@ import { ORIGIN, harness, startSession, testConfig, testEnv } from './helpers.js
 async function withStored(siteId: string, value: unknown) {
   const kv = memoryKv();
   await kv.put(siteConfigKey(siteId), typeof value === 'string' ? value : JSON.stringify(value));
-  return testEnv({ MURMUR_KV: kv });
+  return testEnv({ HELPPUFF_KV: kv });
 }
 
 const widgetOverride = {
@@ -180,7 +180,7 @@ describe('no stored config', () => {
   });
 
   it('works with no KV binding at all', async () => {
-    const h = harness(testConfig(), testEnv({ MURMUR_KV: undefined }), ORIGIN);
+    const h = harness(testConfig(), testEnv({ HELPPUFF_KV: undefined }), ORIGIN);
     expect((await h.fetch('/v1/sites/demo/config')).status).toBe(200);
   });
 });

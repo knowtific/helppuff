@@ -23,7 +23,7 @@ import { inspectSite, normalizeUrl } from './site.js';
 import { wranglerOAuthToken } from './wrangler-auth.js';
 
 /**
- * `murmur init` without the terminal: gather facts, work out what is still
+ * `helppuff init` without the terminal: gather facts, work out what is still
  * unknown, then either ask (through `ask`, the wizard) or hand the questions
  * back (for an agent), and finally write the project.
  */
@@ -45,7 +45,7 @@ export type InitResult =
       site: { name: string | null; accent: string | null; reachable: boolean } | null;
       /** The background knowledge job, when one was started: await before exiting. */
       background?: Promise<unknown>;
-      /** Only when murmur generated it: shown once, never stored in clear. */
+      /** Only when helppuff generated it: shown once, never stored in clear. */
       adminPassword?: string;
       warnings: string[];
     };
@@ -75,7 +75,7 @@ export function validateAnswer(question: Question, value: unknown, facts: Facts)
         return 'That is not a URL.';
       }
     case 'httpMode':
-      return value === 'murmur' || value === 'openai' ? null : 'Use murmur or openai.';
+      return value === 'helppuff' || value === 'openai' ? null : 'Use helppuff or openai.';
     case 'adminEmail':
       return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(value)) ? null : 'That is not an email address.';
     case 'adminPassword':
@@ -155,7 +155,7 @@ export async function runInit(options: {
   const doFetch = options.fetch ?? fetch;
   if (existsSync(join(cwd, PROJECT_FILE)) && !options.force) {
     throw new CliError('project_exists', `${PROJECT_FILE} already exists here.`, {
-      hint: 'Edit it and run `murmur deploy`, or pass --force to start over.',
+      hint: 'Edit it and run `helppuff deploy`, or pass --force to start over.',
     });
   }
 
@@ -261,7 +261,7 @@ export async function runInit(options: {
     files.push(PROMPT_FILE);
   }
   for (const [name, value] of Object.entries(generated.secrets)) writeEnvVar(cwd, name, value);
-  ensureGitignore(cwd, ['.env', '.murmur/']);
+  ensureGitignore(cwd, ['.env', '.helppuff/']);
   writeSchemaFile(cwd);
   if (options.agentFiles !== false) files.push(...writeAgentFiles(cwd));
 

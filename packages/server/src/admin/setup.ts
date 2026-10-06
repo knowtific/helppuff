@@ -1,13 +1,13 @@
 import { Hono, type Context } from 'hono';
-import { MurmurError } from '../core/errors.js';
+import { HelpPuffError } from '../core/errors.js';
 import { hitWindow, rateLimited } from '../core/ratelimit.js';
 import { requireSecret, type HonoEnv } from '../core/request.js';
 import { b64url, hashPassword, issueSession, sessionCookie } from './auth.js';
 import { assertSameOrigin, currentAdmin, db, isSecure, jsonBody, viaApiKey } from './guard.js';
 
 /**
- * One-time links: the setup link `murmur deploy` prints, and the login
- * link `murmur dashboard` mints when a password is lost.
+ * One-time links: the setup link `helppuff deploy` prints, and the login
+ * link `helppuff dashboard` mints when a password is lost.
  *
  *  - Only the SHA-256 of a token is stored (`admin_tokens`); the token itself
  *    exists once, in the link.
@@ -31,10 +31,10 @@ export function newToken(): string {
   return b64url(crypto.getRandomValues(new Uint8Array(32)));
 }
 
-const notFound = () => new MurmurError('not_found', { message: 'This link has expired or was already used.', detail: 'admin_token_invalid' });
+const notFound = () => new HelpPuffError('not_found', { message: 'This link has expired or was already used.', detail: 'admin_token_invalid' });
 
 async function hasAdmin(c: Context<HonoEnv>): Promise<boolean> {
-  if (String(c.get('mm').env['ADMIN_EMAIL'] ?? '')) return true;
+  if (String(c.get('helppuff').env['ADMIN_EMAIL'] ?? '')) return true;
   return Boolean(await db(c).prepare('SELECT 1 AS x FROM admins LIMIT 1').first());
 }
 
@@ -43,7 +43,7 @@ type TokenRow = { token_hash: string; kind: Kind; email: string | null; expires_
 async function liveToken(c: Context<HonoEnv>, token: unknown, kind: Kind): Promise<TokenRow> {
   if (typeof token !== 'string' || token.length < 20 || token.length > 200) throw notFound();
   const row = await db(c).prepare('SELECT * FROM admin_tokens WHERE token_hash = ?').bind(await sha256(token)).first<TokenRow>();
-  if (!row || row.kind !== kind || row.used_at || row.expires_at <= c.get('mm').platform.now()) throw notFound();
+  if (!row || row.kind !== kind || row.used_at || row.expires_at <= c.get('helppuff').platform.now()) throw notFound();
   if (kind === 'setup' && (await hasAdmin(c))) throw notFound();
   return row;
 }
@@ -52,36 +52,36 @@ async function liveToken(c: Context<HonoEnv>, token: unknown, kind: Kind): Promi
 async function spend(c: Context<HonoEnv>, row: TokenRow): Promise<void> {
   const result = (await db(c)
     .prepare('UPDATE admin_tokens SET used_at = ? WHERE token_hash = ? AND used_at IS NULL')
-    .bind(c.get('mm').platform.now(), row.token_hash)
+    .bind(c.get('helppuff').platform.now(), row.token_hash)
     .run()) as { meta?: { changes?: number } } | undefined;
   if (result?.meta?.changes === 0) throw notFound();
 }
 
 async function throttle(c: Context<HonoEnv>): Promise<void> {
-  const ctx = c.get('mm');
+  const ctx = c.get('helppuff');
   const verdict = await hitWindow(ctx.platform.kv, 'admin-link', await ctx.ipKey(), 20, 900);
   if (!verdict.allowed) throw rateLimited(verdict, 'admin_link');
 }
 
-/** Mint a link. API key only: this is what `murmur deploy` and `murmur dashboard` call. */
+/** Mint a link. API key only: this is what `helppuff deploy` and `helppuff dashboard` call. */
 setupRoutes.post('/admin/api/links', async (c) => {
-  if (!(await viaApiKey(c))) throw new MurmurError('unauthorized', { message: 'Use the admin API key.', detail: 'admin_links_api_key_only' });
+  if (!(await viaApiKey(c))) throw new HelpPuffError('unauthorized', { message: 'Use the admin API key.', detail: 'admin_links_api_key_only' });
   const body = await jsonBody(c);
   const kind: Kind = body['kind'] === 'login' ? 'login' : 'setup';
-  const ctx = c.get('mm');
+  const ctx = c.get('helppuff');
   const now = ctx.platform.now();
   let email: string | null = null;
   if (kind === 'setup' && (await hasAdmin(c))) {
-    throw new MurmurError('bad_request', { message: 'Setup is already complete; mint a login link instead.', detail: 'admin_setup_done' });
+    throw new HelpPuffError('bad_request', { message: 'Setup is already complete; mint a login link instead.', detail: 'admin_setup_done' });
   }
   if (kind === 'login') {
     const owner = String(ctx.env['ADMIN_EMAIL'] ?? '').toLowerCase();
     const asked = typeof body['email'] === 'string' ? body['email'].trim().toLowerCase() : '';
     const first = await db(c).prepare('SELECT email FROM admins ORDER BY created_at LIMIT 1').first<{ email: string }>();
     email = asked || owner || first?.email || null;
-    if (!email) throw new MurmurError('bad_request', { message: 'Nobody has an account yet; mint a setup link.', detail: 'admin_no_accounts' });
+    if (!email) throw new HelpPuffError('bad_request', { message: 'Nobody has an account yet; mint a setup link.', detail: 'admin_no_accounts' });
     const known = email === owner || Boolean(await db(c).prepare('SELECT 1 AS x FROM admins WHERE email = ?').bind(email).first());
-    if (!known) throw new MurmurError('not_found', { message: `No account for ${email}.`, detail: 'admin_unknown_email' });
+    if (!known) throw new HelpPuffError('not_found', { message: `No account for ${email}.`, detail: 'admin_unknown_email' });
   }
   const token = newToken();
   await db(c)
@@ -110,10 +110,10 @@ setupRoutes.post('/admin/api/setup', async (c) => {
   const row = await liveToken(c, body['token'], 'setup');
   const email = typeof body['email'] === 'string' ? body['email'].trim().toLowerCase() : '';
   const password = typeof body['password'] === 'string' ? body['password'] : '';
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new MurmurError('bad_request', { message: 'Enter a valid email address.', detail: 'setup_bad_email' });
-  if (password.length < 10) throw new MurmurError('bad_request', { message: 'Use a password of at least 10 characters.', detail: 'setup_weak_password' });
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new HelpPuffError('bad_request', { message: 'Enter a valid email address.', detail: 'setup_bad_email' });
+  if (password.length < 10) throw new HelpPuffError('bad_request', { message: 'Use a password of at least 10 characters.', detail: 'setup_weak_password' });
   await spend(c, row);
-  const ctx = c.get('mm');
+  const ctx = c.get('helppuff');
   const now = ctx.platform.now();
   const name = typeof body['name'] === 'string' ? body['name'].trim().slice(0, 100) || null : null;
   await db(c)
@@ -132,7 +132,7 @@ setupRoutes.post('/admin/api/login-link', async (c) => {
   const row = await liveToken(c, body['token'], 'login');
   if (!row.email) throw notFound();
   await spend(c, row);
-  const ctx = c.get('mm');
+  const ctx = c.get('helppuff');
   c.header('Set-Cookie', sessionCookie(await issueSession(requireSecret(ctx), row.email, ctx.platform.now()), isSecure(c)));
   return c.json({ email: row.email });
 });
@@ -140,5 +140,5 @@ setupRoutes.post('/admin/api/login-link', async (c) => {
 /** Rotate nothing here, but let a signed-in owner see when setup was done. */
 setupRoutes.get('/admin/api/setup/state', async (c) => {
   await currentAdmin(c);
-  return c.json({ claimed: await hasAdmin(c), apiKey: String(c.get('mm').env['ADMIN_API_KEY'] ?? '').length >= 32 });
+  return c.json({ claimed: await hasAdmin(c), apiKey: String(c.get('helppuff').env['ADMIN_API_KEY'] ?? '').length >= 32 });
 });

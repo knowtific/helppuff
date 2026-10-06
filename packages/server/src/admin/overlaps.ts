@@ -1,7 +1,7 @@
 /**
- * Lines of an owner's prompt that repeat, or fight, what Murmur already says
+ * Lines of an owner's prompt that repeat, or fight, what HelpPuff already says
  * from settings and its rules (`core/guidance.ts`, the connector's own
- * rules). Shown beside the prompt editor and by `murmur prompt`, so the
+ * rules). Shown beside the prompt editor and by `helppuff prompt`, so the
  * prompt holds only what is specific to the business. A suggestion, never a
  * block: the owner decides.
  */
@@ -21,7 +21,7 @@ const CHECKS: Check[] = [
   { test: /\bmarkdown\b|\bno (headings|tables)\b/i, why: 'Formatting is built in.' },
   { test: /\b(never|don'?t|do not) (quote|give|share|mention) (any )?(prices?|pricing|costs?)\b/i, why: 'Whether to give prices is a setting: Instructions → Prices.' },
   { test: /\bspeak as (part of|a member of)\b|"we" and "our"/i, why: 'Built in: the assistant always speaks as the team.' },
-  { test: /\b(never|don'?t|do not) (invent|make up|guess)\b/i, why: 'Built in: Murmur’s rules already forbid inventing prices, policies or promises.' },
+  { test: /\b(never|don'?t|do not) (invent|make up|guess)\b/i, why: 'Built in: HelpPuff’s rules already forbid inventing prices, policies or promises.' },
   { test: /\b(reveal|share|disclose) (your|these|the) (instructions|rules|prompt|system prompt)\b/i, why: 'Built in: the assistant never reveals its instructions.' },
   { test: /\{\{\s*lead\.\w+\s*\}\}/, why: 'The visitor’s form answers are given to the assistant automatically.', workersAiOnly: true },
   {

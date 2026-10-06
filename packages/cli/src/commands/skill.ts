@@ -7,7 +7,7 @@ import { AGENTS_MARKER, AGENTS_SECTION, SKILL_MD, SKILL_NAME } from '../skill.js
 import type { Ctx } from './context.js';
 
 /**
- * `murmur skill install` — teach this machine's coding agents about murmur
+ * `helppuff skill install` — teach this machine's coding agents about helppuff
  * before any project exists, so "add a chatbot to my website" works in a
  * fresh session.
  *
@@ -15,7 +15,7 @@ import type { Ctx } from './context.js';
  *   --project   ./.claude/skills/website-chatbot/SKILL.md   this repository only
  *   --codex     also appends a section to ~/.codex/AGENTS.md
  *
- * `murmur skill print` writes the skill to stdout.
+ * `helppuff skill print` writes the skill to stdout.
  */
 export async function skillCommand(ctx: Ctx): Promise<number> {
   assertKnown(ctx.flags, ['project', 'codex'], 'skill');
@@ -25,7 +25,7 @@ export async function skillCommand(ctx: Ctx): Promise<number> {
     return 0;
   }
   if (sub !== 'install') {
-    throw new CliError('usage', 'Usage: murmur skill install [--project] [--codex] | murmur skill print', { exitCode: 2 });
+    throw new CliError('usage', 'Usage: helppuff skill install [--project] [--codex] | helppuff skill print', { exitCode: 2 });
   }
 
   const written: string[] = [];

@@ -1,20 +1,20 @@
-import { defineConfig } from '@murmur/server';
+import { defineConfig } from '@helppuff/server';
 
 /**
  * The demo config, and the only one in git.
  *
- * `murmur.config.ts` — the file the Worker actually loads — is gitignored, so
+ * `helppuff.config.ts` — the file the Worker actually loads — is gitignored, so
  * your sites, origins and agent ids never enter the repository. It is created
  * from this file the first time you run `pnpm dev`, `pnpm build` or the tests,
  * which is what lets a fresh clone start with no setup at all.
  *
- * So: edit `murmur.config.ts`, not this file. Edit this one only to change
+ * So: edit `helppuff.config.ts`, not this file. Edit this one only to change
  * what a fresh clone gets — one site on the `echo` connector, which needs no
  * API key and drives every widget feature.
  *
- * This is the server's own config, for working on Murmur itself. To deploy
- * an assistant, use the CLI (`npx @knowtific/murmur`), which writes and
- * compiles its own from murmur.json.
+ * This is the server's own config, for working on HelpPuff itself. To deploy
+ * an assistant, use the CLI (`npx @knowtific/helppuff`), which writes and
+ * compiles its own from helppuff.json.
  */
 export default defineConfig({
   sites: {
@@ -53,7 +53,7 @@ export default defineConfig({
 
       widget: {
         brand: {
-          name: 'Murmur',
+          name: 'HelpPuff',
           agentName: 'Echo',
           accent: '#5B5BF7',
           theme: 'auto',

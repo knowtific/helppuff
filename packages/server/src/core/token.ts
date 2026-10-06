@@ -1,4 +1,4 @@
-import { MurmurError } from './errors.js';
+import { HelpPuffError } from './errors.js';
 
 /**
  * Stateless session tokens. Payload is base64url JSON, signed with
@@ -56,7 +56,7 @@ function importKey(secret: string): Promise<CryptoKey> {
 
 function assertSecret(secret: string): void {
   if (typeof secret !== 'string' || secret.length < MIN_SECRET_LENGTH) {
-    throw new MurmurError('internal', { detail: 'murmur_secret_too_short' });
+    throw new HelpPuffError('internal', { detail: 'helppuff_secret_too_short' });
   }
 }
 
@@ -102,7 +102,7 @@ export async function issueToken(secret: string, input: IssueTokenInput): Promis
 
   const json = JSON.stringify(payload);
   if (encoder.encode(JSON.stringify(payload.state)).length > MAX_STATE_BYTES) {
-    throw new MurmurError('internal', { detail: 'connector_state_too_large' });
+    throw new HelpPuffError('internal', { detail: 'connector_state_too_large' });
   }
 
   const body = base64urlEncode(encoder.encode(json));
@@ -120,27 +120,27 @@ export async function verifyToken(secret: string, token: string, now = Date.now(
 
   const parts = token.split('.');
   if (parts.length !== 2 || !parts[0] || !parts[1]) {
-    throw new MurmurError('unauthorized', { detail: 'token_malformed' });
+    throw new HelpPuffError('unauthorized', { detail: 'token_malformed' });
   }
   const [body, signature] = parts as [string, string];
 
   const expected = await sign(secret, body);
   if (!timingSafeEqual(expected, signature)) {
-    throw new MurmurError('unauthorized', { detail: 'token_bad_signature' });
+    throw new HelpPuffError('unauthorized', { detail: 'token_bad_signature' });
   }
 
   let payload: unknown;
   try {
     payload = JSON.parse(decoder.decode(base64urlDecode(body)));
   } catch {
-    throw new MurmurError('unauthorized', { detail: 'token_bad_payload' });
+    throw new HelpPuffError('unauthorized', { detail: 'token_bad_payload' });
   }
 
   if (!isPayload(payload)) {
-    throw new MurmurError('unauthorized', { detail: 'token_bad_payload' });
+    throw new HelpPuffError('unauthorized', { detail: 'token_bad_payload' });
   }
   if (payload.exp <= now) {
-    throw new MurmurError('session_expired', { detail: 'token_expired' });
+    throw new HelpPuffError('session_expired', { detail: 'token_expired' });
   }
   return payload;
 }

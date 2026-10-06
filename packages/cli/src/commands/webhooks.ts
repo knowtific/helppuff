@@ -6,8 +6,8 @@ import { loadProject } from '../engine/project.js';
 import type { Ctx } from './context.js';
 
 /**
- * `murmur webhooks` — endpoints that receive the site's events, the same as
- * Settings → Webhooks in the dashboard (stored on the Worker, not in murmur.json).
+ * `helppuff webhooks` — endpoints that receive the site's events, the same as
+ * Settings → Webhooks in the dashboard (stored on the Worker, not in helppuff.json).
  *
  *   list
  *   add <url> [--events lead.captured,callback.requested] [--description "…"]
@@ -18,7 +18,7 @@ import type { Ctx } from './context.js';
 type Webhook = { id: string; url: string; description: string | null; events: string[]; enabled: boolean; secret: string; lastStatus: string | null; lastError: string | null };
 type Listed = { webhooks: Webhook[]; events: { type: string; description: string }[] };
 
-const USAGE = 'Usage: murmur webhooks list | add <url> [--events a,b] [--description …] | remove <id> | test <id> | enable <id> | disable <id> | events';
+const USAGE = 'Usage: helppuff webhooks list | add <url> [--events a,b] [--description …] | remove <id> | test <id> | enable <id> | disable <id> | events';
 
 export async function webhooksCommand(ctx: Ctx): Promise<number> {
   assertKnown(ctx.flags, ['events', 'description'], 'webhooks');
@@ -34,7 +34,7 @@ export async function webhooksCommand(ctx: Ctx): Promise<number> {
       const { webhooks } = await api.get<Listed>('/admin/api/webhooks');
       // The secrets stay out of plain output; --json has them, for the receiver's config.
       ctx.out.result({ webhooks }, () => {
-        if (!webhooks.length) process.stdout.write(c.dim('No webhooks. Add one with `murmur webhooks add https://…`.\n'));
+        if (!webhooks.length) process.stdout.write(c.dim('No webhooks. Add one with `helppuff webhooks add https://…`.\n'));
         for (const w of webhooks) {
           const state = !w.enabled ? c.dim('off') : w.lastStatus === 'failed' ? c.yellow('failing') : c.green('on');
           process.stdout.write(`${w.id}  ${state}  ${w.url}\n    ${c.dim(w.events.includes('*') ? 'all events' : w.events.join(', '))}${w.lastError ? c.dim(`  — last: ${w.lastError}`) : ''}\n`);
@@ -55,7 +55,7 @@ export async function webhooksCommand(ctx: Ctx): Promise<number> {
       const hook = await api.send<Webhook>('POST', '/admin/api/webhooks', { url: need(), ...(events ? { events } : {}), ...(description ? { description } : {}) });
       ctx.out.result(hook, () => {
         ctx.out.success(`Added ${hook.id} → ${hook.url}`);
-        process.stdout.write(`Signing secret (give it to the receiver to verify X-Murmur-Signature): ${hook.secret}\n${c.dim(`Try it: murmur webhooks test ${hook.id}`)}\n`);
+        process.stdout.write(`Signing secret (give it to the receiver to verify X-HelpPuff-Signature): ${hook.secret}\n${c.dim(`Try it: helppuff webhooks test ${hook.id}`)}\n`);
       });
       return 0;
     }

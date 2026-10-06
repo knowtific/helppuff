@@ -155,7 +155,7 @@ export async function initCommand(ctx: Ctx): Promise<number> {
       questions: result.questions,
       assumed: result.assumed,
       known: result.known,
-      next: 'Ask the user these questions, then re-run `murmur init` with the given flags plus everything already known.',
+      next: 'Ask the user these questions, then re-run `helppuff init` with the given flags plus everything already known.',
     });
   }
 
@@ -193,7 +193,7 @@ export async function initCommand(ctx: Ctx): Promise<number> {
     const outcome = (await result.background) as (SyncResult & { error?: never }) | { error: unknown } | null;
     clearInterval(timer);
     if (outcome && 'error' in outcome && outcome.error) {
-      spinner.error(`Knowledge was not ready: ${(outcome.error as Error).message}. Run \`murmur knowledge sync\` to retry.`);
+      spinner.error(`Knowledge was not ready: ${(outcome.error as Error).message}. Run \`helppuff knowledge sync\` to retry.`);
     } else if (outcome && 'target' in outcome) {
       if (outcome.backendUpdate) {
         updateProject(loadProject(ctx.cwd), (raw) => Object.assign(raw['backend'] as object, outcome.backendUpdate));
@@ -223,7 +223,7 @@ export async function initCommand(ctx: Ctx): Promise<number> {
 
   if (!shouldDeploy) {
     await finishKnowledge();
-    out.result({ ...summary, next: ['murmur deploy --json'] }, () => p.outro(`Next: ${c.cyan('murmur deploy')}`));
+    out.result({ ...summary, next: ['helppuff deploy --json'] }, () => p.outro(`Next: ${c.cyan('helppuff deploy')}`));
     return 0;
   }
 
@@ -279,8 +279,8 @@ export function crawlFrom(ctx: Ctx): CrawlRequest | undefined {
 
 function nextSteps(result: DeployResult): string[] {
   return [
-    ...(result.crawl ? ['murmur knowledge status --json   (learning runs in the background on Cloudflare; nothing to wait for)'] : []),
-    'murmur ask "<a question a visitor would ask>" --json',
+    ...(result.crawl ? ['helppuff knowledge status --json   (learning runs in the background on Cloudflare; nothing to wait for)'] : []),
+    'helppuff ask "<a question a visitor would ask>" --json',
     result.setupUrl
       ? `Give the user three things: the dashboard link ${result.setupUrl} (one-time, 24h: they create their sign-in there), the script (deploy.embed) and the demo ${result.preview}`
       : `Give the user three things: the dashboard ${result.dashboard ?? result.url}, the script (deploy.embed) and the demo ${result.preview}`,
@@ -344,16 +344,16 @@ export async function devCommand(ctx: Ctx): Promise<number> {
   if (port !== wanted) ctx.out.warn(`Port ${wanted} is in use; using ${port}.`);
   const compiled = compile(loaded, { dev: true, devPort: port, runtimeVersion: runtimeVersion() });
   const devVars: Record<string, string> = {
-    MURMUR_SECRET: env['MURMUR_SECRET'] ?? 'dev-secret-dev-secret-dev-secret-0000',
+    HELPPUFF_SECRET: env['HELPPUFF_SECRET'] ?? 'dev-secret-dev-secret-dev-secret-0000',
     ADMIN_API_KEY: env['ADMIN_API_KEY'] ?? 'dev-admin-key-dev-admin-key-dev-admin-key',
-    MURMUR_LOG: '1',
+    HELPPUFF_LOG: '1',
   };
   const missing: string[] = [];
   for (const name of compiled.secrets) {
     if (env[name]) devVars[name] = env[name]!;
     else if (!devVars[name]) missing.push(name);
   }
-  if (missing.length) ctx.out.warn(`Not set in .env: ${missing.join(', ')} — replies will fail until you run \`murmur secret set\`.`);
+  if (missing.length) ctx.out.warn(`Not set in .env: ${missing.join(', ')} — replies will fail until you run \`helppuff secret set\`.`);
 
   const auth = aiSearchInstanceFor(loaded.project)
     ? await cloudflareSession(env)
@@ -383,5 +383,5 @@ function freePort(start: number): Promise<number> {
 export function describeIndexing(status: IndexingStatus): string {
   const source = status.crawler ? `Cloudflare is crawling ${status.crawler}` : `instance ${status.instance}`;
   if (status.done) return `${status.indexed} document(s) indexed (${source})${status.failed ? `, ${status.failed} failed` : ''}`;
-  return `${status.indexed} indexed, ${status.pending} in progress — ${source}. It is live now; answers get better as this finishes (\`murmur knowledge status\`).`;
+  return `${status.indexed} indexed, ${status.pending} in progress — ${source}. It is live now; answers get better as this finishes (\`helppuff knowledge status\`).`;
 }

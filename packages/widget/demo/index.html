@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Murmur — live playground</title>
+    <title>HelpPuff — live playground</title>
     <style>
       :root {
         color-scheme: light dark;
@@ -59,7 +59,7 @@
   </head>
   <body>
     <div class="wrap">
-      <h1>Murmur playground</h1>
+      <h1>HelpPuff playground</h1>
       <p class="lede">
         The real widget, running against the local Worker on site
         <code id="site-name">demo</code>.
@@ -99,15 +99,15 @@
       <h2>JavaScript API</h2>
       <div class="card">
         <div class="row">
-          <button class="demo" onclick="Murmur.open()">open()</button>
-          <button class="demo" onclick="Murmur.close()">close()</button>
-          <button class="demo" onclick="Murmur.toggle()">toggle()</button>
-          <button class="demo" onclick="Murmur.send('Hello from the host page')">send(…)</button>
-          <button class="demo" onclick="Murmur.send('/card')">send('/card')</button>
-          <button class="demo" onclick="Murmur.identify({ name: 'Ada Lovelace', phone: '0400 000 000' })">identify(…)</button>
-          <button class="demo" onclick="Murmur.reset()">reset()</button>
-          <button class="demo" onclick="console.log(Murmur.debug())">debug() → console</button>
-          <button class="demo" onclick="Murmur.destroy()">destroy()</button>
+          <button class="demo" onclick="HelpPuff.open()">open()</button>
+          <button class="demo" onclick="HelpPuff.close()">close()</button>
+          <button class="demo" onclick="HelpPuff.toggle()">toggle()</button>
+          <button class="demo" onclick="HelpPuff.send('Hello from the host page')">send(…)</button>
+          <button class="demo" onclick="HelpPuff.send('/card')">send('/card')</button>
+          <button class="demo" onclick="HelpPuff.identify({ name: 'Ada Lovelace', phone: '0400 000 000' })">identify(…)</button>
+          <button class="demo" onclick="HelpPuff.reset()">reset()</button>
+          <button class="demo" onclick="console.log(HelpPuff.debug())">debug() → console</button>
+          <button class="demo" onclick="HelpPuff.destroy()">destroy()</button>
         </div>
       </div>
 
@@ -120,7 +120,7 @@
       <div class="card">
         <p style="margin-top: 0">
           Each of these forces a fatal condition. The widget must vanish without a trace, the console must stay
-          silent, and <code>Murmur.open()</code> must still be callable.
+          silent, and <code>HelpPuff.open()</code> must still be callable.
         </p>
         <div class="row">
           <button class="demo" onclick="location.href='?fail=site'">no data-site</button>
@@ -184,15 +184,15 @@
         : '';
 
       // The queue pattern: calls made before the loader finishes are replayed.
-      window.Murmur = window.Murmur || { q: [] };
+      window.HelpPuff = window.HelpPuff || { q: [] };
       for (const name of ['open', 'close', 'toggle', 'send', 'identify', 'reset', 'on', 'off', 'destroy', 'debug']) {
-        if (!window.Murmur[name]) window.Murmur[name] = (...args) => window.Murmur.q.push([name, ...args]);
+        if (!window.HelpPuff[name]) window.HelpPuff[name] = (...args) => window.HelpPuff.q.push([name, ...args]);
       }
 
-      window.Murmur.on('open', () => log('open'));
-      window.Murmur.on('close', () => log('close'));
-      window.Murmur.on('lead', (lead) => log('lead ' + JSON.stringify(lead)));
-      window.Murmur.on('message', (m) => log('message ' + JSON.stringify(m)));
+      window.HelpPuff.on('open', () => log('open'));
+      window.HelpPuff.on('close', () => log('close'));
+      window.HelpPuff.on('lead', (lead) => log('lead ' + JSON.stringify(lead)));
+      window.HelpPuff.on('message', (m) => log('message ' + JSON.stringify(m)));
 
       function log(line) {
         const box = document.getElementById('log');

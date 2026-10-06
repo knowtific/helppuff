@@ -1,12 +1,12 @@
-import type { PromptGuidance } from '@murmur/connector-types';
+import type { PromptGuidance } from '@helppuff/connector-types';
 import type { SiteConfig } from '../config/schema.js';
 
 /**
- * What Murmur tells the model around the owner's prompt, built from settings
+ * What HelpPuff tells the model around the owner's prompt, built from settings
  * on every answer:
  *
  *   before   who the assistant is, its goal, tone, answer length and format
- *            (Settings › Instructions, `assistant` in murmur.json);
+ *            (Settings › Instructions, `assistant` in helppuff.json);
  *   (the owner's prompt: only what is specific to their business)
  *   after    the rules every answer follows, which win when the owner's
  *            text disagrees.
@@ -53,7 +53,7 @@ export function guidanceFor(site: SiteConfig): PromptGuidance {
 
   const after = [
     '## Rules that always apply',
-    'These come from Murmur and override the instructions above where they disagree.',
+    'These come from HelpPuff and override the instructions above where they disagree.',
     '- Never invent prices, availability, timeframes, policies or promises, and never give medical, legal or financial advice.',
     prices === 'quote'
       ? '- Do not give prices or estimates, even ones you were told: offer a quote from the team instead.'

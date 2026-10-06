@@ -79,19 +79,19 @@ describe('the questions', () => {
     expect(q?.options?.[0]?.value).toBe('acme-site');
   });
 
-  it("never offers an instance murmur created for another site", () => {
+  it("never offers an instance helppuff created for another site", () => {
     const facts = {
       env: {},
       site: { url: 'https://acme.com.au/' } as never,
       instances: [
-        { id: 'knowtific-murmur-othersite', type: 'web-crawler', source: 'other.com' },
-        { id: 'knowtific-murmur-acme', type: 'web-crawler', source: 'acme.com.au' },
+        { id: 'knowtific-helppuff-othersite', type: 'web-crawler', source: 'other.com' },
+        { id: 'knowtific-helppuff-acme', type: 'web-crawler', source: 'acme.com.au' },
         { id: 'handmade', type: 'r2' },
       ],
     };
     const q = pendingQuestions({ website: 'acme.com.au', backend: 'cloudflare' }, facts).find((x) => x.id === 'aiSearch');
     const values = q?.options?.map((o) => o.value);
-    expect(values).toEqual(['knowtific-murmur-acme', 'new', 'handmade', 'endpoint']);
+    expect(values).toEqual(['knowtific-helppuff-acme', 'new', 'handmade', 'endpoint']);
   });
 });
 
@@ -104,7 +104,7 @@ describe('runInit for an agent', () => {
     if (result.status !== 'needs_input') return;
     expect(result.questions.map((q) => q.id)).toEqual(['cfToken']);
     expect(result.known).toEqual({ website: 'acme.com.au' });
-    expect(existsSync(join(dir, 'murmur.json'))).toBe(false);
+    expect(existsSync(join(dir, 'helppuff.json'))).toBe(false);
   });
 
   it('never echoes a secret back', async () => {
@@ -121,7 +121,7 @@ describe('runInit for an agent', () => {
       fetch: world().fetch,
     });
     expect(result.status).toBe('created');
-    const project = JSON.parse(readFileSync(join(dir, 'murmur.json'), 'utf8'));
+    const project = JSON.parse(readFileSync(join(dir, 'helppuff.json'), 'utf8'));
     expect(project).toMatchObject({
       site: 'acme',
       name: 'Acme Plumbing',
@@ -175,17 +175,17 @@ describe('runInit for an agent', () => {
       answers: { website: 'acme.com.au', backend: 'cloudflare', cfToken: 't' },
       fetch: world([{ id: 'acme-web', type: 'web-crawler', source: 'acme.com.au' }]).fetch,
     });
-    expect(JSON.parse(readFileSync(join(dir, 'murmur.json'), 'utf8')).backend.instance).toBe('acme-web');
+    expect(JSON.parse(readFileSync(join(dir, 'helppuff.json'), 'utf8')).backend.instance).toBe('acme-web');
   });
 
-  it('stores a provider key in .env, not in murmur.json', async () => {
+  it('stores a provider key in .env, not in helppuff.json', async () => {
     const dir = tempProject();
     await runInit({
       cwd: dir,
       answers: { website: 'acme.com.au', backend: 'openai', apiKey: 'sk-live', cfToken: 't' },
       fetch: world().fetch,
     });
-    expect(readFileSync(join(dir, 'murmur.json'), 'utf8')).not.toContain('sk-live');
+    expect(readFileSync(join(dir, 'helppuff.json'), 'utf8')).not.toContain('sk-live');
     expect(readFileSync(join(dir, '.env'), 'utf8')).toContain('OPENAI_API_KEY=sk-live');
   });
 
@@ -246,7 +246,7 @@ describe('runInit for an agent', () => {
       ['phone', 'tel', false],
     ]);
     expect(widget.chat.initialMessages).toEqual(["Hi {{name}}! I'm Kai from Acme Plumbing. How can I help you today?"]);
-    // The form and the greeting are settings: Murmur tells the model about them, prompt.md does not repeat them.
+    // The form and the greeting are settings: HelpPuff tells the model about them, prompt.md does not repeat them.
     expect(readFileSync(join(dir, 'prompt.md'), 'utf8')).not.toContain('{{lead.');
   });
 
@@ -272,7 +272,7 @@ describe('runInit for an agent', () => {
   });
 
   it('refuses to overwrite an existing project without --force', async () => {
-    const dir = tempProject({ 'murmur.json': '{}' });
+    const dir = tempProject({ 'helppuff.json': '{}' });
     await expect(runInit({ cwd: dir, answers: {}, fetch: world().fetch })).rejects.toMatchObject({ code: 'project_exists' });
   });
 

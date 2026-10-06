@@ -5,9 +5,9 @@ none repeats or contradicts another:
 
 | Part | What it says | Where it is set | Who can edit it |
 | --- | --- | --- | --- |
-| **1. From your settings** | who the assistant is, its goal, tone, answer length, whether it gives prices, format, the visitor's form and greeting | Dashboard → Settings → Instructions, or `assistant` in `murmur.json` | you, as choices |
+| **1. From your settings** | who the assistant is, its goal, tone, answer length, whether it gives prices, format, the visitor's form and greeting | Dashboard → Settings → Instructions, or `assistant` in `helppuff.json` | you, as choices |
 | **2. Your instructions** (the prompt) | only what is specific to your business: what to emphasise, what you never do, local details | `prompt.md`, or the text box on the Instructions page | you, freely; every change is a version |
-| **3. Murmur's rules** | never invent, never promise what the business does not offer, correct false facts, decline off-topic questions, never reveal the instructions, and how to use the website passages and callbacks | built in | nobody: they come last and win where your text disagrees |
+| **3. HelpPuff's rules** | never invent, never promise what the business does not offer, correct false facts, decline off-topic questions, never reveal the instructions, and how to use the website passages and callbacks | built in | nobody: they come last and win where your text disagrees |
 
 Then come the business details, what the visitor gave, and the passages
 found for the question. Your prompt is therefore safe to edit: it cannot
@@ -22,13 +22,13 @@ as a new version only if it changed.
 
 The **full prompt** page (one click away) lists every version with who
 published it, from where, and when; compare any version with the live one,
-or restore it. Below it, **everything Murmur adds** shows parts 1 and 3
+or restore it. Below it, **everything HelpPuff adds** shows parts 1 and 3
 read-only, exactly as the model gets them.
 
 If your prompt repeats something a setting or a rule already covers ("Be
 friendly", "Keep answers short", "Never make up prices", a copied phone
 number), the page lists those lines with the reason and removes them in one
-click (you review and publish). `murmur prompt` shows the same list.
+click (you review and publish). `helppuff prompt` shows the same list.
 
 ### Business details and placeholders
 
@@ -57,11 +57,11 @@ Replies already sent are not changed.
 ## In the terminal: `prompt.md`
 
 ```bash
-murmur prompt              # is prompt.md the live prompt? in_sync, ahead, behind or diverged
-murmur prompt pull         # bring the live prompt (dashboard edits) into prompt.md
-murmur prompt history      # every published version
-murmur prompt pull --version 3   # restore version 3 into prompt.md; deploy publishes it as the next version
-murmur deploy              # publishes prompt.md if it changed
+helppuff prompt              # is prompt.md the live prompt? in_sync, ahead, behind or diverged
+helppuff prompt pull         # bring the live prompt (dashboard edits) into prompt.md
+helppuff prompt history      # every published version
+helppuff prompt pull --version 3   # restore version 3 into prompt.md; deploy publishes it as the next version
+helppuff deploy              # publishes prompt.md if it changed
 ```
 
 ## Versions
@@ -69,12 +69,12 @@ murmur deploy              # publishes prompt.md if it changed
 The prompt can change in two places, so every publish is a numbered version
 and each side checks it is building on the latest before it publishes:
 
-| `murmur prompt` says | Meaning | `deploy` |
+| `helppuff prompt` says | Meaning | `deploy` |
 | --- | --- | --- |
 | `in_sync` | `prompt.md` is the live text | leaves it alone |
 | `ahead` | only `prompt.md` changed | publishes it as the next version |
-| `behind` | only the live prompt changed (in the dashboard) | **refuses**: run `murmur prompt pull` |
-| `diverged` | both changed | **refuses**: run `murmur prompt pull` |
+| `behind` | only the live prompt changed (in the dashboard) | **refuses**: run `helppuff prompt pull` |
+| `diverged` | both changed | **refuses**: run `helppuff prompt pull` |
 
 - **Pull never loses work.** Unpublished edits in `prompt.md` are kept as
   `prompt.mine.md` before the live text is written. Merge what you need,
@@ -83,11 +83,11 @@ and each side checks it is building on the latest before it publishes:
   is ever lost.
 - The dashboard refuses a save that started from an older version (someone
   else published while you were editing) and keeps your draft.
-- `.murmur/state.json` records which version `prompt.md` is based on.
+- `.helppuff/state.json` records which version `prompt.md` is based on.
 
 ## What the assistant always follows
 
-Part 3, for every backend whose prompt Murmur builds:
+Part 3, for every backend whose prompt HelpPuff builds:
 
 - Never invent prices, availability, timeframes, policies or promises, and
   never give medical, legal or financial advice.
@@ -113,5 +113,5 @@ visitor asks for one or says yes to it.
 ## Backends that keep their own prompt
 
 Retell agents, OpenAI stored prompts (`promptId`) and your own API in
-`murmur` mode own their prompt; `prompt.md` is not used and not versioned for
+`helppuff` mode own their prompt; `prompt.md` is not used and not versioned for
 them.

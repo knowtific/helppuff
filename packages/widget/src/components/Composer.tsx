@@ -49,8 +49,8 @@ export function Composer({
   };
 
   return (
-    <div class="mm-composer-wrap">
-      <div class="mm-composer">
+    <div class="hp-composer-wrap">
+      <div class="hp-composer">
         <textarea
           ref={textarea}
           rows={1}
@@ -65,7 +65,7 @@ export function Composer({
         />
         <button
           type="button"
-          class="mm-send"
+          class="hp-send"
           disabled={!canSend}
           aria-label={t('send')}
           onClick={() => canSend && onSend()}
@@ -75,9 +75,9 @@ export function Composer({
       </div>
 
       {value.length >= COUNTER_FROM ? (
-        <div class="mm-counter">{MAX_LENGTH - value.length}</div>
+        <div class="hp-counter">{MAX_LENGTH - value.length}</div>
       ) : null}
-      {offline ? <div class="mm-offline">{t('offline')}</div> : null}
+      {offline ? <div class="hp-offline">{t('offline')}</div> : null}
     </div>
   );
 }

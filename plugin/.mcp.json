@@ -1,8 +1,8 @@
 {
   "mcpServers": {
-    "murmur": {
+    "helppuff": {
       "command": "npx",
-      "args": ["-y", "@knowtific/murmur", "mcp"]
+      "args": ["-y", "@knowtific/helppuff", "mcp"]
     }
   }
 }

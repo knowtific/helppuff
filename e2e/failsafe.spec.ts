@@ -15,7 +15,7 @@ import {
 /**
  * The fail-safe is the highest-priority behavioural requirement, so it
  * gets its own suite: every fatal condition forced individually, each leaving
- * the DOM clean, `window.Murmur` callable and inert, the console silent and
+ * the DOM clean, `window.HelpPuff` callable and inert, the console silent and
  * the host page untouched.
  *
  * And the other half of the rule: a recoverable failure must NOT hide the
@@ -167,7 +167,7 @@ test.describe('fatal conditions hide the widget silently', () => {
     await startConversation(page);
     await send(page, 'keep this');
     await page.waitForTimeout(500);
-    const stored = await page.evaluate(() => localStorage.getItem('mm:demo'));
+    const stored = await page.evaluate(() => localStorage.getItem('hp:demo'));
     expect(stored).toBeTruthy();
 
     // Now force a fatal condition on the next load.
@@ -177,7 +177,7 @@ test.describe('fatal conditions hide the widget silently', () => {
     await expectNoWidgetInDom(page);
 
     // The fail-safe: storage is left alone.
-    expect(await page.evaluate(() => localStorage.getItem('mm:demo'))).toBe(stored);
+    expect(await page.evaluate(() => localStorage.getItem('hp:demo'))).toBe(stored);
   });
 });
 
@@ -192,10 +192,10 @@ test.describe('recoverable failures do NOT hide the widget', () => {
     await page.route('**/v1/sessions/messages', (route) => route.abort());
     await send(page, 'this will fail');
 
-    await expect(page.locator('murmur-widget [role="alert"]')).toBeVisible();
+    await expect(page.locator('helppuff-widget [role="alert"]')).toBeVisible();
     // The widget is still here.
     await expect(panel(page)).toBeVisible();
-    await expect(page.locator('murmur-widget')).toHaveCount(1);
+    await expect(page.locator('helppuff-widget')).toHaveCount(1);
     // And the message is not lost.
     await expect(composer(page)).toHaveValue('this will fail');
   });
@@ -214,7 +214,7 @@ test.describe('recoverable failures do NOT hide the widget', () => {
     );
     await send(page, 'boom');
 
-    await expect(page.locator('murmur-widget [role="alert"]')).toContainText(/went wrong/i);
+    await expect(page.locator('helppuff-widget [role="alert"]')).toContainText(/went wrong/i);
     await expect(panel(page)).toBeVisible();
   });
 
@@ -240,12 +240,12 @@ test.describe('recoverable failures do NOT hide the widget', () => {
     });
 
     await send(page, 'too fast');
-    const alert = page.locator('murmur-widget [role="alert"]');
+    const alert = page.locator('helppuff-widget [role="alert"]');
     await expect(alert).toContainText(/too many/i);
     await expect(alert).toContainText(/\(2s\)/);
 
     // Once the countdown ends the retry is offered again.
-    await expect(page.locator('murmur-widget [role="alert"] button', { hasText: /try again/i })).toBeEnabled({
+    await expect(page.locator('helppuff-widget [role="alert"] button', { hasText: /try again/i })).toBeEnabled({
       timeout: 6000,
     });
   });
@@ -259,12 +259,12 @@ test.describe('recoverable failures do NOT hide the widget', () => {
     await context.setOffline(true);
     await page.evaluate(() => window.dispatchEvent(new Event('offline')));
 
-    await expect(page.locator('murmur-widget .mm-offline')).toBeVisible();
+    await expect(page.locator('helppuff-widget .hp-offline')).toBeVisible();
     await expect(panel(page)).toBeVisible();
 
     await context.setOffline(false);
     await page.evaluate(() => window.dispatchEvent(new Event('online')));
-    await expect(page.locator('murmur-widget .mm-offline')).toBeHidden();
+    await expect(page.locator('helppuff-widget .hp-offline')).toBeHidden();
   });
 });
 
@@ -274,21 +274,21 @@ test.describe('diagnostics', () => {
     await expect(launcher(page)).toBeVisible();
 
     const info = await page.evaluate(() =>
-      (window as never as { Murmur: { debug(): Record<string, unknown> } }).Murmur.debug(),
+      (window as never as { HelpPuff: { debug(): Record<string, unknown> } }).HelpPuff.debug(),
     );
     expect(info).toHaveProperty('version');
     expect(info).toHaveProperty('siteId', 'demo');
   });
 
-  test('?mmdebug=1 turns on logging for that page view only', async ({ page }) => {
+  test('?hpdebug=1 turns on logging for that page view only', async ({ page }) => {
     const quiet = captureConsole(page);
     await page.goto('/');
     await expect(launcher(page)).toBeVisible();
-    expect(quiet.messages.filter((m) => m.includes('[murmur]'))).toEqual([]);
+    expect(quiet.messages.filter((m) => m.includes('[helppuff]'))).toEqual([]);
 
     const loud = captureConsole(page);
-    await page.goto('/?mmdebug=1&fail=config');
+    await page.goto('/?hpdebug=1&fail=config');
     await page.waitForTimeout(1500);
-    expect(loud.messages.some((m) => m.includes('[murmur]'))).toBe(true);
+    expect(loud.messages.some((m) => m.includes('[helppuff]'))).toBe(true);
   });
 });

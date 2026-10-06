@@ -5,21 +5,21 @@ be changed live in the dashboard.
 
 | | Holds | Changed by |
 | --- | --- | --- |
-| `murmur.json` | What the assistant is: website, backend and model, knowledge, widget, limits, dashboard, and where it is deployed | you, an agent, `murmur config set`, `murmur config pull` |
-| `prompt.md` | How it talks: the system prompt | you, an agent, `murmur prompt pull`; the dashboard's Instructions write it too |
-| `.env` | Secrets: provider keys, `MURMUR_SECRET`, `ADMIN_API_KEY`, an optional Cloudflare token | `murmur secret set`, `murmur deploy` (generates the Murmur secrets) |
+| `helppuff.json` | What the assistant is: website, backend and model, knowledge, widget, limits, dashboard, and where it is deployed | you, an agent, `helppuff config set`, `helppuff config pull` |
+| `prompt.md` | How it talks: the system prompt | you, an agent, `helppuff prompt pull`; the dashboard's Instructions write it too |
+| `.env` | Secrets: provider keys, `HELPPUFF_SECRET`, `ADMIN_API_KEY`, an optional Cloudflare token | `helppuff secret set`, `helppuff deploy` (generates the HelpPuff secrets) |
 
 Every option, with its type, default and limits, is in the
 **[[Configuration reference|Configuration-Reference]]**, generated from the
-same schema `murmur` validates against. `murmur schema` prints it as JSON
-Schema, and `murmur.json` points at a copy (`$schema`), so editors complete and
+same schema `helppuff` validates against. `helppuff schema` prints it as JSON
+Schema, and `helppuff.json` points at a copy (`$schema`), so editors complete and
 check fields as you type.
 
-## A minimal `murmur.json`
+## A minimal `helppuff.json`
 
 ```json
 {
-  "$schema": "./.murmur/murmur.schema.json",
+  "$schema": "./.helppuff/helppuff.schema.json",
   "site": "acme",
   "name": "Acme Plumbing",
   "website": "https://acme.com.au",
@@ -68,24 +68,24 @@ Everything else has a default. A fuller example:
 ## Changing it
 
 ```bash
-murmur config get backend                               # read by dotted path
-murmur config set widget.brand.accent "#0EA5E9"          # validated before it is saved
-murmur config set knowledge.files '["./docs"]'           # JSON values are parsed
-murmur deploy                                            # publish
+helppuff config get backend                               # read by dotted path
+helppuff config set widget.brand.accent "#0EA5E9"          # validated before it is saved
+helppuff config set knowledge.files '["./docs"]'           # JSON values are parsed
+helppuff deploy                                            # publish
 ```
 
 `deploy` only uploads the Worker when its code or bindings changed. Content
 changes (prompt, widget, model, limits) are published to KV and are live in
 seconds.
 
-## The dashboard and `murmur.json`
+## The dashboard and `helppuff.json`
 
 The dashboard's Settings and Instructions change the **live** config
 directly. If you also keep the project in git, the two can drift, so each
 side checks before it overwrites the other:
 
-- `murmur config pull` brings dashboard settings into `murmur.json`.
-- `murmur prompt pull` brings the live prompt into `prompt.md`, keeping any
+- `helppuff config pull` brings dashboard settings into `helppuff.json`.
+- `helppuff prompt pull` brings the live prompt into `prompt.md`, keeping any
   unpublished local edits as `prompt.mine.md`.
 - `deploy` refuses (`settings_changed`, `prompt_behind`) when the dashboard
   changed something this folder has not pulled. `--overwrite-settings` publishes
@@ -95,7 +95,7 @@ See [[Prompt and instructions|Prompts-and-Instructions]] for how prompt versions
 
 ## Secrets
 
-Secrets are never written into `murmur.json`. A field that needs one names
+Secrets are never written into `helppuff.json`. A field that needs one names
 the environment variable instead:
 
 ```json
@@ -103,22 +103,22 @@ the environment variable instead:
 ```
 
 ```bash
-murmur secret set OPENAI_API_KEY              # prompts (hidden); or pipe it in, or --value
-murmur secret list
+helppuff secret set OPENAI_API_KEY              # prompts (hidden); or pipe it in, or --value
+helppuff secret list
 ```
 
 `secret set` writes `.env` and, once deployed, sets the Worker secret too.
-`deploy` generates `MURMUR_SECRET` (signs sessions, never leaves your account)
+`deploy` generates `HELPPUFF_SECRET` (signs sessions, never leaves your account)
 and `ADMIN_API_KEY` (what the CLI and agents use for the dashboard's API) the
 first time. Values in the environment win over `.env`.
 
 | Variable | Used for |
 | --- | --- |
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | Cloudflare access, instead of `wrangler login` |
-| `MURMUR_SECRET` | Signing sessions and dashboard cookies (generated) |
-| `ADMIN_API_KEY` (or `MURMUR_ADMIN_API_KEY`) | The admin API, for the CLI and agents (generated) |
+| `HELPPUFF_SECRET` | Signing sessions and dashboard cookies (generated) |
+| `ADMIN_API_KEY` (or `HELPPUFF_ADMIN_API_KEY`) | The admin API, for the CLI and agents (generated) |
 | `OPENAI_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, `RETELL_API_KEY` | The provider you chose |
-| `MURMUR_BACKEND_TOKEN` | Your own API's bearer token (`http` backend) |
+| `HELPPUFF_BACKEND_TOKEN` | Your own API's bearer token (`http` backend) |
 | any name you choose, e.g. `TURNSTILE_SECRET` | Turnstile's secret key, named in `security.captcha.secret` |
 
 ## Cloudflare access
@@ -135,7 +135,7 @@ Tried in this order:
    - Account › Account Settings › Read
    - Account › AI Search › Edit and Run (only for the Cloudflare AI Search backend)
 2. **Your `wrangler login`**: its OAuth token already carries these scopes.
-   Murmur reads it and lets wrangler refresh it.
+   HelpPuff reads it and lets wrangler refresh it.
 
 If the token can see several accounts, pass `--account-id` or set
 `CLOUDFLARE_ACCOUNT_ID`.

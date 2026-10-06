@@ -1,6 +1,6 @@
 import { render, type ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import type { Message, WidgetConfig } from '@murmur/protocol';
+import type { Message, WidgetConfig } from '@helppuff/protocol';
 import { Composer } from '../src/components/Composer.js';
 import { ErrorNotice } from '../src/components/ErrorNotice.js';
 import { Header } from '../src/components/Header.js';
@@ -129,7 +129,7 @@ function Specimen({
     if (!shadow) {
       shadow = host.attachShadow({ mode: 'open' });
       const mountPoint = document.createElement('div');
-      mountPoint.className = 'mm-root mm-specimen';
+      mountPoint.className = 'hp-root hp-specimen';
       shadow.appendChild(mountPoint);
       rootRef.current = mountPoint;
     }
@@ -169,14 +169,14 @@ function Specimen({
  */
 const HOST_OVERRIDE = `
 :host { position: static !important; display: block; height: 100%; }
-.mm-specimen { height: 100%; }
-.mm-panel, .mm-launcher, .mm-teaser {
+.hp-specimen { height: 100%; }
+.hp-panel, .hp-launcher, .hp-teaser {
   position: relative !important;
   inset: auto !important;
   animation: none !important;
 }
-.mm-panel { width: 100%; max-width: 400px; height: 100%; }
-.mm-launcher, .mm-teaser { display: inline-flex; }
+.hp-panel { width: 100%; max-width: 400px; height: 100%; }
+.hp-launcher, .hp-teaser { display: inline-flex; }
 `;
 
 function Gallery() {
@@ -186,7 +186,7 @@ function Gallery() {
 
   const spec = { theme, accent };
   const shell = (children: ComponentChildren) => (
-    <div class="mm-panel" data-position="bottom-right">
+    <div class="hp-panel" data-position="bottom-right">
       {children}
     </div>
   );
@@ -195,7 +195,7 @@ function Gallery() {
     <>
       <header class="head">
         <div>
-          <h1>Murmur component gallery</h1>
+          <h1>HelpPuff component gallery</h1>
           <p>Every surface, rendered with the real components and the shipped stylesheet.</p>
         </div>
         <div class="controls">
@@ -262,8 +262,8 @@ function Gallery() {
           {shell(
             <>
               <Header config={CONFIG} thinking={false} showBack t={t} onBack={() => {}} onClose={() => {}} />
-              <div class="mm-screen">
-                <div class="mm-scroll">
+              <div class="hp-screen">
+                <div class="hp-scroll">
                   <LeadForm config={CONFIG} initial={null} busy={false} t={t} onSubmit={() => {}} />
                 </div>
               </div>
@@ -275,7 +275,7 @@ function Gallery() {
           {shell(
             <>
               <Header config={CONFIG} thinking={false} showBack={false} t={t} onBack={() => {}} onClose={() => {}} />
-              <div class="mm-screen">
+              <div class="hp-screen">
                 <Thread messages={CONVERSATION} busy={false} pendingIds={new Set()} handlers={inertHandlers} t={t} />
                 <Composer value="" disabled={false} offline={false} placeholder="Type a message…" t={t} onInput={() => {}} onSend={() => {}} />
               </div>
@@ -287,7 +287,7 @@ function Gallery() {
           {shell(
             <>
               <Header config={CONFIG} thinking showBack={false} t={t} onBack={() => {}} onClose={() => {}} />
-              <div class="mm-screen">
+              <div class="hp-screen">
                 <Thread
                   messages={[...CONVERSATION.slice(0, 2)]}
                   busy
@@ -346,11 +346,11 @@ function Gallery() {
         </Specimen>
         <Specimen title="Buttons" {...spec} height={150}>
           <div style={{ padding: '16px', display: 'grid', gap: '10px' }}>
-            <button class="mm-btn">Primary action</button>
-            <button class="mm-btn" disabled>Disabled</button>
+            <button class="hp-btn">Primary action</button>
+            <button class="hp-btn" disabled>Disabled</button>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button class="mm-chip">Chip</button>
-              <button class="mm-chip">Another</button>
+              <button class="hp-chip">Chip</button>
+              <button class="hp-chip">Another</button>
             </div>
           </div>
         </Specimen>
@@ -358,7 +358,7 @@ function Gallery() {
           <Header config={CONFIG} thinking={false} showBack={false} t={t} onBack={() => {}} onClose={() => {}} />
         </Specimen>
         <Specimen title="Icon set" note="20 inline SVGs, no icon font" {...spec} height={150}>
-          <div style={{ padding: '16px', display: 'flex', flexWrap: 'wrap', gap: '12px', color: 'var(--mm-text-2)' }}>
+          <div style={{ padding: '16px', display: 'flex', flexWrap: 'wrap', gap: '12px', color: 'var(--hp-text-2)' }}>
             {ICONS.map((name) => (
               <span key={name} title={name}>
                 <Icon name={name} />
@@ -393,9 +393,9 @@ function MobileFrame() {
   return (
     <div style={{ height: '100vh' }}>
       <Specimen title="" theme="light" accent="#5B5BF7" height={600}>
-        <div class="mm-panel">
+        <div class="hp-panel">
           <Header config={CONFIG} thinking={false} showBack={false} t={t} onBack={() => {}} onClose={() => {}} />
-          <div class="mm-screen">
+          <div class="hp-screen">
             <Thread messages={CONVERSATION} busy={false} pendingIds={new Set()} handlers={inertHandlers} t={t} />
             <Composer value="" disabled={false} offline={false} placeholder="Type a message…" t={t} onInput={() => {}} onSend={() => {}} />
           </div>

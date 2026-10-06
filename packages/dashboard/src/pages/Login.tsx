@@ -55,7 +55,7 @@ export function Login({ onDone }: { onDone: () => void }) {
           </Button>
         </form>
         <p className="mt-4 text-center text-xs text-muted-foreground">
-          Forgot it? Run <code className="rounded bg-muted px-1 py-0.5">murmur users reset &lt;email&gt;</code>
+          Forgot it? Run <code className="rounded bg-muted px-1 py-0.5">helppuff users reset &lt;email&gt;</code>
         </p>
       </div>
     </div>

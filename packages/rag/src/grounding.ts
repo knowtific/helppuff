@@ -4,8 +4,8 @@ import { DEFAULT_RETRIEVAL, retrieve, type RetrievedChunk } from './retrieve.js'
 import type { AiLike, D1Like, Log, VectorIndexLike } from './types.js';
 
 /**
- * Murmur's knowledge base for a connector whose model lives elsewhere
- * (OpenAI, Gemini, Claude with `retrieval: "murmur"`): retrieval stays on
+ * HelpPuff's knowledge base for a connector whose model lives elsewhere
+ * (OpenAI, Gemini, Claude with `retrieval: "helppuff"`): retrieval stays on
  * the site's own Vectorize + D1, only generation moves. The connector
  * adds `block` to its system prompt and `sources` as links under the reply.
  *
@@ -27,7 +27,7 @@ export async function ground(
   options: { finalK?: number; minScore?: number; log?: Log; waitUntil?: (p: Promise<unknown>) => void } = {},
 ): Promise<Grounding | null> {
   const ai = env['AI'] as AiLike | undefined;
-  const db = env['MURMUR_DB'] as D1Like | undefined;
+  const db = env['HELPPUFF_DB'] as D1Like | undefined;
   const vectors = env['VECTORS'] as VectorIndexLike | undefined;
   if (!ai || typeof ai.run !== 'function' || !db || typeof db.prepare !== 'function') return null;
   try {

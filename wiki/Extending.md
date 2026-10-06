@@ -1,4 +1,4 @@
-# Extending Murmur
+# Extending HelpPuff
 
 Most of what people want needs no code. When it does, there is a clean place
 for it. From least to most work:
@@ -28,8 +28,8 @@ posts callback requests to Slack:
 export default {
   async fetch(request, env) {
     const body = await request.text();
-    const timestamp = request.headers.get('X-Murmur-Timestamp');
-    if (!(await valid(env.MURMUR_WEBHOOK_SECRET, timestamp, body, request.headers.get('X-Murmur-Signature')))) {
+    const timestamp = request.headers.get('X-HelpPuff-Timestamp');
+    if (!(await valid(env.HELPPUFF_WEBHOOK_SECRET, timestamp, body, request.headers.get('X-HelpPuff-Signature')))) {
       return new Response('bad signature', { status: 401 });
     }
     const event = JSON.parse(body);
@@ -59,13 +59,13 @@ Every event and its payload: [[Webhooks]].
 
 ```js
 // Track leads in your analytics
-Murmur.on('lead', () => gtag('event', 'generate_lead', { method: 'chat' }));
+HelpPuff.on('lead', () => gtag('event', 'generate_lead', { method: 'chat' }));
 
 // A "Get a quote" button anywhere on your page
-document.querySelector('#quote').addEventListener('click', () => Murmur.send('I would like a quote'));
+document.querySelector('#quote').addEventListener('click', () => HelpPuff.send('I would like a quote'));
 
 // A signed-in customer: skip the form, the details go to the lead and the assistant
-Murmur.identify({ name: user.name, email: user.email });
+HelpPuff.identify({ name: user.name, email: user.email });
 ```
 
 See [[The widget|Widget#the-javascript-api]].
@@ -74,13 +74,13 @@ See [[The widget|Widget#the-javascript-api]].
 
 The `http` backend sends each message to your service and shows what it
 answers, rich messages included. Your service can call your database, your
-booking system, any model or framework. Murmur still provides the widget,
+booking system, any model or framework. HelpPuff still provides the widget,
 dashboard, leads, webhooks, rate limits and security. See
 [[Your own API|Provider-Your-Own-API]].
 
 ## Working from a fork
 
-The rest of this page changes Murmur's code. Set up a fork:
+The rest of this page changes HelpPuff's code. Set up a fork:
 
 ```bash
 git clone https://github.com/<you>/<your fork>.git && cd <your fork>
@@ -98,7 +98,7 @@ cd ~/my-assistant && node /path/to/your-fork/packages/cli/dist/cli.js deploy
 ```
 
 `pnpm pack:cli` makes an installable tarball instead
-(`npm install ./knowtific-murmur-<version>.tgz`). See [[Contributing]] for
+(`npm install ./knowtific-helppuff-<version>.tgz`). See [[Contributing]] for
 the repository's layout and rules.
 
 ### A new tool for the built-in assistant
@@ -150,8 +150,8 @@ case 'check_stock': {
 stock: z.boolean().default(false).describe('Answer stock questions from the Acme API.'),
 ```
 
-Then turn it on in the assistant's `murmur.json` (`"backend": { "tools": { "stock": true } }`),
-set the secret (`murmur secret set ACME_API_TOKEN`), and deploy with your build.
+Then turn it on in the assistant's `helppuff.json` (`"backend": { "tools": { "stock": true } }`),
+set the secret (`helppuff secret set ACME_API_TOKEN`), and deploy with your build.
 
 Rules that keep tools safe: never trust the arguments (validate with zod);
 never let a tool read another site's data or a secret it does not need; keep
@@ -192,7 +192,7 @@ The rules:
 
 - **State is small.** It rides in the signed session token: under 1 KB. Keep
   history in the provider (an id), or use `loadHistory` / `appendHistory`
-  (`history.ts` in `@murmur/connector-types`): they read the server's record
+  (`history.ts` in `@helppuff/connector-types`): they read the server's record
   of the conversation when there is one, and KV otherwise.
 - **Never make the visitor wait for a write.** Hand it to `ctx.waitUntil`;
   `appendHistory` and `saveScope` already do. Start reads early and await
@@ -205,15 +205,15 @@ The rules:
   counts and timings.
 - **Only stream text meant for the visitor** to `ctx.onText`: never reasoning
   or tool arguments.
-- To use Murmur's own knowledge base from your connector, call `ground()`
-  from `@murmur/rag` (as the OpenAI, Gemini and Anthropic connectors do with
-  `retrieval: "murmur"`).
+- To use HelpPuff's own knowledge base from your connector, call `ground()`
+  from `@helppuff/rag` (as the OpenAI, Gemini and Anthropic connectors do with
+  `retrieval: "helppuff"`).
 
 ### A lead sink
 
 A sink sends each lead somewhere (`packages/sinks/webhook` is the example):
 implement `onLead(ctx, event)` with `defineSink`, register it in
-`registry.ts`, and map a `murmur.json` setting to it in `compile.ts`. Sinks
+`registry.ts`, and map a `helppuff.json` setting to it in `compile.ts`. Sinks
 run after the reply, never block it, and their failures are only logged. For
 most destinations a [[webhook|Webhooks]] is simpler and needs no fork.
 
@@ -222,7 +222,7 @@ most destinations a [[webhook|Webhooks]] is simpler and needs no fork.
 Replies can be more than text: option chips, cards with buttons, carousels,
 link lists, inline forms and notices. Models produce them with three tools
 (`show_options`, `show_card`, `show_links`; schemas in `RICH_TOOL_SCHEMAS`,
-`@murmur/connector-types`), or with inline markers when a backend cannot take
+`@helppuff/connector-types`), or with inline markers when a backend cannot take
 tools:
 
 ```

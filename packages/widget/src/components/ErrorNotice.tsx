@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import type { WidgetConfig } from '@murmur/protocol';
+import type { WidgetConfig } from '@helppuff/protocol';
 import type { WidgetError } from '../app/store.js';
 import type { StringKey } from '../app/strings.js';
 
@@ -40,35 +40,35 @@ export function ErrorNotice({
   const expired = error.code === 'session_expired';
 
   return (
-    <div class="mm-inline-error" role="alert">
+    <div class="hp-inline-error" role="alert">
       <span>
         {error.message}
         {remaining > 0 ? ` (${formatWait(remaining)})` : ''}
       </span>
 
-      <div class="mm-error-actions">
+      <div class="hp-error-actions">
         {expired ? (
-          <button type="button" class="mm-chip" onClick={onNewChat}>
+          <button type="button" class="hp-chip" onClick={onNewChat}>
             {t('newChat')}
           </button>
         ) : error.retryable ? (
-          <button type="button" class="mm-chip" disabled={remaining > 0} onClick={onRetry}>
+          <button type="button" class="hp-chip" disabled={remaining > 0} onClick={onRetry}>
             {t('retry')}
           </button>
         ) : null}
 
         {showContact && contact?.phone ? (
-          <a class="mm-chip" href={`tel:${contact.phone}`} style={{ textDecoration: 'none' }}>
+          <a class="hp-chip" href={`tel:${contact.phone}`} style={{ textDecoration: 'none' }}>
             {t('callUs')}
           </a>
         ) : null}
         {showContact && contact?.email ? (
-          <a class="mm-chip" href={`mailto:${contact.email}`} style={{ textDecoration: 'none' }}>
+          <a class="hp-chip" href={`mailto:${contact.email}`} style={{ textDecoration: 'none' }}>
             {t('emailUs')}
           </a>
         ) : null}
 
-        <button type="button" class="mm-chip" onClick={onDismiss}>
+        <button type="button" class="hp-chip" onClick={onDismiss}>
           {t('dismiss')}
         </button>
       </div>

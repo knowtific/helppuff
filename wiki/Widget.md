@@ -12,7 +12,7 @@ cannot break it and it cannot break your page.
 
 Put it before `</body>` on every page, or in the layout your pages share.
 Dashboard → Home has yours, with a **Check my site** button. The page must be
-on one of the `origins` in `murmur.json`.
+on one of the `origins` in `helppuff.json`.
 
 | Attribute | |
 | --- | --- |
@@ -29,7 +29,7 @@ Home → Share a demo).
 
 Most of it is in **Dashboard → Settings**: names, welcome message, suggested
 questions, colour, position, button icon, the lead form. Everything else is
-under `widget` in `murmur.json`; see the
+under `widget` in `helppuff.json`; see the
 [[Configuration reference|Configuration-Reference#widget]]. Highlights:
 
 ```json
@@ -73,19 +73,19 @@ under `widget` in `murmur.json`; see the
 ## The JavaScript API
 
 ```js
-Murmur.open();                       // open the chat
-Murmur.close();
-Murmur.toggle();
-Murmur.send('Do you work on Sundays?');   // send a message as the visitor (opens the chat)
-Murmur.identify({ name: 'Ada', email: 'ada@example.com' });  // skip the lead form; details go to the lead
-Murmur.reset();                      // forget the conversation (e.g. on sign-out)
-Murmur.destroy();                    // remove the widget from the page
+HelpPuff.open();                       // open the chat
+HelpPuff.close();
+HelpPuff.toggle();
+HelpPuff.send('Do you work on Sundays?');   // send a message as the visitor (opens the chat)
+HelpPuff.identify({ name: 'Ada', email: 'ada@example.com' });  // skip the lead form; details go to the lead
+HelpPuff.reset();                      // forget the conversation (e.g. on sign-out)
+HelpPuff.destroy();                    // remove the widget from the page
 
-Murmur.on('open', () => …);
-Murmur.on('close', () => …);
-Murmur.on('lead', (lead) => …);      // the visitor submitted their details
-Murmur.on('message', ({ role, count }) => …);   // a reply arrived
-Murmur.off('lead', handler);
+HelpPuff.on('open', () => …);
+HelpPuff.on('close', () => …);
+HelpPuff.on('lead', (lead) => …);      // the visitor submitted their details
+HelpPuff.on('message', ({ role, count }) => …);   // a reply arrived
+HelpPuff.off('lead', handler);
 ```
 
 Calls made before the script has loaded are queued if you add this stub
@@ -93,9 +93,9 @@ first:
 
 ```html
 <script>
-  window.Murmur = window.Murmur || { q: [] };
+  window.HelpPuff = window.HelpPuff || { q: [] };
   ['open', 'close', 'toggle', 'send', 'identify', 'reset', 'on', 'off'].forEach(function (name) {
-    if (!window.Murmur[name]) window.Murmur[name] = function () { window.Murmur.q.push([name].concat([].slice.call(arguments))); };
+    if (!window.HelpPuff[name]) window.HelpPuff[name] = function () { window.HelpPuff.q.push([name].concat([].slice.call(arguments))); };
   });
 </script>
 ```
@@ -108,12 +108,12 @@ does nothing rather than throw.
 - **It never breaks your page.** Every failure (a missing config, a blocked
   network, an old browser) ends in a working widget or no widget, never an
   error on your page. It writes nothing to your `<head>`, sets no cookies, and
-  uses only `mm:`-prefixed local storage.
+  uses only `hp:`-prefixed local storage.
 - **Accessible.** Keyboard-only use, screen-reader announcements for replies,
   focus returned to the button on close, every target at least 44 px.
 - **Mobile.** Full screen on phones, no zoom on input focus, the composer
   stays above the keyboard.
 - **Conversations survive** page loads and reloads for the session's
   lifetime (`security.sessionTtlHours`, default 24).
-- **Debugging:** add `?mmdebug=1` to a page's URL to log what the widget does
-  to the console; `Murmur.debug()` returns its state.
+- **Debugging:** add `?hpdebug=1` to a page's URL to log what the widget does
+  to the console; `HelpPuff.debug()` returns its state.

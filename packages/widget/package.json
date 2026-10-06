@@ -1,5 +1,5 @@
 {
-  "name": "@murmur/widget",
+  "name": "@helppuff/widget",
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
@@ -14,7 +14,7 @@
     "preact": "^10.27.0"
   },
   "devDependencies": {
-    "@murmur/protocol": "workspace:*",
+    "@helppuff/protocol": "workspace:*",
     "vite": "^7.1.0",
     "typescript": "^5.9.2"
   },

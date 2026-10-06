@@ -39,7 +39,7 @@ mkdirSync(dist, { recursive: true });
  * they are minified here instead — worth ~35% of the CSS.
  */
 const minifyCssLiterals = {
-  name: 'murmur-minify-css',
+  name: 'helppuff-minify-css',
   transform(code, id) {
     if (!/(launcher-shell|widget\.css)\.ts$/.test(id)) return null;
     return {
@@ -63,7 +63,7 @@ const shared = {
   logLevel: 'warn',
   plugins: [minifyCssLiterals],
   esbuild: { jsx: 'automatic', jsxImportSource: 'preact', legalComments: 'none' },
-  define: { __MURMUR_VERSION__: JSON.stringify(version) },
+  define: { __HELPPUFF_VERSION__: JSON.stringify(version) },
 };
 
 // 1. The app chunk: an ES module, content-hashed, with Preact bundled privately.
@@ -82,7 +82,7 @@ await build({
       output: { format: 'es', entryFileNames: 'app-[hash].js', inlineDynamicImports: true },
     },
   },
-  define: { ...shared.define, __MURMUR_APP_FILE__: '""' },
+  define: { ...shared.define, __HELPPUFF_APP_FILE__: '""' },
 });
 
 const appFile = readdirSync(dist).find((name) => /^app-.*\.js$/.test(name));
@@ -104,7 +104,7 @@ await build({
   // The loader resolves this against its own script src at runtime.
   define: {
     ...shared.define,
-    __MURMUR_APP_FILE__: JSON.stringify(`./${appFile}`),
+    __HELPPUFF_APP_FILE__: JSON.stringify(`./${appFile}`),
   },
 });
 

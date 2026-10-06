@@ -1,5 +1,5 @@
-import { actionContent, HISTORY_MAX_TURNS, summarizeReply, trimHistory, type Turn } from '@murmur/connector-types';
-import type { Message } from '@murmur/protocol';
+import { actionContent, HISTORY_MAX_TURNS, summarizeReply, trimHistory, type Turn } from '@helppuff/connector-types';
+import type { Message } from '@helppuff/protocol';
 import type { D1Like } from '../db/d1.js';
 
 /**

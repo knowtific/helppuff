@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Flow, WidgetConfig } from '@murmur/protocol';
+import type { Flow, WidgetConfig } from '@helppuff/protocol';
 import { parseConfig } from '../src/app/validate.js';
 import {
   FLOW_ID_PREFIX,

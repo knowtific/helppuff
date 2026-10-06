@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type { ConfigResponse } from '@murmur/protocol';
+import type { ConfigResponse } from '@helppuff/protocol';
 import { resolveSite } from '../config/site.js';
 import { getConnector } from '../core/registry.js';
 import { dbFrom } from '../db/d1.js';
@@ -54,7 +54,7 @@ function capabilitiesFor(ctx: RequestCtx, site: SiteConfig): ConfigResponse['cap
 export const configRoutes = new Hono<HonoEnv>();
 
 configRoutes.get('/v1/sites/:siteId/config', async (c) => {
-  const ctx = c.get('mm');
+  const ctx = c.get('helppuff');
   const siteId = c.req.param('siteId');
   const site = await resolveSite(ctx, siteId);
 

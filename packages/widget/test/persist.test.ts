@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Message } from '@murmur/protocol';
+import type { Message } from '@helppuff/protocol';
 import { PERSIST_VERSION, clear, load, save, storageKey, type Persisted } from '../src/app/persist.js';
 import { MAX_STORED_MESSAGES, initialState, type State } from '../src/app/store.js';
 
@@ -77,12 +77,12 @@ describe('save and load', () => {
     expect(restored?.messages).toHaveLength(1);
   });
 
-  it('uses one key per site, prefixed mm:', () => {
+  it('uses one key per site, prefixed hp:', () => {
     const storage = fakeStorage();
     install(storage);
     save('demo', liveState());
-    expect([...storage.raw.keys()]).toEqual(['mm:demo']);
-    expect(storageKey('other')).toBe('mm:other');
+    expect([...storage.raw.keys()]).toEqual(['hp:demo']);
+    expect(storageKey('other')).toBe('hp:other');
   });
 
   it('writes nothing when there is no session to keep', () => {
@@ -114,7 +114,7 @@ describe('load rejects anything it cannot trust', () => {
   const rejects = (stored: unknown) => {
     const storage = fakeStorage();
     install(storage);
-    storage.raw.set('mm:demo', typeof stored === 'string' ? stored : JSON.stringify(stored));
+    storage.raw.set('hp:demo', typeof stored === 'string' ? stored : JSON.stringify(stored));
     return load('demo');
   };
 
@@ -153,9 +153,9 @@ describe('load rejects anything it cannot trust', () => {
   it('erases a payload it rejected, so the next load starts clean', () => {
     const storage = fakeStorage();
     install(storage);
-    storage.raw.set('mm:demo', '{ not json');
+    storage.raw.set('hp:demo', '{ not json');
     load('demo');
-    expect(storage.raw.has('mm:demo')).toBe(false);
+    expect(storage.raw.has('hp:demo')).toBe(false);
   });
 
   it('treats a malformed field as absent rather than failing the whole restore', () => {

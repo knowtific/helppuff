@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/preact';
-import type { Message } from '@murmur/protocol';
+import type { Message } from '@helppuff/protocol';
 import { MessageView, inertHandlers, type MessageHandlers } from '../src/components/messages/index.js';
 import { Api } from '../src/app/api.js';
 

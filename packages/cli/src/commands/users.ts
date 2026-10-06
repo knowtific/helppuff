@@ -12,7 +12,7 @@ import { openBrowser } from '../engine/browser.js';
 import type { Ctx } from './context.js';
 
 /**
- * `murmur users` — who can sign in to the dashboard.
+ * `helppuff users` — who can sign in to the dashboard.
  *
  *   add <email> [--password p]     a teammate (password generated if omitted)
  *   remove <email>
@@ -52,11 +52,11 @@ export async function usersCommand(ctx: Ctx): Promise<number> {
     let active = false;
     if (live && loaded.project.cloudflare.url) {
       ctx.out.progress('Waiting for the new password to reach every Cloudflare location…');
-      active = await waitForSignIn(loaded.project.cloudflare.url, email, password, loadEnv(loaded.dir)['MURMUR_SECRET']);
+      active = await waitForSignIn(loaded.project.cloudflare.url, email, password, loadEnv(loaded.dir)['HELPPUFF_SECRET']);
     }
     ctx.out.result({ email, updated: live ? 'worker and .env' : '.env (deploy to publish)', active, ...(generated ? { password } : {}) }, () => {
       ctx.out.success(
-        `Password for ${email} ${live ? (active ? 'changed — sign in now' : 'changed; it can take a minute to apply everywhere') : 'saved; run `murmur deploy` to publish it'}.`,
+        `Password for ${email} ${live ? (active ? 'changed — sign in now' : 'changed; it can take a minute to apply everywhere') : 'saved; run `helppuff deploy` to publish it'}.`,
       );
       if (generated) ctx.out.info(`  New password: ${c.bold(password)}  ${c.dim('(shown once)')}`);
     });
@@ -82,12 +82,12 @@ export async function usersCommand(ctx: Ctx): Promise<number> {
     case 'add':
     case 'reset': {
       if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-        throw new CliError('usage', `Usage: murmur users ${sub} <email> [--password <p>]`, { exitCode: 2 });
+        throw new CliError('usage', `Usage: helppuff users ${sub} <email> [--password <p>]`, { exitCode: 2 });
       }
-      if (email === owner) throw new CliError('usage', `${email} is the owner; use \`murmur users reset ${email}\`.`, { exitCode: 2 });
+      if (email === owner) throw new CliError('usage', `${email} is the owner; use \`helppuff users reset ${email}\`.`, { exitCode: 2 });
       const exists = (await query('SELECT email FROM admins WHERE email = ?', [email])).length > 0;
-      if (sub === 'add' && exists) throw new CliError('user_exists', `${email} can already sign in.`, { hint: `murmur users reset ${email}` });
-      if (sub === 'reset' && !exists) throw new CliError('no_user', `${email} is not a dashboard user.`, { hint: `murmur users add ${email}` });
+      if (sub === 'add' && exists) throw new CliError('user_exists', `${email} can already sign in.`, { hint: `helppuff users reset ${email}` });
+      if (sub === 'reset' && !exists) throw new CliError('no_user', `${email} is not a dashboard user.`, { hint: `helppuff users add ${email}` });
       const { password, generated } = await passwordFor(ctx);
       await query(
         `INSERT INTO admins (email, password_hash, created_at) VALUES (?, ?, ?)
@@ -101,28 +101,28 @@ export async function usersCommand(ctx: Ctx): Promise<number> {
       return 0;
     }
     case 'remove': {
-      if (!email) throw new CliError('usage', 'Usage: murmur users remove <email>', { exitCode: 2 });
+      if (!email) throw new CliError('usage', 'Usage: helppuff users remove <email>', { exitCode: 2 });
       if (email === owner) throw new CliError('usage', 'The owner cannot be removed; change dashboard.adminEmail instead.', { exitCode: 2 });
       await query('DELETE FROM admins WHERE email = ?', [email]);
       ctx.out.result({ email, action: 'removed' }, () => ctx.out.success(`${email} can no longer sign in.`));
       return 0;
     }
     default:
-      throw new CliError('usage', 'Usage: murmur users list | add <email> | remove <email> | reset <email>', { exitCode: 2 });
+      throw new CliError('usage', 'Usage: helppuff users list | add <email> | remove <email> | reset <email>', { exitCode: 2 });
   }
 }
 
 /**
- * `murmur dashboard` — a one-time sign-in link (15 minutes), or the setup
+ * `helppuff dashboard` — a one-time sign-in link (15 minutes), or the setup
  * link when nobody has claimed the dashboard yet. The recovery path for a
  * lost password: whoever holds the project's admin key can always get in.
  */
 export async function dashboardCommand(ctx: Ctx): Promise<number> {
   assertKnown(ctx.flags, ['email', 'browser'], 'dashboard');
   const loaded = loadProject(ctx.cwd);
-  if (!loaded.project.dashboard.enabled) throw new CliError('dashboard_disabled', 'The dashboard is turned off in murmur.json.');
+  if (!loaded.project.dashboard.enabled) throw new CliError('dashboard_disabled', 'The dashboard is turned off in helppuff.json.');
   const url = loaded.project.cloudflare.url;
-  if (!url) throw new CliError('not_deployed', 'Deploy first to get a dashboard.', { hint: 'murmur deploy' });
+  if (!url) throw new CliError('not_deployed', 'Deploy first to get a dashboard.', { hint: 'helppuff deploy' });
   const dashboard = dashboardUrl(url);
   if (loadEnv(loaded.dir)['ADMIN_API_KEY']) {
     const api = adminApi(loaded);

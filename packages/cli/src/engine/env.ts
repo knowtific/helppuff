@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs
 import { join } from 'node:path';
 
 /**
- * `.env` next to murmur.json: where secrets live on this machine. Deploy
+ * `.env` next to helppuff.json: where secrets live on this machine. Deploy
  * copies the ones the project references into Worker secrets; nothing else
  * reads it. It is added to .gitignore the first time it is written.
  *
@@ -50,7 +50,7 @@ export function writeEnvVar(dir: string, name: string, value: string): void {
     ? existing.replace(pattern, line)
     : `${existing}${existing && !existing.endsWith('\n') ? '\n' : ''}${line}\n`;
   writeFileSync(file, next, { mode: 0o600 });
-  ensureGitignore(dir, [ENV_FILE, '.murmur/']);
+  ensureGitignore(dir, [ENV_FILE, '.helppuff/']);
 }
 
 export function ensureGitignore(dir: string, entries: string[]): void {
@@ -59,7 +59,7 @@ export function ensureGitignore(dir: string, entries: string[]): void {
   const lines = new Set(existing.split(/\r?\n/).map((line) => line.trim()));
   const missing = entries.filter((entry) => !lines.has(entry) && !lines.has(`/${entry}`));
   if (missing.length === 0) return;
-  const block = `${existing && !existing.endsWith('\n') ? '\n' : ''}${existing ? '\n' : ''}# Murmur: secrets and generated deploy files\n${missing.join('\n')}\n`;
+  const block = `${existing && !existing.endsWith('\n') ? '\n' : ''}${existing ? '\n' : ''}# HelpPuff: secrets and generated deploy files\n${missing.join('\n')}\n`;
   appendFileSync(file, block);
 }
 

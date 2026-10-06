@@ -1,7 +1,7 @@
 import { projectJsonSchema } from './schema.js';
 
 /**
- * The wiki's configuration reference: every murmur.json field, its type,
+ * The wiki's configuration reference: every helppuff.json field, its type,
  * default, limits and description, generated from the JSON Schema (itself
  * generated from the Zod schemas the CLI validates with). `pnpm sync:plugin`
  * writes it; a test fails when it is stale. To change the text, change the
@@ -108,12 +108,12 @@ export function configReferencePage(): string {
   const schema = projectJsonSchema() as Node;
   const props = schema.properties ?? {};
   const out: string[] = [
-    '<!-- Generated from the murmur.json schema by `pnpm sync:plugin`. Change a field\'s `.describe()`, not this page. -->',
+    '<!-- Generated from the helppuff.json schema by `pnpm sync:plugin`. Change a field\'s `.describe()`, not this page. -->',
     '',
     '# Configuration reference',
     '',
-    'Every field of `murmur.json`. Generated from the schema `murmur` validates against, so it is',
-    'always exact; `murmur schema` prints the same as JSON Schema. For what these files are and how',
+    'Every field of `helppuff.json`. Generated from the schema `helppuff` validates against, so it is',
+    'always exact; `helppuff schema` prints the same as JSON Schema. For what these files are and how',
     'they relate to the dashboard, see [[Configuration]].',
     '',
     'Secrets are never values here: a field marked `{ env }` takes the name of an environment',

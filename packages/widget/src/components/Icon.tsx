@@ -1,4 +1,4 @@
-import type { IconName } from '@murmur/protocol';
+import type { IconName } from '@helppuff/protocol';
 import { ICON_PATHS } from '../lib/icons.js';
 
 export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {

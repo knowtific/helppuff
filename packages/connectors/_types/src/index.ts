@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { Capabilities, Message, SendRequest, StartSessionRequest } from '@murmur/protocol';
+import type { Capabilities, Message, SendRequest, StartSessionRequest } from '@helppuff/protocol';
 import type { Turn } from './history.js';
 import type { PromptGuidance } from './prompt.js';
 
@@ -54,9 +54,9 @@ export type ConnectorContext<Opts> = {
    */
   history?: () => Promise<Turn[]>;
   /**
-   * What Murmur says around the owner's prompt, from the site's settings:
+   * What HelpPuff says around the owner's prompt, from the site's settings:
    * `resolvePrompt` puts the owner's text between `before` and `after`.
-   * Present when Murmur owns this connector's prompt.
+   * Present when HelpPuff owns this connector's prompt.
    */
   guidance?: PromptGuidance;
   /** Report how long a stage took (`rag.embed`, `llm.first_token`…), for the request's Server-Timing. */
@@ -84,7 +84,7 @@ export interface Connector<Opts = unknown, State = unknown> {
   /**
    * The option that carries this site's system prompt, so a new prompt
    * version can replace it. `null` (or absent) when the prompt lives
-   * somewhere Murmur does not own — a Retell agent, an OpenAI stored prompt,
+   * somewhere HelpPuff does not own — a Retell agent, an OpenAI stored prompt,
    * the owner's own API.
    */
   promptOption?(options: Opts): string | null;
@@ -129,7 +129,7 @@ export interface ErasedConnector {
   parseOptions(input: unknown): unknown;
   /** Whether replies stream for these (already parsed) options. */
   streams(options: unknown): boolean;
-  /** Which option holds the prompt for these (already parsed) options, if Murmur owns it. */
+  /** Which option holds the prompt for these (already parsed) options, if HelpPuff owns it. */
   promptOption(options: unknown): string | null;
   builtInPrompt(options: unknown): string | null;
   start(

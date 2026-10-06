@@ -5,7 +5,7 @@ import { DEFAULT_BACKEND, PROMPT_FILE, resourceName, type Backend, type ProjectI
 import { DEFAULT_LEAD_FORM, PROVIDER_KEYS, defaultModel, guessName, type Answers, type Facts } from './questions.js';
 import { originsFor, normalizeUrl, siteIdFor, type SiteInfo } from './site.js';
 
-/** Answers + what was learned → murmur.json, prompt.md and the secrets to store. */
+/** Answers + what was learned → helppuff.json, prompt.md and the secrets to store. */
 
 export type Generated = {
   project: ProjectInput;
@@ -59,11 +59,11 @@ export function generateProject(answers: Answers, facts: Facts): Generated {
       backend = {
         type: 'http',
         url: answers.httpUrl!,
-        mode: answers.httpMode ?? 'murmur',
-        ...(answers.httpToken || facts.env['MURMUR_BACKEND_TOKEN'] ? { token: { env: 'MURMUR_BACKEND_TOKEN' } } : {}),
+        mode: answers.httpMode ?? 'helppuff',
+        ...(answers.httpToken || facts.env['HELPPUFF_BACKEND_TOKEN'] ? { token: { env: 'HELPPUFF_BACKEND_TOKEN' } } : {}),
       };
-      if (answers.httpToken) secrets['MURMUR_BACKEND_TOKEN'] = answers.httpToken;
-      if (!answers.httpMode) assumed['httpMode'] = 'murmur';
+      if (answers.httpToken) secrets['HELPPUFF_BACKEND_TOKEN'] = answers.httpToken;
+      if (!answers.httpMode) assumed['httpMode'] = 'helppuff';
       break;
     case 'retell':
       backend = { type: 'retell', agentId: answers.retellAgent! };
@@ -83,7 +83,7 @@ export function generateProject(answers: Answers, facts: Facts): Generated {
   if (!website) assumed['origins'] = 'http://localhost:3000 (add your real site to `origins` before going live)';
 
   const project: ProjectInput = {
-    $schema: './.murmur/murmur.schema.json',
+    $schema: './.helppuff/helppuff.schema.json',
     site: siteId,
     name,
     ...(website ? { website } : {}),
@@ -180,7 +180,7 @@ function widgetFor(name: string, site: SiteInfo | null): Record<string, unknown>
 /**
  * A starting prompt.md: only what is specific to the business. Who the
  * assistant is, its goal, tone and length are settings (`assistant` in
- * murmur.json), and Murmur adds its rules itself (`server/src/core/guidance.ts`),
+ * helppuff.json), and HelpPuff adds its rules itself (`server/src/core/guidance.ts`),
  * so none of that is written here to go stale or be contradicted. Backends
  * that are not given the business details get the contact details here.
  */

@@ -1,8 +1,8 @@
-import type { LeadEvent, SinkContext } from '@murmur/sink-types';
-import type { Lead, VisitorContext } from '@murmur/protocol';
+import type { LeadEvent, SinkContext } from '@helppuff/sink-types';
+import type { Lead, VisitorContext } from '@helppuff/protocol';
 import type { SiteConfig } from '../config/schema.js';
 import { resolveSecrets } from '../config/load.js';
-import { MurmurError } from './errors.js';
+import { HelpPuffError } from './errors.js';
 import { getSink } from './registry.js';
 import type { RequestCtx } from './request.js';
 
@@ -55,7 +55,7 @@ export function dispatchLead(
            * simply down.
            */
           const detail =
-            error instanceof MurmurError
+            error instanceof HelpPuffError
               ? error.detail
               : error instanceof Error
                 ? error.message.slice(0, 120)

@@ -1,4 +1,4 @@
-import { HTTP_STATUS_FOR_ERROR, type ErrorCode, type ErrorEnvelope } from '@murmur/protocol';
+import { HTTP_STATUS_FOR_ERROR, type ErrorCode, type ErrorEnvelope } from '@helppuff/protocol';
 
 /** Default visitor-facing copy. Never leaks a backend's own error text. */
 const DEFAULT_MESSAGES: Record<ErrorCode, string> = {
@@ -14,7 +14,7 @@ const DEFAULT_MESSAGES: Record<ErrorCode, string> = {
   internal: 'Something went wrong on our end.',
 };
 
-export class MurmurError extends Error {
+export class HelpPuffError extends Error {
   readonly code: ErrorCode;
   readonly retryAfter?: number;
   /** Structured log detail — never sent to the visitor. */
@@ -22,7 +22,7 @@ export class MurmurError extends Error {
 
   constructor(code: ErrorCode, options: { message?: string; retryAfter?: number; detail?: string } = {}) {
     super(options.message ?? DEFAULT_MESSAGES[code]);
-    this.name = 'MurmurError';
+    this.name = 'HelpPuffError';
     this.code = code;
     if (options.retryAfter !== undefined) this.retryAfter = options.retryAfter;
     if (options.detail !== undefined) this.detail = options.detail;
@@ -43,16 +43,16 @@ export class MurmurError extends Error {
   }
 }
 
-export function isMurmurError(value: unknown): value is MurmurError {
-  return value instanceof MurmurError;
+export function isHelpPuffError(value: unknown): value is HelpPuffError {
+  return value instanceof HelpPuffError;
 }
 
 /**
- * Turn anything thrown into a MurmurError. An unexpected throw becomes a
+ * Turn anything thrown into a HelpPuffError. An unexpected throw becomes a
  * generic `internal` — the original text never reaches the visitor.
  */
-export function toMurmurError(thrown: unknown): MurmurError {
-  if (isMurmurError(thrown)) return thrown;
+export function toHelpPuffError(thrown: unknown): HelpPuffError {
+  if (isHelpPuffError(thrown)) return thrown;
   const detail = thrown instanceof Error ? `${thrown.name}: ${thrown.message}` : 'unknown_throw';
-  return new MurmurError('internal', { detail });
+  return new HelpPuffError('internal', { detail });
 }

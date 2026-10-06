@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { defineSink, signBody, type Sink } from '@murmur/sink-types';
+import { defineSink, signBody, type Sink } from '@helppuff/sink-types';
 
 /**
  * POST the lead as JSON to any URL. Covers Zapier, Make, n8n, a Google
@@ -47,7 +47,7 @@ const webhook: Sink<WebhookOptions> = {
       headers[name] = value(raw, `header ${name}`);
     }
     if (ctx.options.signingSecret) {
-      headers['X-Murmur-Signature'] = await signBody(value(ctx.options.signingSecret, 'signingSecret'), body);
+      headers['X-HelpPuff-Signature'] = await signBody(value(ctx.options.signingSecret, 'signingSecret'), body);
     }
 
     const controller = new AbortController();

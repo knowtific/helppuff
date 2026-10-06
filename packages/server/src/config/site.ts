@@ -1,10 +1,10 @@
-import type { MurmurConfig, SiteConfig } from './schema.js';
+import type { HelpPuffConfig, SiteConfig } from './schema.js';
 import { assistantConfigSchema, storedSiteConfigSchema } from './schema.js';
-import { MurmurError } from '../core/errors.js';
+import { HelpPuffError } from '../core/errors.js';
 import type { Platform } from '../core/platform.js';
 
 /**
- * Site config, read from KV first and the bundled `murmur.config.ts` second.
+ * Site config, read from KV first and the bundled `helppuff.config.ts` second.
  *
  * The bundled config is compiled into the Worker, so changing it is a deploy.
  * A `config:<siteId>` key in KV overrides it at runtime, which is what makes a
@@ -32,11 +32,11 @@ export function siteConfigKey(siteId: string): string {
   return `${SITE_CONFIG_PREFIX}${siteId}`;
 }
 
-type Ctx = { config: MurmurConfig; platform: Pick<Platform, 'kv' | 'log'> };
+type Ctx = { config: HelpPuffConfig; platform: Pick<Platform, 'kv' | 'log'> };
 
 export async function resolveSite(ctx: Ctx, siteId: string): Promise<SiteConfig> {
   const bundled = ctx.config.sites[siteId];
-  if (!bundled) throw new MurmurError('not_found', { detail: 'unknown_site' });
+  if (!bundled) throw new HelpPuffError('not_found', { detail: 'unknown_site' });
 
   const stored = await ctx.platform.kv.get(siteConfigKey(siteId), {
     cacheTtl: SITE_CONFIG_CACHE_TTL,

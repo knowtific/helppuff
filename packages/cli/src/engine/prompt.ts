@@ -10,7 +10,7 @@ import {
   type PromptMeta,
   type PromptVersionRow,
   type StoredSiteConfig,
-} from '@murmur/server';
+} from '@helppuff/server';
 import { CliError } from '../errors.js';
 import { gitEmail } from './admins.js';
 import { cloudflareSession, type CloudflareSession } from './credentials.js';
@@ -23,7 +23,7 @@ import { readState, writeState, type State } from './state.js';
  * The owner can change the prompt in the dashboard, and so can anyone else
  * who deploys, so prompt.md is not automatically the latest. Every publish
  * gets a version number (`prompt` in the site's KV config; the full history
- * in D1 when the dashboard is on), and `.murmur/state.json` remembers which
+ * in D1 when the dashboard is on), and `.helppuff/state.json` remembers which
  * version this folder's prompt.md was last published as or pulled from.
  * Comparing the three tells a local edit from a remote one:
  *
@@ -36,7 +36,7 @@ import { readState, writeState, type State } from './state.js';
  *   not_deployed  nothing live yet
  *
  * Deploy refuses `behind` and `diverged` rather than overwrite a change it
- * has not seen. The server shares the hash and SQL (`@murmur/server`), so
+ * has not seen. The server shares the hash and SQL (`@helppuff/server`), so
  * both sides agree on what "the same prompt" means.
  */
 
@@ -117,7 +117,7 @@ export async function readLivePrompt(remote: Remote, site: string): Promise<{ li
 /** The deployment this project points at. Throws if it has not been deployed. */
 export async function remoteFor(loaded: LoadedProject, env: Record<string, string>): Promise<Remote> {
   const kvNamespaceId = loaded.project.cloudflare.kvNamespaceId;
-  if (!kvNamespaceId) throw new CliError('not_deployed', 'This assistant has not been deployed yet.', { hint: 'murmur deploy' });
+  if (!kvNamespaceId) throw new CliError('not_deployed', 'This assistant has not been deployed yet.', { hint: 'helppuff deploy' });
   const cf = await cloudflareSession(env, { accountId: loaded.project.cloudflare.accountId });
   const d1DatabaseId = dashboardEnabled(loaded.project) ? (loaded.project.cloudflare.d1DatabaseId ?? null) : null;
   return { cf, kvNamespaceId, d1DatabaseId };
@@ -150,7 +150,7 @@ export function driftError(sync: 'behind' | 'diverged', live: LivePrompt, base: 
   const name = basename(file);
   if (sync === 'behind') {
     return new CliError('prompt_behind', `The live prompt is now ${describeLive(live)}; ${name} is still version ${base?.version ?? '?'}.`, {
-      hint: `Run \`murmur prompt pull\` to bring ${name} up to date, then deploy again.`,
+      hint: `Run \`helppuff prompt pull\` to bring ${name} up to date, then deploy again.`,
       details: { live: live.version, local: base?.version ?? null },
     });
   }
@@ -160,7 +160,7 @@ export function driftError(sync: 'behind' | 'diverged', live: LivePrompt, base: 
       ? `The live prompt changed to ${describeLive(live)}, and ${name} has edits of its own since version ${base.version}.`
       : `${name} differs from the live prompt, ${describeLive(live)}, and this folder has not synced with it before.`,
     {
-      hint: `Run \`murmur prompt pull\`: it keeps your ${name} as ${mineName(name)} and brings in version ${live.version}. Merge what you need into ${name}, then deploy again.`,
+      hint: `Run \`helppuff prompt pull\`: it keeps your ${name} as ${mineName(name)} and brings in version ${live.version}. Merge what you need into ${name}, then deploy again.`,
       details: { live: live.version, local: base?.version ?? null },
     },
   );
@@ -187,7 +187,7 @@ export async function recordPublish(
     } catch (thrown) {
       if (/UNIQUE|constraint/i.test((thrown as Error).message)) {
         throw new CliError('prompt_behind', `Someone published prompt version ${version} a moment ago.`, {
-          hint: 'Run `murmur prompt pull`, then deploy again.',
+          hint: 'Run `helppuff prompt pull`, then deploy again.',
         });
       }
       throw thrown;
@@ -228,19 +228,19 @@ export type PullResult = {
 export async function pullPrompt(loaded: LoadedProject, remote: Remote, options: { version?: number } = {}): Promise<PullResult> {
   const site = loaded.project.site;
   const { live } = await readLivePrompt(remote, site);
-  if (!live) throw new CliError('not_deployed', 'There is no live prompt to pull yet.', { hint: 'murmur deploy' });
-  if (!live.editable) throw new CliError('prompt_not_versioned', 'This backend keeps its prompt outside Murmur, so there is nothing to pull.');
+  if (!live) throw new CliError('not_deployed', 'There is no live prompt to pull yet.', { hint: 'helppuff deploy' });
+  if (!live.editable) throw new CliError('prompt_not_versioned', 'This backend keeps its prompt outside HelpPuff, so there is nothing to pull.');
 
   let text = live.text;
   let pulled = live.version;
   if (options.version !== undefined && options.version !== live.version) {
     if (!remote.d1DatabaseId) {
       throw new CliError('no_history', 'Older versions are kept in the dashboard database, which this project does not have.', {
-        hint: 'Turn the dashboard on (murmur config set dashboard.adminEmail you@example.com) and deploy.',
+        hint: 'Turn the dashboard on (helppuff config set dashboard.adminEmail you@example.com) and deploy.',
       });
     }
     const [row] = await versionRows<PromptVersionRow & { text: string }>(remote, PROMPT_SQL.get, [site, options.version]);
-    if (!row) throw new CliError('no_such_version', `There is no prompt version ${options.version}.`, { hint: 'murmur prompt history' });
+    if (!row) throw new CliError('no_such_version', `There is no prompt version ${options.version}.`, { hint: 'helppuff prompt history' });
     text = row.text;
     pulled = row.version;
   }
@@ -266,7 +266,7 @@ export async function pullPrompt(loaded: LoadedProject, remote: Remote, options:
 export async function promptHistory(remote: Remote, site: string, limit = 50): Promise<PromptVersionRow[]> {
   if (!remote.d1DatabaseId) {
     throw new CliError('no_history', 'Prompt history is kept in the dashboard database, which this project does not have.', {
-      hint: 'Turn the dashboard on (murmur config set dashboard.adminEmail you@example.com) and deploy.',
+      hint: 'Turn the dashboard on (helppuff config set dashboard.adminEmail you@example.com) and deploy.',
     });
   }
   return versionRows<PromptVersionRow>(remote, PROMPT_SQL.list, [site, limit]);
@@ -274,6 +274,6 @@ export async function promptHistory(remote: Remote, site: string, limit = 50): P
 
 export async function promptVersionText(remote: Remote, site: string, version: number): Promise<string> {
   const [row] = await versionRows<{ text: string }>(remote, PROMPT_SQL.get, [site, version]);
-  if (!row) throw new CliError('no_such_version', `There is no prompt version ${version}.`, { hint: 'murmur prompt history' });
+  if (!row) throw new CliError('no_such_version', `There is no prompt version ${version}.`, { hint: 'helppuff prompt history' });
   return row.text;
 }

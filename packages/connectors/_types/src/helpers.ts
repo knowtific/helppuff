@@ -1,4 +1,4 @@
-import { readSse, SseIdleTimeout, type Message, type MessageBody, type Option, type Role } from '@murmur/protocol';
+import { readSse, SseIdleTimeout, type Message, type MessageBody, type Option, type Role } from '@helppuff/protocol';
 import { ConnectorError } from './errors.js';
 
 /** Outbound calls from a connector time out at 25s. */

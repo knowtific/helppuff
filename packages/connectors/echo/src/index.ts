@@ -1,4 +1,4 @@
-import type { Message, MessageBody, SendRequest } from '@murmur/protocol';
+import type { Message, MessageBody, SendRequest } from '@helppuff/protocol';
 import {
   ConnectorError,
   defineConnector,
@@ -6,7 +6,7 @@ import {
   messageId,
   text,
   type Connector,
-} from '@murmur/connector-types';
+} from '@helppuff/connector-types';
 import { echoOptionsSchema, type EchoOptions } from './schema.js';
 
 export type EchoState = { turn: number };
@@ -18,7 +18,7 @@ function agent(body: MessageBody): Message {
 }
 
 const LONG_PARAGRAPH = [
-  'Murmur keeps the widget and the backend apart on purpose.',
+  'HelpPuff keeps the widget and the backend apart on purpose.',
   'The widget speaks one small REST protocol and knows nothing about which',
   'assistant is answering, which means the same bundle works against Retell,',
   'an OpenAI-compatible endpoint, or a webhook you wrote this afternoon.',
@@ -65,7 +65,7 @@ async function respond(command: string, raw: string, delayMs: number): Promise<M
           type: 'card',
           title: 'Emergency callout',
           body: 'A technician on site within 60 minutes, any hour of the day.',
-          image: { src: 'https://picsum.photos/seed/murmur/640/360', alt: 'A service van', aspect: '16:9' },
+          image: { src: 'https://picsum.photos/seed/helppuff/640/360', alt: 'A service van', aspect: '16:9' },
           actions: [
             { id: 'book', kind: 'reply', label: 'Book it', value: 'book emergency callout' },
             { id: 'call', kind: 'tel', label: 'Call now', phone: '+61400000000' },

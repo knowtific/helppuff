@@ -1,31 +1,31 @@
 # Deployment
 
-`murmur deploy` (or a bare `npx @knowtific/murmur` in a project folder)
+`helppuff deploy` (or a bare `npx @knowtific/helppuff` in a project folder)
 creates or updates everything on your Cloudflare account. It is safe to run
 at any time: it finds what exists before creating anything, and never creates
 anything twice.
 
 ## What it creates
 
-Everything is named **`knowtific-murmur-<site>`**, so it is easy to find on
+Everything is named **`knowtific-helppuff-<site>`**, so it is easy to find on
 your account and never mistaken for anything else.
 
 | Resource | Holds | For |
 | --- | --- | --- |
-| **Worker** `knowtific-murmur-<site>` | the widget files, the chat API, the dashboard | everything |
+| **Worker** `knowtific-helppuff-<site>` | the widget files, the chat API, the dashboard | everything |
 | **KV namespace** | the live config (settings, prompt), new-conversation counters | everything |
 | **Rate limiter** (binding, no resource) | messages per visitor a minute, counted where the visitor is | everything |
 | **D1 database** | conversations (also the source of the chat limits and the model's history), leads, dashboard accounts, webhooks, the knowledge base's text and full-text index | the dashboard and `workers-ai` |
-| **Vectorize index** (1024 dimensions, cosine) | one vector per knowledge passage | `workers-ai` and `"retrieval": "murmur"` |
-| **Workflow** `knowtific-murmur-<site>-crawl` | background jobs: crawls, file processing, each conversation's summary and `conversation.completed`, webhook retries | every assistant with a dashboard |
+| **Vectorize index** (1024 dimensions, cosine) | one vector per knowledge passage | `workers-ai` and `"retrieval": "helppuff"` |
+| **Workflow** `knowtific-helppuff-<site>-crawl` | background jobs: crawls, file processing, each conversation's summary and `conversation.completed`, webhook retries | every assistant with a dashboard |
 | **Workers AI**, **Browser Rendering** | bindings, no resource | answers, embeddings; pages drawn by JavaScript |
 | **AI Search instance** | the provider's index | the `cloudflare` and `anthropic` backends |
 
 plus a daily cron that re-learns sites whose schedule is due, and two
-generated secrets: `MURMUR_SECRET` and `ADMIN_API_KEY` (in your `.env` and set
+generated secrets: `HELPPUFF_SECRET` and `ADMIN_API_KEY` (in your `.env` and set
 on the Worker).
 
-The Worker's address is `https://knowtific-murmur-<site>.<your subdomain>.workers.dev`;
+The Worker's address is `https://knowtific-helppuff-<site>.<your subdomain>.workers.dev`;
 `deploy` prints it, with the dashboard, the demo page and the script.
 
 ## What a deploy does
@@ -34,7 +34,7 @@ The Worker's address is `https://knowtific-murmur-<site>.<your subdomain>.worker
 2. Checks the secrets the config needs are present.
 3. Finds or creates KV, D1 (and applies pending database migrations), Vectorize and AI Search.
 4. Refuses to overwrite a prompt or settings changed in the dashboard since
-   this folder last pulled them (see [[Configuration|Configuration#the-dashboard-and-murmurjson]]).
+   this folder last pulled them (see [[Configuration|Configuration#the-dashboard-and-helppuffjson]]).
 5. Uploads the Worker, **only when its code or bindings changed**. A new
    release always uploads it.
 6. Sets secrets that are missing or changed.
@@ -59,7 +59,7 @@ running on the last good one.
 ## One Worker serves everything
 
 ```
-https://knowtific-murmur-acme.you.workers.dev
+https://knowtific-helppuff-acme.you.workers.dev
 ├── /loader.js, /app-<hash>.js   the widget: static files, served from Cloudflare's edge
 ├── /v1/*                        the chat API
 ├── /admin/                      the dashboard (and /admin/api/*)
@@ -76,7 +76,7 @@ your site.
 app file anywhere, and point the script at the Worker with `data-api`:
 
 ```html
-<script src="https://cdn.acme.com/murmur/loader.js" data-site="acme" data-api="https://knowtific-murmur-acme.you.workers.dev" async></script>
+<script src="https://cdn.acme.com/helppuff/loader.js" data-site="acme" data-api="https://knowtific-helppuff-acme.you.workers.dev" async></script>
 ```
 
 ## Before going live
@@ -89,15 +89,15 @@ app file anywhere, and point the script at the Worker with `data-api`:
    only layer that tells a person from a script; see [[Security]].
 4. Business details are right (Settings → Business details), so visitors can
    still reach you when the assistant cannot help.
-5. `murmur doctor` passes.
+5. `helppuff doctor` passes.
 
 ## Logs
 
 Workers observability is turned on. In the Cloudflare dashboard, open the
-Worker → **Logs** to see requests, errors and the events Murmur logs (event
+Worker → **Logs** to see requests, errors and the events HelpPuff logs (event
 names, ids, counts and timings; never message text or contact details).
 
 ## Removing it
 
-`murmur destroy --yes` deletes every resource above. Irreversible: the
+`helppuff destroy --yes` deletes every resource above. Irreversible: the
 database's conversations, leads and knowledge go with it.

@@ -29,14 +29,14 @@ export default defineConfig({
 
   webServer: [
     {
-      command: 'pnpm --filter @murmur/server exec wrangler dev --port 8787 --local',
+      command: 'pnpm --filter @helppuff/server exec wrangler dev --port 8787 --local',
       url: 'http://localhost:8787/healthz',
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
       stdout: 'ignore',
     },
     {
-      command: 'pnpm --filter @murmur/widget exec vite --port 5173 --strictPort',
+      command: 'pnpm --filter @helppuff/widget exec vite --port 5173 --strictPort',
       url: 'http://localhost:5173/',
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,

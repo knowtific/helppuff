@@ -29,8 +29,8 @@ export function mount(runtime: Runtime): AppHandle {
   applyStyles(runtime.root, BASE_TOKENS + RESET + LOADER_CSS + WIDGET_CSS + themeOverrides(config));
 
   const container = document.createElement('div');
-  // Carries the typography reset (see `.mm-root` in launcher-shell.ts).
-  container.className = 'mm-root';
+  // Carries the typography reset (see `.hp-root` in launcher-shell.ts).
+  container.className = 'hp-root';
   runtime.root.appendChild(container);
   runtime.disposer.add(() => {
     try {

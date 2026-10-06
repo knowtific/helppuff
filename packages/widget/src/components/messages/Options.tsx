@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import type { Message, Option } from '@murmur/protocol';
+import type { Message, Option } from '@helppuff/protocol';
 import { Icon } from '../Icon.js';
 import { renderMarkdown } from '../../lib/markdown.js';
 
@@ -27,17 +27,17 @@ export function OptionsMessage({
     );
 
   return (
-    <div class="mm-options">
+    <div class="hp-options">
       {message.text ? (
-        <div class="mm-agent" dangerouslySetInnerHTML={{ __html: renderMarkdown(message.text) }} />
+        <div class="hp-agent" dangerouslySetInnerHTML={{ __html: renderMarkdown(message.text) }} />
       ) : null}
 
-      <div class="mm-chips">
+      <div class="hp-chips">
         {message.options.map((option, index) => (
           <button
             key={option.id}
             type="button"
-            class="mm-chip"
+            class="hp-chip"
             // Staggered entrance, capped so a long list does not crawl in.
             style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
             disabled={consumed}
@@ -53,7 +53,7 @@ export function OptionsMessage({
       {message.multi && !consumed ? (
         <button
           type="button"
-          class="mm-btn mm-confirm"
+          class="hp-btn hp-confirm"
           disabled={checked.length === 0}
           onClick={() => onPick(message.options.filter((option) => checked.includes(option.id)))}
         >

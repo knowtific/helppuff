@@ -1,5 +1,5 @@
-import type { Field, Lead } from '@murmur/protocol';
-import { MurmurError } from './errors.js';
+import type { Field, Lead } from '@helppuff/protocol';
+import { HelpPuffError } from './errors.js';
 
 /** Each lead value is capped independently of the field's own rules; a message box gets more room. */
 export const MAX_LEAD_VALUE_LENGTH = 200;
@@ -22,7 +22,7 @@ export function validateLead(lead: Lead | undefined, fields: readonly Field[]): 
 
     if (!value) {
       if (field.required) {
-        throw new MurmurError('bad_request', {
+        throw new HelpPuffError('bad_request', {
           message: `Please fill in ${field.label}.`,
           detail: `lead_missing:${field.name}`,
         });
@@ -31,35 +31,35 @@ export function validateLead(lead: Lead | undefined, fields: readonly Field[]): 
     }
 
     if (value.length > (field.type === 'textarea' ? MAX_LEAD_TEXTAREA_LENGTH : MAX_LEAD_VALUE_LENGTH)) {
-      throw new MurmurError('bad_request', {
+      throw new HelpPuffError('bad_request', {
         message: `${field.label} is too long.`,
         detail: `lead_too_long:${field.name}`,
       });
     }
 
     if (field.type === 'email' && !EMAIL_RE.test(value)) {
-      throw new MurmurError('bad_request', {
+      throw new HelpPuffError('bad_request', {
         message: `Please enter a valid ${field.label.toLowerCase()}.`,
         detail: `lead_bad_email:${field.name}`,
       });
     }
 
     if (field.type === 'tel' && !TEL_RE.test(value)) {
-      throw new MurmurError('bad_request', {
+      throw new HelpPuffError('bad_request', {
         message: `Please enter a valid ${field.label.toLowerCase()}.`,
         detail: `lead_bad_tel:${field.name}`,
       });
     }
 
     if (field.type === 'select' && field.options && !field.options.includes(value)) {
-      throw new MurmurError('bad_request', {
+      throw new HelpPuffError('bad_request', {
         message: `Please choose one of the options for ${field.label}.`,
         detail: `lead_bad_option:${field.name}`,
       });
     }
 
     if (field.pattern && !matchesPattern(value, field.pattern)) {
-      throw new MurmurError('bad_request', {
+      throw new HelpPuffError('bad_request', {
         message: `Please check ${field.label}.`,
         detail: `lead_bad_pattern:${field.name}`,
       });

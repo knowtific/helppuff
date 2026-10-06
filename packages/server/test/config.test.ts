@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Field } from '@murmur/protocol';
+import type { Field } from '@helppuff/protocol';
 import { collectSecretNames, defineConfig, getSite, resolveSecrets } from '../src/config/load.js';
-import { isMurmurError } from '../src/core/errors.js';
+import { isHelpPuffError } from '../src/core/errors.js';
 import { validateLead } from '../src/core/lead.js';
 import { hashIp, memoryKv, resilientKv } from '../src/core/platform.js';
 
@@ -32,7 +32,7 @@ describe('defineConfig', () => {
         (thrown as () => void)();
         return false;
       } catch (error) {
-        return isMurmurError(error) && error.code === 'not_found';
+        return isHelpPuffError(error) && error.code === 'not_found';
       }
     });
   });
@@ -58,8 +58,8 @@ describe('resolveSecrets', () => {
       resolveSecrets({ apiKey: { env: 'NOT_SET' } }, env);
       expect.unreachable('should have thrown');
     } catch (error) {
-      expect(isMurmurError(error)).toBe(true);
-      if (isMurmurError(error)) {
+      expect(isHelpPuffError(error)).toBe(true);
+      if (isHelpPuffError(error)) {
         expect(error.detail).toBe('missing_secret:NOT_SET');
         expect(error.message).not.toContain('NOT_SET');
       }
@@ -89,7 +89,7 @@ describe('validateLead', () => {
       fn();
       return null;
     } catch (error) {
-      return isMurmurError(error) ? error.detail : 'not_a_murmur_error';
+      return isHelpPuffError(error) ? error.detail : 'not_a_helppuff_error';
     }
   };
 

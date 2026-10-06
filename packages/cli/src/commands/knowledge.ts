@@ -9,7 +9,7 @@ import { cloudflareSession } from '../engine/credentials.js';
 import { startCrawlFromCli, type CrawlRequest } from '../engine/deploy.js';
 import { loadEnv } from '../engine/env.js';
 import { indexingStatus, syncKnowledge } from '../engine/knowledge.js';
-import { aiSearchInstanceFor, loadProject, updateProject, usesMurmurKnowledge, type LoadedProject } from '../engine/project.js';
+import { aiSearchInstanceFor, loadProject, updateProject, usesHelpPuffKnowledge, type LoadedProject } from '../engine/project.js';
 import { describeIndexing } from './setup.js';
 import type { Ctx } from './context.js';
 
@@ -17,16 +17,16 @@ import type { Ctx } from './context.js';
  * The knowledge base from the terminal (workers-ai): the same admin API the
  * dashboard's onboarding and Knowledge page use.
  *
- *   murmur discover                       pages found, by category, pre-ticked or not
- *   murmur crawl [--all|--urls|--file|--include] [--wait]
- *   murmur ask "<question>"               the answer, plus the passages it came from
- *   murmur knowledge status|sync|add|list|remove|pages|facts
+ *   helppuff discover                       pages found, by category, pre-ticked or not
+ *   helppuff crawl [--all|--urls|--file|--include] [--wait]
+ *   helppuff ask "<question>"               the answer, plus the passages it came from
+ *   helppuff knowledge status|sync|add|list|remove|pages|facts
  */
 
 function requireWorkersAi(loaded: LoadedProject, command: string): void {
-  if (!usesMurmurKnowledge(loaded.project)) {
-    throw new CliError('not_workers_ai', `\`murmur ${command}\` works with Murmur's own knowledge base; this project's ${loaded.project.backend.type} backend keeps its own.`, {
-      hint: 'Use the workers-ai backend, or set `backend.retrieval` to "murmur" (openai, gemini, anthropic), then `murmur deploy`. Or use `murmur knowledge sync`.',
+  if (!usesHelpPuffKnowledge(loaded.project)) {
+    throw new CliError('not_workers_ai', `\`helppuff ${command}\` works with HelpPuff's own knowledge base; this project's ${loaded.project.backend.type} backend keeps its own.`, {
+      hint: 'Use the workers-ai backend, or set `backend.retrieval` to "helppuff" (openai, gemini, anthropic), then `helppuff deploy`. Or use `helppuff knowledge sync`.',
       exitCode: EXIT.usage,
     });
   }
@@ -43,7 +43,7 @@ export async function discoverCommand(ctx: Ctx): Promise<number> {
   const found = await adminApi(loaded).send<Discovery>('POST', '/admin/api/knowledge/discover', {});
   const selected = found.urls.filter((u) => u.selected).length;
   ctx.out.result(
-    { ...found, total: found.urls.length, selected, next: ['murmur crawl --json   (crawls the selected pages)', 'murmur crawl --urls <a,b> --json'] },
+    { ...found, total: found.urls.length, selected, next: ['helppuff crawl --json   (crawls the selected pages)', 'helppuff crawl --urls <a,b> --json'] },
     () => {
       const groups = new Map<string, DiscoveredUrl[]>();
       for (const u of found.urls) groups.set(u.category, [...(groups.get(u.category) ?? []), u]);
@@ -53,7 +53,7 @@ export async function discoverCommand(ctx: Ctx): Promise<number> {
         if (urls.length > 40) process.stdout.write(c.dim(`  … ${urls.length - 40} more\n`));
       }
       for (const warning of found.warnings) ctx.out.warn(warning);
-      process.stdout.write(`\n${selected} of ${found.urls.length} page(s) selected. Next: ${c.cyan('murmur crawl --wait')}\n`);
+      process.stdout.write(`\n${selected} of ${found.urls.length} page(s) selected. Next: ${c.cyan('helppuff crawl --wait')}\n`);
     },
   );
   return 0;
@@ -89,7 +89,7 @@ export async function waitForCrawl(api: AdminApi, runId: string, onProgress: (st
     onProgress(status);
     if (!status.run || status.run.id !== runId || !['queued', 'running'].includes(status.run.status)) return status;
     if (Date.now() - start > timeoutMs) {
-      throw new CliError('crawl_timeout', 'The crawl is still running; it continues in the background.', { hint: 'murmur knowledge status' });
+      throw new CliError('crawl_timeout', 'The crawl is still running; it continues in the background.', { hint: 'helppuff knowledge status' });
     }
     await new Promise((r) => setTimeout(r, 3000));
   }
@@ -106,8 +106,8 @@ export async function crawlCommand(ctx: Ctx): Promise<number> {
     ? await startCrawlFromCli(api, request, ctx.out.progress)
     : await api.send<{ runId: string; total: number }>('POST', '/admin/api/knowledge/crawl', {});
   if (!ctx.flags['wait']) {
-    ctx.out.result({ ...started, status: 'started', next: ['murmur knowledge status --json', `murmur crawl --wait`] }, () =>
-      ctx.out.success(`Crawling ${started.total} page(s) in the background on Cloudflare. Check with ${c.cyan('murmur knowledge status')}.`),
+    ctx.out.result({ ...started, status: 'started', next: ['helppuff knowledge status --json', `helppuff crawl --wait`] }, () =>
+      ctx.out.success(`Crawling ${started.total} page(s) in the background on Cloudflare. Check with ${c.cyan('helppuff knowledge status')}.`),
     );
     return 0;
   }
@@ -119,7 +119,7 @@ export async function crawlCommand(ctx: Ctx): Promise<number> {
   });
   ctx.out.result({ ...started, status: final.run?.status ?? 'unknown', run: final.run, pages: final.pages, chunks: final.chunks }, () => {
     ctx.out.success(`Crawl ${final.run?.status}: ${final.run?.done ?? 0} page(s) indexed, ${final.run?.failed ?? 0} skipped or failed, ${final.chunks} passages.`);
-    if (final.run?.failed) ctx.out.info(`See why: ${c.cyan('murmur knowledge pages --status error')}`);
+    if (final.run?.failed) ctx.out.info(`See why: ${c.cyan('helppuff knowledge pages --status error')}`);
   });
   return final.run?.status === 'done' ? 0 : 1;
 }
@@ -130,13 +130,13 @@ export async function askCommand(ctx: Ctx): Promise<number> {
   assertKnown(ctx.flags, ['session', 'url', 'timing'], 'ask');
   const loaded = loadProject(ctx.cwd);
   const question = ctx.positionals.join(' ').trim();
-  if (!question) throw new CliError('usage', 'Ask something: murmur ask "Do you service Lilydale?"', { exitCode: EXIT.usage });
+  if (!question) throw new CliError('usage', 'Ask something: helppuff ask "Do you service Lilydale?"', { exitCode: EXIT.usage });
   const url = str(ctx.flags, 'url') ?? loaded.project.cloudflare.url;
-  if (!url) throw new CliError('not_deployed', 'Deploy first.', { hint: 'murmur deploy' });
+  if (!url) throw new CliError('not_deployed', 'Deploy first.', { hint: 'helppuff deploy' });
   const env = loadEnv(loaded.dir);
   const [turn, search] = await Promise.all([
-    chat({ url, site: loaded.project.site, origin: new URL(url).origin, message: question, session: str(ctx.flags, 'session'), secret: env['MURMUR_SECRET'] }),
-    usesMurmurKnowledge(loaded.project) ? adminApi(loaded, { url }).send<Search>('POST', '/admin/api/knowledge/search', { query: question }).catch(() => null) : Promise.resolve(null),
+    chat({ url, site: loaded.project.site, origin: new URL(url).origin, message: question, session: str(ctx.flags, 'session'), secret: env['HELPPUFF_SECRET'] }),
+    usesHelpPuffKnowledge(loaded.project) ? adminApi(loaded, { url }).send<Search>('POST', '/admin/api/knowledge/search', { query: question }).catch(() => null) : Promise.resolve(null),
   ]);
   const sources = (search?.chunks ?? []).map((ch) => ({ url: ch.url, section: ch.headingPath, score: Math.round(ch.score * 1000) / 1000, excerpt: ch.content.slice(0, 240) }));
   ctx.out.result({ reply: turn.reply, sources, session: turn.session, retrieval: search?.trace ?? null, timing: { ...turn.timing, roundTrip: turn.elapsedMs }, messages: turn.messages }, () => {
@@ -183,9 +183,9 @@ async function uploadDocuments(ctx: Ctx, api: AdminApi, dir: string, paths: stri
     await new Promise((r) => setTimeout(r, 3000));
     files = (await api.get<{ files: KnowledgeFile[] }>('/admin/api/knowledge/files')).files.filter((f) => ids.includes(f.id));
   }
-  ctx.out.result({ files, next: files.some(busyFile) ? ['murmur knowledge files --json'] : ['murmur ask "<a question the file answers>" --json'] }, () => {
+  ctx.out.result({ files, next: files.some(busyFile) ? ['helppuff knowledge files --json'] : ['helppuff ask "<a question the file answers>" --json'] }, () => {
     for (const f of files) process.stdout.write(`${fileLine(f)}\n`);
-    if (files.some(busyFile)) process.stdout.write(c.dim('Follow it with `murmur knowledge files`.\n'));
+    if (files.some(busyFile)) process.stdout.write(c.dim('Follow it with `helppuff knowledge files`.\n'));
   });
   return files.some((f) => f.status === 'error') ? EXIT.error : 0;
 }
@@ -198,7 +198,7 @@ const fileLine = (f: KnowledgeFile) => {
 export async function knowledgeCommand(ctx: Ctx): Promise<number> {
   const [sub, ...rest] = ctx.positionals;
   const loaded = loadProject(ctx.cwd);
-  if (!usesMurmurKnowledge(loaded.project)) return legacyKnowledge(ctx, loaded, sub);
+  if (!usesHelpPuffKnowledge(loaded.project)) return legacyKnowledge(ctx, loaded, sub);
   const api = adminApi(loaded);
 
   switch (sub) {
@@ -211,7 +211,7 @@ export async function knowledgeCommand(ctx: Ctx): Promise<number> {
           [
             `${c.bold('Passages')}  ${status.chunks}`,
             `${c.bold('Pages')}     ${Object.entries(status.pages).map(([k, v]) => `${v} ${k}`).join(' · ') || 'none yet'}`,
-            run ? `${c.bold('Last crawl')} ${run.status} — ${run.done}/${run.total} indexed${run.failed ? `, ${run.failed} failed` : ''}` : `${c.bold('Last crawl')} never — run ${c.cyan('murmur crawl')}`,
+            run ? `${c.bold('Last crawl')} ${run.status} — ${run.done}/${run.total} indexed${run.failed ? `, ${run.failed} failed` : ''}` : `${c.bold('Last crawl')} never — run ${c.cyan('helppuff crawl')}`,
             `${c.bold('Today')}     ${status.usage.messages} answer(s), ${status.usage.neurons} of ${status.usage.budget} neurons (${status.usage.state}) · ~${status.usage.messagesLeft} answers left`,
           ].join('\n') + '\n',
         );
@@ -224,21 +224,21 @@ export async function knowledgeCommand(ctx: Ctx): Promise<number> {
     }
     case 'upload': {
       assertKnown(ctx.flags, ['wait'], 'knowledge');
-      if (!rest.length) throw new CliError('usage', 'Usage: murmur knowledge upload <file…> [--wait]', { exitCode: EXIT.usage });
+      if (!rest.length) throw new CliError('usage', 'Usage: helppuff knowledge upload <file…> [--wait]', { exitCode: EXIT.usage });
       return uploadDocuments(ctx, api, loaded.dir, rest, ctx.flags['wait'] === true);
     }
     case 'files': {
       assertKnown(ctx.flags, [], 'knowledge');
       if (rest[0] === 'remove') {
         const id = rest[1];
-        if (!id) throw new CliError('usage', 'Usage: murmur knowledge files remove <id>', { exitCode: EXIT.usage });
+        if (!id) throw new CliError('usage', 'Usage: helppuff knowledge files remove <id>', { exitCode: EXIT.usage });
         const removed = await api.send<{ chunks: number }>('DELETE', `/admin/api/knowledge/files/${encodeURIComponent(id)}`);
         ctx.out.result({ id, removed: true, chunks: removed.chunks }, () => ctx.out.success(`Removed ${id} (${removed.chunks} passage(s)).`));
         return 0;
       }
       const { files } = await api.get<{ files: KnowledgeFile[] }>('/admin/api/knowledge/files');
       ctx.out.result({ files }, () => {
-        if (!files.length) process.stdout.write(c.dim('No files yet. Upload one with `murmur knowledge upload price-list.pdf`.\n'));
+        if (!files.length) process.stdout.write(c.dim('No files yet. Upload one with `helppuff knowledge upload price-list.pdf`.\n'));
         for (const f of files) process.stdout.write(`${fileLine(f)}\n`);
       });
       return 0;
@@ -260,7 +260,7 @@ export async function knowledgeCommand(ctx: Ctx): Promise<number> {
         title ??= (/^#\s+(.+)$/m.exec(content)?.[1] ?? basename(path)).trim();
       }
       if (!title || !content.trim()) {
-        throw new CliError('usage', 'Usage: murmur knowledge add --file faq.md  |  --title "Warranty" --text "…"', { exitCode: EXIT.usage });
+        throw new CliError('usage', 'Usage: helppuff knowledge add --file faq.md  |  --title "Warranty" --text "…"', { exitCode: EXIT.usage });
       }
       const id = str(ctx.flags, 'id');
       const added = await api.send<{ id: string; chunks: number }>('POST', '/admin/api/knowledge/manual', { title, content, ...(id ? { id } : {}) });
@@ -271,7 +271,7 @@ export async function knowledgeCommand(ctx: Ctx): Promise<number> {
       assertKnown(ctx.flags, [], 'knowledge');
       const { entries } = await api.get<{ entries: { id: string; title: string; updatedAt: number }[] }>('/admin/api/knowledge/manual');
       ctx.out.result({ entries }, () => {
-        if (!entries.length) process.stdout.write(c.dim('No hand-written entries. Add one with `murmur knowledge add --file faq.md`.\n'));
+        if (!entries.length) process.stdout.write(c.dim('No hand-written entries. Add one with `helppuff knowledge add --file faq.md`.\n'));
         for (const e of entries) process.stdout.write(`${e.id.padEnd(38)} ${e.title}\n`);
       });
       return 0;
@@ -279,7 +279,7 @@ export async function knowledgeCommand(ctx: Ctx): Promise<number> {
     case 'remove': {
       assertKnown(ctx.flags, [], 'knowledge');
       const id = rest[0];
-      if (!id) throw new CliError('usage', 'Usage: murmur knowledge remove <id>', { exitCode: EXIT.usage });
+      if (!id) throw new CliError('usage', 'Usage: helppuff knowledge remove <id>', { exitCode: EXIT.usage });
       await api.send('DELETE', `/admin/api/knowledge/manual/${encodeURIComponent(id)}`);
       ctx.out.result({ id, removed: true }, () => ctx.out.success(`Removed ${id}.`));
       return 0;
@@ -302,10 +302,10 @@ export async function knowledgeCommand(ctx: Ctx): Promise<number> {
       assertKnown(ctx.flags, ['apply'], 'knowledge');
       const { questions, source } = await api.send<{ questions: string[]; source: string }>('POST', '/admin/api/knowledge/suggest-questions', {});
       if (ctx.flags['apply']) await api.send('PUT', '/admin/api/settings', { settings: { starterQuestions: questions } });
-      ctx.out.result({ questions, source, applied: Boolean(ctx.flags['apply']), ...(ctx.flags['apply'] ? { next: ['murmur config pull --json'] } : {}) }, () => {
+      ctx.out.result({ questions, source, applied: Boolean(ctx.flags['apply']), ...(ctx.flags['apply'] ? { next: ['helppuff config pull --json'] } : {}) }, () => {
         for (const q of questions) process.stdout.write(`  • ${q}\n`);
         process.stdout.write(
-          c.dim(ctx.flags['apply'] ? 'Live now as the suggested questions. Run `murmur config pull` to keep them in murmur.json.\n' : 'Add --apply to show them in the widget.\n'),
+          c.dim(ctx.flags['apply'] ? 'Live now as the suggested questions. Run `helppuff config pull` to keep them in helppuff.json.\n' : 'Add --apply to show them in the widget.\n'),
         );
       });
       return 0;
@@ -316,7 +316,7 @@ export async function knowledgeCommand(ctx: Ctx): Promise<number> {
         const facts: Record<string, string> = {};
         for (const pair of rest.slice(1)) {
           const [key, ...value] = pair.split('=');
-          if (!key || !value.length) throw new CliError('usage', 'Usage: murmur knowledge facts set phone="03 9876 5432" hours="Mon-Fri 8am-5pm"', { exitCode: EXIT.usage });
+          if (!key || !value.length) throw new CliError('usage', 'Usage: helppuff knowledge facts set phone="03 9876 5432" hours="Mon-Fri 8am-5pm"', { exitCode: EXIT.usage });
           facts[key] = value.join('=');
         }
         const saved = await api.send<{ facts: unknown[] }>('PUT', '/admin/api/knowledge/facts', { facts });
@@ -325,15 +325,15 @@ export async function knowledgeCommand(ctx: Ctx): Promise<number> {
       }
       const { facts } = await api.get<{ facts: { key: string; value: string; source: string | null }[] }>('/admin/api/knowledge/facts');
       ctx.out.result({ facts }, () => {
-        if (!facts.length) process.stdout.write(c.dim('No facts yet: they are learned from the crawl, or set with `murmur knowledge facts set key=value`.\n'));
+        if (!facts.length) process.stdout.write(c.dim('No facts yet: they are learned from the crawl, or set with `helppuff knowledge facts set key=value`.\n'));
         for (const f of facts) process.stdout.write(`${f.key.padEnd(14)} ${f.value}${f.source === 'owner' ? c.dim('  (you)') : ''}\n`);
       });
       return 0;
     }
     default:
-      throw new CliError('usage', 'Usage: murmur knowledge status | sync | add | list | remove <id> | pages | facts [set k=v …] | suggest [--apply]', {
+      throw new CliError('usage', 'Usage: helppuff knowledge status | sync | add | list | remove <id> | pages | facts [set k=v …] | suggest [--apply]', {
         exitCode: EXIT.usage,
-        hint: 'murmur knowledge --help',
+        hint: 'helppuff knowledge --help',
       });
   }
 }
@@ -345,16 +345,16 @@ async function legacyKnowledge(ctx: Ctx, loaded: LoadedProject, sub: string | un
     const cf = await cloudflareSession(loadEnv(loaded.dir));
     const status = await indexingStatus(cf.api, cf.accountId, loaded.project);
     ctx.out.result({ indexing: status }, () =>
-      process.stdout.write(`${status ? describeIndexing(status) : 'This backend has no AI Search index; see `murmur status`.'}\n`),
+      process.stdout.write(`${status ? describeIndexing(status) : 'This backend has no AI Search index; see `helppuff status`.'}\n`),
     );
     return 0;
   }
-  if (sub !== 'sync') throw new CliError('usage', 'Usage: murmur knowledge sync | status', { exitCode: EXIT.usage, hint: 'murmur knowledge --help' });
+  if (sub !== 'sync') throw new CliError('usage', 'Usage: helppuff knowledge sync | status', { exitCode: EXIT.usage, hint: 'helppuff knowledge --help' });
   const env = loadEnv(loaded.dir);
   const cf = aiSearchInstanceFor(loaded.project) ? await cloudflareSession(env) : undefined;
   const result = await syncKnowledge(loaded, { env, progress: ctx.out.progress, ...(cf ? { cf } : {}) });
   if (result.backendUpdate) updateProject(loaded, (raw) => Object.assign(raw['backend'] as object, result.backendUpdate));
-  const next = result.backendUpdate ? ['murmur deploy --json   (publishes the new store id)'] : [];
+  const next = result.backendUpdate ? ['helppuff deploy --json   (publishes the new store id)'] : [];
   ctx.out.result({ ...result, next }, () => {
     ctx.out.success(
       result.target === 'none'
@@ -362,7 +362,7 @@ async function legacyKnowledge(ctx: Ctx, loaded: LoadedProject, sub: string | un
         : `${result.uploaded} document(s) → ${result.target} (${result.pages} page(s), ${result.files} file(s)${result.removed ? `, ${result.removed} removed` : ''})`,
     );
     for (const skipped of result.skipped) ctx.out.warn(`Skipped ${skipped}`);
-    if (next.length) ctx.out.info(`Run ${c.cyan('murmur deploy')} to switch the assistant to the new knowledge.`);
+    if (next.length) ctx.out.info(`Run ${c.cyan('helppuff deploy')} to switch the assistant to the new knowledge.`);
   });
   return 0;
 }

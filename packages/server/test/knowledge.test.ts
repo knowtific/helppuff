@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { runCrawlPart, runFileJob, uploadKey, type CrawlParams, type FileParams } from '@murmur/rag';
+import { runCrawlPart, runFileJob, uploadKey, type CrawlParams, type FileParams } from '@helppuff/rag';
 import { defineConfig } from '../src/config/load.js';
 import { resetSchemaMemo } from '../src/db/d1.js';
 import { memoryKv } from '../src/core/platform.js';
@@ -50,9 +50,9 @@ function world(env: Record<string, unknown> = {}): World {
   const created: { id?: string; params: CrawlParams }[] = [];
   const pending: Promise<unknown>[] = [];
   const bindings = {
-    MURMUR_SECRET: SECRET,
-    MURMUR_KV: kv,
-    MURMUR_DB: db,
+    HELPPUFF_SECRET: SECRET,
+    HELPPUFF_KV: kv,
+    HELPPUFF_DB: db,
     AI: ai,
     VECTORS: vectors,
     CRAWL_WORKFLOW: { create: async (o: { id?: string; params: CrawlParams }) => void created.push(o) },
@@ -182,7 +182,7 @@ describe('knowledge', () => {
     await send(w.api, 'PUT', '/admin/api/knowledge/facts', { facts: { phone: '1300 000 000', email: '' } });
     const facts = (await (await get(w.api, '/admin/api/knowledge/facts')).json()) as { facts: { key: string; value: string; source: string }[] };
     expect(facts.facts).toEqual([{ key: 'phone', value: '1300 000 000', source: 'owner', sourceUrl: 'owner' }]);
-    const passage = w.db.raw.prepare("SELECT content FROM chunks WHERE url = 'murmur://facts'").get() as { content: string };
+    const passage = w.db.raw.prepare("SELECT content FROM chunks WHERE url = 'helppuff://facts'").get() as { content: string };
     expect(passage.content).toContain('Phone: 1300 000 000');
   });
 
@@ -246,7 +246,7 @@ describe('settings', () => {
     expect((await options()).retrieval).toBeUndefined();
   });
 
-  it('shows the rules Murmur adds to the prompt, read-only, next to it', async () => {
+  it('shows the rules HelpPuff adds to the prompt, read-only, next to it', async () => {
     const w = world();
     const view = (await (await get(w.api, '/admin/api/prompt')).json()) as { text: string; builtIn: string | null };
     expect(view.text).toBe('You help Acme.');
@@ -285,7 +285,7 @@ describe('one-time links', () => {
     const token = minted.url.split('/').pop()!;
     expect(minted.url).toMatch(/\/admin\/#\/setup\//);
 
-    const browser = harness(config(), { MURMUR_SECRET: SECRET, MURMUR_KV: w.kv, MURMUR_DB: w.db, ADMIN_API_KEY: API_KEY }, ADMIN);
+    const browser = harness(config(), { HELPPUFF_SECRET: SECRET, HELPPUFF_KV: w.kv, HELPPUFF_DB: w.db, ADMIN_API_KEY: API_KEY }, ADMIN);
     expect((await browser.fetch(`/admin/api/setup?token=${token}`)).status).toBe(200);
     expect((await browser.fetch('/admin/api/setup?token=nope-nope-nope-nope-nope')).status).toBe(404);
 
@@ -306,7 +306,7 @@ describe('one-time links', () => {
     const loginToken = login.url.split('/').pop()!;
     const signedIn = await browser.post('/admin/api/login-link', { token: loginToken });
     expect(signedIn.status).toBe(200);
-    expect(signedIn.headers.get('Set-Cookie')).toMatch(/^mm_admin=/);
+    expect(signedIn.headers.get('Set-Cookie')).toMatch(/^hp_admin=/);
     expect((await browser.post('/admin/api/login-link', { token: loginToken })).status).toBe(404);
   });
 
@@ -323,7 +323,7 @@ describe('feedback and form leads', () => {
     const pending: Promise<unknown>[] = [];
     const h = harness(
       defineConfig({ sites: { demo: { origins: [ORIGIN], connector: { type: 'echo' }, widget: { leadForm: { enabled: false } } } } }),
-      { MURMUR_SECRET: SECRET, MURMUR_KV: memoryKv(), MURMUR_DB: db },
+      { HELPPUFF_SECRET: SECRET, HELPPUFF_KV: memoryKv(), HELPPUFF_DB: db },
       ORIGIN,
       (p) => pending.push(p),
     );
@@ -385,7 +385,7 @@ describe('instructions', () => {
     expect(view.settings.behaviour).toEqual({ goal: 'answers', tone: 'casual', length: 'detailed', prices: 'share' });
   });
 
-  it('shows everything Murmur adds around the prompt, and the lines of the prompt that repeat it', async () => {
+  it('shows everything HelpPuff adds around the prompt, and the lines of the prompt that repeat it', async () => {
     const w = world();
     const published = await send(w.api, 'POST', '/admin/api/prompt', {
       text: 'You are the website assistant for Acme.\nBe warm and friendly.\nWe only work in the eastern suburbs.\nCall us on 03 9876 5432.',
@@ -426,7 +426,7 @@ describe('the rate-limit gate', () => {
         },
       },
     });
-    const h = harness(config, { MURMUR_SECRET: SECRET, MURMUR_KV: memoryKv(), MURMUR_DB: db, AI: ai, VECTORS: fakeVectors() }, ORIGIN, () => {});
+    const h = harness(config, { HELPPUFF_SECRET: SECRET, HELPPUFF_KV: memoryKv(), HELPPUFF_DB: db, AI: ai, VECTORS: fakeVectors() }, ORIGIN, () => {});
     const start = (await (await h.post('/v1/sites/acme/sessions', { context: { pageUrl: `${ORIGIN}/` } })).json()) as { sessionToken: string };
     const send = (text: string) => h.post('/v1/sessions/messages', { kind: 'text', text, clientId: text }, { headers: { Authorization: `Bearer ${start.sessionToken}` } });
 

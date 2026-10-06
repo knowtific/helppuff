@@ -27,7 +27,7 @@
  */
 
 const SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-const SCRIPT_ID = 'mm-turnstile';
+const SCRIPT_ID = 'hp-turnstile';
 
 /** Loading the script. Generous: a cold CDN fetch on a bad connection. */
 const LOAD_TIMEOUT_MS = 10_000;

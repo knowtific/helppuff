@@ -1,4 +1,4 @@
-import { MurmurError } from './errors.js';
+import { HelpPuffError } from './errors.js';
 import type { Platform } from './platform.js';
 
 /**
@@ -70,5 +70,5 @@ export async function assertTurnstile(
 
   // Error codes are Cloudflare's, not the visitor's business.
   platform.log('captcha.failed', { codes: result.codes.join(',') || 'none' });
-  throw new MurmurError('captcha_failed', { detail: `turnstile:${result.codes[0] ?? 'unknown'}` });
+  throw new HelpPuffError('captcha_failed', { detail: `turnstile:${result.codes[0] ?? 'unknown'}` });
 }

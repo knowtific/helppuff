@@ -1,5 +1,5 @@
-import { STREAM_MEDIA_TYPE, sseFrame } from '@murmur/protocol';
-import { toMurmurError } from './errors.js';
+import { STREAM_MEDIA_TYPE, sseFrame } from '@helppuff/protocol';
+import { toHelpPuffError } from './errors.js';
 import type { PreparedConnector } from './run.js';
 import type { RequestCtx } from './request.js';
 
@@ -59,7 +59,7 @@ export function streamResponse(
       ctx.platform.log('timing', { path, ...ctx.timing.summary() });
       await write('done', body);
     } catch (thrown) {
-      const error = toMurmurError(thrown);
+      const error = toHelpPuffError(thrown);
       ctx.platform.log('request.error', { code: error.code, detail: error.detail ?? 'none', path, streamed: true });
       await write('error', error.toEnvelope().error);
     } finally {

@@ -21,9 +21,9 @@ import {
   type FileParams,
   usageDay,
   writeFacts,
-} from '@murmur/rag';
+} from '@helppuff/rag';
 import { resolveSite } from '../config/site.js';
-import { MurmurError } from '../core/errors.js';
+import { HelpPuffError } from '../core/errors.js';
 import type { HonoEnv } from '../core/request.js';
 import { aiSettingsFor, requireKnowledgeEnv, websiteFor, type KnowledgeEnv } from '../knowledge/env.js';
 import { cancelCrawl, crawlStatus, discoverSite, startCrawl, userAgentFor, type CrawlTrigger } from '../knowledge/crawl.js';
@@ -31,7 +31,7 @@ import { assertSameOrigin, currentAdmin, jsonBody, siteParam } from './guard.js'
 
 /**
  * The knowledge base, under `/admin/api/knowledge`: what the dashboard's
- * onboarding and Knowledge page use, and what `murmur discover / crawl /
+ * onboarding and Knowledge page use, and what `helppuff discover / crawl /
  * status / knowledge / ask` call with the admin API key. One API, two
  * front ends.
  */
@@ -42,7 +42,7 @@ const FACT_KEYS = ['name', 'phone', 'email', 'address', 'hours', 'serviceAreas',
 
 async function siteOf(c: Context<HonoEnv>, value: unknown) {
   const siteId = siteParam(c, value);
-  const ctx = c.get('mm');
+  const ctx = c.get('helppuff');
   return { siteId, site: await resolveSite(ctx, siteId), env: requireKnowledgeEnv(ctx.env), now: ctx.platform.now() };
 }
 
@@ -184,13 +184,13 @@ knowledgeRoutes.get('/admin/api/usage', async (c) => {
   return c.json({ site: siteId, today: await usageToday(env, siteId, now, budgetOf(site)), days: rows.results });
 });
 
-/** What retrieval finds for a question, with scores: `murmur ask` and the dashboard's test panel show it. */
+/** What retrieval finds for a question, with scores: `helppuff ask` and the dashboard's test panel show it. */
 knowledgeRoutes.post('/admin/api/knowledge/search', async (c) => {
   await currentAdmin(c);
   const body = await jsonBody(c);
   const { siteId, site, env } = await siteOf(c, body['site']);
   const query = typeof body['query'] === 'string' ? body['query'].trim().slice(0, 1000) : '';
-  if (!query) throw new MurmurError('bad_request', { message: 'Send a query.', detail: 'knowledge_search_empty' });
+  if (!query) throw new HelpPuffError('bad_request', { message: 'Send a query.', detail: 'knowledge_search_empty' });
   const options = (site.connector.options ?? {}) as { retrieval?: Record<string, unknown>; gateway?: string };
   const ai = aiSettingsFor(site);
   const retrieval = options.retrieval ?? {};
@@ -231,7 +231,7 @@ knowledgeRoutes.post('/admin/api/knowledge/manual', async (c) => {
   const { siteId, site, env, now } = await siteOf(c, body['site']);
   const title = typeof body['title'] === 'string' ? body['title'].trim().slice(0, 200) : '';
   const content = typeof body['content'] === 'string' ? body['content'].trim().slice(0, 100_000) : '';
-  if (!title || !content) throw new MurmurError('bad_request', { message: 'Give the entry a title and some text.', detail: 'manual_body' });
+  if (!title || !content) throw new HelpPuffError('bad_request', { message: 'Give the entry a title and some text.', detail: 'manual_body' });
   const id = typeof body['id'] === 'string' && /^[a-z0-9-]{1,64}$/.test(body['id']) ? body['id'] : crypto.randomUUID();
   const url = manualUrl(id);
   await env.db
@@ -311,14 +311,14 @@ knowledgeRoutes.post('/admin/api/knowledge/files', async (c) => {
   const { siteId, site, env, now } = await siteOf(c, c.req.query('site'));
   const name = (c.req.query('name') ?? '').trim().replace(/[\\/]/g, '_').slice(0, 200);
   const kind = fileKind(name);
-  if (!kind) throw new MurmurError('bad_request', { message: 'Upload a PDF, Word (.docx), Markdown or text file.', detail: 'file_type' });
+  if (!kind) throw new HelpPuffError('bad_request', { message: 'Upload a PDF, Word (.docx), Markdown or text file.', detail: 'file_type' });
   const declared = Number(c.req.header('Content-Length') ?? 0);
-  if (declared > MAX_FILE_BYTES) throw new MurmurError('bad_request', { message: 'Files can be up to 10 MB.', detail: 'file_too_large' });
+  if (declared > MAX_FILE_BYTES) throw new HelpPuffError('bad_request', { message: 'Files can be up to 10 MB.', detail: 'file_too_large' });
   const bytes = await c.req.arrayBuffer();
-  if (!bytes.byteLength) throw new MurmurError('bad_request', { message: 'The file is empty.', detail: 'file_empty' });
-  if (bytes.byteLength > MAX_FILE_BYTES) throw new MurmurError('bad_request', { message: 'Files can be up to 10 MB.', detail: 'file_too_large' });
+  if (!bytes.byteLength) throw new HelpPuffError('bad_request', { message: 'The file is empty.', detail: 'file_empty' });
+  if (bytes.byteLength > MAX_FILE_BYTES) throw new HelpPuffError('bad_request', { message: 'Files can be up to 10 MB.', detail: 'file_too_large' });
   if (!env.workflow || !env.uploads) {
-    throw new MurmurError('internal', { message: 'This deployment cannot process files yet. Run `murmur deploy` again.', detail: 'knowledge_no_workflow' });
+    throw new HelpPuffError('internal', { message: 'This deployment cannot process files yet. Run `helppuff deploy` again.', detail: 'knowledge_no_workflow' });
   }
 
   const id = crypto.randomUUID();
@@ -333,7 +333,7 @@ knowledgeRoutes.post('/admin/api/knowledge/files', async (c) => {
     await env.workflow.create({ id: `file-${id}`, params });
   } catch {
     await env.db.prepare("UPDATE knowledge_files SET status = 'error', error = ? WHERE id = ?").bind('Could not start reading it. Upload it again in a minute.', id).run();
-    throw new MurmurError('internal', { message: 'The file could not be queued. Try again in a minute.', detail: 'file_workflow_create_failed' });
+    throw new HelpPuffError('internal', { message: 'The file could not be queued. Try again in a minute.', detail: 'file_workflow_create_failed' });
   }
   return c.json({ id, name, kind, size: bytes.byteLength, status: 'queued' }, 202);
 });
@@ -366,7 +366,7 @@ knowledgeRoutes.post('/admin/api/knowledge/facts/detect', async (c) => {
   const body = await jsonBody(c);
   const { siteId, site, env, now } = await siteOf(c, body['site']);
   const website = websiteFor(site);
-  if (!website) throw new MurmurError('bad_request', { message: 'Set the website address first.', detail: 'knowledge_no_website' });
+  if (!website) throw new HelpPuffError('bad_request', { message: 'Set the website address first.', detail: 'knowledge_no_website' });
   const ai = aiSettingsFor(site);
   const contactUrl =
     (await env.db.prepare("SELECT url FROM pages WHERE site_id = ? AND category = 'contact' ORDER BY length(url) LIMIT 1").bind(siteId).first<{ url: string }>())?.url ?? null;
@@ -423,11 +423,11 @@ knowledgeRoutes.put('/admin/api/knowledge/facts', async (c) => {
  */
 knowledgeRoutes.get('/admin/api/install-check', async (c) => {
   await currentAdmin(c);
-  const ctx = c.get('mm');
+  const ctx = c.get('helppuff');
   const siteId = siteParam(c, c.req.query('site'));
   const site = await resolveSite(ctx, siteId);
   const target = c.req.query('url') || site.knowledge.website || site.origins.find((o) => /^https:/.test(o) && !/workers\.dev/.test(o));
-  if (!target || !/^https?:\/\//.test(target)) throw new MurmurError('bad_request', { message: 'Which page should be checked?', detail: 'install_no_url' });
+  if (!target || !/^https?:\/\//.test(target)) throw new HelpPuffError('bad_request', { message: 'Which page should be checked?', detail: 'install_no_url' });
   const page = await fetchPage(target, { timeoutMs: 10_000 });
   if (!page.ok) return c.json({ url: target, installed: false, reachable: false, reason: page.error });
   const origin = new URL(c.req.url).origin;
@@ -454,7 +454,7 @@ knowledgeRoutes.post('/admin/api/knowledge/suggest-questions', async (c) => {
   const headings = (
     await env.db
       .prepare(
-        `SELECT heading_path AS h, category FROM chunks WHERE site_id = ? AND url NOT LIKE 'murmur://%'
+        `SELECT heading_path AS h, category FROM chunks WHERE site_id = ? AND url NOT LIKE 'helppuff://%'
          GROUP BY heading_path ORDER BY CASE category WHEN 'service' THEN 0 WHEN 'faq' THEN 1 WHEN 'pricing' THEN 2 WHEN 'location' THEN 3 ELSE 4 END LIMIT 60`,
       )
       .bind(siteId)
@@ -503,7 +503,7 @@ knowledgeRoutes.post('/admin/api/knowledge/suggest-questions', async (c) => {
  * How fast the models answer from this Worker, right now: each candidate
  * embedding model twice (the second is the warm number), the reranker at
  * two sizes, and the chat model's time to first token. A few neurons; what
- * `murmur doctor --speed` reads to pick models by data, not by guess.
+ * `helppuff doctor --speed` reads to pick models by data, not by guess.
  */
 knowledgeRoutes.post('/admin/api/diagnostics/models', async (c) => {
   await currentAdmin(c);

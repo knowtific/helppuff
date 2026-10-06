@@ -1,4 +1,4 @@
-import type { Message } from '@murmur/protocol';
+import type { Message } from '@helppuff/protocol';
 import type { ConnectorContext } from './index.js';
 import type { PromptScope } from './prompt.js';
 

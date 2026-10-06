@@ -2,18 +2,18 @@
  * Dashboard sign-in: email and password, then a signed, HttpOnly cookie.
  *
  * Passwords are PBKDF2-SHA256 hashes (`pbkdf2$<iterations>$<salt>$<hash>`,
- * base64url), computed by `murmur` on the owner's machine — a password
+ * base64url), computed by `helppuff` on the owner's machine — a password
  * never travels to Cloudflare in the clear except at sign-in, over TLS.
  * The owner account comes from Worker secrets (`ADMIN_EMAIL`,
  * `ADMIN_PASSWORD_HASH`); further accounts live in the `admins` table and
- * are managed with `murmur users`.
+ * are managed with `helppuff users`.
  *
  * Sessions are stateless: `base64url(payload).base64url(hmac)`, keyed from
- * MURMUR_SECRET, valid for seven days.
+ * HELPPUFF_SECRET, valid for seven days.
  */
 
 const encoder = new TextEncoder();
-export const SESSION_COOKIE = 'mm_admin';
+export const SESSION_COOKIE = 'hp_admin';
 export const SESSION_TTL_MS = 7 * 24 * 3600_000;
 /** Workers caps PBKDF2 at 100k iterations. */
 export const PBKDF2_ITERATIONS = 100_000;

@@ -16,16 +16,16 @@ import { fetchConfig, launcherHints, type LauncherHints, type RawConfig } from '
  */
 
 /** Content-hashed filename of the app chunk, injected at build time. */
-declare const __MURMUR_APP_FILE__: string;
-declare const __MURMUR_VERSION__: string;
+declare const __HELPPUFF_APP_FILE__: string;
+declare const __HELPPUFF_VERSION__: string;
 
-/** Everything on `window.Murmur` that the app ultimately handles. */
+/** Everything on `window.HelpPuff` that the app ultimately handles. */
 const METHODS = ['open', 'close', 'toggle', 'send', 'identify', 'reset'] as const;
 type Method = (typeof METHODS)[number];
 
 type Call = [Method, ...unknown[]];
 type Handler = (payload?: unknown) => void;
-type MurmurGlobal = Record<string, unknown> & { __loaded?: boolean; q?: unknown[] };
+type HelpPuffGlobal = Record<string, unknown> & { __loaded?: boolean; q?: unknown[] };
 
 /** What the loader hands to the app when it mounts. */
 export type Runtime = {
@@ -49,7 +49,7 @@ export type Runtime = {
 
 export type AppHandle = Record<Method, (...args: never[]) => void> & { state: () => unknown };
 
-const HOST_TAG = 'murmur-widget';
+const HOST_TAG = 'helppuff-widget';
 
 /**
  * Inline styles on the host element, so no page stylesheet can reach it
@@ -66,7 +66,7 @@ const HOST_STYLE =
 
 function version(): string {
   try {
-    return __MURMUR_VERSION__;
+    return __HELPPUFF_VERSION__;
   } catch {
     return '0.0.0';
   }
@@ -138,22 +138,22 @@ function apiBaseFrom(script: HTMLScriptElement | null): string {
  */
 function appUrlFrom(script: HTMLScriptElement | null): string {
   try {
-    if (script?.src) return new URL(__MURMUR_APP_FILE__, script.src).href;
+    if (script?.src) return new URL(__HELPPUFF_APP_FILE__, script.src).href;
   } catch {
     // Fall through.
   }
-  return __MURMUR_APP_FILE__;
+  return __HELPPUFF_APP_FILE__;
 }
 
 /**
- * Leave `window.Murmur` callable and inert, so host-page code that calls
- * `Murmur.open()` never throws.
+ * Leave `window.HelpPuff` callable and inert, so host-page code that calls
+ * `HelpPuff.open()` never throws.
  */
 function inertGlobal(): void {
-  const stub: MurmurGlobal = { __loaded: true };
+  const stub: HelpPuffGlobal = { __loaded: true };
   for (const name of [...METHODS, 'on', 'off', 'destroy']) stub[name] = () => undefined;
   stub['debug'] = () => ({ state: 'hidden', version: version() });
-  (window as { Murmur?: MurmurGlobal }).Murmur = stub;
+  (window as { HelpPuff?: HelpPuffGlobal }).HelpPuff = stub;
 }
 
 /** Fatal before a Loader exists: leave the page exactly as it was. */
@@ -169,7 +169,7 @@ function fail(reason: string): void {
 
 function boot(): void {
   // Guard against the script tag appearing twice.
-  if ((window as { Murmur?: MurmurGlobal }).Murmur?.__loaded) return log('already loaded');
+  if ((window as { HelpPuff?: HelpPuffGlobal }).HelpPuff?.__loaded) return log('already loaded');
 
   const script = findScript();
   const siteId = script?.getAttribute('data-site')?.trim() ?? '';
@@ -238,8 +238,8 @@ class Loader {
   }
 
   private installGlobal(): void {
-    const previous = (window as { Murmur?: MurmurGlobal }).Murmur;
-    const api: MurmurGlobal = { __loaded: true };
+    const previous = (window as { HelpPuff?: HelpPuffGlobal }).HelpPuff;
+    const api: HelpPuffGlobal = { __loaded: true };
 
     for (const name of METHODS) api[name] = this.command(name);
 
@@ -258,7 +258,7 @@ class Loader {
       siteId: this.siteId,
     });
 
-    (window as { Murmur?: MurmurGlobal }).Murmur = api;
+    (window as { HelpPuff?: HelpPuffGlobal }).HelpPuff = api;
 
     // Replay calls the site made before the script finished loading.
     const pending = Array.isArray(previous?.q) ? previous.q : [];
@@ -446,7 +446,7 @@ class Loader {
 
   /**
    * What "hide" means exactly: the host element goes, every listener
-   * and timer goes, `window.Murmur` stays callable and inert, nothing is
+   * and timer goes, `window.HelpPuff` stays callable and inert, nothing is
    * written to the console, localStorage is left untouched so a later page
    * load can still restore, and nothing is retried in this page view.
    */

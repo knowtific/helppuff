@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite';
 /**
  * The dashboard is served by the Worker as static assets under /admin/, and
  * talks to /admin/api on the same origin. In development, point the proxy
- * at a running `murmur dev` (MURMUR_DEV_URL, default localhost:8787).
+ * at a running `helppuff dev` (HELPPUFF_DEV_URL, default localhost:8787).
  */
 export default defineConfig({
   base: '/admin/',
@@ -13,6 +13,6 @@ export default defineConfig({
   build: { outDir: 'dist', emptyOutDir: true, sourcemap: false },
   server: {
     port: 5174,
-    proxy: { '/admin/api': process.env.MURMUR_DEV_URL ?? 'http://localhost:8787' },
+    proxy: { '/admin/api': process.env.HELPPUFF_DEV_URL ?? 'http://localhost:8787' },
   },
 });

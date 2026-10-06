@@ -1,5 +1,5 @@
-import type { Message, SendRequest, VisitorContext } from '@murmur/protocol';
-import { usageDay } from '@murmur/rag';
+import type { Message, SendRequest, VisitorContext } from '@helppuff/protocol';
+import { usageDay } from '@helppuff/rag';
 import type { RequestCtx } from '../core/request.js';
 import { dbFrom, ensureSchema, type D1Like, type D1Statement } from '../db/d1.js';
 import { conversationStarted, leadCaptured, turn } from '../webhooks/events.js';

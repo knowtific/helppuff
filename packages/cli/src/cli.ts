@@ -68,11 +68,11 @@ export async function main(argv: string[]): Promise<number> {
       process.stdout.write(json ? `${JSON.stringify({ ok: true, version: VERSION })}\n` : `${VERSION}\n`);
       return EXIT.ok;
     }
-    // `npx @knowtific/murmur` in a terminal: set up here, or redeploy what is here.
+    // `npx @knowtific/helppuff` in a terminal: set up here, or redeploy what is here.
     if (!command && Object.keys(flags).length === 0 && !json && process.stdin.isTTY && process.stdout.isTTY && !process.env['CI']) {
       const here = resolve(process.cwd());
       const ctx: Ctx = { cwd: here, positionals: [], flags: {}, out: new Output(false), interactive: true };
-      return await (existsSync(join(here, 'murmur.json')) ? COMMANDS['deploy']! : COMMANDS['init']!)(ctx);
+      return await (existsSync(join(here, 'helppuff.json')) ? COMMANDS['deploy']! : COMMANDS['init']!)(ctx);
     }
     if (!command || command === 'help') {
       const topic = positionals[0];
@@ -104,13 +104,13 @@ export async function main(argv: string[]): Promise<number> {
       const close = Object.keys(COMMAND_HELP).find((name) => name.startsWith(command.slice(0, 3)));
       throw new CliError('usage', `Unknown command "${command}".`, {
         exitCode: EXIT.usage,
-        hint: close ? `Did you mean \`murmur ${close}\`? See \`murmur --help\`.` : 'See `murmur --help`.',
+        hint: close ? `Did you mean \`helppuff ${close}\`? See \`helppuff --help\`.` : 'See `helppuff --help`.',
       });
     }
 
     const interactive =
       !json && !flags['non-interactive'] && Boolean(process.stdin.isTTY && process.stdout.isTTY) && !process.env['CI'];
-    // `--config path/to/murmur.json` names the project by its file; the folder is what matters.
+    // `--config path/to/helppuff.json` names the project by its file; the folder is what matters.
     const config = str(flags, 'config');
     if (config && typeof flags['config'] === 'string') delete flags['config'];
     const cwd = resolve(config ? dirname(resolve(config)) : (str(flags, 'cwd') ?? process.cwd()));

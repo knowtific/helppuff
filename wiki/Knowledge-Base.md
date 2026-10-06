@@ -1,29 +1,29 @@
 # The knowledge base (`workers-ai`)
 
 The default backend answers from the site's own pages, using a knowledge base
-Murmur builds and keeps on the site owner's Cloudflare account:
+HelpPuff builds and keeps on the site owner's Cloudflare account:
 
 | Piece | Cloudflare product | Holds |
 | --- | --- | --- |
 | Crawl | Workflows (`CRAWL_WORKFLOW`) | the background job: fetch → extract → chunk → embed → store |
-| Text and keyword search | D1 (`MURMUR_DB`) + FTS5 | pages, chunks, site facts, crawl runs, daily usage |
+| Text and keyword search | D1 (`HELPPUFF_DB`) + FTS5 | pages, chunks, site facts, crawl runs, daily usage |
 | Meaning search | Vectorize (`VECTORS`) | one 1024-dimension vector per chunk, namespace = site id |
 | Models | Workers AI (`AI`) | embeddings, reranking, answers |
 | JavaScript pages | Browser Rendering (`BROWSER`, optional) | the rendered HTML of pages drawn by scripts |
 
-Everything is created by `murmur deploy` and named `knowtific-murmur-<site>`.
+Everything is created by `helppuff deploy` and named `knowtific-helppuff-<site>`.
 The code is `packages/rag` (pure logic, tested in Node) and
 `packages/connectors/workers-ai` (answering); the Worker wires them up in
 `packages/server/src/knowledge` and `src/workflows/crawl.ts`.
 
 ## 1. Discovery
 
-`murmur discover`, or the first step of the setup page. From one Worker
+`helppuff discover`, or the first step of the setup page. From one Worker
 request (so within the free plan's 50 external fetches):
 
 - the home page's links, same site only (`www.` and the apex are one site);
 - `robots.txt` — its `Sitemap:` lines, and its rules for our user agent
-  (`murmur-crawler/…`, or `*`), honoured per RFC 9309: longest rule wins,
+  (`helppuff-crawler/…`, or `*`), honoured per RFC 9309: longest rule wins,
   `Allow` wins a tie, `*` and `$` work;
 - `/sitemap.xml`, `/sitemap_index.xml` and `/wp-sitemap.xml` when robots.txt
   names none, with nested sitemap indexes followed (post sitemaps last), up to
@@ -39,12 +39,12 @@ author, cart, checkout, my-account) untick matches.
 
 ## 2. The crawl
 
-`murmur crawl`, the setup page's *Learn from these pages*, or the weekly cron.
+`helppuff crawl`, the setup page's *Learn from these pages*, or the weekly cron.
 It runs in a **Cloudflare Workflow**, so it is durable: it carries on after
 whoever started it closes the browser or the terminal, and a page that fails
 (a timeout, a Workers AI hiccup) is retried on its own, twice, without redoing
 the pages before it. Progress is in D1 (`crawl_runs`, `pages`), which is all
-the dashboard, `murmur knowledge status` and `murmur crawl --wait` read.
+the dashboard, `helppuff knowledge status` and `helppuff crawl --wait` read.
 
 Shaped for the **Workers Free plan**:
 
@@ -95,16 +95,16 @@ are checked (a phone must have digits, an email must be one). The setup page
 does the same as soon as it opens (`POST /admin/api/knowledge/facts/detect`),
 so the details are pre-filled in seconds rather than when the crawl ends.
 
-Facts the owner sets (setup page, Settings, `murmur knowledge facts set`) are
+Facts the owner sets (setup page, Settings, `helppuff knowledge facts set`) are
 marked as theirs and never overwritten by a crawl.
 
 ## 2b. Files
 
 Documents the site does not have — price lists, brochures, policies — are
 uploaded from the dashboard (Knowledge → Files), with
-`murmur knowledge upload <file…>`, or by listing them in `knowledge.files`
-in murmur.json (each deploy uploads new and changed ones and removes the
-ones taken out; `.murmur/state.json` remembers their hashes). PDF, Word
+`helppuff knowledge upload <file…>`, or by listing them in `knowledge.files`
+in helppuff.json (each deploy uploads new and changed ones and removes the
+ones taken out; `.helppuff/state.json` remembers their hashes). PDF, Word
 (.docx), Markdown and text, up to 10 MB each.
 
 The upload only queues the file: the bytes wait in KV (for a day at most)
@@ -121,7 +121,7 @@ not stop it. Its steps, each small enough for the free plan's 10 ms of CPU:
    title-like line on its own becomes one, so passages keep their context.
    At most 300,000 characters (60–100 pages) are kept; a longer file says so.
 3. **Learn,** one section of about 16,000 characters per step: chunked,
-   embedded and stored like a page, under `murmur://file/<id>#<n>` with
+   embedded and stored like a page, under `helppuff://file/<id>#<n>` with
    source `file`. Each section starts with the headings it sits under.
 
 The cleaned Markdown stays in D1 (`knowledge_files`), so when the embedding
@@ -231,17 +231,17 @@ others, compared for speed, quality and answers a day, are on
 
 ## 5b. The same knowledge base with another model
 
-`openai`, `gemini` and `anthropic` take `"retrieval": "murmur"` in their
+`openai`, `gemini` and `anthropic` take `"retrieval": "helppuff"` in their
 backend: the site is crawled exactly as above, and each answer gets the
 retrieved passages in its system prompt (and the best pages as *Sources*),
 while generation stays with the provider. Embeddings and reranking still run
 on Workers AI and count against the free allocation; the provider's own
 tokens are billed by the provider.
 
-A `retell` backend with `"retrieval": "murmur"` gets the knowledge base as a
+A `retell` backend with `"retrieval": "helppuff"` gets the knowledge base as a
 **Retell custom function**: in the Retell dashboard, add a function that POSTs
 to `https://<worker>/v1/sites/<site>/retell/kb` with one parameter,
-`{ "query": { "type": "string" } }` (`murmur status --json` prints it).
+`{ "query": { "type": "string" } }` (`helppuff status --json` prints it).
 Requests must carry Retell's `X-Retell-Signature` (HMAC-SHA256 with the
 account's API key, at most five minutes old); the answer is the matching
 passages as plain text.
@@ -261,11 +261,11 @@ Every answer and every embedding is priced from its token counts (the table in
 A typical answer on GLM-4.7 Flash (~4k tokens in, ~250 out) is about 30
 neurons, so roughly 300 answers a day fit in the free allocation. Embedding a
 small business site costs a few neurons; re-crawls of unchanged pages cost
-none. `murmur knowledge status` and the dashboard show today's use.
+none. `helppuff knowledge status` and the dashboard show today's use.
 
 ## 7. Configuration
 
-In `murmur.json` (see `murmur schema` for every field):
+In `helppuff.json` (see `helppuff schema` for every field):
 
 ```jsonc
 {
@@ -287,7 +287,7 @@ In `murmur.json` (see `murmur schema` for every field):
 ```
 
 The dashboard's Settings page and `/admin/api/settings` change the same
-fields live; `murmur config pull` brings them back into murmur.json.
+fields live; `helppuff config pull` brings them back into helppuff.json.
 
 ## 8. Verified platform facts
 

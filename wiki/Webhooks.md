@@ -5,15 +5,15 @@ n8n, a CRM, a Slack bot, your own server. Add endpoints in the dashboard
 (**Settings → Webhooks**) or from the terminal:
 
 ```bash
-murmur webhooks add https://hooks.zapier.com/hooks/catch/123/abc --events lead.captured,callback.requested
-murmur webhooks test wh_1a2b3c      # sends a test.ping and prints what came back
-murmur webhooks list --json         # includes each signing secret
-murmur webhooks events              # every event type
+helppuff webhooks add https://hooks.zapier.com/hooks/catch/123/abc --events lead.captured,callback.requested
+helppuff webhooks test wh_1a2b3c      # sends a test.ping and prints what came back
+helppuff webhooks list --json         # includes each signing secret
+helppuff webhooks events              # every event type
 ```
 
 Each endpoint gets every event, or only the ones you pick. Up to 10 per site,
 `https://` only. They are stored on your Worker (D1 `webhooks`), not in
-murmur.json. The older `leads.webhook` in murmur.json still works, for
+helppuff.json. The older `leads.webhook` in helppuff.json still works, for
 leads only; see [[Leads]].
 
 ## Events
@@ -25,17 +25,17 @@ leads only; see [[Leads]].
 | `message.sent` | The assistant replied | `conversationId`, `text` (the reply as plain text), `messages` (the rich messages as the widget showed them) |
 | `lead.captured` | Contact details arrived: the form, typed in the chat, or found by the assistant | `conversationId`, `source` (`form`, `chat`, `ai`), `name`, `email`, `phone`, `fields` (custom form fields), `message` |
 | `callback.requested` | The visitor asked to be called back: the assistant requested it with the details it had, or the visitor sent the callback form. Sent with `lead.captured`; see [Callbacks](#callbacks) | `callbackId`, `conversationId`, `name`, `email`, `phone`, `message`, `requestedAt` |
-| `callback.updated` | A callback request was marked done or dismissed, reopened, or its note changed (dashboard or `murmur callbacks`) | `callback` (`id`, `conversationId`, `status`, `note`, `name`, `phone`, `email`, `reason`, `closedBy`…), `previousStatus` |
+| `callback.updated` | A callback request was marked done or dismissed, reopened, or its note changed (dashboard or `helppuff callbacks`) | `callback` (`id`, `conversationId`, `status`, `note`, `name`, `phone`, `email`, `reason`, `closedBy`…), `previousStatus` |
 | `lead.updated` | A lead's status, notes or name changed in the dashboard | `leadId`, `conversationId`, `changed`, `lead` |
 | `feedback.received` | A visitor rated a reply | `conversationId`, `messageId`, `rating` (`up`, `down`, `cleared`) |
 | `conversation.completed` | A conversation went quiet: **5 minutes after its last message**. Sent once (again if the visitor comes back later) | `conversationId`, `startedAt`, `lastMessageAt`, `messageCount`, `page`, `country`, `summary`, `labels` `{intent, sentiment, leadQuality, outcome, topics}`, `unanswered` (questions it could not answer), `followUp`, `lead`, `transcript` `[{role, text, at}]` |
 | `conversation.summarized` | Someone pressed **Summarise** in the dashboard | `conversationId`, `summary`, `intent`, `sentiment`, `leadQuality`, `outcome`, `topics`, `unanswered`, `followUp` |
-| `conversation.ended` | The visitor started a new chat, or the page called `Murmur.reset()`. Most visitors just leave, so prefer `conversation.completed` | `conversationId` |
+| `conversation.ended` | The visitor started a new chat, or the page called `HelpPuff.reset()`. Most visitors just leave, so prefer `conversation.completed` | `conversationId` |
 | `budget.warning` | Today's AI budget is 80% used; answers are kept shorter. Once a day | `day`, `neuronsUsed`, `dailyBudget`, `resetsAt` |
 | `budget.exhausted` | Today's AI budget is used up; visitors get your contact details and a callback form until `resetsAt`. Once a day | `day`, `neuronsUsed`, `dailyBudget`, `resetsAt` |
 | `knowledge.crawl.finished` | Learning the website finished | `runId`, `status`, `trigger`, `pages` `{learned,failed}`, `passages` |
 | `knowledge.file.processed` | An uploaded file was learned, or failed | `fileId`, `name`, `status` (`indexed` or `error`), `passages`, `truncated`, `error` |
-| `test.ping` | **Send test** in the dashboard, or `murmur webhooks test` | `message` |
+| `test.ping` | **Send test** in the dashboard, or `helppuff webhooks test` | `message` |
 
 **Which to pick.** For a CRM, a spreadsheet or a team chat, three cover most
 needs: `conversation.started` (who, from which page, the pre-chat form),
@@ -101,7 +101,7 @@ Match the two on **`callbackId`** = **`callback.id`**.
   change alone sends `callback.updated` with the same status.
 - `message` in `callback.requested` is the same text as `reason` in
   `callback.updated`: what the visitor wants.
-- `closedBy` is the dashboard user's email, or `cli` for `murmur callbacks`.
+- `closedBy` is the dashboard user's email, or `cli` for `helppuff callbacks`.
 
 In Zapier, Make or n8n: create a task (or a CRM activity) on
 `callback.requested`, keyed by `callbackId`, and complete it on
@@ -112,11 +112,11 @@ In Zapier, Make or n8n: create a task (or a CRM activity) on
 ```http
 POST /your/endpoint
 Content-Type: application/json
-User-Agent: Murmur-Webhooks/1
-X-Murmur-Event: lead.captured
-X-Murmur-Delivery: evt_4f0c…
-X-Murmur-Timestamp: 1791234567
-X-Murmur-Signature: sha256=9a1b…
+User-Agent: HelpPuff-Webhooks/1
+X-HelpPuff-Event: lead.captured
+X-HelpPuff-Delivery: evt_4f0c…
+X-HelpPuff-Timestamp: 1791234567
+X-HelpPuff-Signature: sha256=9a1b…
 
 {
   "id": "evt_4f0c…",
@@ -155,10 +155,10 @@ have already handled (a retry after a timeout can repeat one).
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 function verify(secret, headers, rawBody) {
-  const timestamp = headers['x-murmur-timestamp'];
+  const timestamp = headers['x-helppuff-timestamp'];
   if (Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) return false;
   const expected = 'sha256=' + createHmac('sha256', secret).update(`${timestamp}.${rawBody}`).digest('hex');
-  const given = headers['x-murmur-signature'] ?? '';
+  const given = headers['x-helppuff-signature'] ?? '';
   return given.length === expected.length && timingSafeEqual(Buffer.from(given), Buffer.from(expected));
 }
 ```
@@ -167,11 +167,11 @@ function verify(secret, headers, rawBody) {
 import hashlib, hmac, time
 
 def verify(secret: str, headers, raw_body: bytes) -> bool:
-    timestamp = headers["X-Murmur-Timestamp"]
+    timestamp = headers["X-HelpPuff-Timestamp"]
     if abs(time.time() - int(timestamp)) > 300:
         return False
     expected = "sha256=" + hmac.new(secret.encode(), f"{timestamp}.".encode() + raw_body, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(expected, headers.get("X-Murmur-Signature", ""))
+    return hmac.compare_digest(expected, headers.get("X-HelpPuff-Signature", ""))
 ```
 
 **New secret** in the dashboard (or `PATCH /admin/api/webhooks/:id` with
@@ -180,5 +180,5 @@ def verify(secret: str, headers, raw_body: bytes) -> bool:
 ## Privacy
 
 Deliveries carry what visitors typed and their contact details, to endpoints
-you chose. That is why only `https://` is accepted. Murmur's own logs record
+you chose. That is why only `https://` is accepted. HelpPuff's own logs record
 only the event type and HTTP status of a failed delivery, never the payload.

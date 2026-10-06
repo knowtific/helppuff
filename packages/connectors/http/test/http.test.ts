@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { messageSchema } from '@murmur/protocol';
-import { isConnectorError, type ConnectorContext } from '@murmur/connector-types';
+import { messageSchema } from '@helppuff/protocol';
+import { isConnectorError, type ConnectorContext } from '@helppuff/connector-types';
 import http, { normalizeBackendReply, signBody } from '../src/index.js';
 
 type Call = { url: string; init: RequestInit };
@@ -34,7 +34,7 @@ const headers = (c: Call) => c.init.headers as Record<string, string>;
 const body = (c: Call) => JSON.parse(c.init.body as string);
 const sse = (text: string) => new Response(text, { headers: { 'Content-Type': 'text/event-stream' } });
 
-describe('murmur mode', () => {
+describe('helppuff mode', () => {
   it('posts start and message, and threads the backend state through', async () => {
     const { ctx, calls } = harness({ url: 'https://api.acme.com/chat/' }, [
       Response.json({ text: 'Welcome!', state: { conv: 'c-9' } }),
@@ -82,8 +82,8 @@ describe('murmur mode', () => {
     const { ctx, calls } = harness({ url: 'https://api.acme.com', signingSecret: 'shh' }, [Response.json({ text: 'ok' })]);
     await http.send(ctx, {}, { kind: 'text', text: 'hi', clientId: 'c1' });
     const h = headers(calls[0]!);
-    const expected = await signBody('shh', calls[0]!.init.body as string, Number(h['X-Murmur-Timestamp']));
-    expect(h['X-Murmur-Signature']).toBe(expected);
+    const expected = await signBody('shh', calls[0]!.init.body as string, Number(h['X-HelpPuff-Timestamp']));
+    expect(h['X-HelpPuff-Signature']).toBe(expected);
   });
 
   it('a 500 is retryable, a 401 is not', async () => {

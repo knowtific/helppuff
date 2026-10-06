@@ -7,34 +7,34 @@
 
 export { VERSION } from './engine/version.js';
 
-export const MAIN_HELP = `murmur — an AI chat assistant for your website, on your own Cloudflare account.
+export const MAIN_HELP = `helppuff — an AI chat assistant for your website, on your own Cloudflare account.
 
 USAGE
-  murmur <command> [options]
-  murmur <command> --help        details and examples for one command
+  helppuff <command> [options]
+  helppuff <command> --help        details and examples for one command
 
 QUICK START (people)
-  npx @knowtific/murmur                asks for your website, deploys, and prints one link: the setup page
+  npx @knowtific/helppuff                asks for your website, deploys, and prints one link: the setup page
 
 QUICK START (AI agents: Claude Code, Codex, Cursor…)
-  1. murmur init --url <site> --deploy --yes --json
+  1. helppuff init --url <site> --deploy --yes --json
        → {"ok":false,"status":"needs_input","questions":[…]}   ask the user exactly these,
          then re-run with each question's "flag". Repeat until {"ok":true,"status":"created"}.
      With no person at a browser, init does the onboarding itself: it starts learning the
-     suggested pages (--crawl "<globs>" or knowledge.website.include/exclude in murmur.json
+     suggested pages (--crawl "<globs>" or knowledge.website.include/exclude in helppuff.json
      to choose) and reads the business details. It all runs on Cloudflare; nothing to wait for.
-  2. murmur knowledge status --json            progress (or: murmur crawl --wait --json to block)
-  3. murmur ask "a real visitor question" --json   → read "reply" and "sources"; if it is wrong, fix
-     prompt.md, add knowledge (murmur knowledge upload price-list.pdf) or facts, and ask again
+  2. helppuff knowledge status --json            progress (or: helppuff crawl --wait --json to block)
+  3. helppuff ask "a real visitor question" --json   → read "reply" and "sources"; if it is wrong, fix
+     prompt.md, add knowledge (helppuff knowledge upload price-list.pdf) or facts, and ask again
   4. Give the user three things: deploy.setupUrl (the dashboard — a one-time link, 24h, where they
      create their sign-in; it opens on Home, no onboarding), deploy.embed (the script) and
-     deploy.preview (the demo). Lost the link? \`murmur dashboard\` mints a sign-in link.
+     deploy.preview (the demo). Lost the link? \`helppuff dashboard\` mints a sign-in link.
   Rules: never invent a URL, key or account id; ask. Never print or commit .env or ADMIN_API_KEY.
-  Secrets: prefer asking the user to run \`murmur secret set NAME\`; pass --api-key only if they gave it to you.
+  Secrets: prefer asking the user to run \`helppuff secret set NAME\`; pass --api-key only if they gave it to you.
 
 COMMANDS
   Setup
-    init                 Create murmur.json, prompt.md and .env by asking only what it cannot detect
+    init                 Create helppuff.json, prompt.md and .env by asking only what it cannot detect
     deploy               Create or update everything on Cloudflare; content changes go live in seconds
     upgrade              Move a deployed assistant to this release: shows the plan, keeps a restore point
     dev                  Run the assistant locally at http://localhost:8787 (uses your .env)
@@ -57,9 +57,9 @@ COMMANDS
     embed                Print the <script> snippet for the site
 
   Change
-    config get [path]    Read murmur.json, e.g. \`config get backend.model\`
-    config set <path> <value>   Change murmur.json, validated; \`murmur deploy\` publishes it
-    config pull          Bring settings changed in the dashboard into murmur.json
+    config get [path]    Read helppuff.json, e.g. \`config get backend.model\`
+    config set <path> <value>   Change helppuff.json, validated; \`helppuff deploy\` publishes it
+    config pull          Bring settings changed in the dashboard into helppuff.json
     config export [--live] | import <file> | schema
     secret set <NAME>    Store a secret in .env and on the Worker (prompted, piped, or --value)
     secret list          Which secrets are set, locally and on the Worker (never the values)
@@ -70,20 +70,20 @@ COMMANDS
     webhooks             Send chats, messages, leads and callbacks to other tools (signed JSON)
     callbacks            Visitors waiting to be called back: list them, mark them done
     dashboard            A one-time sign-in link to the dashboard (or the setup link, before setup)
-    validate             Check murmur.json and prompt.md without deploying
-    schema               Print the JSON Schema of murmur.json (every field, with descriptions)
+    validate             Check helppuff.json and prompt.md without deploying
+    schema               Print the JSON Schema of helppuff.json (every field, with descriptions)
 
   Agents
-    skill install        Teach Claude Code (and with --codex, Codex) about murmur on this machine
+    skill install        Teach Claude Code (and with --codex, Codex) about helppuff on this machine
     mcp                  Run as an MCP server over stdio (tools: setup, deploy, ask, crawl, status, …)
 
 BACKENDS (--backend; default: workers-ai)
-  workers-ai   Workers AI + Murmur's own knowledge base (Vectorize + D1). Free plan. (default)
+  workers-ai   Workers AI + HelpPuff's own knowledge base (Vectorize + D1). Free plan. (default)
   cloudflare   Cloudflare AI Search: Cloudflare manages crawling and retrieval
   openai       OpenAI Responses + File Search                        needs OPENAI_API_KEY
   gemini       Gemini + File Search                                  needs GEMINI_API_KEY
   anthropic    Claude, with knowledge from Cloudflare AI Search      needs ANTHROPIC_API_KEY
-  http         Your own API: Murmur protocol or OpenAI-compatible, JSON or SSE streaming
+  http         Your own API: HelpPuff protocol or OpenAI-compatible, JSON or SSE streaming
   retell       A Retell chat agent                                   needs RETELL_API_KEY
 
 FREE BY DEFAULT
@@ -92,14 +92,14 @@ FREE BY DEFAULT
   the widget offers contact buttons and a lead form until 00:00 UTC. Leads always work.
 
 FILES
-  murmur.json  what the assistant is — backend, prompt path, knowledge, widget, origins (commit it)
+  helppuff.json  what the assistant is — backend, prompt path, knowledge, widget, origins (commit it)
   prompt.md    how it behaves (commit it). Every deploy or dashboard edit publishes a numbered version;
-               deploy refuses to overwrite a version prompt.md is not based on (\`murmur prompt pull\`)
-  .env         secrets: MURMUR_SECRET, ADMIN_API_KEY, provider keys (never commit; gitignored)
-  .murmur/     generated Worker, schema and deploy state (gitignored)
+               deploy refuses to overwrite a version prompt.md is not based on (\`helppuff prompt pull\`)
+  .env         secrets: HELPPUFF_SECRET, ADMIN_API_KEY, provider keys (never commit; gitignored)
+  .helppuff/     generated Worker, schema and deploy state (gitignored)
 
 CLOUDFLARE ACCESS
-  Easiest: \`npx wrangler login\` once (opens a browser) — murmur reuses that login.
+  Easiest: \`npx wrangler login\` once (opens a browser) — helppuff reuses that login.
   Or an API token (https://dash.cloudflare.com/profile/api-tokens → Custom Token) with: Workers Scripts:Edit,
   Workers KV Storage:Edit, D1:Edit, Vectorize:Edit, Account Settings:Read (+ AI Search:Edit and :Run for the
   cloudflare backend) — as CLOUDFLARE_API_TOKEN (env or .env) or --cf-token. CLOUDFLARE_ACCOUNT_ID or
@@ -118,7 +118,7 @@ OUTPUT AND EXIT CODES
 
 GLOBAL OPTIONS
   --json              machine-readable output        --cwd <dir>        run as if in <dir>
-  --config <file>     the murmur.json to use         --non-interactive  never prompt (also: no TTY, CI=1)
+  --config <file>     the helppuff.json to use         --non-interactive  never prompt (also: no TTY, CI=1)
   --help, -h          help                           --version          print the version
 `;
 
@@ -126,7 +126,7 @@ type CommandHelp = { usage: string; summary: string; options?: [string, string][
 
 export const COMMAND_HELP: Record<string, CommandHelp> = {
   init: {
-    usage: 'murmur init [options]',
+    usage: 'helppuff init [options]',
     summary:
       'Set up a new assistant in this folder. In a terminal it asks only for the website, deploys, and prints the setup link; everything else is a flag, or Settings in the dashboard. With --json (or no terminal) it never prompts and returns anything still needed as {"status":"needs_input"}.',
     options: [
@@ -139,7 +139,7 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       ['--ai-search <name>', 'cloudflare/anthropic: "new" (default), an existing instance name, or "endpoint"'],
       ['--ai-search-endpoint <url>', 'A public AI Search endpoint to use instead of an instance'],
       ['--http-url <url>', 'http backend: your API base URL'],
-      ['--http-mode <mode>', 'http backend: murmur | openai'],
+      ['--http-mode <mode>', 'http backend: helppuff | openai'],
       ['--http-token <token>', 'http backend: Bearer token for your API'],
       ['--retell-agent <id>', 'retell backend: the agent id'],
       ['--docs <paths>', 'Files or folders to learn from, comma separated'],
@@ -157,33 +157,33 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       ['--crawl <which>', 'workers-ai, with --deploy: suggested | all | none | globs like "**/services/**,**/faq/**"'],
       ['--crawl-file <file>', 'workers-ai, with --deploy: crawl exactly the URLs in this file'],
       ['--no-browser', 'Do not open the setup page; continue in the terminal'],
-      ['--force', 'Overwrite an existing murmur.json'],
+      ['--force', 'Overwrite an existing helppuff.json'],
       ['--no-agent-files', 'Do not write AGENTS.md and the Claude Code skill'],
     ],
     examples: [
-      'murmur init',
-      'murmur init --url acme.com.au --deploy --crawl suggested --yes --json',
-      'murmur init --url acme.com.au --deploy --crawl "**/services/**,**/faq/**" --yes --json',
-      'murmur init --url acme.com --backend cloudflare --yes --json',
-      'murmur init --url acme.com --backend openai --api-key "$OPENAI_API_KEY" --deploy --json',
-      'murmur init --url acme.com --backend http --http-url https://api.acme.com/chat --http-mode murmur --json',
+      'helppuff init',
+      'helppuff init --url acme.com.au --deploy --crawl suggested --yes --json',
+      'helppuff init --url acme.com.au --deploy --crawl "**/services/**,**/faq/**" --yes --json',
+      'helppuff init --url acme.com --backend cloudflare --yes --json',
+      'helppuff init --url acme.com --backend openai --api-key "$OPENAI_API_KEY" --deploy --json',
+      'helppuff init --url acme.com --backend http --http-url https://api.acme.com/chat --http-mode helppuff --json',
     ],
   },
   upgrade: {
-    usage: 'npx @knowtific/murmur@latest upgrade [--check] [--yes] [--allow-downgrade]',
+    usage: 'npx @knowtific/helppuff@latest upgrade [--check] [--yes] [--allow-downgrade]',
     summary:
-      'Bring the deployed assistant to this release. Shows what is live, what will change (murmur.json format, D1 migrations), notes a restore point (D1 Time Travel: the database can be put back to just before, for 7 days on the Free plan), then deploys. Data, settings, prompt versions and the knowledge base are kept. Run it with @latest so npx fetches the newest CLI.',
+      'Bring the deployed assistant to this release. Shows what is live, what will change (helppuff.json format, D1 migrations), notes a restore point (D1 Time Travel: the database can be put back to just before, for 7 days on the Free plan), then deploys. Data, settings, prompt versions and the knowledge base are kept. Run it with @latest so npx fetches the newest CLI.',
     options: [
-      ['--check', 'Only report: versions, pending migrations, murmur.json changes'],
+      ['--check', 'Only report: versions, pending migrations, helppuff.json changes'],
       ['--yes', 'Go ahead without asking (needed with --json or without a terminal)'],
       ['--allow-downgrade', 'Go to this release although the Worker runs a newer one'],
     ],
-    examples: ['npx @knowtific/murmur@latest upgrade', 'npx -y @knowtific/murmur@latest upgrade --check --json', 'npx -y @knowtific/murmur@latest upgrade --yes --json'],
+    examples: ['npx @knowtific/helppuff@latest upgrade', 'npx -y @knowtific/helppuff@latest upgrade --check --json', 'npx -y @knowtific/helppuff@latest upgrade --yes --json'],
     notes:
-      'Rolling back: npx @knowtific/murmur@<previous version> deploy --allow-downgrade. Migrations only add tables and columns, so the previous release runs on the upgraded database. To also put the data back, use the restore command upgrade printed (wrangler d1 time-travel restore).',
+      'Rolling back: npx @knowtific/helppuff@<previous version> deploy --allow-downgrade. Migrations only add tables and columns, so the previous release runs on the upgraded database. To also put the data back, use the restore command upgrade printed (wrangler d1 time-travel restore).',
   },
   deploy: {
-    usage: 'murmur deploy [options]',
+    usage: 'helppuff deploy [options]',
     summary:
       'Create or update the Worker, storage, knowledge, secrets and config on Cloudflare. Idempotent. When only content changed (prompt, widget, model) it skips the Worker upload and is live in seconds.',
     options: [
@@ -193,50 +193,50 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       ['--dry-run', 'Check credentials and secrets and show the URL, change nothing'],
       ['--crawl <which>', 'workers-ai: also start a crawl — suggested | all | globs'],
       ['--crawl-file <file>', 'workers-ai: crawl exactly the URLs in this file'],
-      ['--overwrite-settings', 'Publish murmur.json over settings changed in the dashboard (otherwise: config pull first)'],
+      ['--overwrite-settings', 'Publish helppuff.json over settings changed in the dashboard (otherwise: config pull first)'],
       ['--allow-downgrade', 'Deploy although the Worker runs a newer release: a deliberate rollback'],
       ['--account-id <id>', 'The Cloudflare account, when the token sees several'],
     ],
-    examples: ['murmur deploy', 'murmur deploy --json', 'murmur deploy --crawl suggested --json', 'murmur deploy --knowledge'],
+    examples: ['helppuff deploy', 'helppuff deploy --json', 'helppuff deploy --crawl suggested --json', 'helppuff deploy --knowledge'],
     notes:
       'workers-ai: the first deploy creates a Vectorize index, a D1 database, a KV namespace and a Workflow, generates ADMIN_API_KEY into .env, and returns setupUrl — a one-time link (24h) to the setup page. Re-running never creates duplicates.',
   },
   dev: {
-    usage: 'murmur dev [--port 8787]',
-    summary: 'Run the assistant locally with wrangler, using secrets from .env. Open http://localhost:8787 to try it; `murmur chat --local` talks to it.',
+    usage: 'helppuff dev [--port 8787]',
+    summary: 'Run the assistant locally with wrangler, using secrets from .env. Open http://localhost:8787 to try it; `helppuff chat --local` talks to it.',
   },
   chat: {
-    usage: 'murmur chat [message] [--session <token>] [--local] [--json]',
+    usage: 'helppuff chat [message] [--session <token>] [--local] [--json]',
     summary:
       'Send a message through the real API, as a visitor would. Without a message in a terminal it opens an interactive chat. Pass the returned "session" back with --session to continue a conversation.',
     options: [
       ['--session <token>', 'Continue a conversation'],
-      ['--local', 'Talk to `murmur dev` on localhost:8787 instead of the deployed Worker'],
+      ['--local', 'Talk to `helppuff dev` on localhost:8787 instead of the deployed Worker'],
       ['--url <url>', 'Talk to another deployment'],
     ],
-    examples: ['murmur chat "How much does a service cost?" --json', 'murmur chat "And on weekends?" --session <token> --json', 'murmur chat'],
+    examples: ['helppuff chat "How much does a service cost?" --json', 'helppuff chat "And on weekends?" --session <token> --json', 'helppuff chat'],
   },
   knowledge: {
-    usage: 'murmur knowledge status | sync [--wait] | add (--file f.md | --title t --text …) | upload <file…> [--wait] | files [remove <id>] | list | remove <id> | pages [--status s] | facts [set k=v …] | suggest [--apply]',
+    usage: 'helppuff knowledge status | sync [--wait] | add (--file f.md | --title t --text …) | upload <file…> [--wait] | files [remove <id>] | list | remove <id> | pages [--status s] | facts [set k=v …] | suggest [--apply]',
     summary:
-      'workers-ai: the knowledge base on your Worker. `sync` re-crawls the selected pages (same as `murmur crawl`); `add` indexes hand-written knowledge at once; `upload` sends PDF, Word (.docx), Markdown or text files (up to 10 MB) that the Worker reads, cleans and learns in the background — `files` shows their progress, and `--wait` follows them to the end. Files listed in `knowledge.files` in murmur.json are synced on every deploy (new and changed ones uploaded, removed ones deleted); `facts` are the business details (phone, hours…) answers always see — yours are never overwritten by a crawl. Other backends: `sync` uploads the website and knowledge.files to AI Search, an OpenAI vector store or a Gemini File Search store.',
+      'workers-ai: the knowledge base on your Worker. `sync` re-crawls the selected pages (same as `helppuff crawl`); `add` indexes hand-written knowledge at once; `upload` sends PDF, Word (.docx), Markdown or text files (up to 10 MB) that the Worker reads, cleans and learns in the background — `files` shows their progress, and `--wait` follows them to the end. Files listed in `knowledge.files` in helppuff.json are synced on every deploy (new and changed ones uploaded, removed ones deleted); `facts` are the business details (phone, hours…) answers always see — yours are never overwritten by a crawl. Other backends: `sync` uploads the website and knowledge.files to AI Search, an OpenAI vector store or a Gemini File Search store.',
     examples: [
-      'murmur knowledge status --json',
-      'murmur knowledge add --file faq.md',
-      'murmur knowledge upload price-list.pdf brochure.docx --wait --json',
-      'murmur knowledge add --title "Warranty" --text "All installs carry a 5 year warranty."',
-      'murmur knowledge facts set phone="03 9876 5432" hours="Mon-Fri 7am-5pm"',
-      'murmur knowledge pages --status error',
-      'murmur knowledge suggest --apply   (starter questions written from the crawled pages)',
+      'helppuff knowledge status --json',
+      'helppuff knowledge add --file faq.md',
+      'helppuff knowledge upload price-list.pdf brochure.docx --wait --json',
+      'helppuff knowledge add --title "Warranty" --text "All installs carry a 5 year warranty."',
+      'helppuff knowledge facts set phone="03 9876 5432" hours="Mon-Fri 7am-5pm"',
+      'helppuff knowledge pages --status error',
+      'helppuff knowledge suggest --apply   (starter questions written from the crawled pages)',
     ],
   },
   discover: {
-    usage: 'murmur discover [--json]',
+    usage: 'helppuff discover [--json]',
     summary:
       'workers-ai: find the pages of the site — home page links, robots.txt sitemaps and sitemap indexes — each with a category (service, faq, contact, pricing, legal…) and whether it is selected. Legal pages, archives and old blog posts start unselected.',
   },
   crawl: {
-    usage: 'murmur crawl [--all | --urls a,b | --file urls.txt | --include globs] [--wait] [--json]',
+    usage: 'helppuff crawl [--all | --urls a,b | --file urls.txt | --include globs] [--wait] [--json]',
     summary:
       'workers-ai: crawl pages into the knowledge base. It runs in a Cloudflare Workflow on your account, so it carries on if you close the terminal; --wait follows it to the end. With no choice given it crawls the selected pages (the first time: the suggested ones). Pages that are unchanged since the last crawl are not re-embedded.',
     options: [
@@ -246,99 +246,99 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       ['--include <globs>', 'Discovered pages matching e.g. "**/services/**,**/faq/**"'],
       ['--wait', 'Block until the crawl finishes, printing progress'],
     ],
-    examples: ['murmur crawl --wait', 'murmur crawl --include "**/services/**,**/faq/**" --json', 'murmur crawl --urls https://acme.com.au/pricing'],
+    examples: ['helppuff crawl --wait', 'helppuff crawl --include "**/services/**,**/faq/**" --json', 'helppuff crawl --urls https://acme.com.au/pricing'],
   },
   ask: {
-    usage: 'murmur ask "<question>" [--session <token>] [--timing] [--json]',
+    usage: 'helppuff ask "<question>" [--session <token>] [--timing] [--json]',
     summary:
       'Ask the deployed assistant as a visitor would, and show the passages retrieval found for it with their scores. When nothing passes the relevance threshold the assistant should say it is not sure — if it answers anyway, tighten prompt.md.',
-    examples: ['murmur ask "Do you service Lilydale?"', 'murmur ask "How much is a hot water service?" --timing'],
+    examples: ['helppuff ask "Do you service Lilydale?"', 'helppuff ask "How much is a hot water service?" --timing'],
     notes: '--timing prints where the time went, stage by stage (auth, limits, context, rag.embed / vector / keyword / rerank, llm.first_token, llm.round1…), from the Worker\'s Server-Timing header.',
   },
   eval: {
-    usage: 'murmur eval <golden.json> [--min 0.8] [--json]',
+    usage: 'helppuff eval <golden.json> [--min 0.8] [--json]',
     summary:
       'Ask the deployed assistant a set of real visitor questions, each in a fresh conversation, and score them: retrieval found the expected page (`source`, a URL substring), the reply mentions every `contains`, and `refuse` questions get "not sure" rather than a guess. Exit code 1 when the share passing is below --min.',
-    examples: ['murmur eval golden.json', 'murmur eval golden.json --min 0.9 --json'],
+    examples: ['helppuff eval golden.json', 'helppuff eval golden.json --min 0.9 --json'],
     notes:
       'golden.json: [{ "question": "What\'s your phone number?", "source": "/contact", "contains": ["9876 5432"] }, { "question": "Can you fix my car?", "refuse": true }]',
   },
   destroy: {
-    usage: 'murmur destroy --yes [--keep-data]',
+    usage: 'helppuff destroy --yes [--keep-data]',
     summary:
-      'Delete everything this project created on Cloudflare: the Worker and its Workflow, KV, the D1 database (conversations, leads, knowledge), the Vectorize index, and an AI Search instance murmur made. murmur.json, prompt.md and .env stay, so `murmur deploy` rebuilds it. Irreversible.',
+      'Delete everything this project created on Cloudflare: the Worker and its Workflow, KV, the D1 database (conversations, leads, knowledge), the Vectorize index, and an AI Search instance helppuff made. helppuff.json, prompt.md and .env stay, so `helppuff deploy` rebuilds it. Irreversible.',
     options: [['--keep-data', 'Keep the D1 database and the Vectorize index']],
   },
   secret: {
-    usage: 'murmur secret set <NAME> [--value <v>]   |   murmur secret list',
+    usage: 'helppuff secret set <NAME> [--value <v>]   |   helppuff secret list',
     summary:
       'Store a secret in .env and, if deployed, on the Worker. The value is read from --value, from stdin when piped, or prompted (hidden) in a terminal. Values are never printed.',
-    examples: ['murmur secret set OPENAI_API_KEY', 'echo "$KEY" | murmur secret set OPENAI_API_KEY', 'murmur secret list --json'],
+    examples: ['helppuff secret set OPENAI_API_KEY', 'echo "$KEY" | helppuff secret set OPENAI_API_KEY', 'helppuff secret list --json'],
   },
   config: {
-    usage: 'murmur config get [path] | set <path> <value> | pull | export [--live] | import <file> | schema',
+    usage: 'helppuff config get [path] | set <path> <value> | pull | export [--live] | import <file> | schema',
     summary:
-      'Read or change murmur.json by dotted path; values are parsed as JSON when they look like JSON, else as text, and the result is validated before it is saved. `pull` brings settings changed in the dashboard into murmur.json (deploy refuses to overwrite them otherwise). `export --live` prints the live settings; `import` takes a murmur.json, or a settings object (published live, then pulled).',
+      'Read or change helppuff.json by dotted path; values are parsed as JSON when they look like JSON, else as text, and the result is validated before it is saved. `pull` brings settings changed in the dashboard into helppuff.json (deploy refuses to overwrite them otherwise). `export --live` prints the live settings; `import` takes a helppuff.json, or a settings object (published live, then pulled).',
     examples: [
-      'murmur config pull && murmur deploy',
-      'murmur config set backend.model @cf/qwen/qwen3-30b-a3b-fp8',
-      'murmur config set backend.timezone Australia/Melbourne',
-      'murmur config get backend',
-      'murmur config set backend.model gpt-5',
-      'murmur config set widget.brand.accent "#0EA5E9"',
-      "murmur config set knowledge.files '[\"./docs\"]'",
+      'helppuff config pull && helppuff deploy',
+      'helppuff config set backend.model @cf/qwen/qwen3-30b-a3b-fp8',
+      'helppuff config set backend.timezone Australia/Melbourne',
+      'helppuff config get backend',
+      'helppuff config set backend.model gpt-5',
+      'helppuff config set widget.brand.accent "#0EA5E9"',
+      "helppuff config set knowledge.files '[\"./docs\"]'",
     ],
   },
   prompt: {
-    usage: 'murmur prompt [status | pull [--version N] | history [--limit N] | show [N]] [--json]',
+    usage: 'helppuff prompt [status | pull [--version N] | history [--limit N] | show [N]] [--json]',
     summary:
-      'The prompt is versioned: every `murmur deploy` that changes prompt.md, and every edit or restore in the dashboard, publishes a new version (history in the dashboard database). `status` compares prompt.md with the live version: in_sync, ahead (deploy publishes it), behind or diverged (pull first). Deploy refuses behind and diverged, so a dashboard edit is never overwritten unseen.',
+      'The prompt is versioned: every `helppuff deploy` that changes prompt.md, and every edit or restore in the dashboard, publishes a new version (history in the dashboard database). `status` compares prompt.md with the live version: in_sync, ahead (deploy publishes it), behind or diverged (pull first). Deploy refuses behind and diverged, so a dashboard edit is never overwritten unseen.',
     options: [
       ['--version <N>', 'pull: write version N into prompt.md; deploying it then restores it as a new version'],
       ['--limit <N>', 'history: how many versions to list (default 20)'],
     ],
-    examples: ['murmur prompt', 'murmur prompt pull', 'murmur prompt pull --version 3 && murmur deploy', 'murmur prompt history --json', 'murmur prompt show 2'],
+    examples: ['helppuff prompt', 'helppuff prompt pull', 'helppuff prompt pull --version 3 && helppuff deploy', 'helppuff prompt history --json', 'helppuff prompt show 2'],
     notes:
       'When pull finds unpublished edits in prompt.md it keeps them as prompt.mine.md instead of discarding them: merge what you need into prompt.md, delete prompt.mine.md, and deploy.',
   },
-  validate: { usage: 'murmur validate [--json]', summary: 'Validate murmur.json and prompt.md and compile the Worker config, without touching Cloudflare.' },
-  schema: { usage: 'murmur schema', summary: 'Print the JSON Schema for murmur.json.' },
-  status: { usage: 'murmur status [--json]', summary: 'Show the site, backend, deployment URL, preview and embed snippet; for workers-ai also the crawl, the passages and today\'s usage against the free budget.' },
-  doctor: { usage: 'murmur doctor [--json]', summary: 'Run every check and print a fix for each failure. Exit code 1 if any check fails.' },
-  embed: { usage: 'murmur embed', summary: 'Print the <script> tag to paste into the site.' },
+  validate: { usage: 'helppuff validate [--json]', summary: 'Validate helppuff.json and prompt.md and compile the Worker config, without touching Cloudflare.' },
+  schema: { usage: 'helppuff schema', summary: 'Print the JSON Schema for helppuff.json.' },
+  status: { usage: 'helppuff status [--json]', summary: 'Show the site, backend, deployment URL, preview and embed snippet; for workers-ai also the crawl, the passages and today\'s usage against the free budget.' },
+  doctor: { usage: 'helppuff doctor [--json]', summary: 'Run every check and print a fix for each failure. Exit code 1 if any check fails.' },
+  embed: { usage: 'helppuff embed', summary: 'Print the <script> tag to paste into the site.' },
   users: {
-    usage: 'murmur users list | add <email> | remove <email> | reset <email> [--password <p>]',
+    usage: 'helppuff users list | add <email> | remove <email> | reset <email> [--password <p>]',
     summary:
       'Manage who can sign in to the dashboard. The owner is dashboard.adminEmail; others are stored in the D1 database. A password is generated and shown once when --password is omitted.',
-    examples: ['murmur users add sam@acme.com', 'murmur users reset owner@acme.com --json', 'murmur users list'],
+    examples: ['helppuff users add sam@acme.com', 'helppuff users reset owner@acme.com --json', 'helppuff users list'],
   },
   webhooks: {
-    usage: 'murmur webhooks list | add <url> [--events a,b] [--description …] | remove <id> | test <id> | enable <id> | disable <id> | events',
+    usage: 'helppuff webhooks list | add <url> [--events a,b] [--description …] | remove <id> | test <id> | enable <id> | disable <id> | events',
     summary:
-      'Endpoints that receive what happens, as signed JSON: conversations, messages, leads, callback requests and their updates, summaries, budget alerts, learning (`murmur webhooks events` lists every type). The same as Settings → Webhooks in the dashboard; stored on the Worker. Each has a signing secret: X-Murmur-Signature is sha256= + hex HMAC-SHA256 of "<X-Murmur-Timestamp>.<body>". https only; up to 10 per site.',
-    examples: ['murmur webhooks add https://hooks.zapier.com/hooks/catch/123/abc --events lead.captured,callback.requested --json', 'murmur webhooks test wh_1a2b3c', 'murmur webhooks list --json'],
+      'Endpoints that receive what happens, as signed JSON: conversations, messages, leads, callback requests and their updates, summaries, budget alerts, learning (`helppuff webhooks events` lists every type). The same as Settings → Webhooks in the dashboard; stored on the Worker. Each has a signing secret: X-HelpPuff-Signature is sha256= + hex HMAC-SHA256 of "<X-HelpPuff-Timestamp>.<body>". https only; up to 10 per site.',
+    examples: ['helppuff webhooks add https://hooks.zapier.com/hooks/catch/123/abc --events lead.captured,callback.requested --json', 'helppuff webhooks test wh_1a2b3c', 'helppuff webhooks list --json'],
   },
   callbacks: {
-    usage: 'murmur callbacks list [--status open|done|dismissed|all] | done <id> [--note …] | dismiss <id> [--note …] | reopen <id>',
+    usage: 'helppuff callbacks list [--status open|done|dismissed|all] | done <id> [--note …] | dismiss <id> [--note …] | reopen <id>',
     summary:
       'Visitors who asked to be called back, the same as the dashboard\'s Callbacks page: waiting ones oldest first, with how to reach them, why, and the conversation. Mark one done (with a note of what happened) or dismissed; each change sends the callback.updated webhook. A conversation has at most one waiting request; asking again updates it.',
-    examples: ['murmur callbacks --json', 'murmur callbacks done cb_k2x9 --note "Booked a measure for Tuesday"', 'murmur callbacks list --status done'],
+    examples: ['helppuff callbacks --json', 'helppuff callbacks done cb_k2x9 --note "Booked a measure for Tuesday"', 'helppuff callbacks list --status done'],
   },
   dashboard: {
-    usage: 'murmur dashboard [--email <e>] [--no-browser]',
+    usage: 'helppuff dashboard [--email <e>] [--no-browser]',
     summary:
       'Mint a one-time sign-in link to the dashboard (15 minutes), or the setup link if nobody has an account yet, and open it. The recovery path for a lost password.',
   },
   skill: {
-    usage: 'murmur skill install [--project] [--codex]  |  murmur skill print',
+    usage: 'helppuff skill install [--project] [--codex]  |  helppuff skill print',
     summary:
       'Install the "website-chatbot" agent skill so a fresh Claude Code session knows how to set up, test and deploy an assistant: into ~/.claude/skills (default) or this repository (--project); --codex also adds it to ~/.codex/AGENTS.md. Or install the Claude Code plugin, which bundles the skill and the MCP server.',
-    examples: ['npx -y @knowtific/murmur skill install', 'npx -y @knowtific/murmur skill install --codex'],
+    examples: ['npx -y @knowtific/helppuff skill install', 'npx -y @knowtific/helppuff skill install --codex'],
   },
   mcp: {
-    usage: 'murmur mcp',
+    usage: 'helppuff mcp',
     summary:
-      'Serve the murmur tools over MCP (stdio). Add to Claude Code with: claude mcp add murmur -- npx -y @knowtific/murmur mcp',
+      'Serve the helppuff tools over MCP (stdio). Add to Claude Code with: claude mcp add helppuff -- npx -y @knowtific/helppuff mcp',
   },
 };
 
@@ -352,7 +352,7 @@ export function commandHelp(name: string): string | null {
   }
   if (help.examples?.length) lines.push(`EXAMPLES\n${help.examples.map((e) => `  ${e}`).join('\n')}\n`);
   if (help.notes) lines.push(help.notes);
-  lines.push('Add --json for machine-readable output. See `murmur --help` for the agent workflow.');
+  lines.push('Add --json for machine-readable output. See `helppuff --help` for the agent workflow.');
   return lines.join('\n');
 }
 
@@ -365,7 +365,7 @@ export function commandHelp(name: string): string | null {
 export function commandReference(): string {
   return Object.entries(COMMAND_HELP)
     .map(([name, help]) => {
-      const lines = [`### \`murmur ${name}\``, '', '```', help.usage, '```', '', help.summary, ''];
+      const lines = [`### \`helppuff ${name}\``, '', '```', help.usage, '```', '', help.summary, ''];
       if (help.options?.length) {
         lines.push('| Option | |', '| --- | --- |', ...help.options.map(([flag, text]) => `| \`${flag.replace(/\|/g, '\\|')}\` | ${text.replace(/\|/g, '\\|')} |`), '');
       }
@@ -382,8 +382,8 @@ export function cliReferencePage(): string {
 
 # CLI reference
 
-Run any command with \`npx @knowtific/murmur <command>\` (or \`murmur <command>\` once installed).
-\`murmur <command> --help\` prints the same in a terminal.
+Run any command with \`npx @knowtific/helppuff <command>\` (or \`helppuff <command>\` once installed).
+\`helppuff <command> --help\` prints the same in a terminal.
 
 **Every command** takes \`--json\` (stdout is one JSON object: \`{"ok":true,…}\` or
 \`{"ok":false,"error":{code,message,hint}}\`; progress goes to stderr), \`--non-interactive\`,
@@ -395,9 +395,9 @@ ${commandReference()}`;
 
 export function agentsGuide(): string {
   const commands = commandReference();
-  return `# @knowtific/murmur — guide for AI agents
+  return `# @knowtific/helppuff — guide for AI agents
 
-Murmur puts an AI chat assistant on a website, entirely on the site owner's own
+HelpPuff puts an AI chat assistant on a website, entirely on the site owner's own
 Cloudflare account: one Worker serves the widget, the chat API, a dashboard and a
 knowledge base it builds by crawling the site (Workers AI + Vectorize + D1, crawled in
 a Workflow). The default setup runs on the Workers Free plan. Everything a person
@@ -406,18 +406,18 @@ can do in the dashboard can be done here, non-interactively, with \`--json\`.
 ## Quick start (non-interactive)
 
 \`\`\`bash
-npx -y @knowtific/murmur init --url https://acme.com.au --deploy --yes --json
-npx -y @knowtific/murmur knowledge status --json          # learning runs in the background
-npx -y @knowtific/murmur ask "Do you service Lilydale?" --json
+npx -y @knowtific/helppuff init --url https://acme.com.au --deploy --yes --json
+npx -y @knowtific/helppuff knowledge status --json          # learning runs in the background
+npx -y @knowtific/helppuff ask "Do you service Lilydale?" --json
 \`\`\`
 
 Without a person at a browser (\`--json\`, no terminal, or \`--no-browser\`), \`init\` and
 \`deploy\` do onboarding themselves the first time: they start learning the suggested pages
 (shape them with \`--crawl "<globs>"\` or \`knowledge.website.include\`/\`exclude\` in
-murmur.json) and read the business details from the site. Then give the user three things
+helppuff.json) and read the business details from the site. Then give the user three things
 from the result: \`deploy.setupUrl\` (the dashboard: a one-time link, 24 hours, where they
 create their sign-in — it opens on Home, with nothing left to onboard), \`deploy.embed\`
-(the script) and \`deploy.preview\` (the demo). \`murmur dashboard --json\` mints a fresh
+(the script) and \`deploy.preview\` (the demo). \`helppuff dashboard --json\` mints a fresh
 sign-in link at any time.
 
 ## Output, exit codes and environment
@@ -428,9 +428,9 @@ sign-in link at any time.
   permission · \`4\` Cloudflare quota or limit · \`10\` needs_input (\`init\` returns the
   questions; ask the user, re-run with each question's \`flag\`).
 - Never prompts when \`--json\`, \`--non-interactive\`, \`CI=1\` or there is no terminal.
-- Global flags: \`--json\`, \`--non-interactive\`, \`--cwd <dir>\`, \`--config <murmur.json>\`,
+- Global flags: \`--json\`, \`--non-interactive\`, \`--cwd <dir>\`, \`--config <helppuff.json>\`,
   \`--yes\`, \`--account-id\` (where Cloudflare is used).
-- Environment: \`CLOUDFLARE_API_TOKEN\`, \`CLOUDFLARE_ACCOUNT_ID\`, \`MURMUR_ADMIN_API_KEY\`
+- Environment: \`CLOUDFLARE_API_TOKEN\`, \`CLOUDFLARE_ACCOUNT_ID\`, \`HELPPUFF_ADMIN_API_KEY\`
   (or \`ADMIN_API_KEY\` in \`.env\`), \`OPENAI_API_KEY\`, \`GEMINI_API_KEY\`,
   \`ANTHROPIC_API_KEY\`, \`RETELL_API_KEY\`. Values in the environment win over \`.env\`.
 
@@ -440,27 +440,27 @@ sign-in link at any time.
 
 ## Configuration
 
-\`murmur.json\` (commit it) says what the assistant is; \`prompt.md\` how it behaves;
-\`.env\` holds secrets (never commit, never print). \`murmur schema\` prints the JSON
+\`helppuff.json\` (commit it) says what the assistant is; \`prompt.md\` how it behaves;
+\`.env\` holds secrets (never commit, never print). \`helppuff schema\` prints the JSON
 Schema of every field. Settings changed in the dashboard are pulled with
-\`murmur config pull\`; deploy refuses to overwrite them otherwise.
+\`helppuff config pull\`; deploy refuses to overwrite them otherwise.
 
 ## Commands
 
 ${commands}
 ## Recipes
 
-- **Install with defaults:** \`murmur init --url <site> --deploy --yes --json\`
-- **Add documents:** \`murmur knowledge upload price-list.pdf brochure.docx --wait --json\`
-- **Crawl only services and FAQ:** \`murmur crawl --include "**/services/**,**/faq/**" --wait --json\`
-- **Switch the model:** \`murmur config set backend.model @cf/qwen/qwen3-30b-a3b-fp8 && murmur deploy --json\` (compared on the wiki's AI models page)
-- **Faster answers:** \`murmur config set backend.reasoning low && murmur deploy --json\` (thinking cannot be switched off: answers without it proved unsafe)
-- **Add a manual FAQ:** \`murmur knowledge add --file faq.md --json\`
-- **Correct a fact:** \`murmur knowledge facts set phone="03 9876 5432" --json\`
-- **Get the embed snippet:** \`murmur embed\`
-- **Check usage against the free budget:** \`murmur knowledge status --json\` → \`usage\`
-- **Lost dashboard password:** \`murmur dashboard --json\` → a one-time sign-in link
-- **Remove everything:** \`murmur destroy --yes --json\`
+- **Install with defaults:** \`helppuff init --url <site> --deploy --yes --json\`
+- **Add documents:** \`helppuff knowledge upload price-list.pdf brochure.docx --wait --json\`
+- **Crawl only services and FAQ:** \`helppuff crawl --include "**/services/**,**/faq/**" --wait --json\`
+- **Switch the model:** \`helppuff config set backend.model @cf/qwen/qwen3-30b-a3b-fp8 && helppuff deploy --json\` (compared on the wiki's AI models page)
+- **Faster answers:** \`helppuff config set backend.reasoning low && helppuff deploy --json\` (thinking cannot be switched off: answers without it proved unsafe)
+- **Add a manual FAQ:** \`helppuff knowledge add --file faq.md --json\`
+- **Correct a fact:** \`helppuff knowledge facts set phone="03 9876 5432" --json\`
+- **Get the embed snippet:** \`helppuff embed\`
+- **Check usage against the free budget:** \`helppuff knowledge status --json\` → \`usage\`
+- **Lost dashboard password:** \`helppuff dashboard --json\` → a one-time sign-in link
+- **Remove everything:** \`helppuff destroy --yes --json\`
 
 ## Rules
 

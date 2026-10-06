@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { indexDocument } from '@murmur/rag';
+import { indexDocument } from '@helppuff/rag';
 import { defineConfig } from '../src/config/load.js';
 import { memoryKv } from '../src/core/platform.js';
 import { verifyRetellSignature } from '../src/routes/retell.js';
@@ -15,7 +15,7 @@ async function sign(body: string, key: string, stamp = Date.now()): Promise<stri
   return `v=${stamp},d=${[...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')}`;
 }
 
-async function world(retrieval: 'murmur' | null = 'murmur') {
+async function world(retrieval: 'helppuff' | null = 'helppuff') {
   const db = sqliteD1();
   const ai = fakeAi();
   const vectors = fakeVectors();
@@ -23,7 +23,7 @@ async function world(retrieval: 'murmur' | null = 'murmur') {
   const config = defineConfig({
     sites: { acme: { origins: [ORIGIN], connector: { type: 'retell', options: { apiKey: { env: 'RETELL_API_KEY' }, agentId: 'agent_1', ...(retrieval ? { retrieval } : {}) } } } },
   });
-  return harness(config, { MURMUR_SECRET: SECRET, MURMUR_KV: memoryKv(), MURMUR_DB: db, AI: ai, VECTORS: vectors, RETELL_API_KEY: KEY }, null);
+  return harness(config, { HELPPUFF_SECRET: SECRET, HELPPUFF_KV: memoryKv(), HELPPUFF_DB: db, AI: ai, VECTORS: vectors, RETELL_API_KEY: KEY }, null);
 }
 
 const call = async (h: Awaited<ReturnType<typeof world>>, body: string, signature?: string) =>

@@ -1,12 +1,12 @@
 /**
  * The D1 schema, as numbered migrations.
  *
- * Applied in two places that must agree: `murmur deploy` (through the
+ * Applied in two places that must agree: `helppuff deploy` (through the
  * Cloudflare REST API, before the new Worker serves anything) and the Worker
  * itself, once per isolate on first use, so a Worker never writes to a table
  * that does not exist.
  *
- * Rules for adding one — they are what keeps `murmur upgrade` safe and a
+ * Rules for adding one — they are what keeps `helppuff upgrade` safe and a
  * rollback possible:
  *  - Append; never edit a migration that has shipped.
  *  - Additive only: new tables, new columns (nullable or with a default), new
@@ -244,7 +244,7 @@ export const MIGRATIONS: readonly Migration[] = [
     // Uploaded documents. The bytes wait in KV until the Workflow reads them;
     // what is kept is the cleaned Markdown, so the file can be re-embedded
     // (a new embedding model) without uploading it again. Its passages are
-    // pages with source 'file' and URLs murmur://file/<id>#<section>.
+    // pages with source 'file' and URLs helppuff://file/<id>#<section>.
     statements: [
       `CREATE TABLE IF NOT EXISTS knowledge_files (
         id TEXT PRIMARY KEY,
@@ -267,7 +267,7 @@ export const MIGRATIONS: readonly Migration[] = [
   {
     id: 5,
     name: 'webhooks',
-    // Endpoints the owner adds in the dashboard (murmur.json `sinks` still work,
+    // Endpoints the owner adds in the dashboard (helppuff.json `sinks` still work,
     // for leads). `events` is a JSON array, or ["*"] for everything. The
     // secret is generated here and signs every delivery. Deliveries are a
     // short log per endpoint (the newest 50), for the dashboard.

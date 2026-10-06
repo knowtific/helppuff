@@ -4,8 +4,8 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 import { GENERATED_DIR, projectSchema } from './project.js';
 
 /**
- * The JSON Schema for murmur.json, generated from the same Zod schema the
- * CLI validates with. Written into `.murmur/` so editors (and agents that
+ * The JSON Schema for helppuff.json, generated from the same Zod schema the
+ * CLI validates with. Written into `.helppuff/` so editors (and agents that
  * read `$schema`) get completion and docs without a network fetch.
  */
 export function projectJsonSchema(): Record<string, unknown> {
@@ -13,11 +13,11 @@ export function projectJsonSchema(): Record<string, unknown> {
     string,
     unknown
   >;
-  return { ...schema, title: 'murmur.json', description: 'An AI chat assistant, deployed to Cloudflare by the murmur CLI.' };
+  return { ...schema, title: 'helppuff.json', description: 'An AI chat assistant, deployed to Cloudflare by the helppuff CLI.' };
 }
 
 export function writeSchemaFile(dir: string): string {
-  const out = join(dir, GENERATED_DIR, 'murmur.schema.json');
+  const out = join(dir, GENERATED_DIR, 'helppuff.schema.json');
   mkdirSync(join(dir, GENERATED_DIR), { recursive: true });
   writeFileSync(out, `${JSON.stringify(projectJsonSchema(), null, 2)}\n`);
   return out;

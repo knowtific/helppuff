@@ -1,4 +1,4 @@
-import type { Message } from '@murmur/protocol';
+import type { Message } from '@helppuff/protocol';
 import { MAX_STORED_MESSAGES, type State } from './store.js';
 
 /** Bumping this discards every older payload rather than migrating it. */
@@ -15,7 +15,7 @@ export type Persisted = {
   ui: { sound: boolean; teaserDismissed: boolean };
 };
 
-export const storageKey = (siteId: string) => `mm:${siteId}`;
+export const storageKey = (siteId: string) => `hp:${siteId}`;
 
 /**
  * Storage is never load-bearing. Every read and write is guarded, and
@@ -27,7 +27,7 @@ function safeStorage(): Storage | null {
     const store = globalThis.localStorage;
     if (!store) return null;
     // Safari in private mode throws on write, not on access.
-    const probe = '__mm__';
+    const probe = '__hp__';
     store.setItem(probe, '1');
     store.removeItem(probe);
     return store;

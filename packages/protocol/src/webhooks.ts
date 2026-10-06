@@ -4,10 +4,10 @@
  * Every delivery is one JSON envelope, `POST`ed with
  *
  *   Content-Type: application/json
- *   X-Murmur-Event: <type>
- *   X-Murmur-Delivery: <envelope id>
- *   X-Murmur-Timestamp: <unix seconds>
- *   X-Murmur-Signature: sha256=<hex HMAC-SHA256 of "<timestamp>.<body>" with the endpoint's secret>
+ *   X-HelpPuff-Event: <type>
+ *   X-HelpPuff-Delivery: <envelope id>
+ *   X-HelpPuff-Timestamp: <unix seconds>
+ *   X-HelpPuff-Signature: sha256=<hex HMAC-SHA256 of "<timestamp>.<body>" with the endpoint's secret>
  *
  * Receivers should check the signature and reject a timestamp more than five
  * minutes old. Deliveries can repeat (a retry after a timeout); `id` is the
@@ -20,11 +20,11 @@ export const WEBHOOK_EVENTS = {
   'message.sent': 'The assistant replied.',
   'lead.captured': 'Contact details arrived: the pre-chat form, typed in the chat, or found by the assistant.',
   'callback.requested': 'The visitor asked to be called back.',
-  'callback.updated': 'A callback request was marked done or dismissed (or reopened), or its note changed, in the dashboard or with `murmur callbacks`.',
+  'callback.updated': 'A callback request was marked done or dismissed (or reopened), or its note changed, in the dashboard or with `helppuff callbacks`.',
   'lead.updated': 'A lead’s status, notes or name changed in the dashboard.',
   'feedback.received': 'A visitor rated a reply (thumbs up or down).',
   'conversation.summarized': 'The dashboard summarised a conversation.',
-  'conversation.ended': 'The visitor started a new chat (or the page called Murmur.reset()), ending this one. Most visitors just leave: see conversation.completed.',
+  'conversation.ended': 'The visitor started a new chat (or the page called HelpPuff.reset()), ending this one. Most visitors just leave: see conversation.completed.',
   'conversation.completed': 'A conversation went quiet (5 minutes after the last message): its summary, labels, lead and transcript.',
   'budget.warning': 'Today\'s AI budget is 80% used: answers are being kept shorter. Once a day.',
   'budget.exhausted': 'Today\'s AI budget is used up: visitors get your contact details and a callback form until 00:00 UTC. Once a day.',

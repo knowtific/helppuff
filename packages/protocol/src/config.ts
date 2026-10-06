@@ -5,7 +5,7 @@ import { fieldSchema, linkItemSchema } from './messages.js';
 import { httpUrl, safeUrl } from './url-schema.js';
 
 /**
- * Every CSS custom property a site may override, without the `--mm-` prefix.
+ * Every CSS custom property a site may override, without the `--hp-` prefix.
  * An unknown key is ignored rather than written into the stylesheet.
  */
 export const THEME_TOKENS = [
@@ -94,7 +94,7 @@ export const brandSchema = z.object({
   avatar: httpUrl.optional().describe('The assistant\'s picture: a square image URL.'),
   accent: hexColor.default('#5B5BF7').describe('The main colour (hex). Text on it is made readable automatically.'),
   theme: z.enum(['light', 'dark', 'auto']).default('auto').describe('`auto` follows the visitor\'s system setting.'),
-  tokens: themeTokensSchema.optional().describe('Fine-grained styling: CSS custom properties without the `--mm-` prefix, e.g. `{ "radius-panel": "12px", "font": "Inter, sans-serif" }`.'),
+  tokens: themeTokensSchema.optional().describe('Fine-grained styling: CSS custom properties without the `--hp-` prefix, e.g. `{ "radius-panel": "12px", "font": "Inter, sans-serif" }`.'),
 });
 export type Brand = z.infer<typeof brandSchema>;
 
@@ -177,7 +177,7 @@ export const teaserSchema = z
   );
 
 /**
- * The footer credit. `true` shows the Murmur credit, `false` hides it, and an
+ * The footer credit. `true` shows the HelpPuff credit, `false` hides it, and an
  * object whitelabels it: `text` replaces the wording and `url`, when given,
  * is where it links. Without a `url` the credit is plain text.
  */

@@ -22,10 +22,10 @@ export function isSupported(): boolean {
   }
 }
 
-/** `?mmdebug=1` turns on console logging for this page view only. */
+/** `?hpdebug=1` turns on console logging for this page view only. */
 export function debugEnabled(): boolean {
   try {
-    return new URLSearchParams(location.search).get('mmdebug') === '1';
+    return new URLSearchParams(location.search).get('hpdebug') === '1';
   } catch {
     return false;
   }
@@ -44,7 +44,7 @@ export function setDebug(value: boolean): void {
 export function log(event: string, data?: unknown): void {
   if (!debug) return;
   try {
-    console.log(`[murmur] ${event}`, data ?? '');
+    console.log(`[helppuff] ${event}`, data ?? '');
   } catch {
     // A host page that broke console is not our problem to solve.
   }

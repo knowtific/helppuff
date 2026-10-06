@@ -1,5 +1,5 @@
 import { useRef } from 'preact/hooks';
-import type { Action, Shortcut } from '@murmur/protocol';
+import type { Action, Shortcut } from '@helppuff/protocol';
 import { Icon } from './Icon.js';
 import { useScrollEdges } from '../lib/scroll-edges.js';
 
@@ -26,25 +26,25 @@ export function ShortcutTiles({
   if (shortcuts.length === 0) return null;
 
   return (
-    <div class="mm-tiles">
+    <div class="hp-tiles">
       {shortcuts.map((shortcut) => {
         const link = href(shortcut.action);
         const inner = (
           <>
             {shortcut.icon ? (
-              <span class="mm-tile-icon">
+              <span class="hp-tile-icon">
                 <Icon name={shortcut.icon} />
               </span>
             ) : null}
-            <span class="mm-tile-label">{shortcut.label}</span>
-            {shortcut.description ? <span class="mm-tile-desc">{shortcut.description}</span> : null}
+            <span class="hp-tile-label">{shortcut.label}</span>
+            {shortcut.description ? <span class="hp-tile-desc">{shortcut.description}</span> : null}
           </>
         );
 
         return link ? (
           <a
             key={shortcut.id}
-            class="mm-tile"
+            class="hp-tile"
             href={link}
             {...(shortcut.action.kind === 'url' ? { target: '_blank' } : {})}
             rel="noopener noreferrer nofollow"
@@ -52,7 +52,7 @@ export function ShortcutTiles({
             {inner}
           </a>
         ) : (
-          <button key={shortcut.id} type="button" class="mm-tile" onClick={() => onPick(shortcut)}>
+          <button key={shortcut.id} type="button" class="hp-tile" onClick={() => onPick(shortcut)}>
             {inner}
           </button>
         );
@@ -89,9 +89,9 @@ export function ShortcutBar({
 
   if (collapsed && !expanded) {
     return (
-      <div class="mm-shortcut-wrap">
-        <div class="mm-shortcut-bar" ref={track}>
-          <button type="button" class="mm-chip" aria-label="Show shortcuts" onClick={onExpand}>
+      <div class="hp-shortcut-wrap">
+        <div class="hp-shortcut-bar" ref={track}>
+          <button type="button" class="hp-chip" aria-label="Show shortcuts" onClick={onExpand}>
             ⋯
           </button>
         </div>
@@ -101,17 +101,17 @@ export function ShortcutBar({
 
   return (
     <div
-      class="mm-shortcut-wrap"
+      class="hp-shortcut-wrap"
       {...(edges.atStart ? {} : { 'data-more-start': '' })}
       {...(edges.atEnd ? {} : { 'data-more-end': '' })}
     >
-      <div class="mm-shortcut-bar" ref={track}>
+      <div class="hp-shortcut-bar" ref={track}>
         {shortcuts.map((shortcut) => {
           const link = href(shortcut.action);
           return link ? (
             <a
               key={shortcut.id}
-              class="mm-chip"
+              class="hp-chip"
               href={link}
               {...(shortcut.action.kind === 'url' ? { target: '_blank' } : {})}
               rel="noopener noreferrer nofollow"
@@ -119,7 +119,7 @@ export function ShortcutBar({
               {shortcut.label}
             </a>
           ) : (
-            <button key={shortcut.id} type="button" class="mm-chip" onClick={() => onPick(shortcut)}>
+            <button key={shortcut.id} type="button" class="hp-chip" onClick={() => onPick(shortcut)}>
               {shortcut.label}
             </button>
           );
@@ -129,7 +129,7 @@ export function ShortcutBar({
       {edges.atEnd ? null : (
         <button
           type="button"
-          class="mm-shortcut-nav"
+          class="hp-shortcut-nav"
           aria-label="More shortcuts"
           onClick={() => scrollByStep(1)}
         >

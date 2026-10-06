@@ -5,7 +5,7 @@ import type { BrowserLike } from './types.js';
  * followed and recorded, and a cap on how much of the body is read.
  */
 
-export const DEFAULT_USER_AGENT = 'murmur-crawler/0.1 (+https://github.com/knowtific/murmur)';
+export const DEFAULT_USER_AGENT = 'helppuff-crawler/0.1 (+https://github.com/knowtific/helppuff)';
 const MAX_BYTES = 3 * 1024 * 1024;
 
 export type FetchedPage =

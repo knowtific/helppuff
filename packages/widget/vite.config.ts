@@ -16,7 +16,7 @@ function demoRoutes(): Plugin {
     '/gallery.html': '/demo/gallery.html',
   };
   return {
-    name: 'murmur-demo-routes',
+    name: 'helppuff-demo-routes',
     configureServer(server) {
       server.middlewares.use((req, _res, next) => {
         const [path = '/', query] = (req.url ?? '/').split('?');
@@ -34,8 +34,8 @@ export default defineConfig({
   server: { port: 5173, strictPort: true },
   esbuild: { jsx: 'automatic', jsxImportSource: 'preact' },
   define: {
-    __MURMUR_VERSION__: JSON.stringify('0.1.0-dev'),
-    __MURMUR_APP_FILE__: JSON.stringify('/src/app/index.tsx'),
+    __HELPPUFF_VERSION__: JSON.stringify('0.1.0-dev'),
+    __HELPPUFF_APP_FILE__: JSON.stringify('/src/app/index.tsx'),
   },
   build: {
     outDir: resolve(__dirname, 'dist-demo'),

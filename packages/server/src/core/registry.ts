@@ -1,15 +1,15 @@
-import type { ErasedConnector } from '@murmur/connector-types';
-import type { ErasedSink } from '@murmur/sink-types';
-import echoConnector from '@murmur/connector-echo';
-import retellConnector from '@murmur/connector-retell';
-import openaiConnector from '@murmur/connector-openai';
-import geminiConnector from '@murmur/connector-gemini';
-import cloudflareConnector from '@murmur/connector-cloudflare';
-import anthropicConnector from '@murmur/connector-anthropic';
-import httpConnector from '@murmur/connector-http';
-import workersAiConnector from '@murmur/connector-workers-ai';
-import webhookSink from '@murmur/sink-webhook';
-import { MurmurError } from './errors.js';
+import type { ErasedConnector } from '@helppuff/connector-types';
+import type { ErasedSink } from '@helppuff/sink-types';
+import echoConnector from '@helppuff/connector-echo';
+import retellConnector from '@helppuff/connector-retell';
+import openaiConnector from '@helppuff/connector-openai';
+import geminiConnector from '@helppuff/connector-gemini';
+import cloudflareConnector from '@helppuff/connector-cloudflare';
+import anthropicConnector from '@helppuff/connector-anthropic';
+import httpConnector from '@helppuff/connector-http';
+import workersAiConnector from '@helppuff/connector-workers-ai';
+import webhookSink from '@helppuff/sink-webhook';
+import { HelpPuffError } from './errors.js';
 
 /**
  * Registration is explicit: the bundle contains only what is listed
@@ -29,7 +29,7 @@ export const connectors: Readonly<Record<string, ErasedConnector>> = {
 export function getConnector(type: string): ErasedConnector {
   const connector = connectors[type];
   if (!connector) {
-    throw new MurmurError('internal', { detail: `unknown_connector:${type}` });
+    throw new HelpPuffError('internal', { detail: `unknown_connector:${type}` });
   }
   return connector;
 }
@@ -41,6 +41,6 @@ export const sinks: Readonly<Record<string, ErasedSink>> = {
 
 export function getSink(type: string): ErasedSink {
   const sink = sinks[type];
-  if (!sink) throw new MurmurError('internal', { detail: `unknown_sink:${type}` });
+  if (!sink) throw new HelpPuffError('internal', { detail: `unknown_sink:${type}` });
   return sink;
 }

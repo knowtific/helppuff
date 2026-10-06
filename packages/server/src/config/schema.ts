@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { widgetConfigSchema } from '@murmur/protocol';
+import { widgetConfigSchema } from '@helppuff/protocol';
 
 /**
  * A reference to an environment variable. Secrets are never written into the
@@ -72,7 +72,7 @@ export const knowledgeConfigSchema = z
 export type KnowledgeConfig = z.infer<typeof knowledgeConfigSchema>;
 
 /**
- * How the assistant behaves: settings, not prompt text. Murmur writes them
+ * How the assistant behaves: settings, not prompt text. HelpPuff writes them
  * into the instructions it adds around the owner's prompt (`core/guidance.ts`),
  * so the prompt the owner edits never has to repeat them, or fight them.
  */
@@ -116,7 +116,7 @@ export type SiteConfig = z.infer<typeof siteConfigSchema>;
  */
 /**
  * Which prompt version the stored connector options carry. Written by
- * `murmur deploy` and by the dashboard whenever either publishes a prompt,
+ * `helppuff deploy` and by the dashboard whenever either publishes a prompt,
  * so each can tell whether the other has moved on since it last looked.
  * The text itself stays in the connector's own option; history is in D1.
  */
@@ -142,7 +142,7 @@ export const storedSiteConfigSchema = z
     prompt: promptMetaSchema.optional(),
     /** Retired: the instructions form's choices, from when it wrote them into the prompt. Read as `assistant` when that is missing. */
     profile: z.record(z.string(), z.unknown()).optional(),
-    /** Who last changed settings from the dashboard, so `murmur deploy` does not overwrite them unseen. */
+    /** Who last changed settings from the dashboard, so `helppuff deploy` does not overwrite them unseen. */
     settings: z
       .object({ at: z.number().int().nonnegative(), by: z.string().max(200).nullable().default(null), hash: z.string().max(64) })
       .strict()
@@ -151,10 +151,10 @@ export const storedSiteConfigSchema = z
   .strict();
 export type StoredSiteConfig = z.infer<typeof storedSiteConfigSchema>;
 
-export const murmurConfigSchema = z.object({
+export const helppuffConfigSchema = z.object({
   sites: z.record(z.string().min(1).max(64), siteConfigSchema),
 });
-export type MurmurConfig = z.infer<typeof murmurConfigSchema>;
+export type HelpPuffConfig = z.infer<typeof helppuffConfigSchema>;
 
-/** The shape a user writes in `murmur.config.ts` — defaults not yet applied. */
-export type MurmurConfigInput = z.input<typeof murmurConfigSchema>;
+/** The shape a user writes in `helppuff.config.ts` — defaults not yet applied. */
+export type HelpPuffConfigInput = z.input<typeof helppuffConfigSchema>;

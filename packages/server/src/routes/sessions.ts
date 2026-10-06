@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
-import { startSessionRequestSchema, type StartSessionResponse } from '@murmur/protocol';
+import { startSessionRequestSchema, type StartSessionResponse } from '@helppuff/protocol';
 import { resolveSite } from '../config/site.js';
-import { MurmurError } from '../core/errors.js';
+import { HelpPuffError } from '../core/errors.js';
 import { validateLead } from '../core/lead.js';
 import { assertAllowedOrigin } from '../core/origin.js';
 import { requireSecret, type HonoEnv } from '../core/request.js';
@@ -22,7 +22,7 @@ export const sessionRoutes = new Hono<HonoEnv>();
  * Cheap rejections first, anything that costs money or writes data last.
  */
 sessionRoutes.post('/v1/sites/:siteId/sessions', async (c) => {
-  const ctx = c.get('mm');
+  const ctx = c.get('helppuff');
   const siteId = c.req.param('siteId');
 
   // 1. Resolve site.
@@ -34,7 +34,7 @@ sessionRoutes.post('/v1/sites/:siteId/sessions', async (c) => {
   // 3. Body shape.
   const parsed = startSessionRequestSchema.safeParse(await readJsonBody(c.req.raw));
   if (!parsed.success) {
-    throw new MurmurError('bad_request', { detail: 'session_body_invalid' });
+    throw new HelpPuffError('bad_request', { detail: 'session_body_invalid' });
   }
   const input = parsed.data;
 
@@ -44,7 +44,7 @@ sessionRoutes.post('/v1/sites/:siteId/sessions', async (c) => {
     : {};
 
   if (input.firstMessage && input.firstMessage.length > site.security.limits.maxMessageLength) {
-    throw new MurmurError('bad_request', {
+    throw new HelpPuffError('bad_request', {
       message: 'That message is a little too long.',
       detail: 'first_message_too_long',
     });
@@ -175,6 +175,6 @@ export async function readJsonBody(request: Request): Promise<unknown> {
   try {
     return await request.json();
   } catch {
-    throw new MurmurError('bad_request', { detail: 'body_not_json' });
+    throw new HelpPuffError('bad_request', { detail: 'body_not_json' });
   }
 }

@@ -2,7 +2,7 @@ import { log } from './env.js';
 
 /**
  * Timers, listeners and observers registered here are all removed by one
- * `dispose()` — the same path `Murmur.destroy()` and a fatal `hide()` take.
+ * `dispose()` — the same path `HelpPuff.destroy()` and a fatal `hide()` take.
  */
 export class Disposer {
   private tasks: Array<() => void> = [];

@@ -20,8 +20,8 @@ import {
   type ConnectorContext,
   type PromptScope,
   type Turn,
-} from '@murmur/connector-types';
-import type { Message, SendRequest } from '@murmur/protocol';
+} from '@helppuff/connector-types';
+import type { Message, SendRequest } from '@helppuff/protocol';
 import {
   addUsage,
   embedQuery,
@@ -36,7 +36,7 @@ import {
   type D1Like,
   type RetrievedChunk,
   type VectorIndexLike,
-} from '@murmur/rag';
+} from '@helppuff/rag';
 import { complete, isQuotaError, type ChatMessage, type Completion } from './chat.js';
 import { workersAiOptionsSchema, type WorkersAiOptions } from './options.js';
 import { callbackForm, EMAIL, PHONE, runTool, toolDefinitions, type Business, type Contact, type ToolEnv } from './tools.js';
@@ -52,7 +52,7 @@ export { complete, readCompletion, readStream, isQuotaError } from './chat.js';
  * Per message:
  *   1. budget check: past the daily neuron budget, no model is called
  *      and the visitor gets contact buttons and a lead form instead
- *   2. a standalone query, then hybrid retrieval with rerank (`@murmur/rag`)
+ *   2. a standalone query, then hybrid retrieval with rerank (`@helppuff/rag`)
  *   3. a grounded prompt — persona, rules, business facts, numbered
  *      passages, recent turns — kept under `budget.maxInputTokens`
  *   4. the model, streamed, with up to three rounds of tool calls
@@ -130,7 +130,7 @@ const passage = (chunk: RetrievedChunk, n: number) =>
   `[${n}] ${chunk.headingPath || chunk.title}${isWebUrl(chunk.url) ? ` (${chunk.url})` : ''}\n${chunk.content}`;
 
 /**
- * What this backend adds to Murmur's general rules (`ctx.guidance`, which
+ * What this backend adds to HelpPuff's general rules (`ctx.guidance`, which
  * covers goal, tone, length, language, promises and off-topic questions):
  * how to use the passages, and the callback tool.
  */

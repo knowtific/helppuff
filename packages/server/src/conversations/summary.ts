@@ -1,4 +1,4 @@
-import { addUsage, neurons as costOf, reasoningInputs } from '@murmur/rag';
+import { addUsage, neurons as costOf, reasoningInputs } from '@helppuff/rag';
 import { leadStatements } from '../admin/record.js';
 import type { D1Like } from '../db/d1.js';
 

@@ -1,5 +1,5 @@
-import { summarizeReply } from '@murmur/connector-types';
-import type { Message, SendRequest, VisitorContext } from '@murmur/protocol';
+import { summarizeReply } from '@helppuff/connector-types';
+import type { Message, SendRequest, VisitorContext } from '@helppuff/protocol';
 import type { RequestCtx } from '../core/request.js';
 import { emit } from './deliver.js';
 

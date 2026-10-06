@@ -5,7 +5,7 @@ import { expect, test } from '@playwright/test';
 
 /**
  * The size budgets, asserted against the real production bundles. Run
- * `pnpm --filter @murmur/widget build` first; the suite skips if dist/ is
+ * `pnpm --filter @helppuff/widget build` first; the suite skips if dist/ is
  * absent so a fresh clone does not fail on a missing artefact.
  */
 const DIST = join(process.cwd(), 'packages/widget/dist');
@@ -33,8 +33,8 @@ test.describe('bundle budgets', () => {
     const app = readdirSync(DIST).find((f) => /^app-.*\.js$/.test(f)) as string;
     for (const file of ['loader.js', app]) {
       const source = readFileSync(join(DIST, file), 'utf8');
-      expect(source, `${file} leaks a build constant`).not.toContain('__MURMUR_APP_FILE__');
-      expect(source, `${file} leaks a build constant`).not.toContain('__MURMUR_VERSION__');
+      expect(source, `${file} leaks a build constant`).not.toContain('__HELPPUFF_APP_FILE__');
+      expect(source, `${file} leaks a build constant`).not.toContain('__HELPPUFF_VERSION__');
     }
   });
 

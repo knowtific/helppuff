@@ -1,12 +1,12 @@
-import { isHttpUrl, isSafeUrl } from '@murmur/protocol/url';
-import type { Action, Field, Flow, FlowStep, Img, Message, Option, Shortcut, WidgetConfig } from '@murmur/protocol';
+import { isHttpUrl, isSafeUrl } from '@helppuff/protocol/url';
+import type { Action, Field, Flow, FlowStep, Img, Message, Option, Shortcut, WidgetConfig } from '@helppuff/protocol';
 
 /**
  * Boundary validation for the widget: config and every message from the
  * server are parsed before use. A field of the wrong type is treated as absent
  * and its default applied; an unknown message type is dropped.
  *
- * This deliberately mirrors the Zod schemas in `@murmur/protocol` rather than
+ * This deliberately mirrors the Zod schemas in `@helppuff/protocol` rather than
  * importing them — Zod would cost more than a third of the widget's 35 kb
  * budget. `test/validate.test.ts` cross-checks the two on shared
  * fixtures so they cannot drift apart.

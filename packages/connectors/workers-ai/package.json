@@ -1,5 +1,5 @@
 {
-  "name": "@murmur/connector-workers-ai",
+  "name": "@helppuff/connector-workers-ai",
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
@@ -8,9 +8,9 @@
   "exports": { ".": "./src/index.ts" },
   "scripts": { "typecheck": "tsc --noEmit" },
   "dependencies": {
-    "@murmur/connector-types": "workspace:*",
-    "@murmur/protocol": "workspace:*",
-    "@murmur/rag": "workspace:*",
+    "@helppuff/connector-types": "workspace:*",
+    "@helppuff/protocol": "workspace:*",
+    "@helppuff/rag": "workspace:*",
     "zod": "^3.25.76"
   }
 }

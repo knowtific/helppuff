@@ -1,4 +1,4 @@
-import type { VisitorContext } from '@murmur/protocol';
+import type { VisitorContext } from '@helppuff/protocol';
 
 /**
  * What the widget tells the server about the page it is sitting on.

@@ -29,7 +29,7 @@ test.beforeEach(async ({ page }) => {
 test.describe('the conversation', () => {
   test('a visitor can open, fill the form and talk to the assistant', async ({ page }) => {
     await openWidget(page);
-    await expect(page.locator('murmur-widget .mm-home-title')).toHaveText('Hi there');
+    await expect(page.locator('helppuff-widget .hp-home-title')).toHaveText('Hi there');
 
     await startConversation(page);
     await expect(agentMessages(page).first()).toContainText('echo connector');
@@ -47,10 +47,10 @@ test.describe('the conversation', () => {
     await sendButton(page).click();
 
     // The typing indicator is up while echo waits three seconds.
-    await expect(page.locator('murmur-widget .mm-typing')).toBeVisible();
+    await expect(page.locator('helppuff-widget .hp-typing')).toBeVisible();
     await expect(composer(page)).toHaveValue('');
     await expect(agentMessages(page).last()).toContainText('three seconds', { timeout: 10_000 });
-    await expect(page.locator('murmur-widget .mm-typing')).toBeHidden();
+    await expect(page.locator('helppuff-widget .hp-typing')).toBeHidden();
   });
 
   test('the composer shows no scrollbar until it stops growing', async ({ page }) => {
@@ -80,12 +80,12 @@ test.describe('the conversation', () => {
 
   test("the lead form's first message appears in the thread", async ({ page }) => {
     await openWidget(page);
-    await page.locator('murmur-widget .mm-btn').first().click();
-    await page.locator('murmur-widget #mm-f-name').fill('Ada');
-    await page.locator('murmur-widget #mm-f-email').fill('ada@example.com');
-    await page.locator('murmur-widget #mm-f-phone').fill('0400 000 000');
-    await page.locator('murmur-widget #mm-f-first').fill('a question asked up front');
-    await page.locator('murmur-widget button[type="submit"]').click();
+    await page.locator('helppuff-widget .hp-btn').first().click();
+    await page.locator('helppuff-widget #hp-f-name').fill('Ada');
+    await page.locator('helppuff-widget #hp-f-email').fill('ada@example.com');
+    await page.locator('helppuff-widget #hp-f-phone').fill('0400 000 000');
+    await page.locator('helppuff-widget #hp-f-first').fill('a question asked up front');
+    await page.locator('helppuff-widget button[type="submit"]').click();
 
     await expect(userMessages(page)).toHaveText(['a question asked up front']);
     await expect(agentMessages(page).last()).toContainText('a question asked up front');
@@ -96,7 +96,7 @@ test.describe('the conversation', () => {
     await startConversation(page);
     await send(page, 'hello');
 
-    const strong = page.locator('murmur-widget .mm-agent strong').last();
+    const strong = page.locator('helppuff-widget .hp-agent strong').last();
     await expect(strong).toHaveText('hello');
   });
 
@@ -106,7 +106,7 @@ test.describe('the conversation', () => {
     await send(page, '/long');
 
     await expect(agentMessages(page).last()).toContainText('Paragraph 12');
-    const scrolledToBottom = await page.locator('murmur-widget .mm-scroll').last().evaluate((el) => {
+    const scrolledToBottom = await page.locator('helppuff-widget .hp-scroll').last().evaluate((el) => {
       return el.scrollHeight - el.scrollTop - el.clientHeight < 100;
     });
     expect(scrolledToBottom).toBe(true);
@@ -117,7 +117,7 @@ test.describe('the conversation', () => {
     await startConversation(page);
     await send(page, '/error');
 
-    const alert = page.locator('murmur-widget [role="alert"]');
+    const alert = page.locator('helppuff-widget [role="alert"]');
     await expect(alert).toBeVisible();
     await expect(alert).toContainText(/having a moment|unavailable/i);
 
@@ -136,7 +136,7 @@ test.describe('the conversation', () => {
     await expect(agentMessages(page).last()).toContainText('remember me');
     // A streamed reply shows its text before the turn is done; the conversation
     // is stored when it is. Wait for that, as a visitor's next page load would.
-    await expect(page.locator('murmur-widget [data-streaming], murmur-widget [data-pending]')).toHaveCount(0);
+    await expect(page.locator('helppuff-widget [data-streaming], helppuff-widget [data-pending]')).toHaveCount(0);
 
     await page.reload();
     await openWidget(page);
@@ -152,9 +152,9 @@ test.describe('the conversation', () => {
     await send(page, 'forget me');
     await expect(thread(page)).toContainText('forget me');
 
-    await page.evaluate(() => (window as never as { Murmur: { reset(): void } }).Murmur.reset());
-    await expect(page.locator('murmur-widget .mm-home-title')).toBeVisible();
-    expect(await page.evaluate(() => localStorage.getItem('mm:demo'))).toBeNull();
+    await page.evaluate(() => (window as never as { HelpPuff: { reset(): void } }).HelpPuff.reset());
+    await expect(page.locator('helppuff-widget .hp-home-title')).toBeVisible();
+    expect(await page.evaluate(() => localStorage.getItem('hp:demo'))).toBeNull();
   });
 });
 
@@ -163,43 +163,43 @@ test.describe('the JavaScript API', () => {
     type Api = { open(): void; close(): void; toggle(): void };
     const api = () => page.evaluate.bind(page);
 
-    await page.evaluate(() => (window as never as { Murmur: Api }).Murmur.open());
+    await page.evaluate(() => (window as never as { HelpPuff: Api }).HelpPuff.open());
     await expect(panel(page)).toBeVisible();
 
-    await page.evaluate(() => (window as never as { Murmur: Api }).Murmur.close());
+    await page.evaluate(() => (window as never as { HelpPuff: Api }).HelpPuff.close());
     await expect(panel(page)).toBeHidden();
 
-    await page.evaluate(() => (window as never as { Murmur: Api }).Murmur.toggle());
+    await page.evaluate(() => (window as never as { HelpPuff: Api }).HelpPuff.toggle());
     await expect(panel(page)).toBeVisible();
     void api;
   });
 
   test('send() opens the widget and keeps the message through the lead form', async ({ page }) => {
     await page.evaluate(() =>
-      (window as never as { Murmur: { send(t: string): void } }).Murmur.send('I need a quote'),
+      (window as never as { HelpPuff: { send(t: string): void } }).HelpPuff.send('I need a quote'),
     );
     await expect(panel(page)).toBeVisible();
 
     // The site requires a lead, so the form comes first — but the visitor's
     // intent is not discarded.
-    await page.locator('murmur-widget #mm-f-name').fill('Ada');
-    await page.locator('murmur-widget #mm-f-email').fill('ada@example.com');
-    await page.locator('murmur-widget #mm-f-phone').fill('0400 000 000');
-    await page.locator('murmur-widget button[type="submit"]').click();
+    await page.locator('helppuff-widget #hp-f-name').fill('Ada');
+    await page.locator('helppuff-widget #hp-f-email').fill('ada@example.com');
+    await page.locator('helppuff-widget #hp-f-phone').fill('0400 000 000');
+    await page.locator('helppuff-widget button[type="submit"]').click();
 
     await expect(thread(page)).toContainText('quote', { timeout: 10_000 });
   });
 
   test('send() delivers immediately when no lead is required', async ({ page }) => {
     await page.evaluate(() =>
-      (window as never as { Murmur: { identify(l: object): void; send(t: string): void } }).Murmur.identify({
+      (window as never as { HelpPuff: { identify(l: object): void; send(t: string): void } }).HelpPuff.identify({
         name: 'Grace',
         email: 'grace@example.com',
         phone: '0400 111 222',
       }),
     );
     await page.evaluate(() =>
-      (window as never as { Murmur: { send(t: string): void } }).Murmur.send('straight through'),
+      (window as never as { HelpPuff: { send(t: string): void } }).HelpPuff.send('straight through'),
     );
     await expect(panel(page)).toBeVisible();
     await expect(thread(page)).toContainText('straight through', { timeout: 10_000 });
@@ -207,24 +207,24 @@ test.describe('the JavaScript API', () => {
 
   test('identify() skips the lead form', async ({ page }) => {
     await page.evaluate(() =>
-      (window as never as { Murmur: { identify(l: object): void } }).Murmur.identify({
+      (window as never as { HelpPuff: { identify(l: object): void } }).HelpPuff.identify({
         name: 'Grace Hopper',
         email: 'grace@example.com',
         phone: '0400 111 222',
       }),
     );
     await openWidget(page);
-    await page.locator('murmur-widget .mm-btn').first().click();
+    await page.locator('helppuff-widget .hp-btn').first().click();
 
     // Straight to the thread — no form.
     await expect(composer(page)).toBeVisible();
-    await expect(page.locator('murmur-widget #mm-f-name')).toHaveCount(0);
+    await expect(page.locator('helppuff-widget #hp-f-name')).toHaveCount(0);
   });
 
   test('events fire for the host page', async ({ page }) => {
     await page.evaluate(() => {
       (window as never as { __events: string[] }).__events = [];
-      const api = (window as never as { Murmur: { on(e: string, h: () => void): void } }).Murmur;
+      const api = (window as never as { HelpPuff: { on(e: string, h: () => void): void } }).HelpPuff;
       api.on('open', () => (window as never as { __events: string[] }).__events.push('open'));
       api.on('lead', () => (window as never as { __events: string[] }).__events.push('lead'));
     });
@@ -239,12 +239,12 @@ test.describe('the JavaScript API', () => {
 
   test('destroy() removes the widget and leaves an inert global', async ({ page }) => {
     await openWidget(page);
-    await page.evaluate(() => (window as never as { Murmur: { destroy(): void } }).Murmur.destroy());
+    await page.evaluate(() => (window as never as { HelpPuff: { destroy(): void } }).HelpPuff.destroy());
 
-    await expect(page.locator('murmur-widget')).toHaveCount(0);
+    await expect(page.locator('helppuff-widget')).toHaveCount(0);
     const threw = await page.evaluate(() => {
       try {
-        (window as never as { Murmur: { open(): void } }).Murmur.open();
+        (window as never as { HelpPuff: { open(): void } }).HelpPuff.open();
         return null;
       } catch (error) {
         return String(error);
@@ -257,9 +257,9 @@ test.describe('the JavaScript API', () => {
 test.describe('accessibility', () => {
   test('the panel is a labelled, non-blocking dialog', async ({ page }) => {
     await openWidget(page);
-    const dialog = page.locator('murmur-widget [role="dialog"]');
+    const dialog = page.locator('helppuff-widget [role="dialog"]');
     await expect(dialog).toHaveAttribute('aria-modal', 'false');
-    await expect(dialog).toHaveAttribute('aria-labelledby', 'mm-title');
+    await expect(dialog).toHaveAttribute('aria-labelledby', 'hp-title');
   });
 
   test('Escape closes the panel and returns focus to the launcher', async ({ page }) => {
@@ -268,10 +268,10 @@ test.describe('accessibility', () => {
     await expect(panel(page)).toBeHidden();
 
     const focused = await page.evaluate(() => {
-      const host = document.querySelector('murmur-widget');
+      const host = document.querySelector('helppuff-widget');
       return host?.shadowRoot?.activeElement?.className ?? '';
     });
-    expect(focused).toContain('mm-orb');
+    expect(focused).toContain('hp-orb');
   });
 
   test('the whole flow is reachable by keyboard alone', async ({ page }) => {
@@ -281,8 +281,8 @@ test.describe('accessibility', () => {
 
     // Focus lands inside the panel on open.
     const inside = await page.evaluate(() => {
-      const root = document.querySelector('murmur-widget')?.shadowRoot;
-      return Boolean(root?.querySelector('.mm-panel')?.contains(root.activeElement));
+      const root = document.querySelector('helppuff-widget')?.shadowRoot;
+      return Boolean(root?.querySelector('.hp-panel')?.contains(root.activeElement));
     });
     expect(inside).toBe(true);
   });
@@ -292,7 +292,7 @@ test.describe('accessibility', () => {
     await startConversation(page);
 
     const small = await page.evaluate(() => {
-      const root = document.querySelector('murmur-widget')?.shadowRoot;
+      const root = document.querySelector('helppuff-widget')?.shadowRoot;
       if (!root) return ['no shadow root'];
       const offenders: string[] = [];
       for (const el of root.querySelectorAll<HTMLElement>('button, a, input, textarea, select')) {
@@ -302,7 +302,7 @@ test.describe('accessibility', () => {
         const { offsetWidth: w, offsetHeight: h } = el;
         if (w === 0 && h === 0) continue; // not rendered
         // Links inside prose and the tiny footer credit are text, not controls.
-        if (el.tagName === 'A' && (el.closest('.mm-agent') || el.closest('.mm-powered'))) continue;
+        if (el.tagName === 'A' && (el.closest('.hp-agent') || el.closest('.hp-powered'))) continue;
         if (h < 44 || w < 44) offenders.push(`${el.tagName}.${el.className} ${w}x${h}`);
       }
       return offenders;
@@ -314,7 +314,7 @@ test.describe('accessibility', () => {
     await openWidget(page);
     await startConversation(page);
 
-    const live = page.locator('murmur-widget [aria-live="polite"]');
+    const live = page.locator('helppuff-widget [aria-live="polite"]');
     await expect(live).toHaveCount(1);
     await expect(live).toHaveAttribute('aria-live', 'polite');
   });
@@ -334,12 +334,12 @@ test.describe('the host page is unaffected', () => {
     expect(after.bodyChildTags).toBe(before.bodyChildTags);
   });
 
-  test('the widget writes only mm:-prefixed storage and no cookies', async ({ page }) => {
+  test('the widget writes only hp:-prefixed storage and no cookies', async ({ page }) => {
     await openWidget(page);
     await startConversation(page);
 
     const keys = await page.evaluate(() => Object.keys(localStorage));
-    expect(keys.every((k) => k.startsWith('mm:'))).toBe(true);
+    expect(keys.every((k) => k.startsWith('hp:'))).toBe(true);
     expect(await page.evaluate(() => document.cookie)).toBe('');
   });
 
@@ -351,7 +351,7 @@ test.describe('the host page is unaffected', () => {
     await send(page, 'hello');
 
     expect(errors).toEqual([]);
-    expect(messages.filter((m) => m.toLowerCase().includes('murmur'))).toEqual([]);
+    expect(messages.filter((m) => m.toLowerCase().includes('helppuff'))).toEqual([]);
   });
 
   test('the launcher causes no layout shift', async ({ page }) => {

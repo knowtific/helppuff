@@ -1,4 +1,4 @@
-import type { ErrorCode, Message, WidgetConfig } from '@murmur/protocol';
+import type { ErrorCode, Message, WidgetConfig } from '@helppuff/protocol';
 import { makeStrings } from './strings.js';
 
 /**

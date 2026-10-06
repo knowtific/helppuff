@@ -2,7 +2,7 @@
 
 `"backend": { "type": "workers-ai" }`
 
-Answers with Cloudflare Workers AI, from **Murmur's own knowledge base**: your
+Answers with Cloudflare Workers AI, from **HelpPuff's own knowledge base**: your
 website and files, learned into Vectorize and D1 on your account by a
 background Workflow. Everything runs on your Cloudflare account and fits the
 **Workers Free plan**. No other account or key is needed.
@@ -10,7 +10,7 @@ background Workflow. Everything runs on your Cloudflare account and fits the
 ## Set up
 
 ```bash
-npx @knowtific/murmur          # the default
+npx @knowtific/helppuff          # the default
 ```
 
 That is all. The setup page (or, for agents, `init --json`) starts learning
@@ -49,7 +49,7 @@ The common ones; every option is in the
 | `budget.dailyNeurons` | `9000` | Past this many neurons in a UTC day, visitors get your contact details and a callback form |
 | `gateway` | — | An AI Gateway id, for caching and logs in front of every model call |
 
-Change any of them with `murmur config set backend.<option> <value>` and
+Change any of them with `helppuff config set backend.<option> <value>` and
 deploy, or in the dashboard (model, thinking, reranker, time zone, language).
 
 ## Speed
@@ -63,7 +63,7 @@ context ~25 ms, keyword search ~20 ms, embedding 50–400 ms, vector search
 goes with:
 
 ```bash
-murmur ask "How much is a service call?" --timing
+helppuff ask "How much is a service call?" --timing
 ```
 
 ## Cost

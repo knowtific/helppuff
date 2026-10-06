@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { ground } from '@murmur/rag';
-import type { Message, SendRequest } from '@murmur/protocol';
+import { ground } from '@helppuff/rag';
+import type { Message, SendRequest } from '@helppuff/protocol';
 import {
   ConnectorError,
   RICH_TOOL_SCHEMAS,
@@ -17,7 +17,7 @@ import {
   type Connector,
   type ConnectorContext,
   type PromptScope,
-} from '@murmur/connector-types';
+} from '@helppuff/connector-types';
 
 /**
  * The OpenAI Responses API.
@@ -67,14 +67,14 @@ export const openaiOptionsSchema = z.object({
   richMessages: z.boolean().default(true),
   /**
    * OpenAI vector stores to answer from, through the hosted `file_search`
-   * tool. `murmur knowledge sync` creates and fills one.
+   * tool. `helppuff knowledge sync` creates and fills one.
    */
   vectorStoreIds: z.array(z.string().min(1)).max(2).default([]),
   /**
-   * `murmur`: answer from Murmur's own knowledge base (Vectorize + D1 on the
+   * `helppuff`: answer from HelpPuff's own knowledge base (Vectorize + D1 on the
    * site's Cloudflare account, crawled by the Worker) instead of a vector store.
    */
-  retrieval: z.literal('murmur').optional(),
+  retrieval: z.literal('helppuff').optional(),
   /** Extra function tools, forwarded verbatim. */
   tools: z.array(z.record(z.string(), z.unknown())).max(16).optional(),
   maxOutputTokens: z.number().int().min(16).max(32_000).default(800),
@@ -245,7 +245,7 @@ async function respond(
   // reason to also send text that would silently override it.
   const prompt = options.promptRef ? undefined : await resolvePrompt(ctx, options.instructions, scope);
   const grounding =
-    options.retrieval === 'murmur' ? await ground(ctx.env, ctx.siteId, input, { log: ctx.log, waitUntil: ctx.waitUntil }) : null;
+    options.retrieval === 'helppuff' ? await ground(ctx.env, ctx.siteId, input, { log: ctx.log, waitUntil: ctx.waitUntil }) : null;
   // With a stored prompt, `instructions` would replace it; the passages ride with the input instead.
   const instructions = grounding && !options.promptRef ? [prompt, grounding.block].filter(Boolean).join('\n\n') : prompt;
   const sentInput = grounding && options.promptRef ? `${grounding.block}\n\nVisitor: ${input}` : input;

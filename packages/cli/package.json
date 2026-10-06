@@ -1,5 +1,5 @@
 {
-  "name": "@knowtific/murmur",
+  "name": "@knowtific/helppuff",
   "version": "0.1.0",
   "description": "Set up, deploy and manage an AI chat widget on your own Cloudflare account — built to be driven by people and by AI agents.",
   "author": "Knowtific (MYT PTY LTD)",
@@ -19,7 +19,7 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "murmur": "./dist/cli.js"
+    "helppuff": "./dist/cli.js"
   },
   "files": [
     "dist",
@@ -38,12 +38,12 @@
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
     "@clack/prompts": "^1.8.1",
-    "@murmur/connector-types": "workspace:*",
-    "@murmur/connector-workers-ai": "workspace:*",
-    "@murmur/protocol": "workspace:*",
-    "@murmur/rag": "workspace:*",
-    "@murmur/server": "workspace:*",
-    "@murmur/widget": "workspace:*",
+    "@helppuff/connector-types": "workspace:*",
+    "@helppuff/connector-workers-ai": "workspace:*",
+    "@helppuff/protocol": "workspace:*",
+    "@helppuff/rag": "workspace:*",
+    "@helppuff/server": "workspace:*",
+    "@helppuff/widget": "workspace:*",
     "node-html-parser": "^9.0.4",
     "zod": "^3.25.76",
     "zod-to-json-schema": "^3.25.2"

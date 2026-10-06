@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import type { Field, WidgetConfig } from '@murmur/protocol';
+import type { Field, WidgetConfig } from '@helppuff/protocol';
 import { FieldRow, collectValues, validateField, validateFields } from './Fields.js';
 import type { StringKey } from '../app/strings.js';
 
@@ -56,14 +56,14 @@ export function LeadForm({
   };
 
   return (
-    <form class="mm-form" onSubmit={submit} noValidate>
-      {config.leadForm.title ? <h2 class="mm-form-title">{config.leadForm.title}</h2> : null}
+    <form class="hp-form" onSubmit={submit} noValidate>
+      {config.leadForm.title ? <h2 class="hp-form-title">{config.leadForm.title}</h2> : null}
 
       {fields.map((field) => (
         <FieldRow
           key={field.name}
           field={field}
-          idPrefix="mm-f"
+          idPrefix="hp-f"
           value={values[field.name] ?? ''}
           error={touched[field.name] ? (errors[field.name] ?? '') : ''}
           requiredLabel={t('required')}
@@ -73,13 +73,13 @@ export function LeadForm({
       ))}
 
       {config.leadForm.askFirstMessage ? (
-        <div class="mm-field">
-          <label class="mm-label-text" for="mm-f-first">
+        <div class="hp-field">
+          <label class="hp-label-text" for="hp-f-first">
             {t('firstMessage')}
           </label>
           <textarea
-            id="mm-f-first"
-            class="mm-textarea"
+            id="hp-f-first"
+            class="hp-textarea"
             value={firstMessage}
             maxLength={1000}
             onInput={(e) => setFirstMessage((e.target as HTMLTextAreaElement).value)}
@@ -87,12 +87,12 @@ export function LeadForm({
         </div>
       ) : null}
 
-      <button type="submit" class="mm-btn" disabled={busy}>
+      <button type="submit" class="hp-btn" disabled={busy}>
         {busy ? '…' : (config.leadForm.submitLabel ?? t('submit'))}
       </button>
 
       {config.leadForm.privacy ? (
-        <p class="mm-privacy">
+        <p class="hp-privacy">
           {config.leadForm.privacy.text}{' '}
           <a href={config.leadForm.privacy.url} target="_blank" rel="noopener noreferrer nofollow">
             Privacy

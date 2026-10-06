@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isMurmurError } from '../src/core/errors.js';
+import { isHelpPuffError } from '../src/core/errors.js';
 import { issueToken, verifyToken } from '../src/core/token.js';
 import { SECRET } from './helpers.js';
 
@@ -7,7 +7,7 @@ const base = { siteId: 'demo', sessionId: 's1', state: { chatId: 'c1' }, count: 
 
 async function expectCode(promise: Promise<unknown>, code: string) {
   await expect(promise).rejects.toSatisfy(
-    (error: unknown) => isMurmurError(error) && error.code === code,
+    (error: unknown) => isHelpPuffError(error) && error.code === code,
   );
 }
 

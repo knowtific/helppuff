@@ -1,14 +1,14 @@
 import { Hono } from 'hono';
-import { ground } from '@murmur/rag';
+import { ground } from '@helppuff/rag';
 import { resolveSite } from '../config/site.js';
 import { resolveSecrets } from '../config/load.js';
-import { MurmurError } from '../core/errors.js';
+import { HelpPuffError } from '../core/errors.js';
 import { hitWindow, rateLimited } from '../core/ratelimit.js';
 import type { HonoEnv } from '../core/request.js';
 import { ownsKnowledge } from '../knowledge/env.js';
 
 /**
- * Murmur's knowledge base as a Retell custom function: a Retell agent
+ * HelpPuff's knowledge base as a Retell custom function: a Retell agent
  * (chat or voice) calls this to look things up on the site, so retrieval
  * stays on the owner's Cloudflare account while Retell owns the agent.
  *
@@ -47,11 +47,11 @@ function queryOf(body: unknown): string {
 }
 
 retellRoutes.post('/v1/sites/:siteId/retell/kb', async (c) => {
-  const ctx = c.get('mm');
+  const ctx = c.get('helppuff');
   const siteId = c.req.param('siteId');
   const site = await resolveSite(ctx, siteId);
   if (site.connector.type !== 'retell' || !ownsKnowledge(site)) {
-    throw new MurmurError('not_found', { detail: 'retell_kb_not_enabled' });
+    throw new HelpPuffError('not_found', { detail: 'retell_kb_not_enabled' });
   }
   const verdict = await hitWindow(ctx.platform.kv, 'retellkb', siteId, 120, 60);
   if (!verdict.allowed) throw rateLimited(verdict, 'retell_kb_per_minute');
@@ -60,13 +60,13 @@ retellRoutes.post('/v1/sites/:siteId/retell/kb', async (c) => {
   const options = resolveSecrets(site.connector.options ?? {}, ctx.env) as { apiKey?: unknown };
   const apiKey = typeof options.apiKey === 'string' ? options.apiKey : '';
   if (!(await verifyRetellSignature(raw, apiKey, c.req.header('X-Retell-Signature'), ctx.platform.now()))) {
-    throw new MurmurError('unauthorized', { detail: 'retell_signature_invalid' });
+    throw new HelpPuffError('unauthorized', { detail: 'retell_signature_invalid' });
   }
   let body: unknown;
   try {
     body = JSON.parse(raw);
   } catch {
-    throw new MurmurError('bad_request', { detail: 'retell_body_not_json' });
+    throw new HelpPuffError('bad_request', { detail: 'retell_body_not_json' });
   }
   const query = queryOf(body);
   if (!query) return c.text('Ask with a "query" argument: what the caller wants to know.');

@@ -1,5 +1,5 @@
 {
-  "name": "@murmur/sink-types",
+  "name": "@helppuff/sink-types",
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
@@ -7,5 +7,5 @@
   "types": "./src/index.ts",
   "exports": { ".": "./src/index.ts" },
   "scripts": { "typecheck": "tsc --noEmit" },
-  "dependencies": { "@murmur/protocol": "workspace:*", "zod": "^3.25.76" }
+  "dependencies": { "@helppuff/protocol": "workspace:*", "zod": "^3.25.76" }
 }

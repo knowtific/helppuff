@@ -11,7 +11,7 @@ test.beforeEach(async ({ page }) => {
 
 test.describe('the launcher', () => {
   test('a pill puts the configured label inside the button', async ({ page }) => {
-    const orb = page.locator('murmur-widget .mm-orb');
+    const orb = page.locator('helppuff-widget .hp-orb');
     await expect(orb).toBeVisible();
     await expect(orb).toHaveAttribute('data-shape', 'pill');
     await expect(orb).toContainText('Chat with us!');
@@ -26,13 +26,13 @@ test.describe('the launcher', () => {
     await page.route('**/app/index.tsx*', (route) => route.abort());
     await page.goto('/');
 
-    const orb = page.locator('murmur-widget .mm-orb');
+    const orb = page.locator('helppuff-widget .hp-orb');
     await expect(orb).toContainText('Chat with us!');
     await expect(orb.locator('svg path')).toHaveCount(1);
   });
 
   test('the pill collapses to a circle once open, so the close glyph stands alone', async ({ page }) => {
-    const orb = page.locator('murmur-widget .mm-orb');
+    const orb = page.locator('helppuff-widget .hp-orb');
     const wide = await orb.evaluate((el) => (el as HTMLElement).offsetWidth);
 
     await openWidget(page);
@@ -43,7 +43,7 @@ test.describe('the launcher', () => {
 });
 
 test.describe('the teaser', () => {
-  const teaser = (page: Page) => page.locator('murmur-widget .mm-teaser');
+  const teaser = (page: Page) => page.locator('helppuff-widget .hp-teaser');
 
   test('appears once the visitor has scrolled far enough', async ({ page }) => {
     await expect(launcher(page)).toBeVisible();
@@ -80,14 +80,14 @@ test.describe('the teaser', () => {
 
   test('never appears once a conversation is under way', async ({ page }) => {
     await openWidget(page);
-    await page.locator('murmur-widget .mm-btn').first().click();
-    await page.locator('murmur-widget #mm-f-name').fill('Ada');
-    await page.locator('murmur-widget #mm-f-email').fill('ada@example.com');
-    await page.locator('murmur-widget #mm-f-phone').fill('0400 000 000');
-    await page.locator('murmur-widget button[type="submit"]').click();
-    await expect(page.locator('murmur-widget .mm-agent').first()).toBeVisible();
+    await page.locator('helppuff-widget .hp-btn').first().click();
+    await page.locator('helppuff-widget #hp-f-name').fill('Ada');
+    await page.locator('helppuff-widget #hp-f-email').fill('ada@example.com');
+    await page.locator('helppuff-widget #hp-f-phone').fill('0400 000 000');
+    await page.locator('helppuff-widget button[type="submit"]').click();
+    await expect(page.locator('helppuff-widget .hp-agent').first()).toBeVisible();
 
-    await page.evaluate(() => (window as never as { Murmur: { close(): void } }).Murmur.close());
+    await page.evaluate(() => (window as never as { HelpPuff: { close(): void } }).HelpPuff.close());
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
     await page.waitForTimeout(1500);
     await expect(teaser(page)).toBeHidden();

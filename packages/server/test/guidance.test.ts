@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolvePrompt } from '@murmur/connector-types';
+import { resolvePrompt } from '@helppuff/connector-types';
 import { siteConfigSchema } from '../src/config/schema.js';
 import { guidanceFor } from '../src/core/guidance.js';
 import { promptOverlaps } from '../src/admin/overlaps.js';
@@ -25,7 +25,7 @@ describe('guidance', () => {
 
   it('ends with the rules, which win over the owner\'s text', async () => {
     const { after } = guidanceFor(site());
-    expect(after).toMatch(/^## Rules that always apply\nThese come from Murmur and override/);
+    expect(after).toMatch(/^## Rules that always apply\nThese come from HelpPuff and override/);
     expect(after).toContain('you can only help with questions about Acme Plumbing');
     expect(after).toContain('for English use en-AU spelling');
 

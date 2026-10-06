@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import type { Message } from '@murmur/protocol';
+import type { Message } from '@helppuff/protocol';
 import { canRender, isGrouped, MessageView, type MessageHandlers } from './messages/index.js';
 import { stripMarkdown } from '../lib/markdown.js';
 import { TextMessage } from './messages/Text.js';
@@ -10,7 +10,7 @@ const NEAR_BOTTOM_PX = 80;
 
 export function Typing() {
   return (
-    <div class="mm-typing" aria-hidden="true">
+    <div class="hp-typing" aria-hidden="true">
       <i />
       <i />
       <i />
@@ -71,33 +71,33 @@ export function Thread({
   }, []);
 
   return (
-    <div class="mm-scroll" ref={scroller}>
-      <div class="mm-thread">
+    <div class="hp-scroll" ref={scroller}>
+      <div class="hp-thread">
         {drawable.map((message, index) => {
           const grouped = isGrouped(drawable[index - 1], message);
           const isUser = message.role === 'user';
           return (
             <div
               key={message.id}
-              class="mm-row"
+              class="hp-row"
               {...(grouped ? { 'data-grouped': '' } : {})}
               {...(isUser ? { 'data-user': '' } : {})}
               {...(pendingIds.has(message.id) ? { 'data-pending': '' } : {})}
             >
               <MessageView message={message} handlers={handlers} />
-              <span class="mm-time">{relativeTime(message.ts, now)}</span>
+              <span class="hp-time">{relativeTime(message.ts, now)}</span>
             </div>
           );
         })}
 
         {busy && preview ? (
-          <div class="mm-row" data-streaming="">
+          <div class="hp-row" data-streaming="">
             <TextMessage text={preview} />
           </div>
         ) : busy ? (
-          <div class="mm-row">
+          <div class="hp-row">
             <Typing />
-            <span class="mm-sr">{t('thinking')}</span>
+            <span class="hp-sr">{t('thinking')}</span>
           </div>
         ) : null}
       </div>
@@ -116,7 +116,7 @@ export function LiveRegion({ messages }: { messages: Message[] }) {
       ? stripMarkdown(last.text)
       : '';
   return (
-    <div class="mm-sr" aria-live="polite" aria-atomic="true">
+    <div class="hp-sr" aria-live="polite" aria-atomic="true">
       {announce}
     </div>
   );

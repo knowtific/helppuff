@@ -21,7 +21,7 @@ function project(backend: Record<string, unknown>, files: string[] = ['./docs'],
     backend,
     knowledge: { website: Boolean(website), files },
   };
-  return { dir, file: `${dir}/murmur.json`, raw, project: parseProject(raw) };
+  return { dir, file: `${dir}/helppuff.json`, raw, project: parseProject(raw) };
 }
 
 describe('gatherDocs', () => {
@@ -46,21 +46,21 @@ describe('AI Search sync', () => {
       (url, init) => {
         const path = url.pathname;
         const base = `/client/v4/accounts/${ACCOUNT}/ai-search/namespaces/default/instances`;
-        if (path === `${base}/knowtific-murmur-acme` && init.method === 'GET') return created ? cf({ id: 'knowtific-murmur-acme' }) : new Response('{}', { status: 404 });
+        if (path === `${base}/knowtific-helppuff-acme` && init.method === 'GET') return created ? cf({ id: 'knowtific-helppuff-acme' }) : new Response('{}', { status: 404 });
         if (path === base && init.method === 'POST') {
           created = true;
-          return cf({ id: 'knowtific-murmur-acme' });
+          return cf({ id: 'knowtific-helppuff-acme' });
         }
-        if (path === `${base}/knowtific-murmur-acme/items` && init.method === 'GET') {
+        if (path === `${base}/knowtific-helppuff-acme/items` && init.method === 'GET') {
           return cf(index, { info: { total_count: index.length } });
         }
-        if (path === `${base}/knowtific-murmur-acme/items` && init.method === 'POST') {
+        if (path === `${base}/knowtific-helppuff-acme/items` && init.method === 'POST') {
           const name = ((init.body as FormData).get('file') as File).name;
           uploaded.push(name);
           index.push({ id: `n${index.length}`, key: name });
           return cf({ id: 'new' });
         }
-        if (path.startsWith(`${base}/knowtific-murmur-acme/items/`) && init.method === 'DELETE') {
+        if (path.startsWith(`${base}/knowtific-helppuff-acme/items/`) && init.method === 'DELETE') {
           const id = path.split('/').pop()!;
           deleted.push(id);
           index = index.filter((item) => item.id !== id);
@@ -103,7 +103,7 @@ describe('AI Search sync', () => {
 });
 
 describe('OpenAI sync', () => {
-  it('fills a fresh vector store and reports its id for murmur.json', async () => {
+  it('fills a fresh vector store and reports its id for helppuff.json', async () => {
     const { fetch, calls } = fakeFetch([
       (url, init) => {
         if (url.pathname === '/v1/vector_stores' && init.method === 'POST') return Response.json({ id: 'vs_new' });
@@ -112,9 +112,9 @@ describe('OpenAI sync', () => {
         if (url.pathname === '/v1/vector_stores') {
           return Response.json({
             data: [
-              { id: 'vs_new', name: 'knowtific-murmur-acme-3', created_at: 3 },
-              { id: 'vs_prev', name: 'knowtific-murmur-acme-2', created_at: 2 },
-              { id: 'vs_old', name: 'knowtific-murmur-acme-1', created_at: 1 },
+              { id: 'vs_new', name: 'knowtific-helppuff-acme-3', created_at: 3 },
+              { id: 'vs_prev', name: 'knowtific-helppuff-acme-2', created_at: 2 },
+              { id: 'vs_old', name: 'knowtific-helppuff-acme-1', created_at: 1 },
               { id: 'vs_other', name: 'someone-else', created_at: 1 },
             ],
           });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { murmurConfigSchema } from '@murmur/server';
+import { helppuffConfigSchema } from '@helppuff/server';
 import { compile } from '../src/engine/compile.js';
 import { parseProject, type ProjectInput } from '../src/engine/project.js';
 import { parseEnv } from '../src/engine/env.js';
@@ -16,7 +16,7 @@ function loaded(backend: Record<string, unknown>, extra: Partial<ProjectInput> =
     ...extra,
   };
   const dir = tempProject({ 'prompt.md': 'You help Acme customers.' });
-  return { dir, file: `${dir}/murmur.json`, raw, project: parseProject(raw) };
+  return { dir, file: `${dir}/helppuff.json`, raw, project: parseProject(raw) };
 }
 
 describe('compile', () => {
@@ -33,39 +33,39 @@ describe('compile', () => {
       { type: 'echo' },
     ];
     for (const backend of backends) {
-      const compiled = compile(loaded(backend), { workerUrl: 'https://knowtific-murmur-acme.me.workers.dev' });
-      expect(murmurConfigSchema.safeParse(compiled.serverConfig).success, backend.type).toBe(true);
+      const compiled = compile(loaded(backend), { workerUrl: 'https://knowtific-helppuff-acme.me.workers.dev' });
+      expect(helppuffConfigSchema.safeParse(compiled.serverConfig).success, backend.type).toBe(true);
     }
   });
 
   it('inlines the prompt, adds the preview origin, and never embeds a secret value', () => {
-    const compiled = compile(loaded({ type: 'openai' }), { workerUrl: 'https://knowtific-murmur-acme.me.workers.dev' });
+    const compiled = compile(loaded({ type: 'openai' }), { workerUrl: 'https://knowtific-helppuff-acme.me.workers.dev' });
     const site = (compiled.serverConfig as { sites: Record<string, { origins: string[]; connector: { options: Record<string, unknown> } }> }).sites['acme']!;
     expect(site.connector.options['instructions']).toBe('You help Acme customers.');
     expect(site.connector.options['apiKey']).toEqual({ env: 'OPENAI_API_KEY' });
-    expect(site.origins).toEqual(['https://acme.com', 'https://knowtific-murmur-acme.me.workers.dev']);
-    expect(compiled.secrets).toEqual(['MURMUR_SECRET', 'OPENAI_API_KEY']);
+    expect(site.origins).toEqual(['https://acme.com', 'https://knowtific-helppuff-acme.me.workers.dev']);
+    expect(compiled.secrets).toEqual(['HELPPUFF_SECRET', 'OPENAI_API_KEY']);
   });
 
   it('counts messages per visitor with a Rate Limiting binding set to the live limit, one namespace per site', () => {
     const compiled = compile(loaded({ type: 'echo' }));
     const [limiter] = compiled.wrangler['ratelimits'] as { name: string; namespace_id: string; simple: { limit: number; period: number } }[];
-    expect(limiter).toMatchObject({ name: 'MURMUR_IP_LIMITER', simple: { limit: 10, period: 60 } });
+    expect(limiter).toMatchObject({ name: 'HELPPUFF_IP_LIMITER', simple: { limit: 10, period: 60 } });
     expect(Number(limiter!.namespace_id)).toBeGreaterThan(0);
-    expect((compiled.wrangler['vars'] as Record<string, string>)['MURMUR_IP_LIMIT']).toBe('10');
+    expect((compiled.wrangler['vars'] as Record<string, string>)['HELPPUFF_IP_LIMIT']).toBe('10');
     const other = compile({ ...loaded({ type: 'echo' }), project: parseProject({ ...loaded({ type: 'echo' }).raw, site: 'beta' }) });
     expect((other.wrangler['ratelimits'] as { namespace_id: string }[])[0]!.namespace_id).not.toBe(limiter!.namespace_id);
   });
 
   it('binds an AI Search instance only when one is used', () => {
     expect(compile(loaded({ type: 'cloudflare' })).wrangler['ai_search']).toEqual([
-      { binding: 'AI_SEARCH', instance_name: 'knowtific-murmur-acme' },
+      { binding: 'AI_SEARCH', instance_name: 'knowtific-helppuff-acme' },
     ]);
     expect(compile(loaded({ type: 'cloudflare', instance: 'existing' })).aiSearchInstance).toBe('existing');
     expect(compile(loaded({ type: 'cloudflare', endpoint: 'https://s.acme.com' })).wrangler['ai_search']).toBeUndefined();
     expect(compile(loaded({ type: 'openai' })).wrangler['ai_search']).toBeUndefined();
     // Anthropic with a website to learn from gets an instance for its knowledge.
-    expect(compile(loaded({ type: 'anthropic' })).aiSearchInstance).toBe('knowtific-murmur-acme');
+    expect(compile(loaded({ type: 'anthropic' })).aiSearchInstance).toBe('knowtific-helppuff-acme');
   });
 
   it('changes the worker hash only for worker-shaping changes', () => {
@@ -78,7 +78,7 @@ describe('compile', () => {
 
   it('adds D1, Workers AI and the owner for the dashboard, and needs the password hash', () => {
     const compiled = compile(loaded({ type: 'openai' }, { dashboard: { adminEmail: 'Owner@Acme.com' } }), { d1DatabaseId: 'db-1' });
-    expect(compiled.wrangler['d1_databases']).toEqual([{ binding: 'MURMUR_DB', database_name: 'knowtific-murmur-acme', database_id: 'db-1' }]);
+    expect(compiled.wrangler['d1_databases']).toEqual([{ binding: 'HELPPUFF_DB', database_name: 'knowtific-helppuff-acme', database_id: 'db-1' }]);
     expect(compiled.wrangler['ai']).toEqual({ binding: 'AI' });
     expect((compiled.wrangler['vars'] as Record<string, string>)['ADMIN_EMAIL']).toBe('owner@acme.com');
     expect(compiled.secrets).toContain('ADMIN_PASSWORD_HASH');
@@ -88,7 +88,7 @@ describe('compile', () => {
 
   it('matches the Worker\'s password format exactly', async () => {
     const { hashPassword } = await import('../src/engine/admins.js');
-    const { verifyPassword } = await import('@murmur/server');
+    const { verifyPassword } = await import('@helppuff/server');
     expect(await verifyPassword(hashPassword('correct-horse', 20_000), 'correct-horse')).toBe(true);
     expect(await verifyPassword(hashPassword('correct-horse', 20_000), 'wrong-horse')).toBe(false);
   });

@@ -63,7 +63,7 @@ export function parseArgs(argv: string[]): Parsed {
       else {
         const next = argv[i + 1];
         if (next === undefined || (next.startsWith('--') && next.length > 2)) {
-          throw new CliError('usage', `--${name} needs a value.`, { exitCode: 2, hint: `murmur --help` });
+          throw new CliError('usage', `--${name} needs a value.`, { exitCode: 2, hint: `helppuff --help` });
         }
         value = next;
         i++;
@@ -105,9 +105,9 @@ export function assertKnown(flags: Flags, allowed: string[], command: string): v
   const known = new Set([...allowed, 'json', 'help', 'h', 'cwd', 'version', 'non-interactive', 'verbose', 'config']);
   const unknown = Object.keys(flags).filter((name) => !known.has(name));
   if (unknown.length) {
-    throw new CliError('usage', `Unknown option(s) for \`murmur ${command}\`: ${unknown.map((u) => `--${u}`).join(', ')}`, {
+    throw new CliError('usage', `Unknown option(s) for \`helppuff ${command}\`: ${unknown.map((u) => `--${u}`).join(', ')}`, {
       exitCode: 2,
-      hint: `murmur ${command} --help`,
+      hint: `helppuff ${command} --help`,
     });
   }
 }

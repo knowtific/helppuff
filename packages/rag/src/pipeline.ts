@@ -35,8 +35,8 @@ export async function indexDocument(deps: IndexDeps, doc: IndexDocument, options
 }
 
 /** Pseudo-URLs for documents that are not web pages. Never shown as links. */
-export const FACTS_URL = 'murmur://facts';
-export const manualUrl = (id: string) => `murmur://manual/${id}`;
+export const FACTS_URL = 'helppuff://facts';
+export const manualUrl = (id: string) => `helppuff://manual/${id}`;
 export const isWebUrl = (url: string) => /^https?:\/\//i.test(url);
 
 const FACT_LABELS: Record<string, string> = {

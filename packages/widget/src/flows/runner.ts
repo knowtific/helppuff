@@ -1,4 +1,4 @@
-import type { Flow, FlowStep, Message, WidgetConfig } from '@murmur/protocol';
+import type { Flow, FlowStep, Message, WidgetConfig } from '@helppuff/protocol';
 
 /**
  * Multi-step shortcuts, run entirely client-side. Each step appears as

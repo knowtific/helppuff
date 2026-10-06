@@ -114,7 +114,7 @@ function Team() {
         </ul>
         <div className="space-y-2 border-t px-4 py-3">
           <p className="text-xs text-muted-foreground">Add, remove or reset people from the command line:</p>
-          <CopyBlock text={'murmur users add teammate@example.com\nmurmur users remove teammate@example.com\nmurmur users reset teammate@example.com'} label="commands" />
+          <CopyBlock text={'helppuff users add teammate@example.com\nhelppuff users remove teammate@example.com\nhelppuff users reset teammate@example.com'} label="commands" />
         </div>
       </Card>
 
@@ -124,7 +124,7 @@ function Team() {
           <p>
             <span className="font-medium">Locked out?</span> <span className="text-muted-foreground">A one-time sign-in link, from the folder you set up in:</span>
           </p>
-          <CopyBlock text="npx @knowtific/murmur dashboard" label="command" />
+          <CopyBlock text="npx @knowtific/helppuff dashboard" label="command" />
           <p className="pt-2">
             <span className="font-medium">Rotate the admin key</span>{' '}
             <span className="text-muted-foreground">(what the CLI and agents use): delete ADMIN_API_KEY from .env and redeploy — a new one is made and set.</span>

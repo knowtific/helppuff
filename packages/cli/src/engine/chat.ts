@@ -1,10 +1,10 @@
-import type { Message } from '@murmur/protocol';
-import { OWNER_HEADER, ownerToken } from '@murmur/server';
+import type { Message } from '@helppuff/protocol';
+import { OWNER_HEADER, ownerToken } from '@helppuff/server';
 import { CliError } from '../errors.js';
 
 /**
  * Talk to a deployed (or local) assistant through the real protocol — the
- * same requests the widget makes — so a passing `murmur chat` means a
+ * same requests the widget makes — so a passing `helppuff chat` means a
  * visitor would get the same answer.
  *
  * A conversation continues by passing the returned `session` token back.
@@ -46,7 +46,7 @@ function sampleLead(fields: Field[]): Record<string, string> {
   const lead: Record<string, string> = {};
   for (const field of fields) {
     if (!field.required) continue;
-    lead[field.name] = SAMPLE[field.type ?? 'text'] ?? (field.name === 'name' ? 'Murmur Test' : 'test');
+    lead[field.name] = SAMPLE[field.type ?? 'text'] ?? (field.name === 'name' ? 'HelpPuff Test' : 'test');
   }
   return lead;
 }
@@ -56,7 +56,7 @@ async function call(doFetch: typeof fetch, url: string, init: RequestInit): Prom
     return await doFetch(url, init);
   } catch (thrown) {
     throw new CliError('unreachable', `Could not reach ${new URL(url).origin}: ${(thrown as Error).message}`, {
-      hint: 'Is it deployed (`murmur status`)? For a local server, run `murmur dev` first.',
+      hint: 'Is it deployed (`helppuff status`)? For a local server, run `helppuff dev` first.',
     });
   }
 }
@@ -66,11 +66,11 @@ async function envelope(response: Response): Promise<Record<string, unknown>> {
   if (response.ok) return body;
   const error = (body['error'] ?? {}) as { code?: string; message?: string };
   const hints: Record<string, string> = {
-    forbidden_origin: 'The origin is not allowed. Redeploy with `murmur deploy` so the preview origin is added.',
+    forbidden_origin: 'The origin is not allowed. Redeploy with `helppuff deploy` so the preview origin is added.',
     captcha_failed: 'Turnstile is on for this site, so scripted chats are refused. Test in the preview page instead.',
-    not_found: 'Unknown site id — check `site` in murmur.json, then `murmur deploy`.',
-    connector_error: 'The backend failed. `murmur doctor` checks its keys and knowledge.',
-    internal: 'Usually a missing secret. `murmur doctor` lists what the Worker is missing.',
+    not_found: 'Unknown site id — check `site` in helppuff.json, then `helppuff deploy`.',
+    connector_error: 'The backend failed. `helppuff doctor` checks its keys and knowledge.',
+    internal: 'Usually a missing secret. `helppuff doctor` lists what the Worker is missing.',
     rate_limited: 'Rate limited — wait a minute and try again.',
   };
   throw new CliError(`chat_${error.code ?? response.status}`, `The assistant answered ${response.status}: ${error.message ?? 'no message'}`, {
@@ -106,7 +106,7 @@ export async function chat(input: {
   origin: string;
   message: string;
   session?: string | undefined;
-  /** MURMUR_SECRET, when known: proves this is the owner testing, exempt from per-IP limits. */
+  /** HELPPUFF_SECRET, when known: proves this is the owner testing, exempt from per-IP limits. */
   secret?: string | undefined;
   fetch?: typeof fetch;
 }): Promise<ChatTurn> {
@@ -127,7 +127,7 @@ export async function chat(input: {
     });
     const body = await envelope(response);
     const messages = (body['messages'] ?? []) as Message[];
-    const session = response.headers.get('X-Murmur-Token') ?? input.session;
+    const session = response.headers.get('X-HelpPuff-Token') ?? input.session;
     return { session, sessionId: sessionIdOf(session), messages, reply: flatten(messages), timing: parseServerTiming(response.headers.get('Server-Timing')), elapsedMs: Date.now() - started };
   }
 
@@ -140,7 +140,7 @@ export async function chat(input: {
     method: 'POST',
     headers,
     body: JSON.stringify({
-      context: { pageUrl: `${input.origin}/`, pageTitle: 'murmur chat (CLI test)' },
+      context: { pageUrl: `${input.origin}/`, pageTitle: 'helppuff chat (CLI test)' },
       firstMessage: input.message,
       ...(lead ? { lead } : {}),
     }),

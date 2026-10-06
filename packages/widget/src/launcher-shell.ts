@@ -6,7 +6,7 @@ import type { LauncherHints } from './loader-config.js';
  * the same markup and reuses this stylesheet, so the handoff is invisible.
  *
  * Kept small and string-based: this is the only CSS in the loader's budget.
- * The orb's gradient stops are derived from '--mm-accent' in CSS rather than
+ * The orb's gradient stops are derived from '--hp-accent' in CSS rather than
  * computed in JS, which keeps the colour maths out of both bundles.
  */
 
@@ -15,24 +15,24 @@ export const LOADER_CSS = `
   display: block;
   position: fixed;
   inset: 0;
-  z-index: var(--mm-z, 2147483000);
+  z-index: var(--hp-z, 2147483000);
   pointer-events: none;
 
-  --mm-accent: #5B5BF7;
-  --mm-accent-fg: #FFFFFF;
-  --mm-bg: #FFFFFF;
-  --mm-text: #111114;
-  --mm-border: rgba(15, 15, 20, .08);
-  --mm-danger: #D93F3F;
-  --mm-text-sm: 13px;
-  --mm-dur: 220ms;
-  --mm-ease-spring: cubic-bezier(.34, 1.56, .64, 1);
-  --mm-shadow-orb: 0 10px 30px -8px rgba(15, 15, 30, .35);
+  --hp-accent: #5B5BF7;
+  --hp-accent-fg: #FFFFFF;
+  --hp-bg: #FFFFFF;
+  --hp-text: #111114;
+  --hp-border: rgba(15, 15, 20, .08);
+  --hp-danger: #D93F3F;
+  --hp-text-sm: 13px;
+  --hp-dur: 220ms;
+  --hp-ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+  --hp-shadow-orb: 0 10px 30px -8px rgba(15, 15, 30, .35);
 }
 
-:host([data-theme="dark"]) { --mm-bg: #0E0E12; --mm-text: #F4F4F6; --mm-border: rgba(255,255,255,.08); }
+:host([data-theme="dark"]) { --hp-bg: #0E0E12; --hp-text: #F4F4F6; --hp-border: rgba(255,255,255,.08); }
 @media (prefers-color-scheme: dark) {
-  :host([data-theme="auto"]) { --mm-bg: #0E0E12; --mm-text: #F4F4F6; --mm-border: rgba(255,255,255,.08); }
+  :host([data-theme="auto"]) { --hp-bg: #0E0E12; --hp-text: #F4F4F6; --hp-border: rgba(255,255,255,.08); }
 }
 
 /*
@@ -42,8 +42,8 @@ export const LOADER_CSS = `
  * place to establish the widget's own type. Nothing in the host page can
  * match a shadow-internal element.
  */
-.mm-root {
-  font-family: var(--mm-font, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Roboto, sans-serif);
+.hp-root {
+  font-family: var(--hp-font, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Roboto, sans-serif);
   font-size: 15px;
   font-weight: 400;
   font-style: normal;
@@ -54,48 +54,48 @@ export const LOADER_CSS = `
   text-transform: none;
   text-indent: 0;
   white-space: normal;
-  color: var(--mm-text, #111114);
+  color: var(--hp-text, #111114);
   direction: ltr;
   -webkit-font-smoothing: antialiased;
   -webkit-text-size-adjust: 100%;
   /* The host passes clicks through; only the widget's surfaces take them. */
   pointer-events: none;
 }
-.mm-launcher, .mm-panel, .mm-teaser { pointer-events: auto; }
-:host([dir="rtl"]) .mm-root { direction: rtl; }
+.hp-launcher, .hp-panel, .hp-teaser { pointer-events: auto; }
+:host([dir="rtl"]) .hp-root { direction: rtl; }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; font: inherit; color: inherit; line-height: inherit; letter-spacing: inherit; text-align: inherit; }
 button { cursor: pointer; background: none; border: none; outline: none; -webkit-appearance: none; appearance: none; user-select: none; }
 svg { display: block; fill: none; }
-:focus-visible { outline: 2px solid var(--mm-accent); outline-offset: 2px; border-radius: 4px; }
+:focus-visible { outline: 2px solid var(--hp-accent); outline-offset: 2px; border-radius: 4px; }
 
-.mm-launcher {
+.hp-launcher {
   position: fixed;
-  bottom: var(--mm-launcher-y, 24px);
-  inset-inline-end: var(--mm-launcher-x, 24px);
+  bottom: var(--hp-launcher-y, 24px);
+  inset-inline-end: var(--hp-launcher-x, 24px);
   display: flex;
   align-items: center;
   gap: 10px;
   z-index: 1;
 }
-.mm-launcher[data-position="bottom-left"] {
+.hp-launcher[data-position="bottom-left"] {
   inset-inline-end: auto;
-  inset-inline-start: var(--mm-launcher-x, 24px);
+  inset-inline-start: var(--hp-launcher-x, 24px);
   flex-direction: row-reverse;
 }
 
-.mm-orb {
+.hp-orb {
   position: relative;
   width: 56px; height: 56px; min-width: 56px;
   border-radius: 50%;
   display: grid; place-items: center;
-  color: var(--mm-accent-fg);
-  background-color: var(--mm-accent);
-  box-shadow: var(--mm-shadow-orb);
-  transition: transform var(--mm-dur) var(--mm-ease-spring);
+  color: var(--hp-accent-fg);
+  background-color: var(--hp-accent);
+  box-shadow: var(--hp-shadow-orb);
+  transition: transform var(--hp-dur) var(--hp-ease-spring);
 }
 /* A pill widens the button to sit the label inside it. */
-.mm-orb[data-shape="pill"] {
+.hp-orb[data-shape="pill"] {
   width: auto;
   min-width: 0;
   border-radius: 999px;
@@ -105,54 +105,54 @@ svg { display: block; fill: none; }
   /* Same height as the orb, so the shape choice does not move the launcher. */
   height: 56px;
 }
-.mm-orb-label { font-size: 15px; font-weight: 500; white-space: nowrap; }
+.hp-orb-label { font-size: 15px; font-weight: 500; white-space: nowrap; }
 
-.mm-orb:hover { transform: scale(1.06); }
-.mm-orb:active { transform: scale(.98); }
-.mm-orb svg { width: 24px; height: 24px; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.hp-orb:hover { transform: scale(1.06); }
+.hp-orb:active { transform: scale(.98); }
+.hp-orb svg { width: 24px; height: 24px; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 
 /* The living gradient, derived entirely from the accent. */
 @supports (background: color-mix(in oklab, red, blue)) {
-  .mm-orb {
+  .hp-orb {
     background-image:
       radial-gradient(120% 120% at 30% 25%, rgba(255,255,255,.34), transparent 55%),
-      conic-gradient(from var(--mm-orb-angle, 0deg),
-        var(--mm-accent),
-        color-mix(in oklab, var(--mm-accent) 68%, #ffffff),
-        color-mix(in oklab, var(--mm-accent) 74%, #2b0b6b),
-        var(--mm-accent));
-    animation: mm-drift 12s linear infinite;
+      conic-gradient(from var(--hp-orb-angle, 0deg),
+        var(--hp-accent),
+        color-mix(in oklab, var(--hp-accent) 68%, #ffffff),
+        color-mix(in oklab, var(--hp-accent) 74%, #2b0b6b),
+        var(--hp-accent));
+    animation: hp-drift 12s linear infinite;
   }
 }
 
-.mm-label {
-  font-size: var(--mm-text-sm);
+.hp-label {
+  font-size: var(--hp-text-sm);
   font-weight: 500;
-  color: var(--mm-text);
-  background: var(--mm-bg);
-  border: 1px solid var(--mm-border);
+  color: var(--hp-text);
+  background: var(--hp-bg);
+  border: 1px solid var(--hp-border);
   border-radius: 999px;
   padding: 8px 14px;
   box-shadow: 0 4px 14px -6px rgba(15,15,30,.2);
   white-space: nowrap;
 }
-@media (max-width: 640px) { .mm-label { display: none; } }
+@media (max-width: 640px) { .hp-label { display: none; } }
 
-.mm-dot {
+.hp-dot {
   position: absolute;
   top: 2px; inset-inline-end: 2px;
   width: 12px; height: 12px;
   border-radius: 50%;
-  background: var(--mm-danger);
-  border: 2px solid var(--mm-bg);
+  background: var(--hp-danger);
+  border: 2px solid var(--hp-bg);
 }
 
-@property --mm-orb-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
-@keyframes mm-drift { to { --mm-orb-angle: 360deg; } }
+@property --hp-orb-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+@keyframes hp-drift { to { --hp-orb-angle: 360deg; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .mm-orb { animation: none; transition: none; }
-  .mm-orb:hover { transform: none; }
+  .hp-orb { animation: none; transition: none; }
+  .hp-orb:hover { transform: none; }
 }
 `;
 
@@ -162,8 +162,8 @@ function escapeAttr(value: string): string {
 
 /** Per-site accent, emitted as one rule so it overrides the defaults above. */
 export function accentCss(hints: LauncherHints): string {
-  const offset = hints.offset ? `--mm-launcher-x:${hints.offset.x}px;--mm-launcher-y:${hints.offset.y}px;` : '';
-  return `:host{--mm-accent:${hints.accent};--mm-accent-fg:${hints.accentFg};${offset}}`;
+  const offset = hints.offset ? `--hp-launcher-x:${hints.offset.x}px;--hp-launcher-y:${hints.offset.y}px;` : '';
+  return `:host{--hp-accent:${hints.accent};--hp-accent-fg:${hints.accentFg};${offset}}`;
 }
 
 export function launcherMarkup(hints: LauncherHints): string {
@@ -172,14 +172,14 @@ export function launcherMarkup(hints: LauncherHints): string {
   const icon = launcherIconSvg(hints.icon, 24);
 
   return (
-    `<div class="mm-root">` +
-    `<div class="mm-launcher" data-position="${hints.position}">` +
-    `<button type="button" class="mm-orb"${pill ? ' data-shape="pill"' : ''}` +
+    `<div class="hp-root">` +
+    `<div class="hp-launcher" data-position="${hints.position}">` +
+    `<button type="button" class="hp-orb"${pill ? ' data-shape="pill"' : ''}` +
     ` aria-label="${aria}" aria-expanded="false" aria-haspopup="dialog">` +
     icon +
-    (pill ? `<span class="mm-orb-label">${escapeAttr(hints.label)}</span>` : '') +
+    (pill ? `<span class="hp-orb-label">${escapeAttr(hints.label)}</span>` : '') +
     `</button>` +
-    (hints.label && !pill ? `<span class="mm-label">${escapeAttr(hints.label)}</span>` : '') +
+    (hints.label && !pill ? `<span class="hp-label">${escapeAttr(hints.label)}</span>` : '') +
     `</div></div>`
   );
 }

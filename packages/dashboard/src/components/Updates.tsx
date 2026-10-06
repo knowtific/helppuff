@@ -20,7 +20,7 @@ export type VersionInfo = {
   releaseNotes: string;
 };
 
-const SEEN = 'mm-version';
+const SEEN = 'hp-version';
 
 /** The update check, once per browser session (the server caches npm for 12 hours anyway). */
 export function useVersion(): VersionInfo | null {
@@ -61,7 +61,7 @@ export function Updates() {
           <div className="flex items-start gap-3">
             {v.upgradeAvailable ? <ArrowUpCircle className="mt-0.5 size-5 text-primary" aria-hidden /> : <CheckCircle2 className="mt-0.5 size-5 text-[#16a34a]" aria-hidden />}
             <div className="space-y-0.5">
-              <p className="text-[13px] font-medium">{v.upgradeAvailable ? `Murmur ${v.latest} is available` : 'You’re up to date'}</p>
+              <p className="text-[13px] font-medium">{v.upgradeAvailable ? `HelpPuff ${v.latest} is available` : 'You’re up to date'}</p>
               <p className="text-xs text-muted-foreground">
                 Running {v.current ?? 'a development build'}
                 {v.latest && !v.upgradeAvailable ? ` · latest is ${v.latest}` : ''}
@@ -90,7 +90,7 @@ export function Updates() {
           into the dashboard can change what runs on your account.
         </p>
         <p>
-          Something wrong after an upgrade? Go back with <code>npx @knowtific/murmur@&lt;previous version&gt; deploy --allow-downgrade</code>; the upgrade also
+          Something wrong after an upgrade? Go back with <code>npx @knowtific/helppuff@&lt;previous version&gt; deploy --allow-downgrade</code>; the upgrade also
           printed a command to put the database back as it was.
         </p>
       </Card>

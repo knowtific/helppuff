@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { actionSchema, messageSchema, widgetConfigSchema } from '@murmur/protocol';
+import { actionSchema, messageSchema, widgetConfigSchema } from '@helppuff/protocol';
 import { invalidMessages, validMessages } from '../../protocol/test/fixtures.js';
 import {
   DEFAULT_LEAD_FIELDS,

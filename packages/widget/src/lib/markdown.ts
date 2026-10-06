@@ -1,4 +1,4 @@
-import { isSafeUrl } from '@murmur/protocol';
+import { isSafeUrl } from '@helppuff/protocol';
 
 /**
  * The markdown subset of the protocol: paragraphs, line breaks, bold, italic, inline

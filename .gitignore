@@ -12,8 +12,8 @@ dist/
 !.env.example
 
 # Your sites, origins and agent ids for `pnpm dev`. Created from
-# murmur.config.demo.ts on first run.
-murmur.config.ts
+# helppuff.config.demo.ts on first run.
+helppuff.config.ts
 .DS_Store
 dist-demo/
 test-results/

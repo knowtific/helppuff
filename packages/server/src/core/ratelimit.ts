@@ -1,7 +1,7 @@
-import type { KvStore } from '@murmur/connector-types';
-import { usageDay } from '@murmur/rag';
+import type { KvStore } from '@helppuff/connector-types';
+import { usageDay } from '@helppuff/rag';
 import type { D1Like } from '../db/d1.js';
-import { MurmurError } from './errors.js';
+import { HelpPuffError } from './errors.js';
 
 /**
  * Abuse bounds. Where each is counted, cheapest first:
@@ -99,7 +99,7 @@ export async function hitTotal(
 
 export const sessionMessageKey = (sessionId: string) => `msg:${sessionId}`;
 
-/** `quota:{siteId}:{yyyy-mm-dd}` in UTC — the cost backstop. */
+/** `quota:{siteId}:{yyyy-hp-dd}` in UTC — the cost backstop. */
 export function dailyKey(siteId: string, now = Date.now()): string {
   return `quota:${siteId}:${new Date(now).toISOString().slice(0, 10)}`;
 }
@@ -127,9 +127,9 @@ function untilMidnight(now: number): number {
 /** Cloudflare's Rate Limiting binding (`ratelimits` in the Worker's config). */
 export type RateLimiter = { limit(options: { key: string }): Promise<{ success: boolean }> };
 
-export const IP_LIMITER_BINDING = 'MURMUR_IP_LIMITER';
+export const IP_LIMITER_BINDING = 'HELPPUFF_IP_LIMITER';
 /** The limit the binding was deployed with, so a different live limit falls back to KV rather than being ignored. */
-export const IP_LIMIT_VAR = 'MURMUR_IP_LIMIT';
+export const IP_LIMIT_VAR = 'HELPPUFF_IP_LIMIT';
 
 /** The per-visitor minute limiter, when the Worker has one deployed with this limit. */
 export function ipLimiter(env: Record<string, unknown>, limit: number): RateLimiter | null {
@@ -183,13 +183,13 @@ export async function recordedCaps(
   };
 }
 
-export function rateLimited(verdict: LimitVerdict, detail: string): MurmurError {
-  return new MurmurError('rate_limited', {
+export function rateLimited(verdict: LimitVerdict, detail: string): HelpPuffError {
+  return new HelpPuffError('rate_limited', {
     ...(verdict.retryAfter === undefined ? {} : { retryAfter: verdict.retryAfter }),
     detail,
   });
 }
 
-export function quotaExceeded(detail: string, message?: string): MurmurError {
-  return new MurmurError('quota_exceeded', { ...(message ? { message } : {}), detail });
+export function quotaExceeded(detail: string, message?: string): HelpPuffError {
+  return new HelpPuffError('quota_exceeded', { ...(message ? { message } : {}), detail });
 }

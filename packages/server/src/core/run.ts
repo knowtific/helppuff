@@ -1,9 +1,9 @@
-import { isConnectorError, type ConnectorContext, type ErasedConnector, type PromptGuidance } from '@murmur/connector-types';
+import { isConnectorError, type ConnectorContext, type ErasedConnector, type PromptGuidance } from '@helppuff/connector-types';
 import { guidanceFor } from './guidance.js';
-import type { Capabilities } from '@murmur/protocol';
+import type { Capabilities } from '@helppuff/protocol';
 import type { SiteConfig } from '../config/schema.js';
 import { resolveSecrets } from '../config/load.js';
-import { MurmurError, toMurmurError } from './errors.js';
+import { HelpPuffError, toHelpPuffError } from './errors.js';
 import { getConnector } from './registry.js';
 import type { RequestCtx } from './request.js';
 import { recordedHistory } from '../conversations/history.js';
@@ -13,7 +13,7 @@ import { emit } from '../webhooks/deliver.js';
 export type PreparedConnector = {
   connector: ErasedConnector;
   options: unknown;
-  /** Murmur's words around the owner's prompt; absent when the backend owns its prompt (Retell, OpenAI `promptId`…). */
+  /** HelpPuff's words around the owner's prompt; absent when the backend owns its prompt (Retell, OpenAI `promptId`…). */
   guidance?: PromptGuidance;
 };
 
@@ -28,9 +28,9 @@ export function prepareConnector(ctx: RequestCtx, site: SiteConfig): PreparedCon
     const options = connector.parseOptions(resolved);
     return { connector, options, ...(connector.promptOption(options) ? { guidance: guidanceFor(site) } : {}) };
   } catch (thrown) {
-    if (thrown instanceof MurmurError) throw thrown;
+    if (thrown instanceof HelpPuffError) throw thrown;
     ctx.platform.log('connector.bad_options', { type: site.connector.type });
-    throw new MurmurError('internal', { detail: `connector_options_invalid:${site.connector.type}` });
+    throw new HelpPuffError('internal', { detail: `connector_options_invalid:${site.connector.type}` });
   }
 }
 
@@ -82,18 +82,18 @@ export async function runConnector<T>(ctx: RequestCtx, operation: string, work: 
   } catch (thrown) {
     if (isConnectorError(thrown)) {
       ctx.platform.log('connector.error', { operation, detail: thrown.detail ?? 'unspecified' });
-      throw new MurmurError(thrown.code, {
+      throw new HelpPuffError(thrown.code, {
         message: thrown.message,
         ...(thrown.retryAfter !== undefined ? { retryAfter: thrown.retryAfter } : {}),
         ...(thrown.detail !== undefined ? { detail: thrown.detail } : {}),
       });
     }
-    const error = toMurmurError(thrown);
+    const error = toHelpPuffError(thrown);
     ctx.platform.log('connector.threw', { operation, detail: error.detail ?? 'unknown' });
     // Anything that is not a ConnectorError is a bug in the connector, not a
     // condition the visitor should see described.
     throw error.code === 'internal'
-      ? new MurmurError('connector_error', { detail: error.detail ?? 'connector_threw' })
+      ? new HelpPuffError('connector_error', { detail: error.detail ?? 'connector_threw' })
       : error;
   }
 }

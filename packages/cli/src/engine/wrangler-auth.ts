@@ -6,7 +6,7 @@ import { runWrangler } from './wrangler.js';
 /**
  * Reuse `wrangler login`.
  *
- * Its OAuth token already carries every scope murmur needs (workers,
+ * Its OAuth token already carries every scope helppuff needs (workers,
  * workers_kv, ai-search write+run, d1), so someone who has logged in once —
  * or who runs `npx wrangler login` now — never has to create an API token.
  * The token lives in wrangler's own config file; when it is about to

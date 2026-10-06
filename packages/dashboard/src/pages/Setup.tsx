@@ -7,10 +7,10 @@ import { replaceHash } from '../lib/utils';
 /**
  * The two pages reached by a one-time link, before anyone is signed in:
  *
- *  - `#/setup/<token>` (from `murmur deploy`): create the first account,
+ *  - `#/setup/<token>` (from `helppuff deploy`): create the first account,
  *    then onboarding picks up from there — or Home, when the terminal (an
  *    AI agent, usually) already started learning the site;
- *  - `#/signin/<token>` (from `murmur dashboard`): sign in without a password.
+ *  - `#/signin/<token>` (from `helppuff dashboard`): sign in without a password.
  *
  * The token lives in the URL fragment, which browsers never send to a
  * server, and is spent on first use.
@@ -40,7 +40,7 @@ function Expired() {
     <Frame title="This link has expired" description="Setup and sign-in links work once, for a limited time.">
       <div className="rounded-lg border bg-card p-5 text-[13px] shadow-sm">
         <p>Get a fresh one from the folder you set up the assistant in:</p>
-        <code className="mt-2 block rounded-md bg-muted px-2.5 py-2 text-xs">npx @knowtific/murmur dashboard</code>
+        <code className="mt-2 block rounded-md bg-muted px-2.5 py-2 text-xs">npx @knowtific/helppuff dashboard</code>
         <a href="#/" className="mt-4 inline-block text-xs text-muted-foreground hover:text-foreground">
           Sign in with a password instead
         </a>

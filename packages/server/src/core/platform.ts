@@ -1,4 +1,4 @@
-import type { KvStore } from '@murmur/connector-types';
+import type { KvStore } from '@helppuff/connector-types';
 
 /**
  * Everything the core needs from its host. Keeping Worker-only APIs behind

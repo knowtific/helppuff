@@ -6,11 +6,11 @@ import {
   IP_LIMITER_BINDING,
   IP_LIMIT_VAR,
   collectSecretNames,
-  murmurConfigSchema,
+  helppuffConfigSchema,
   normalizePrompt,
   storedSiteConfigSchema,
   getConnector,
-} from '@murmur/server';
+} from '@helppuff/server';
 import { CliError } from '../errors.js';
 import {
   BACKENDS_WITH_PROMPT,
@@ -18,7 +18,7 @@ import {
   dashboardEnabled,
   needsDatabase,
   resourceName,
-  usesMurmurKnowledge,
+  usesHelpPuffKnowledge,
   vectorizeIndexFor,
   usesAnthropicKnowledge,
   workerNameFor,
@@ -27,7 +27,7 @@ import {
 } from './project.js';
 
 /**
- * murmur.json → everything the Worker needs.
+ * helppuff.json → everything the Worker needs.
  *
  *  - `serverConfig`  bundled into the Worker: the full site, origins included
  *  - `storedConfig`  pushed to KV as `config:<site>`: everything but origins,
@@ -41,8 +41,8 @@ import {
  */
 
 export const AI_SEARCH_BINDING = 'AI_SEARCH';
-export const KV_BINDING = 'MURMUR_KV';
-export const DB_BINDING = 'MURMUR_DB';
+export const KV_BINDING = 'HELPPUFF_KV';
+export const DB_BINDING = 'HELPPUFF_DB';
 export const VECTORS_BINDING = 'VECTORS';
 export const WORKFLOW_BINDING = 'CRAWL_WORKFLOW';
 export const BROWSER_BINDING = 'BROWSER';
@@ -74,7 +74,7 @@ export function readPrompt(loaded: LoadedProject): string | undefined {
   const file = resolve(loaded.dir, loaded.project.prompt);
   if (!existsSync(file)) {
     throw new CliError('missing_prompt', `The prompt file ${loaded.project.prompt} does not exist.`, {
-      hint: 'Create it, or point `prompt` in murmur.json at the right file.',
+      hint: 'Create it, or point `prompt` in helppuff.json at the right file.',
     });
   }
   const text = normalizePrompt(readFileSync(file, 'utf8'));
@@ -112,7 +112,7 @@ export function connectorFor(project: Project, prompt: string | undefined): { ty
           apiKey: backend.apiKey,
           model: backend.model,
           ...(backend.promptId ? { promptRef: { id: backend.promptId } } : instructions),
-          ...(backend.vectorStoreId && backend.retrieval !== 'murmur' ? { vectorStoreIds: [backend.vectorStoreId] } : {}),
+          ...(backend.vectorStoreId && backend.retrieval !== 'helppuff' ? { vectorStoreIds: [backend.vectorStoreId] } : {}),
           ...(backend.retrieval ? { retrieval: backend.retrieval } : {}),
           ...(backend.baseUrl ? { baseUrl: backend.baseUrl } : {}),
           stream: true,
@@ -125,7 +125,7 @@ export function connectorFor(project: Project, prompt: string | undefined): { ty
           apiKey: backend.apiKey,
           model: backend.model,
           ...(prompt ? { systemInstruction: prompt } : {}),
-          ...(backend.fileSearchStore && backend.retrieval !== 'murmur' ? { fileSearchStores: [backend.fileSearchStore] } : {}),
+          ...(backend.fileSearchStore && backend.retrieval !== 'helppuff' ? { fileSearchStores: [backend.fileSearchStore] } : {}),
           ...(backend.retrieval ? { retrieval: backend.retrieval } : {}),
           stream: true,
         },
@@ -225,7 +225,7 @@ export function compile(
   const site = { origins, ...stored };
   const serverConfig = { sites: { [project.site]: site } };
 
-  const parsedServer = murmurConfigSchema.safeParse(serverConfig);
+  const parsedServer = helppuffConfigSchema.safeParse(serverConfig);
   if (!parsedServer.success) {
     throw new CliError(
       'invalid_config',
@@ -246,7 +246,7 @@ export function compile(
   const dashboard = dashboardEnabled(project);
   const owner = dashboard && Boolean(project.dashboard.adminEmail);
   const database = needsDatabase(project);
-  const ownKnowledge = usesMurmurKnowledge(project);
+  const ownKnowledge = usesHelpPuffKnowledge(project);
   const secrets = [
     ...collectSecretNames(site),
     ...(owner ? ['ADMIN_PASSWORD_HASH'] : []),
@@ -261,7 +261,7 @@ export function compile(
     // The Anthropic SDK imports Node built-ins.
     compatibility_flags: ['nodejs_compat'],
     workers_dev: true,
-    kv_namespaces: [{ binding: KV_BINDING, id: options.kvNamespaceId ?? 'murmur-local' }],
+    kv_namespaces: [{ binding: KV_BINDING, id: options.kvNamespaceId ?? 'helppuff-local' }],
     ratelimits: [{ name: IP_LIMITER_BINDING, namespace_id: ipLimiterNamespace, simple: { limit: ipLimit, period: 60 } }],
     ...(aiSearchInstance
       ? { ai_search: [{ binding: AI_SEARCH_BINDING, instance_name: aiSearchInstance, ...(options.dev ? { remote: true } : {}) }] }
@@ -269,7 +269,7 @@ export function compile(
     ...(database
       ? {
           d1_databases: [
-            { binding: DB_BINDING, database_name: resourceName(project.site), database_id: options.d1DatabaseId ?? 'murmur-local' },
+            { binding: DB_BINDING, database_name: resourceName(project.site), database_id: options.d1DatabaseId ?? 'helppuff-local' },
           ],
           // Workers AI: answers and embeddings (workers-ai), conversation summaries (dashboard).
           ai: { binding: 'AI' },
@@ -286,12 +286,12 @@ export function compile(
       : {}),
     assets: { directory: 'assets', not_found_handling: 'none' },
     vars: {
-      MURMUR_LOG: options.dev ? '1' : '0',
-      // What `murmur upgrade` and the dashboard compare against the latest release.
-      MURMUR_VERSION: VERSION,
+      HELPPUFF_LOG: options.dev ? '1' : '0',
+      // What `helppuff upgrade` and the dashboard compare against the latest release.
+      HELPPUFF_VERSION: VERSION,
       [IP_LIMIT_VAR]: String(ipLimit),
       ...(owner ? { ADMIN_EMAIL: project.dashboard.adminEmail!.toLowerCase() } : {}),
-      ...(dashboard && project.dashboard.summaryModel ? { MURMUR_SUMMARY_MODEL: project.dashboard.summaryModel } : {}),
+      ...(dashboard && project.dashboard.summaryModel ? { HELPPUFF_SUMMARY_MODEL: project.dashboard.summaryModel } : {}),
     },
     observability: { enabled: true },
   };
@@ -307,15 +307,15 @@ export function compile(
     serverConfig,
     storedConfig: stored,
     wrangler,
-    secrets: ['MURMUR_SECRET', ...secrets.filter((name) => name !== 'MURMUR_SECRET')],
+    secrets: ['HELPPUFF_SECRET', ...secrets.filter((name) => name !== 'HELPPUFF_SECRET')],
     aiSearchInstance,
     workerHash,
   };
 }
 
-/** The Worker-side crawl settings, for workers-ai: what murmur.json's `knowledge.website` says. */
+/** The Worker-side crawl settings, for workers-ai: what helppuff.json's `knowledge.website` says. */
 export function knowledgeFor(project: Project): Record<string, unknown> | null {
-  if (!usesMurmurKnowledge(project)) return null;
+  if (!usesHelpPuffKnowledge(project)) return null;
   const website = project.knowledge.website;
   const settings = typeof website === 'object' ? website : {};
   return {

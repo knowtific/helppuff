@@ -1,15 +1,15 @@
-import type { Message, VisitorContext } from '@murmur/protocol';
-import { STREAM_MEDIA_TYPE, SseIdleTimeout, readSse } from '@murmur/protocol/sse';
+import type { Message, VisitorContext } from '@helppuff/protocol';
+import { STREAM_MEDIA_TYPE, SseIdleTimeout, readSse } from '@helppuff/protocol/sse';
 import { fetchWithTimeout } from '../lib/safe.js';
 import { parseConfig, parseMessages } from './validate.js';
 import type { SendInput, Session, WidgetError } from './store.js';
-import type { WidgetConfig } from '@murmur/protocol';
+import type { WidgetConfig } from '@helppuff/protocol';
 
 /** Fail-safe: config gets 6s, a message send gets 30s. Nothing is unbounded. */
 export const CONFIG_TIMEOUT_MS = 6000;
 export const SEND_TIMEOUT_MS = 30_000;
 
-const TOKEN_HEADER = 'x-murmur-token';
+const TOKEN_HEADER = 'x-helppuff-token';
 
 export type Capabilities = { poll: boolean; end: boolean; stream: boolean; feedback?: boolean };
 

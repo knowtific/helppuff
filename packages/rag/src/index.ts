@@ -1,5 +1,5 @@
 /**
- * @murmur/rag — Murmur's own knowledge base: discovery, crawling, extraction,
+ * @helppuff/rag — HelpPuff's own knowledge base: discovery, crawling, extraction,
  * structure-aware chunking, embedding and hybrid retrieval, on Cloudflare
  * Workers AI + Vectorize + D1. Runs in the Worker (and its crawl Workflow);
  * pure parts also run in the CLI and in tests.

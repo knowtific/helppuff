@@ -1,4 +1,4 @@
-import type { Message } from '@murmur/protocol';
+import type { Message } from '@helppuff/protocol';
 import { message, messageId } from './helpers.js';
 
 /**

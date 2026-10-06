@@ -5,7 +5,7 @@ import {
   readSse,
   startSessionResponseSchema,
   streamedSendDoneSchema,
-} from '@murmur/protocol';
+} from '@helppuff/protocol';
 import { harness, startBody, startSession, testConfig, testEnv, type Harness } from './helpers.js';
 
 /**

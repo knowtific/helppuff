@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { messageSchema } from '@murmur/protocol';
-import { isConnectorError, type ConnectorContext } from '@murmur/connector-types';
+import { messageSchema } from '@helppuff/protocol';
+import { isConnectorError, type ConnectorContext } from '@helppuff/connector-types';
 import gemini, { collectCitations, mapGeminiSteps } from '../src/index.js';
 
 /** Built against ai.google.dev's Interactions + File Search docs. */

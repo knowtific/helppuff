@@ -1,5 +1,5 @@
 {
-  "name": "@murmur/connector-anthropic",
+  "name": "@helppuff/connector-anthropic",
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
@@ -13,9 +13,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
-    "@murmur/connector-types": "workspace:*",
-    "@murmur/protocol": "workspace:*",
-    "@murmur/rag": "workspace:*",
+    "@helppuff/connector-types": "workspace:*",
+    "@helppuff/protocol": "workspace:*",
+    "@helppuff/rag": "workspace:*",
     "zod": "^3.25.76"
   }
 }

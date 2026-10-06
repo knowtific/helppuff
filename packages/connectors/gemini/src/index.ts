@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { ground } from '@murmur/rag';
-import type { LinkItem, Message, SendRequest } from '@murmur/protocol';
+import { ground } from '@helppuff/rag';
+import type { LinkItem, Message, SendRequest } from '@helppuff/protocol';
 import {
   ConnectorError,
   RICH_TOOL_SCHEMAS,
@@ -16,7 +16,7 @@ import {
   type Connector,
   type ConnectorContext,
   type PromptScope,
-} from '@murmur/connector-types';
+} from '@helppuff/connector-types';
 
 /**
  * Gemini, with File Search as the retrieval layer — the RAG option.
@@ -58,8 +58,8 @@ export const geminiOptionsSchema = z.object({
    * redeploy. See `wiki/Prompts-and-Instructions.md`.
    */
   systemInstruction: promptSourceSchema.optional(),
-  /** `murmur`: answer from Murmur's own knowledge base instead of File Search. */
-  retrieval: z.literal('murmur').optional(),
+  /** `helppuff`: answer from HelpPuff's own knowledge base instead of File Search. */
+  retrieval: z.literal('helppuff').optional(),
   richMessages: z.boolean().default(true),
   /** Render the documents an answer came from as a `links` message. */
   showCitations: z.boolean().default(true),
@@ -349,7 +349,7 @@ async function interact(
   const options = ctx.options;
   const prompt = await resolvePrompt(ctx, options.systemInstruction, scope);
   const grounding =
-    options.retrieval === 'murmur' ? await ground(ctx.env, ctx.siteId, input, { log: ctx.log, waitUntil: ctx.waitUntil }) : null;
+    options.retrieval === 'helppuff' ? await ground(ctx.env, ctx.siteId, input, { log: ctx.log, waitUntil: ctx.waitUntil }) : null;
   const system = grounding ? [prompt, grounding.block].filter(Boolean).join('\n\n') : prompt;
 
   const response = await fetchWithTimeout(ctx.fetch, `${options.baseUrl}/interactions`, {

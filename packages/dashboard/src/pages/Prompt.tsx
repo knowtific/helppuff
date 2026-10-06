@@ -9,7 +9,7 @@ import { cn, fmtDateTime, fmtRelative, useData } from '../lib/utils';
 /**
  * The assistant's system prompt, versioned. Publishing makes a new version
  * live; restoring publishes an old text as a new version, so nothing in the
- * history is ever lost. `murmur deploy` publishes into the same history, and
+ * history is ever lost. `helppuff deploy` publishes into the same history, and
  * refuses to overwrite a version made here that prompt.md has not pulled.
  */
 
@@ -155,7 +155,7 @@ export function Prompt({ me }: { me: Me }) {
                     return (
                       <div className="rounded-md border bg-subtle px-3 py-2.5 text-xs" role="note">
                         <p className="font-medium">
-                          {repeats.length === 1 ? 'One line repeats' : `${repeats.length} lines repeat`} what Murmur already adds from your settings and rules
+                          {repeats.length === 1 ? 'One line repeats' : `${repeats.length} lines repeat`} what HelpPuff already adds from your settings and rules
                         </p>
                         <ul className="mt-1.5 space-y-1 text-muted-foreground">
                           {repeats.map((o) => (
@@ -193,7 +193,7 @@ export function Prompt({ me }: { me: Me }) {
                     className="min-h-[28rem] resize-y font-mono text-[12.5px] leading-relaxed"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Only what is specific to your business: goal, tone and length are settings, and Murmur adds its rules itself. Facts belong in the
+                    Only what is specific to your business: goal, tone and length are settings, and HelpPuff adds its rules itself. Facts belong in the
                     knowledge base. You can use <code className="rounded bg-muted px-1">{'{{business.phone}}'}</code>,{' '}
                     <code className="rounded bg-muted px-1">{'{{lead.name}}'}</code> and{' '}
                     <code className="rounded bg-muted px-1">{'{{context.pageUrl}}'}</code>.
@@ -236,7 +236,7 @@ export function Prompt({ me }: { me: Me }) {
               <Card>
                 <details className="group">
                   <summary className="cursor-pointer list-none px-4 py-3 text-[13px] font-medium marker:hidden">
-                    Murmur also adds these rules to every answer
+                    HelpPuff also adds these rules to every answer
                     <span className="block text-xs font-normal text-muted-foreground">
                       Read-only. They come from your settings; there is no need to repeat them above, and instructions that contradict them confuse the assistant.
                     </span>
@@ -250,7 +250,7 @@ export function Prompt({ me }: { me: Me }) {
               <CardHeader title="History" description={data.versions.length ? `${data.versions.length} version${data.versions.length === 1 ? '' : 's'}` : undefined} />
               {data.versions.length === 0 ? (
                 <p className="px-4 pb-4 text-[13px] text-muted-foreground">
-                  No versions yet. The next publish — here or with <code className="rounded bg-muted px-1">murmur deploy</code> — starts the history.
+                  No versions yet. The next publish — here or with <code className="rounded bg-muted px-1">helppuff deploy</code> — starts the history.
                 </p>
               ) : (
                 <ul className="max-h-[36rem] overflow-auto border-t scroll-thin">

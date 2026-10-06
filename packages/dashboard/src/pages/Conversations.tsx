@@ -158,7 +158,7 @@ function SummaryCard({ id, stored, enabled, onDone }: { id: string; stored: Summ
             </>
           ) : (
             <p className="text-[13px] text-muted-foreground">
-              {enabled ? 'Summarise what the visitor wanted, how it ended and what to do next.' : 'Summaries need Workers AI — redeploy with murmur deploy.'}
+              {enabled ? 'Summarise what the visitor wanted, how it ended and what to do next.' : 'Summaries need Workers AI — redeploy with helppuff deploy.'}
             </p>
           )}
           {error && <p className="text-xs text-danger">{error}</p>}

@@ -4,14 +4,14 @@ import type { LoadedProject } from './project.js';
 
 /**
  * The deployed Worker's admin API (`/admin/api/*`), as the CLI calls it:
- * with `Authorization: Bearer <ADMIN_API_KEY>`, the key `murmur deploy`
+ * with `Authorization: Bearer <ADMIN_API_KEY>`, the key `helppuff deploy`
  * generated into `.env`. The dashboard calls the very same endpoints with a
  * session cookie, so the terminal can do everything the browser can.
  */
 
 export const ADMIN_KEY_ENV = 'ADMIN_API_KEY';
 /** The plan's `<PKG>_ADMIN_API_KEY`, for agents that pass it in the environment. */
-export const ADMIN_KEY_ALIAS = 'MURMUR_ADMIN_API_KEY';
+export const ADMIN_KEY_ALIAS = 'HELPPUFF_ADMIN_API_KEY';
 
 export type AdminApi = {
   url: string;
@@ -24,12 +24,12 @@ export type AdminApi = {
 
 export function adminApi(loaded: LoadedProject, options: { url?: string; fetch?: typeof fetch; env?: Record<string, string> } = {}): AdminApi {
   const url = (options.url ?? loaded.project.cloudflare.url)?.replace(/\/$/, '');
-  if (!url) throw new CliError('not_deployed', 'This assistant has not been deployed yet.', { hint: 'murmur deploy' });
+  if (!url) throw new CliError('not_deployed', 'This assistant has not been deployed yet.', { hint: 'helppuff deploy' });
   const env = options.env ?? loadEnv(loaded.dir);
   const key = env[ADMIN_KEY_ENV] || env[ADMIN_KEY_ALIAS];
   if (!key) {
     throw new CliError('no_admin_key', `No ${ADMIN_KEY_ENV} in .env.`, {
-      hint: '`murmur deploy` generates it and sets it on the Worker. Or set MURMUR_ADMIN_API_KEY in the environment.',
+      hint: '`helppuff deploy` generates it and sets it on the Worker. Or set HELPPUFF_ADMIN_API_KEY in the environment.',
       exitCode: EXIT.auth,
     });
   }
@@ -46,7 +46,7 @@ export function adminApi(loaded: LoadedProject, options: { url?: string; fetch?:
         ...(raw ? { body: raw.raw as Uint8Array<ArrayBuffer> } : body ? { body: JSON.stringify({ site, ...body }) } : {}),
       });
     } catch (thrown) {
-      throw new CliError('network', `Could not reach ${url}: ${(thrown as Error).message}`, { hint: 'Check the address, or run `murmur doctor`.' });
+      throw new CliError('network', `Could not reach ${url}: ${(thrown as Error).message}`, { hint: 'Check the address, or run `helppuff doctor`.' });
     }
     const text = await response.text();
     let json: unknown = null;
@@ -60,7 +60,7 @@ export function adminApi(loaded: LoadedProject, options: { url?: string; fetch?:
     const message = error?.message ?? `HTTP ${response.status}`;
     if (response.status === 401) {
       throw new CliError('admin_unauthorized', `The Worker refused the admin API key: ${message}`, {
-        hint: `${ADMIN_KEY_ENV} in .env does not match the Worker's. Run \`murmur deploy\` to set it again.`,
+        hint: `${ADMIN_KEY_ENV} in .env does not match the Worker's. Run \`helppuff deploy\` to set it again.`,
         exitCode: EXIT.auth,
       });
     }
@@ -69,7 +69,7 @@ export function adminApi(loaded: LoadedProject, options: { url?: string; fetch?:
     }
     throw new CliError(error?.code === 'not_found' ? 'not_found' : 'admin_error', message, {
       details: { status: response.status, path },
-      ...(response.status === 404 && /knowledge/.test(path) ? { hint: 'Deploy with the workers-ai backend: `murmur config set backend.type workers-ai && murmur deploy`.' } : {}),
+      ...(response.status === 404 && /knowledge/.test(path) ? { hint: 'Deploy with the workers-ai backend: `helppuff config set backend.type workers-ai && helppuff deploy`.' } : {}),
     });
   };
 

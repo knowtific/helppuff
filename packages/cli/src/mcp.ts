@@ -18,10 +18,10 @@ import type { Answers } from './engine/questions.js';
 import { projectJsonSchema } from './engine/schema.js';
 import { promptHistory, promptSync, pullPrompt, readLivePrompt, readLocalPrompt, remoteFor } from './engine/prompt.js';
 import { readState } from './engine/state.js';
-import { promptHash } from '@murmur/server';
+import { promptHash } from '@helppuff/server';
 
 /**
- * `murmur mcp` — the same engine as the CLI, as MCP tools over stdio.
+ * `helppuff mcp` — the same engine as the CLI, as MCP tools over stdio.
  *
  * Hand-rolled JSON-RPC rather than an SDK: the protocol surface a tool
  * server needs (initialize, tools/list, tools/call, ping) is small and
@@ -48,9 +48,9 @@ function crawlOf(value: string): CrawlRequest {
 export function tools(base: string): Tool[] {
   return [
     {
-      name: 'murmur_setup',
+      name: 'helppuff_setup',
       description:
-        'Create a chat assistant project (murmur.json, prompt.md, .env). Pass what you know; if anything required is missing the result has status "needs_input" with the questions to ask the user — ask them, then call again with the answers added. Never invent URLs, keys or account ids.',
+        'Create a chat assistant project (helppuff.json, prompt.md, .env). Pass what you know; if anything required is missing the result has status "needs_input" with the questions to ask the user — ask them, then call again with the answers added. Never invent URLs, keys or account ids.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -64,7 +64,7 @@ export function tools(base: string): Tool[] {
           aiSearch: { type: 'string', description: '"new", an existing AI Search instance name, or "endpoint"' },
           aiSearchEndpoint: { type: 'string' },
           httpUrl: { type: 'string' },
-          httpMode: { type: 'string', enum: ['murmur', 'openai'] },
+          httpMode: { type: 'string', enum: ['helppuff', 'openai'] },
           httpToken: { type: 'string' },
           retellAgent: { type: 'string' },
           docs: { type: 'array', items: { type: 'string' } },
@@ -109,14 +109,14 @@ export function tools(base: string): Tool[] {
           return {
             ...result,
             project: undefined,
-            next: 'Call murmur_deploy (with crawl: "suggested" for workers-ai), then murmur_ask with a realistic question. Give the user setupUrl from the deploy. If adminPassword is present, show it to the user once.',
+            next: 'Call helppuff_deploy (with crawl: "suggested" for workers-ai), then helppuff_ask with a realistic question. Give the user setupUrl from the deploy. If adminPassword is present, show it to the user once.',
           };
         }
         return result;
       },
     },
     {
-      name: 'murmur_deploy',
+      name: 'helppuff_deploy',
       description: 'Deploy or update the assistant on Cloudflare. Returns the preview URL and embed snippet. Content-only changes are live in seconds.',
       inputSchema: {
         type: 'object',
@@ -129,7 +129,7 @@ export function tools(base: string): Tool[] {
             type: 'string',
             description: 'workers-ai: also start a crawl — "suggested", "all", or globs like "**/services/**,**/faq/**". It runs in the background.',
           },
-          overwriteSettings: { type: 'boolean', description: 'Publish over settings changed in the dashboard. Prefer murmur_config with action pull.' },
+          overwriteSettings: { type: 'boolean', description: 'Publish over settings changed in the dashboard. Prefer helppuff_config with action pull.' },
         },
       },
       run: async (args) => {
@@ -145,9 +145,9 @@ export function tools(base: string): Tool[] {
       },
     },
     {
-      name: 'murmur_crawl',
+      name: 'helppuff_crawl',
       description:
-        'workers-ai: crawl pages into the knowledge base, in the background on Cloudflare. which: "selected" (default; the first time, the suggested pages), "suggested", "all", globs, or urls. Then poll murmur_knowledge_status (or pass wait:true).',
+        'workers-ai: crawl pages into the knowledge base, in the background on Cloudflare. which: "selected" (default; the first time, the suggested pages), "suggested", "all", globs, or urls. Then poll helppuff_knowledge_status (or pass wait:true).',
       inputSchema: {
         type: 'object',
         properties: {
@@ -167,18 +167,18 @@ export function tools(base: string): Tool[] {
           : which === 'selected'
             ? await api.send<{ runId: string; total: number }>('POST', '/admin/api/knowledge/crawl', {})
             : await startCrawlFromCli(api, crawlOf(which), progress);
-        if (args['wait'] !== true) return { ...started, status: 'started', next: 'murmur_knowledge_status' };
+        if (args['wait'] !== true) return { ...started, status: 'started', next: 'helppuff_knowledge_status' };
         return { ...started, final: await waitForCrawl(api, started.runId, () => {}) };
       },
     },
     {
-      name: 'murmur_knowledge_status',
+      name: 'helppuff_knowledge_status',
       description: 'workers-ai: crawl progress, page statuses, passage count, and today’s usage against the free daily budget.',
       inputSchema: { type: 'object', properties: cwdProp },
       run: async (args) => adminApi(loadProject(cwdOf(args, base))).get('/admin/api/knowledge/status'),
     },
     {
-      name: 'murmur_knowledge_add',
+      name: 'helppuff_knowledge_add',
       description: 'workers-ai: add hand-written knowledge (a Q&A, a policy, a price list) — indexed and live at once.',
       inputSchema: { type: 'object', required: ['title', 'text'], properties: { ...cwdProp, title: { type: 'string' }, text: { type: 'string' }, id: { type: 'string' } } },
       run: async (args) =>
@@ -189,17 +189,17 @@ export function tools(base: string): Tool[] {
         }),
     },
     {
-      name: 'murmur_ask',
+      name: 'helppuff_ask',
       description:
         'Ask the deployed assistant a visitor question and see the passages retrieval found (with scores). Use it to check answers are grounded; when sources is empty the assistant should say it is not sure.',
       inputSchema: { type: 'object', required: ['question'], properties: { ...cwdProp, question: { type: 'string' }, session: { type: 'string' } } },
       run: async (args) => {
         const loaded = loadProject(cwdOf(args, base));
         const url = loaded.project.cloudflare.url;
-        if (!url) return { ok: false, error: 'Not deployed yet. Call murmur_deploy first.' };
+        if (!url) return { ok: false, error: 'Not deployed yet. Call helppuff_deploy first.' };
         const question = String(args['question']);
         const [turn, search] = await Promise.all([
-          chat({ url, site: loaded.project.site, origin: new URL(url).origin, message: question, session: typeof args['session'] === 'string' ? args['session'] : undefined, secret: loadEnv(loaded.dir)['MURMUR_SECRET'] }),
+          chat({ url, site: loaded.project.site, origin: new URL(url).origin, message: question, session: typeof args['session'] === 'string' ? args['session'] : undefined, secret: loadEnv(loaded.dir)['HELPPUFF_SECRET'] }),
           loaded.project.backend.type === 'workers-ai'
             ? adminApi(loaded).send<{ chunks: { url: string; headingPath: string; score: number }[] }>('POST', '/admin/api/knowledge/search', { query: question }).catch(() => null)
             : Promise.resolve(null),
@@ -208,7 +208,7 @@ export function tools(base: string): Tool[] {
       },
     },
     {
-      name: 'murmur_chat',
+      name: 'helppuff_chat',
       description: 'Send a visitor message to the deployed assistant (or local dev with local:true) and get its reply. Pass the returned session to continue the conversation.',
       inputSchema: {
         type: 'object',
@@ -218,23 +218,23 @@ export function tools(base: string): Tool[] {
       run: async (args) => {
         const loaded = loadProject(cwdOf(args, base));
         const local = args['local'] === true;
-        const portFile = resolve(loaded.dir, '.murmur', 'dev', 'port');
+        const portFile = resolve(loaded.dir, '.helppuff', 'dev', 'port');
         const port = existsSync(portFile) ? Number(readFileSync(portFile, 'utf8').trim()) : 8787;
         const url = local ? `http://localhost:${port}` : loaded.project.cloudflare.url;
-        if (!url) return { ok: false, error: 'Not deployed yet. Call murmur_deploy first.' };
+        if (!url) return { ok: false, error: 'Not deployed yet. Call helppuff_deploy first.' };
         const turn = await chat({
           url,
           site: loaded.project.site,
           origin: local ? devOrigin(port) : new URL(url).origin,
           message: String(args['message']),
           session: typeof args['session'] === 'string' ? args['session'] : undefined,
-          secret: loadEnv(loaded.dir)['MURMUR_SECRET'],
+          secret: loadEnv(loaded.dir)['HELPPUFF_SECRET'],
         });
         return { reply: turn.reply, messages: turn.messages, session: turn.session };
       },
     },
     {
-      name: 'murmur_status',
+      name: 'helppuff_status',
       description: 'The project summary: site, backend, deployed URL, preview and embed snippet.',
       inputSchema: { type: 'object', properties: cwdProp },
       run: async (args) => {
@@ -251,13 +251,13 @@ export function tools(base: string): Tool[] {
       },
     },
     {
-      name: 'murmur_doctor',
+      name: 'helppuff_doctor',
       description: 'Run every health check (config, secrets, Cloudflare token, provider key, knowledge, Worker, live endpoint) with a fix for each failure.',
       inputSchema: { type: 'object', properties: cwdProp },
       run: async (args) => doctor(cwdOf(args, base)),
     },
     {
-      name: 'murmur_knowledge_sync',
+      name: 'helppuff_knowledge_sync',
       description: 'Re-crawl the website and re-upload knowledge files to the backend. Deploy afterwards if the result says so.',
       inputSchema: { type: 'object', properties: cwdProp },
       run: async (args) => {
@@ -270,9 +270,9 @@ export function tools(base: string): Tool[] {
       },
     },
     {
-      name: 'murmur_config',
+      name: 'helppuff_config',
       description:
-        'Read murmur.json, or change one field by dotted path (e.g. widget.brand.accent, backend.model, knowledge.files). Changes are validated; call murmur_deploy to publish.',
+        'Read helppuff.json, or change one field by dotted path (e.g. widget.brand.accent, backend.model, knowledge.files). Changes are validated; call helppuff_deploy to publish.',
       inputSchema: {
         type: 'object',
         properties: { ...cwdProp, path: { type: 'string' }, value: { description: 'Omit to read. Any JSON value to set.' } },
@@ -289,13 +289,13 @@ export function tools(base: string): Tool[] {
           node[keys.at(-1)!] = args['value'];
         });
         compile(updated);
-        return { saved: true, next: 'murmur_deploy' };
+        return { saved: true, next: 'helppuff_deploy' };
       },
     },
     {
-      name: 'murmur_prompt',
+      name: 'helppuff_prompt',
       description:
-        "The assistant's system prompt (prompt.md), which is versioned. action: read (default) · write (replace prompt.md with text; murmur_deploy publishes it as a new version) · status (prompt.md vs the live version: in_sync, ahead, behind, diverged) · pull (bring the live prompt, or `version`, into prompt.md — do this when deploy fails with prompt_behind or prompt_diverged; unpublished edits are kept in prompt.mine.md to merge) · history (every version: who, where, when).",
+        "The assistant's system prompt (prompt.md), which is versioned. action: read (default) · write (replace prompt.md with text; helppuff_deploy publishes it as a new version) · status (prompt.md vs the live version: in_sync, ahead, behind, diverged) · pull (bring the live prompt, or `version`, into prompt.md — do this when deploy fails with prompt_behind or prompt_diverged; unpublished edits are kept in prompt.mine.md to merge) · history (every version: who, where, when).",
       inputSchema: {
         type: 'object',
         properties: {
@@ -313,7 +313,7 @@ export function tools(base: string): Tool[] {
           if (typeof args['text'] !== 'string') return { ok: false, error: 'write needs text.' };
           writeFileSync(file, `${args['text'].trim()}\n`);
           compile(loaded);
-          return { saved: file, next: 'murmur_deploy' };
+          return { saved: file, next: 'helppuff_deploy' };
         }
         if (action === 'read') return { text: existsSync(file) ? readFileSync(file, 'utf8') : '' };
         const remote = await remoteFor(loaded, loadEnv(loaded.dir));
@@ -331,30 +331,30 @@ export function tools(base: string): Tool[] {
       },
     },
     {
-      name: 'murmur_secret',
-      description: 'Store a secret (e.g. OPENAI_API_KEY) in .env; it is uploaded to the Worker on the next deploy. Prefer asking the user to run `murmur secret set NAME` themselves.',
+      name: 'helppuff_secret',
+      description: 'Store a secret (e.g. OPENAI_API_KEY) in .env; it is uploaded to the Worker on the next deploy. Prefer asking the user to run `helppuff secret set NAME` themselves.',
       inputSchema: { type: 'object', required: ['name', 'value'], properties: { ...cwdProp, name: { type: 'string' }, value: { type: 'string' } } },
       run: async (args) => {
         const loaded = loadProject(cwdOf(args, base));
         const name = String(args['name']);
         if (!/^[A-Z][A-Z0-9_]*$/.test(name)) return { ok: false, error: 'Secret names are UPPER_SNAKE_CASE.' };
         writeEnvVar(loaded.dir, name, String(args['value']));
-        return { stored: name, next: 'murmur_deploy' };
+        return { stored: name, next: 'helppuff_deploy' };
       },
     },
     {
-      name: 'murmur_schema',
-      description: 'The JSON Schema of murmur.json: every field with its description.',
+      name: 'helppuff_schema',
+      description: 'The JSON Schema of helppuff.json: every field with its description.',
       inputSchema: { type: 'object', properties: {} },
       run: async () => projectJsonSchema(),
     },
   ];
 }
 
-const INSTRUCTIONS = `Murmur deploys an AI chat widget for a website to the user's Cloudflare account.
-Typical flow: murmur_setup (repeat while it returns needs_input, asking the user those questions) →
-murmur_deploy → murmur_chat with a realistic visitor question → give the user the preview URL and embed snippet.
-Change behaviour with murmur_prompt, look and backend with murmur_config, then murmur_deploy. If deploy reports prompt_behind or prompt_diverged, the owner edited the prompt in the dashboard: murmur_prompt action pull, merge, deploy again.`;
+const INSTRUCTIONS = `HelpPuff deploys an AI chat widget for a website to the user's Cloudflare account.
+Typical flow: helppuff_setup (repeat while it returns needs_input, asking the user those questions) →
+helppuff_deploy → helppuff_chat with a realistic visitor question → give the user the preview URL and embed snippet.
+Change behaviour with helppuff_prompt, look and backend with helppuff_config, then helppuff_deploy. If deploy reports prompt_behind or prompt_diverged, the owner edited the prompt in the dashboard: helppuff_prompt action pull, merge, deploy again.`;
 
 export async function serveMcp(base: string): Promise<number> {
   const registry = tools(base);
@@ -384,7 +384,7 @@ export async function serveMcp(base: string): Promise<number> {
             result: {
               protocolVersion: typeof params['protocolVersion'] === 'string' ? params['protocolVersion'] : '2025-06-18',
               capabilities: { tools: {} },
-              serverInfo: { name: 'murmur', version: VERSION },
+              serverInfo: { name: 'helppuff', version: VERSION },
               instructions: INSTRUCTIONS,
             },
           });

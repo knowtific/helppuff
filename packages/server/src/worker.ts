@@ -1,8 +1,8 @@
-import type { MurmurConfig, SiteConfig } from './config/schema.js';
+import type { HelpPuffConfig, SiteConfig } from './config/schema.js';
 import { resolveSite } from './config/site.js';
 import { createApp } from './app.js';
 import { resilientKv } from './core/platform.js';
-import type { KvStore } from '@murmur/connector-types';
+import type { KvStore } from '@helppuff/connector-types';
 import { knowledgeEnv } from './knowledge/env.js';
 import { runScheduledCrawls } from './knowledge/crawl.js';
 import { ensureSchema } from './db/d1.js';
@@ -14,14 +14,14 @@ type Ctx = { waitUntil(promise: Promise<unknown>): void };
  * base fresh. The crawl itself is the `CrawlWorkflow` export, which only the
  * Worker entry (`index.ts` / `runtime.ts`) can import.
  */
-export function createWorker(config: MurmurConfig) {
+export function createWorker(config: HelpPuffConfig) {
   const app = createApp(config);
   return {
     fetch: app.fetch,
     async scheduled(_controller: unknown, env: Record<string, unknown>, ctx: Ctx): Promise<void> {
       const knowledge = knowledgeEnv(env);
       if (!knowledge) return;
-      const kv = resilientKv(env['MURMUR_KV'] as KvStore | undefined, () => {});
+      const kv = resilientKv(env['HELPPUFF_KV'] as KvStore | undefined, () => {});
       const platform = { kv, log: () => {} };
       ctx.waitUntil(
         (async () => {

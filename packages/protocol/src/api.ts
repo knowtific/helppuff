@@ -123,7 +123,7 @@ export type SendResponse = z.infer<typeof sendResponseSchema>;
 /**
  * The `done` event of a streamed send. A streamed response has already sent
  * its headers by the time the connector returns new state, so the refreshed
- * token rides in the body instead of `X-Murmur-Token`.
+ * token rides in the body instead of `X-HelpPuff-Token`.
  */
 export const streamedSendDoneSchema = sendResponseSchema.extend({ token: z.string().min(1).optional() });
 export type StreamedSendDone = z.infer<typeof streamedSendDoneSchema>;
@@ -139,6 +139,6 @@ export const feedbackRequestSchema = z.object({
 export type FeedbackRequest = z.infer<typeof feedbackRequestSchema>;
 
 /** Response header carrying a refreshed session token. */
-export const TOKEN_HEADER = 'X-Murmur-Token';
+export const TOKEN_HEADER = 'X-HelpPuff-Token';
 /** Request header carrying the HMAC signature for the `http` connector. */
-export const SIGNATURE_HEADER = 'X-Murmur-Signature';
+export const SIGNATURE_HEADER = 'X-HelpPuff-Signature';

@@ -9,7 +9,7 @@ const DOWN = 'M17 13V4h3v9h-3Zm0 0-4 7a2 2 0 0 1-2-2v-3H6a2 2 0 0 1-2-2.3l1.2-7A
 
 function Thumb({ path, label, pressed, onClick }: { path: string; label: string; pressed: boolean; onClick: () => void }) {
   return (
-    <button type="button" class="mm-rate-btn" aria-label={label} aria-pressed={pressed} title={label} onClick={onClick}>
+    <button type="button" class="hp-rate-btn" aria-label={label} aria-pressed={pressed} title={label} onClick={onClick}>
       <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
         <path d={path} />
       </svg>
@@ -19,7 +19,7 @@ function Thumb({ path, label, pressed, onClick }: { path: string; label: string;
 
 export function Rating({ value, labels, onRate }: { value: number; labels: [string, string]; onRate: (value: 1 | -1 | 0) => void }) {
   return (
-    <div class="mm-rate" role="group" aria-label={`${labels[0]} / ${labels[1]}`}>
+    <div class="hp-rate" role="group" aria-label={`${labels[0]} / ${labels[1]}`}>
       <Thumb path={UP} label={labels[0]} pressed={value === 1} onClick={() => onRate(value === 1 ? 0 : 1)} />
       <Thumb path={DOWN} label={labels[1]} pressed={value === -1} onClick={() => onRate(value === -1 ? 0 : -1)} />
     </div>

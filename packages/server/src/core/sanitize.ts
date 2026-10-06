@@ -1,4 +1,4 @@
-import { sanitizeMessages, type Message } from '@murmur/protocol';
+import { sanitizeMessages, type Message } from '@helppuff/protocol';
 import type { Platform } from './platform.js';
 
 /** Shown when a connector replied but nothing it sent was usable. */

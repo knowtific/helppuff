@@ -1,11 +1,11 @@
-import { ALL_WEBHOOK_EVENTS, type WebhookEnvelope, type WebhookEventType } from '@murmur/protocol';
+import { ALL_WEBHOOK_EVENTS, type WebhookEnvelope, type WebhookEventType } from '@helppuff/protocol';
 import type { RequestCtx } from '../core/request.js';
 import { dbFrom, ensureSchema, type D1Like } from '../db/d1.js';
 
 /**
  * Webhooks the owner adds in the dashboard (D1 `webhooks`), and their
  * deliveries. Every event goes to every enabled endpoint that asked for it,
- * signed with that endpoint's secret (see `@murmur/protocol` webhooks.ts for
+ * signed with that endpoint's secret (see `@helppuff/protocol` webhooks.ts for
  * the envelope and headers).
  *
  * Never on the visitor's path: requests emit through `waitUntil`, and a slow
@@ -106,11 +106,11 @@ export async function deliver(db: D1Like, hook: WebhookRow, event: WebhookEnvelo
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'User-Agent': 'Murmur-Webhooks/1',
-          'X-Murmur-Event': event.type,
-          'X-Murmur-Delivery': event.id,
-          'X-Murmur-Timestamp': String(timestamp),
-          'X-Murmur-Signature': await signDelivery(hook.secret, timestamp, body),
+          'User-Agent': 'HelpPuff-Webhooks/1',
+          'X-HelpPuff-Event': event.type,
+          'X-HelpPuff-Delivery': event.id,
+          'X-HelpPuff-Timestamp': String(timestamp),
+          'X-HelpPuff-Signature': await signDelivery(hook.secret, timestamp, body),
         },
         body,
         signal: controller.signal,

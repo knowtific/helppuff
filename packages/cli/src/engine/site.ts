@@ -30,7 +30,7 @@ export type KeyPage = 'pricing' | 'contact' | 'faq' | 'booking' | 'services' | '
 
 export type CrawledPage = { url: string; title: string; markdown: string };
 
-const USER_AGENT = 'MurmurSetup/1.0 (+https://github.com/murmur; setting up a chat assistant for this site)';
+const USER_AGENT = 'HelpPuffSetup/1.0 (+https://github.com/helppuff; setting up a chat assistant for this site)';
 
 const KEY_PAGES: [KeyPage, RegExp, string][] = [
   ['pricing', /\b(pricing|prices|plans|rates|cost)\b/i, 'Pricing'],

@@ -60,12 +60,12 @@ Allow: /private/open$
 Crawl-delay: 2
 Sitemap: https://acme.com/sitemap_index.xml
 
-User-agent: murmur-crawler
+User-agent: helppuff-crawler
 Disallow: /no-bots
 `;
 
   it('uses our own group when there is one', () => {
-    const robots = parseRobots(text, 'murmur-crawler/0.1 (+https://x)');
+    const robots = parseRobots(text, 'helppuff-crawler/0.1 (+https://x)');
     expect(robotsAllows(robots, 'https://acme.com/no-bots/x')).toBe(false);
     expect(robotsAllows(robots, 'https://acme.com/private/a')).toBe(true);
     expect(robots.sitemaps).toEqual(['https://acme.com/sitemap_index.xml']);

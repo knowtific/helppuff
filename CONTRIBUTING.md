@@ -1,4 +1,4 @@
-# Contributing to Murmur
+# Contributing to HelpPuff
 
 Thanks for helping. The full guide is in the wiki:
 **[Contributing](../../wiki/Contributing)** (setup, the repository's layout,

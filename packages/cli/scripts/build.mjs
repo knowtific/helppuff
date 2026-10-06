@@ -2,11 +2,11 @@
  * Builds the publishable CLI:
  *
  *   dist/cli.js              the CLI, one ESM file (wrangler stays a dependency)
- *   dist/runtime/server.js   the Murmur server, prebundled for Workers
+ *   dist/runtime/server.js   the HelpPuff server, prebundled for Workers
  *   dist/runtime/widget/     the widget bundles, served as static assets
  *   dist/runtime/version.json
  *
- * Nothing in the workspace is needed at run time: `npx @knowtific/murmur` works
+ * Nothing in the workspace is needed at run time: `npx @knowtific/helppuff` works
  * from the registry alone.
  */
 import { build } from 'esbuild';
@@ -66,8 +66,8 @@ await build({
   banner: {
     js: [
       '#!/usr/bin/env node',
-      "import { createRequire as __murmurCreateRequire } from 'node:module';",
-      'const require = __murmurCreateRequire(import.meta.url);',
+      "import { createRequire as __helppuffCreateRequire } from 'node:module';",
+      'const require = __helppuffCreateRequire(import.meta.url);',
     ].join('\n'),
   },
   legalComments: 'none',

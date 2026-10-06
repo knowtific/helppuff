@@ -3,7 +3,7 @@
 `"backend": { "type": "gemini" }`
 
 Answers with Google Gemini (the Interactions API). Knowledge comes from Gemini
-**File Search** (Google chunks, embeds and retrieves), or from Murmur's own
+**File Search** (Google chunks, embeds and retrieves), or from HelpPuff's own
 knowledge base.
 
 ## Set up
@@ -11,7 +11,7 @@ knowledge base.
 Get a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey), then:
 
 ```bash
-npx @knowtific/murmur init --url acme.com --backend gemini --api-key "$GEMINI_API_KEY"
+npx @knowtific/helppuff init --url acme.com --backend gemini --api-key "$GEMINI_API_KEY"
 ```
 
 ```json
@@ -26,19 +26,19 @@ npx @knowtific/murmur init --url acme.com --backend gemini --api-key "$GEMINI_AP
 | --- | --- | --- |
 | `model` | `gemini-3-flash` | Any Gemini model |
 | `apiKey` | `{ "env": "GEMINI_API_KEY" }` | By environment variable name |
-| `retrieval` | — | `"murmur"`: Murmur's knowledge base instead of File Search |
-| `fileSearchStore` | — | Filled in by `murmur knowledge sync` |
+| `retrieval` | — | `"helppuff"`: HelpPuff's knowledge base instead of File Search |
+| `fileSearchStore` | — | Filled in by `helppuff knowledge sync` |
 
 ## Knowledge: two ways
 
-**Gemini File Search.** `murmur knowledge sync` crawls your site (up to
+**Gemini File Search.** `helppuff knowledge sync` crawls your site (up to
 `knowledge.website.maxPages`, default 50), creates a File Search store, and
 uploads the pages and `knowledge.files` to it; the store name is written to
 `fileSearchStore`. Google keeps the embeddings; the raw files are deleted after
 48 hours. Run `sync` again to refresh. Citations come back as links (for web
 pages) or a note naming the document.
 
-**Murmur's knowledge base** (`"retrieval": "murmur"`): the site is learned on
+**HelpPuff's knowledge base** (`"retrieval": "helppuff"`): the site is learned on
 your Cloudflare account as with the default backend, and Gemini only writes
 the answer from the passages it is given.
 

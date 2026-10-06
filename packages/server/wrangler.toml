@@ -1,4 +1,4 @@
-name = "murmur"
+name = "helppuff"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
 # The Anthropic connector's SDK imports Node built-ins.
@@ -14,11 +14,11 @@ workers_dev = true
 # a [section] belongs to that section, which silently moved this binding into
 # [assets] the first time round.
 kv_namespaces = [
-  { binding = "MURMUR_KV", id = "local-dev", preview_id = "local-dev" }
+  { binding = "HELPPUFF_KV", id = "local-dev", preview_id = "local-dev" }
 ]
 
 [vars]
-MURMUR_LOG = "0"
+HELPPUFF_LOG = "0"
 
 # One Worker serves both halves: the widget bundles as static assets,
 # and the protocol at /v1/*. A request matching a built file is served from

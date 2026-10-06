@@ -1,4 +1,4 @@
-import type { Field } from '@murmur/protocol';
+import type { Field } from '@helppuff/protocol';
 
 /**
  * One field, shared by the lead form and inline `form` messages, so
@@ -83,28 +83,28 @@ export function FieldRow({
   };
 
   return (
-    <div class="mm-field">
-      <label class="mm-label-text" for={id}>
+    <div class="hp-field">
+      <label class="hp-label-text" for={id}>
         {field.label}
         {field.required ? (
-          <span class="mm-req" aria-hidden="true">
+          <span class="hp-req" aria-hidden="true">
             {' *'}
           </span>
         ) : null}
-        {field.required ? <span class="mm-sr">{` (${requiredLabel})`}</span> : null}
+        {field.required ? <span class="hp-sr">{` (${requiredLabel})`}</span> : null}
       </label>
 
       {field.type === 'textarea' ? (
         <textarea
           {...shared}
-          class="mm-textarea"
+          class="hp-textarea"
           placeholder={field.placeholder ?? ''}
           onInput={(e) => onInput((e.target as HTMLTextAreaElement).value)}
         />
       ) : field.type === 'select' ? (
         <select
           {...shared}
-          class="mm-select"
+          class="hp-select"
           onChange={(e) => onInput((e.target as HTMLSelectElement).value)}
         >
           <option value="">{field.placeholder ?? '—'}</option>
@@ -117,7 +117,7 @@ export function FieldRow({
       ) : (
         <input
           {...shared}
-          class="mm-input"
+          class="hp-input"
           type={field.type === 'email' ? 'email' : field.type === 'tel' ? 'tel' : 'text'}
           placeholder={field.placeholder ?? ''}
           autocomplete={field.autocomplete ?? 'off'}
@@ -127,7 +127,7 @@ export function FieldRow({
       )}
 
       {error ? (
-        <span class="mm-error-text" id={`${id}-err`}>
+        <span class="hp-error-text" id={`${id}-err`}>
           {error}
         </span>
       ) : null}

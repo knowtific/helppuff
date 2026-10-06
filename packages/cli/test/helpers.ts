@@ -26,7 +26,7 @@ export const cf = (result: unknown, init: ResponseInit & { info?: object } = {})
   Response.json({ success: true, errors: [], result, ...(init.info ? { result_info: init.info } : {}) }, init);
 
 export function tempProject(files: Record<string, string> = {}): string {
-  const dir = mkdtempSync(join(tmpdir(), 'murmur-test-'));
+  const dir = mkdtempSync(join(tmpdir(), 'helppuff-test-'));
   for (const [name, content] of Object.entries(files)) {
     mkdirSync(dirname(join(dir, name)), { recursive: true });
     writeFileSync(join(dir, name), content);

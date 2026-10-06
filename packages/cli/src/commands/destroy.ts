@@ -10,11 +10,11 @@ import { GENERATED_DIR, aiSearchInstanceFor, loadProject, resourceName, updatePr
 import type { Ctx } from './context.js';
 
 /**
- * `murmur destroy` — remove everything this project created on Cloudflare:
+ * `helppuff destroy` — remove everything this project created on Cloudflare:
  * the Worker (and its crawl Workflow), the KV namespace, the D1 database
  * (conversations, leads, knowledge text), the Vectorize index, and an AI
- * Search instance murmur created. Local files stay: murmur.json, prompt.md
- * and .env are untouched, so `murmur deploy` builds it all again.
+ * Search instance helppuff created. Local files stay: helppuff.json, prompt.md
+ * and .env are untouched, so `helppuff deploy` builds it all again.
  *
  * Irreversible, so it never runs without `--yes` (or typing the site id in
  * the terminal). `--keep-data` keeps the database and the vector index.
@@ -66,7 +66,7 @@ export async function destroyCommand(ctx: Ctx): Promise<number> {
     if (dbId) await attempt(`D1 ${name}`, () => cf.api.deleteD1Database(cf.accountId, dbId));
     const index = vectorizeIndexFor(project);
     if (index) await attempt(`Vectorize ${index}`, () => cf.api.deleteVectorizeIndex(cf.accountId, index));
-    // Only an instance murmur made for this site; a reused one belongs to someone else.
+    // Only an instance helppuff made for this site; a reused one belongs to someone else.
     const instance = aiSearchInstanceFor(project);
     if (instance === name) await attempt(`AI Search ${instance}`, () => cf.api.deleteAiSearchInstance(cf.accountId, instance));
   }
@@ -80,10 +80,10 @@ export async function destroyCommand(ctx: Ctx): Promise<number> {
     rmSync(join(loaded.dir, GENERATED_DIR), { recursive: true, force: true });
   }
 
-  ctx.out.result({ removed, failed, keptData: keepData, next: failed.length ? ['murmur destroy --yes   (retry)'] : ['murmur deploy   (to build it again)'] }, () => {
+  ctx.out.result({ removed, failed, keptData: keepData, next: failed.length ? ['helppuff destroy --yes   (retry)'] : ['helppuff deploy   (to build it again)'] }, () => {
     for (const r of removed) ctx.out.success(`Deleted ${r}`);
     for (const f of failed) ctx.out.warn(`${f.resource}: ${f.error}`);
-    if (!failed.length) ctx.out.info(c.dim('murmur.json, prompt.md and .env are untouched; `murmur deploy` rebuilds everything.'));
+    if (!failed.length) ctx.out.info(c.dim('helppuff.json, prompt.md and .env are untouched; `helppuff deploy` rebuilds everything.'));
   });
   return failed.length ? 1 : 0;
 }

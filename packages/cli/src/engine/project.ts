@@ -1,13 +1,13 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
-import { widgetConfigSchema } from '@murmur/protocol';
-import { assistantConfigSchema, securitySchema } from '@murmur/server';
-import { workersAiOptionsSchema } from '@murmur/connector-workers-ai';
+import { widgetConfigSchema } from '@helppuff/protocol';
+import { assistantConfigSchema, securitySchema } from '@helppuff/server';
+import { workersAiOptionsSchema } from '@helppuff/connector-workers-ai';
 import { CliError } from '../errors.js';
 
 /**
- * `murmur.json` — the one file a person or an agent edits.
+ * `helppuff.json` — the one file a person or an agent edits.
  *
  * It describes *what* the assistant is (site, backend, prompt, knowledge,
  * widget) and never *how* it is deployed: the Worker config, the bundled
@@ -19,9 +19,9 @@ import { CliError } from '../errors.js';
  * `type` plus a handful of fields, not a connector with nested options.
  */
 
-export const PROJECT_FILE = 'murmur.json';
+export const PROJECT_FILE = 'helppuff.json';
 export const PROMPT_FILE = 'prompt.md';
-export const GENERATED_DIR = '.murmur';
+export const GENERATED_DIR = '.helppuff';
 
 const envRef = z
   .object({ env: z.string().regex(/^[A-Z][A-Z0-9_]*$/, 'an UPPER_SNAKE_CASE variable name').describe('The variable name, e.g. `OPENAI_API_KEY`.') })
@@ -32,30 +32,30 @@ const secretRef = (fallback: string) => envRef.default({ env: fallback });
 export const SITE_ID = /^[a-z0-9][a-z0-9-]{0,40}$/;
 
 /**
- * Every resource murmur creates on a Cloudflare account is named
- * `knowtific-murmur-<site>`: the Worker, the KV namespace, the D1 database
+ * Every resource helppuff creates on a Cloudflare account is named
+ * `knowtific-helppuff-<site>`: the Worker, the KV namespace, the D1 database
  * and the AI Search instance. One prefix makes them easy to find, and to
  * tell apart from anything else on the account.
  */
-export const RESOURCE_PREFIX = 'knowtific-murmur';
+export const RESOURCE_PREFIX = 'knowtific-helppuff';
 export const resourceName = (site: string) => `${RESOURCE_PREFIX}-${site}`.slice(0, 63);
 
 /** Where an AI Search instance comes from: one we manage, one that exists, or a public URL. */
 const aiSearchFields = {
-  instance: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/).optional().describe('Instance name on your account. Created by `murmur deploy` if it does not exist.'),
+  instance: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/).optional().describe('Instance name on your account. Created by `helppuff deploy` if it does not exist.'),
   endpoint: z.string().url().optional().describe('Use an existing public endpoint instead of a binding, e.g. https://search.example.com'),
 };
 
 /**
- * Murmur's own knowledge base: the Worker crawls the site into Vectorize +
+ * HelpPuff's own knowledge base: the Worker crawls the site into Vectorize +
  * D1 and answers with Workers AI. Everything is optional; leaving a field
- * out takes the connector's default (see `murmur schema`). The prompt comes
- * from prompt.md, and the bindings are wired by `murmur deploy`.
+ * out takes the connector's default (see `helppuff schema`). The prompt comes
+ * from prompt.md, and the bindings are wired by `helppuff deploy`.
  */
 const workersAiBackend = workersAiOptionsSchema
   .omit({ instructions: true, bindings: true, stream: true })
   .partial()
-  .extend({ type: z.literal('workers-ai').describe('Workers AI with Murmur\'s own knowledge base. The default; runs on the Workers Free plan.') })
+  .extend({ type: z.literal('workers-ai').describe('Workers AI with HelpPuff\'s own knowledge base. The default; runs on the Workers Free plan.') })
   .strict();
 
 export const backendSchema = z.discriminatedUnion('type', [
@@ -73,8 +73,8 @@ export const backendSchema = z.discriminatedUnion('type', [
       type: z.literal('openai').describe('OpenAI (Responses API), or any compatible endpoint with `baseUrl`.'),
       model: z.string().min(1).default('gpt-5-mini').describe('The OpenAI model.'),
       apiKey: secretRef('OPENAI_API_KEY').describe('Your OpenAI API key, by environment variable name.'),
-      vectorStoreId: z.string().min(1).optional().describe('Filled in by `murmur knowledge sync`.'),
-      retrieval: z.literal('murmur').optional().describe('`murmur`: answer from Murmur\'s own knowledge base (crawled by the Worker) instead of a vector store.'),
+      vectorStoreId: z.string().min(1).optional().describe('Filled in by `helppuff knowledge sync`.'),
+      retrieval: z.literal('helppuff').optional().describe('`helppuff`: answer from HelpPuff\'s own knowledge base (crawled by the Worker) instead of a vector store.'),
       promptId: z.string().min(1).optional().describe('A stored prompt in the OpenAI dashboard; overrides prompt.md.'),
       baseUrl: z.string().url().optional().describe('Another OpenAI-compatible Responses endpoint, e.g. Azure OpenAI.'),
     })
@@ -84,18 +84,18 @@ export const backendSchema = z.discriminatedUnion('type', [
       type: z.literal('gemini').describe('Google Gemini, with File Search.'),
       model: z.string().min(1).default('gemini-3-flash').describe('The Gemini model.'),
       apiKey: secretRef('GEMINI_API_KEY').describe('Your Gemini API key, by environment variable name.'),
-      fileSearchStore: z.string().min(1).optional().describe('Filled in by `murmur knowledge sync`.'),
-      retrieval: z.literal('murmur').optional().describe('`murmur`: answer from Murmur\'s own knowledge base instead of File Search.'),
+      fileSearchStore: z.string().min(1).optional().describe('Filled in by `helppuff knowledge sync`.'),
+      retrieval: z.literal('helppuff').optional().describe('`helppuff`: answer from HelpPuff\'s own knowledge base instead of File Search.'),
     })
     .strict(),
   z
     .object({
-      type: z.literal('anthropic').describe('Anthropic Claude, grounded in AI Search or Murmur\'s own knowledge base.'),
+      type: z.literal('anthropic').describe('Anthropic Claude, grounded in AI Search or HelpPuff\'s own knowledge base.'),
       model: z.string().min(1).default('claude-opus-5').describe('The Claude model.'),
       apiKey: secretRef('ANTHROPIC_API_KEY').describe('Your Anthropic API key, by environment variable name.'),
       effort: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional().describe('How hard Claude thinks before answering. Lower is faster and cheaper.'),
       knowledge: z.boolean().optional().describe('Ground answers in a Cloudflare AI Search instance. On by default when there is knowledge.'),
-      retrieval: z.literal('murmur').optional().describe('`murmur`: ground answers in Murmur\'s own knowledge base instead of AI Search.'),
+      retrieval: z.literal('helppuff').optional().describe('`helppuff`: ground answers in HelpPuff\'s own knowledge base instead of AI Search.'),
       ...aiSearchFields,
     })
     .strict(),
@@ -103,7 +103,7 @@ export const backendSchema = z.discriminatedUnion('type', [
     .object({
       type: z.literal('http').describe('Your own API.'),
       url: z.string().url().describe('Your API\'s base URL.'),
-      mode: z.enum(['murmur', 'openai']).default('murmur').describe('`murmur`: your API speaks the Murmur backend protocol. `openai`: any /chat/completions endpoint.'),
+      mode: z.enum(['helppuff', 'openai']).default('helppuff').describe('`helppuff`: your API speaks the HelpPuff backend protocol. `openai`: any /chat/completions endpoint.'),
       model: z.string().min(1).optional().describe('`openai` mode: the model name your endpoint expects.'),
       token: envRef.optional().describe('Sent as `Authorization: Bearer …`.'),
       signingSecret: envRef.optional().describe('Signs every request with HMAC-SHA256 so your API can verify it.'),
@@ -115,7 +115,7 @@ export const backendSchema = z.discriminatedUnion('type', [
       type: z.literal('retell').describe('A Retell chat agent.'),
       agentId: z.string().min(1).describe('The Retell chat agent id.'),
       apiKey: secretRef('RETELL_API_KEY').describe('Your Retell API key, by environment variable name.'),
-      retrieval: z.literal('murmur').optional().describe('`murmur`: crawl the site into Murmur\'s knowledge base; the agent searches it via a custom function (see `murmur status`).'),
+      retrieval: z.literal('helppuff').optional().describe('`helppuff`: crawl the site into HelpPuff\'s knowledge base; the agent searches it via a custom function (see `helppuff status`).'),
     })
     .strict(),
   z.object({ type: z.literal('echo').describe('Echoes what it is sent, with a demo of every widget feature. For development; needs no key.') }).strict(),
@@ -144,14 +144,14 @@ export const knowledgeSchema = z
       ])
       .default(true)
       .describe('Learn from the website: `true` (the defaults), `false`, or which pages and how often.'),
-    files: z.array(z.string().min(1)).default([]).describe('Files and folders to index, relative to murmur.json. PDF, Markdown, text, HTML, DOCX.'),
+    files: z.array(z.string().min(1)).default([]).describe('Files and folders to index, relative to helppuff.json. PDF, Markdown, text, HTML, DOCX.'),
   })
   .strict();
 
 /**
- * The murmur.json format. When a release moves or renames a field, it bumps
+ * The helppuff.json format. When a release moves or renames a field, it bumps
  * this and adds a step to PROJECT_UPGRADES: a file in the old format is then
- * read as the new one everywhere, and `murmur upgrade` writes it back.
+ * read as the new one everywhere, and `helppuff upgrade` writes it back.
  */
 export const PROJECT_FORMAT = 1;
 
@@ -160,7 +160,7 @@ export type ProjectUpgrade = { to: number; describe: string; apply: (raw: Record
 /** One step per format bump, in order. Each must be safe to run on any file of the previous format. */
 export const PROJECT_UPGRADES: readonly ProjectUpgrade[] = [];
 
-/** A raw murmur.json in the current format, and what changed to get there. Pure: the input is not modified. */
+/** A raw helppuff.json in the current format, and what changed to get there. Pure: the input is not modified. */
 export function upgradeProjectFile(
   input: Record<string, unknown>,
   upgrades: readonly ProjectUpgrade[] = PROJECT_UPGRADES,
@@ -168,8 +168,8 @@ export function upgradeProjectFile(
 ): { raw: Record<string, unknown>; from: number; changes: string[] } {
   const from = typeof input['format'] === 'number' ? input['format'] : 1;
   if (from > current) {
-    throw new CliError('project_too_new', `${PROJECT_FILE} is format ${from}, written by a newer murmur than this one (format ${current}).`, {
-      hint: 'Run the newer CLI: npx @knowtific/murmur@latest',
+    throw new CliError('project_too_new', `${PROJECT_FILE} is format ${from}, written by a newer helppuff than this one (format ${current}).`, {
+      hint: 'Run the newer CLI: npx @knowtific/helppuff@latest',
     });
   }
   const raw = structuredClone(input);
@@ -185,19 +185,19 @@ export function upgradeProjectFile(
 
 export const projectSchema = z
   .object({
-    $schema: z.string().optional().describe('The JSON Schema for editors and agents. Written by murmur.'),
-    format: z.number().int().min(1).optional().describe('The murmur.json format version. Absent means 1; `murmur upgrade` updates it when a release changes the format.'),
+    $schema: z.string().optional().describe('The JSON Schema for editors and agents. Written by helppuff.'),
+    format: z.number().int().min(1).optional().describe('The helppuff.json format version. Absent means 1; `helppuff upgrade` updates it when a release changes the format.'),
     site: z.string().regex(SITE_ID, 'lowercase letters, digits and dashes, starting with a letter or digit').describe('Site id: lowercase letters, digits and dashes. Appears in the embed snippet.'),
     name: z.string().min(1).max(60).describe('The business name, as visitors see it.'),
     website: z.string().url().optional().describe('The website the assistant is for, and learns from.'),
     origins: z.array(z.string().url()).min(1).describe('Every origin the widget may be embedded on. The preview page is added automatically.'),
     backend: backendSchema,
-    prompt: z.string().min(1).default(PROMPT_FILE).describe('Path to the system prompt, relative to murmur.json.'),
+    prompt: z.string().min(1).default(PROMPT_FILE).describe('Path to the system prompt, relative to helppuff.json.'),
     knowledge: knowledgeSchema.default({}).describe('What the assistant learns from: the website, and your own files.'),
-    widget: widgetConfigSchema.default({}).describe('Brand, launcher, home screen, lead form, flows — see `murmur schema`.'),
+    widget: widgetConfigSchema.default({}).describe('Brand, launcher, home screen, lead form, flows — see `helppuff schema`.'),
     assistant: assistantConfigSchema
       .default({})
-      .describe('How the assistant behaves: goal, tone, answer length. Murmur writes these around prompt.md on every answer, so prompt.md holds only what is specific to the business.'),
+      .describe('How the assistant behaves: goal, tone, answer length. HelpPuff writes these around prompt.md on every answer, so prompt.md holds only what is specific to the business.'),
     security: securitySchema.default({}).describe('Rate limits, daily cap, Turnstile. The defaults are safe for a public site.'),
     leads: z
       .object({
@@ -221,7 +221,7 @@ export const projectSchema = z
     cloudflare: z
       .object({
         accountId: z.string().regex(/^[0-9a-f]{32}$/).optional().describe('The Cloudflare account deployed to.'),
-        workerName: z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/).optional().describe('The Worker\'s name. Default: knowtific-murmur-<site>.'),
+        workerName: z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/).optional().describe('The Worker\'s name. Default: knowtific-helppuff-<site>.'),
         url: z.string().url().optional().describe('Where the Worker answers.'),
         kvNamespaceId: z.string().optional().describe('The KV namespace (live config, new-conversation counters).'),
         d1DatabaseId: z.string().optional().describe('The D1 database (conversations, leads, knowledge).'),
@@ -229,7 +229,7 @@ export const projectSchema = z
       })
       .strict()
       .default({})
-      .describe('Written by `murmur deploy`. Safe to commit; holds no secrets.'),
+      .describe('Written by `helppuff deploy`. Safe to commit; holds no secrets.'),
   })
   .strict();
 
@@ -238,7 +238,7 @@ export type ProjectInput = z.input<typeof projectSchema>;
 
 export type LoadedProject = { dir: string; file: string; project: Project; raw: Record<string, unknown> };
 
-/** Walk up from `start` to the nearest murmur.json. */
+/** Walk up from `start` to the nearest helppuff.json. */
 export function findProjectDir(start: string): string | null {
   let dir = resolve(start);
   for (;;) {
@@ -253,7 +253,7 @@ export function loadProject(cwd: string): LoadedProject {
   const dir = findProjectDir(cwd);
   if (!dir) {
     throw new CliError('no_project', `No ${PROJECT_FILE} found in ${cwd} or any parent folder.`, {
-      hint: 'Run `murmur init` to create one.',
+      hint: 'Run `helppuff init` to create one.',
     });
   }
   const file = join(dir, PROJECT_FILE);
@@ -263,7 +263,7 @@ export function loadProject(cwd: string): LoadedProject {
   } catch (thrown) {
     throw new CliError('invalid_project', `${PROJECT_FILE} is not valid JSON: ${(thrown as Error).message}`);
   }
-  // An older format is read as the current one; `murmur upgrade` saves it.
+  // An older format is read as the current one; `helppuff upgrade` saves it.
   raw = upgradeProjectFile(raw).raw;
   return { dir, file, project: parseProject(raw), raw };
 }
@@ -273,7 +273,7 @@ export function parseProject(raw: unknown): Project {
   if (!parsed.success) {
     const problems = parsed.error.issues.map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`);
     throw new CliError('invalid_project', `${PROJECT_FILE} has ${problems.length} problem(s):\n  ${problems.join('\n  ')}`, {
-      hint: 'Fix the fields above, or run `murmur schema` to see every allowed field.',
+      hint: 'Fix the fields above, or run `helppuff schema` to see every allowed field.',
       details: { problems },
     });
   }
@@ -283,7 +283,7 @@ export function parseProject(raw: unknown): Project {
 /**
  * Write the project back. Keys the user wrote are kept in their order and
  * fields left at their default are not expanded into the file, so a diff of
- * murmur.json only ever shows what actually changed.
+ * helppuff.json only ever shows what actually changed.
  */
 export function saveProject(dir: string, next: ProjectInput): void {
   parseProject(next);
@@ -317,7 +317,7 @@ export function aiSearchInstanceFor(project: Project): string | null {
 
 export function usesAnthropicKnowledge(project: Project): boolean {
   const backend = project.backend;
-  if (backend.type !== 'anthropic' || backend.retrieval === 'murmur') return false;
+  if (backend.type !== 'anthropic' || backend.retrieval === 'helppuff') return false;
   if (backend.knowledge !== undefined) return backend.knowledge;
   return Boolean(backend.endpoint || backend.instance || hasKnowledge(project));
 }
@@ -329,29 +329,29 @@ export function hasKnowledge(project: Project): boolean {
 export const usesWorkersAi = (project: Project) => project.backend.type === 'workers-ai';
 
 /**
- * Murmur's own knowledge base is deployed (Vectorize, the crawl Workflow,
+ * HelpPuff's own knowledge base is deployed (Vectorize, the crawl Workflow,
  * the setup link): always for workers-ai, and for openai / gemini /
- * anthropic with `retrieval: "murmur"` — retrieval stays on Cloudflare and
+ * anthropic with `retrieval: "helppuff"` — retrieval stays on Cloudflare and
  * only generation moves to the provider.
  */
-export const usesMurmurKnowledge = (project: Project) =>
-  usesWorkersAi(project) || ('retrieval' in project.backend && project.backend.retrieval === 'murmur');
+export const usesHelpPuffKnowledge = (project: Project) =>
+  usesWorkersAi(project) || ('retrieval' in project.backend && project.backend.retrieval === 'helppuff');
 
 /**
  * Whether this project deploys the dashboard. With workers-ai the first
  * account is created from the setup link, so no admin email is needed up
- * front; the other backends still name the owner in murmur.json.
+ * front; the other backends still name the owner in helppuff.json.
  */
 export function dashboardEnabled(project: Project): boolean {
-  return project.dashboard.enabled && (Boolean(project.dashboard.adminEmail) || usesMurmurKnowledge(project));
+  return project.dashboard.enabled && (Boolean(project.dashboard.adminEmail) || usesHelpPuffKnowledge(project));
 }
 
 /** D1 holds the dashboard and, for workers-ai, the knowledge base. */
 export function needsDatabase(project: Project): boolean {
-  return dashboardEnabled(project) || usesMurmurKnowledge(project);
+  return dashboardEnabled(project) || usesHelpPuffKnowledge(project);
 }
 
 /** The Vectorize index a workers-ai project uses. */
 export function vectorizeIndexFor(project: Project): string | null {
-  return usesMurmurKnowledge(project) ? (project.cloudflare.vectorizeIndex ?? resourceName(project.site)) : null;
+  return usesHelpPuffKnowledge(project) ? (project.cloudflare.vectorizeIndex ?? resourceName(project.site)) : null;
 }

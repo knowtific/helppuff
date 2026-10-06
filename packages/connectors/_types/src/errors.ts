@@ -1,4 +1,4 @@
-import type { ErrorCode } from '@murmur/protocol';
+import type { ErrorCode } from '@helppuff/protocol';
 
 /**
  * The only error a connector should throw. `message` is shown to the visitor,

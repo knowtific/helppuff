@@ -7,10 +7,10 @@ import {
   type PollResponse,
   type SendResponse,
   type StreamedSendDone,
-} from '@murmur/protocol';
-import { isCallbackForm } from '@murmur/connector-types';
+} from '@helppuff/protocol';
+import { isCallbackForm } from '@helppuff/connector-types';
 import { resolveSite } from '../config/site.js';
-import { MurmurError } from '../core/errors.js';
+import { HelpPuffError } from '../core/errors.js';
 import { assertAllowedOrigin } from '../core/origin.js';
 import { requireSecret, type RequestCtx, type HonoEnv } from '../core/request.js';
 import { connectorContext, prepareConnector, runConnector, type PreparedConnector } from '../core/run.js';
@@ -39,7 +39,7 @@ async function authenticate(ctx: RequestCtx, authorization: string | undefined):
   const secret = requireSecret(ctx);
 
   const token = authorization?.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
-  if (!token) throw new MurmurError('unauthorized', { detail: 'token_missing' });
+  if (!token) throw new HelpPuffError('unauthorized', { detail: 'token_missing' });
 
   const payload = await verifyToken(secret, token, ctx.platform.now());
   const site = await resolveSite(ctx, payload.siteId);
@@ -61,18 +61,18 @@ async function refreshToken(ctx: RequestCtx, session: Session, state: unknown, c
 }
 
 messageRoutes.post('/v1/sessions/messages', async (c) => {
-  const ctx = c.get('mm');
+  const ctx = c.get('helppuff');
   const session = await ctx.timing.span('auth', () => authenticate(ctx, c.req.header('Authorization')));
   const { site, payload } = session;
 
   // 3. Body shape and length cap.
   const parsed = sendRequestSchema.safeParse(await readJsonBody(c.req.raw));
-  if (!parsed.success) throw new MurmurError('bad_request', { detail: 'send_body_invalid' });
+  if (!parsed.success) throw new HelpPuffError('bad_request', { detail: 'send_body_invalid' });
   const input = parsed.data;
 
   const length = input.kind === 'text' ? input.text.length : input.value.length;
   if (length > site.security.limits.maxMessageLength) {
-    throw new MurmurError('bad_request', {
+    throw new HelpPuffError('bad_request', {
       message: 'That message is a little too long.',
       detail: 'message_too_long',
     });
@@ -202,12 +202,12 @@ messageRoutes.post('/v1/sessions/messages', async (c) => {
 });
 
 messageRoutes.get('/v1/sessions/messages', async (c) => {
-  const ctx = c.get('mm');
+  const ctx = c.get('helppuff');
   const session = await authenticate(ctx, c.req.header('Authorization'));
   const poll = session.prepared.connector.poll;
 
   if (!poll) {
-    throw new MurmurError('bad_request', { detail: 'poll_not_supported' });
+    throw new HelpPuffError('bad_request', { detail: 'poll_not_supported' });
   }
 
   const after = c.req.query('after');
@@ -222,7 +222,7 @@ messageRoutes.get('/v1/sessions/messages', async (c) => {
 
 /** Best effort, fire-and-forget: the visitor's response never waits on it. */
 messageRoutes.post('/v1/sessions/end', async (c) => {
-  const ctx = c.get('mm');
+  const ctx = c.get('helppuff');
   const session = await authenticate(ctx, c.req.header('Authorization'));
   const end = session.prepared.connector.end;
 
@@ -242,16 +242,16 @@ messageRoutes.post('/v1/sessions/end', async (c) => {
 
 /** Thumbs up or down on a reply. Stored with the conversation for the dashboard. */
 messageRoutes.post('/v1/sessions/feedback', async (c) => {
-  const ctx = c.get('mm');
+  const ctx = c.get('helppuff');
   const session = await authenticate(ctx, c.req.header('Authorization'));
   const parsed = feedbackRequestSchema.safeParse(await readJsonBody(c.req.raw));
-  if (!parsed.success) throw new MurmurError('bad_request', { detail: 'feedback_body_invalid' });
+  if (!parsed.success) throw new HelpPuffError('bad_request', { detail: 'feedback_body_invalid' });
   const db = dbFrom(ctx.env);
-  if (!db) throw new MurmurError('not_found', { detail: 'feedback_not_recorded' });
+  if (!db) throw new HelpPuffError('not_found', { detail: 'feedback_not_recorded' });
   const perIp = await hitWindow(ctx.platform.kv, 'fb', `${session.payload.siteId}:${await ctx.ipKey()}`, 30, 60);
   if (!perIp.allowed) throw rateLimited(perIp, 'feedback_per_ip');
   const found = await recordFeedback(db, session.payload.sessionId, parsed.data.messageId, parsed.data.value);
-  if (!found) throw new MurmurError('not_found', { detail: 'feedback_message_unknown' });
+  if (!found) throw new HelpPuffError('not_found', { detail: 'feedback_message_unknown' });
   emit(ctx, session.payload.siteId, 'feedback.received', {
     conversationId: session.payload.sessionId,
     messageId: parsed.data.messageId,

@@ -17,8 +17,8 @@ const FIXTURES = [
 /** Computed styles the host page tries hardest to corrupt. */
 async function widgetStyle(page: Page) {
   return page.evaluate(() => {
-    const root = document.querySelector('murmur-widget')?.shadowRoot;
-    const orb = root?.querySelector('.mm-orb') as HTMLElement | null;
+    const root = document.querySelector('helppuff-widget')?.shadowRoot;
+    const orb = root?.querySelector('.hp-orb') as HTMLElement | null;
     if (!orb) return null;
     const style = getComputedStyle(orb);
     const box = orb.getBoundingClientRect();
@@ -99,10 +99,10 @@ test.describe('the host page is left alone', () => {
       // The widget must not touch history.
       pushCalls: (window as never as { __pushCalls?: number }).__pushCalls ?? 0,
       headStyles: document.head.querySelectorAll('style,link[rel=stylesheet]').length,
-      // Exactly one global. `__MURMUR_*` are Vite's build-time constants,
+      // Exactly one global. `__HELPPUFF_*` are Vite's build-time constants,
       // which exist only on the dev server — the shipped bundle inlines them,
       // which `e2e/bundle.spec.ts` asserts against dist/.
-      murmurGlobals: Object.keys(window).filter((k) => /murmur/i.test(k) && !k.startsWith('__')),
+      helppuffGlobals: Object.keys(window).filter((k) => /helppuff/i.test(k) && !k.startsWith('__')),
       // Silent at default verbosity.
       consoleCalls: (window as never as { __consoleCalls?: number }).__consoleCalls ?? 0,
     }));
@@ -111,14 +111,14 @@ test.describe('the host page is left alone', () => {
     expect(report.fetchUsed, 'widget should go through the page fetch').toBeGreaterThan(0);
     expect(report.pushCalls, 'widget must not call history.pushState').toBe(0);
     expect(report.headStyles).toBe(0);
-    expect(report.murmurGlobals).toEqual(['Murmur']);
+    expect(report.helppuffGlobals).toEqual(['HelpPuff']);
     expect(report.consoleCalls).toBe(0);
   });
 
   test('including the script twice creates exactly one widget', async ({ page }) => {
     await page.goto('/fixtures/double-include.html');
     await expect(launcher(page)).toBeVisible();
-    await expect(page.locator('murmur-widget')).toHaveCount(1);
+    await expect(page.locator('helppuff-widget')).toHaveCount(1);
 
     await openWidget(page);
     await expect(panel(page)).toHaveCount(1);
@@ -141,9 +141,9 @@ test.describe('SPA navigation', () => {
     // Still there, still the same conversation.
     await expect(panel(page)).toBeVisible();
     await expect(agentMessages(page).first()).toBeVisible();
-    await expect(page.locator('murmur-widget')).toHaveCount(1);
+    await expect(page.locator('helppuff-widget')).toHaveCount(1);
 
     await page.locator('#nav-home').click();
-    await expect(page.locator('murmur-widget')).toHaveCount(1);
+    await expect(page.locator('helppuff-widget')).toHaveCount(1);
   });
 });

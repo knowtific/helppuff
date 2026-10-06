@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { Lead, VisitorContext } from '@murmur/protocol';
+import type { Lead, VisitorContext } from '@helppuff/protocol';
 
 /**
  * A lead destination. Sinks run after the lead is accepted, via

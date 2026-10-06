@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
-import { PROTOCOL_VERSION } from '@murmur/protocol';
-import type { MurmurConfig } from './config/schema.js';
-import { MurmurError, toMurmurError } from './core/errors.js';
+import { PROTOCOL_VERSION } from '@helppuff/protocol';
+import type { HelpPuffConfig } from './config/schema.js';
+import { HelpPuffError, toHelpPuffError } from './core/errors.js';
 import { corsHeaders } from './core/origin.js';
 import { allConfiguredOrigins, buildRequestCtx, type HonoEnv } from './core/request.js';
 import { configRoutes } from './routes/config.js';
@@ -12,12 +12,12 @@ import { retellRoutes } from './routes/retell.js';
 import { deployedVersion } from './admin/version.js';
 import { LATEST_MIGRATION } from './db/migrations.js';
 
-export function createApp(config: MurmurConfig): Hono<HonoEnv> {
+export function createApp(config: HelpPuffConfig): Hono<HonoEnv> {
   const app = new Hono<HonoEnv>();
   const origins = allConfiguredOrigins(config);
 
   app.use('*', async (c, next) => {
-    c.set('mm', buildRequestCtx(c, config));
+    c.set('helppuff', buildRequestCtx(c, config));
 
     // CORS reflection only decides what the browser may read. Authorization is
     // enforced per site inside each route.
@@ -35,7 +35,7 @@ export function createApp(config: MurmurConfig): Hono<HonoEnv> {
   });
 
   // `version` is the release that deployed this Worker (null in development); `schema` the D1 migration it expects.
-  app.get('/healthz', (c) => c.json({ ok: true, protocol: PROTOCOL_VERSION, version: deployedVersion(c.get('mm').env), schema: LATEST_MIGRATION }));
+  app.get('/healthz', (c) => c.json({ ok: true, protocol: PROTOCOL_VERSION, version: deployedVersion(c.get('helppuff').env), schema: LATEST_MIGRATION }));
 
   app.route('/', configRoutes);
   app.route('/', sessionRoutes);
@@ -44,7 +44,7 @@ export function createApp(config: MurmurConfig): Hono<HonoEnv> {
   app.route('/', retellRoutes);
 
   app.notFound(() => {
-    throw new MurmurError('not_found', { detail: 'no_route' });
+    throw new HelpPuffError('not_found', { detail: 'no_route' });
   });
 
   /**
@@ -52,8 +52,8 @@ export function createApp(config: MurmurConfig): Hono<HonoEnv> {
    * error page — the widget's parser must always have something valid to read.
    */
   app.onError((thrown, c) => {
-    const error = toMurmurError(thrown);
-    c.get('mm')?.platform.log('request.error', {
+    const error = toHelpPuffError(thrown);
+    c.get('helppuff')?.platform.log('request.error', {
       code: error.code,
       detail: error.detail ?? 'none',
       path: c.req.path,

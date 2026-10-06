@@ -1,12 +1,12 @@
 import { readFileSync } from 'node:fs';
 
-export const PACKAGE_NAME = '@knowtific/murmur';
+export const PACKAGE_NAME = '@knowtific/helppuff';
 
 /**
  * This CLI's version, from its package.json: next to `dist/` once published
  * (dist/cli.js → ../package.json), two levels up from this file in the
- * source. It is stamped into every Worker it deploys (`MURMUR_VERSION`),
- * which is how `murmur upgrade` and the dashboard know what is running.
+ * source. It is stamped into every Worker it deploys (`HELPPUFF_VERSION`),
+ * which is how `helppuff upgrade` and the dashboard know what is running.
  */
 export const VERSION: string = (() => {
   for (const path of ['../package.json', '../../package.json']) {

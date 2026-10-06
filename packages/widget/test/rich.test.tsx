@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/preact';
-import type { Message } from '@murmur/protocol';
+import type { Message } from '@helppuff/protocol';
 import { MessageView, inertHandlers, type MessageHandlers } from '../src/components/messages/index.js';
 
 /** The rich message types. */
@@ -136,7 +136,7 @@ describe('carousel', () => {
 
   it('renders every card in a labelled group', () => {
     const { container } = setup(carousel);
-    expect(container.querySelectorAll('.mm-carousel-item')).toHaveLength(3);
+    expect(container.querySelectorAll('.hp-carousel-item')).toHaveLength(3);
     expect(screen.getByRole('group', { name: '3 options' })).toBeTruthy();
   });
 });

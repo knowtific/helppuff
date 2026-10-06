@@ -1,7 +1,7 @@
-import type { KvStore } from '@murmur/connector-types';
-import { storedSiteConfigSchema, type ConnectorConfig, type MurmurConfig, type PromptMeta, type StoredSiteConfig } from '../config/schema.js';
+import type { KvStore } from '@helppuff/connector-types';
+import { storedSiteConfigSchema, type ConnectorConfig, type HelpPuffConfig, type PromptMeta, type StoredSiteConfig } from '../config/schema.js';
 import { siteConfigKey } from '../config/site.js';
-import { MurmurError } from '../core/errors.js';
+import { HelpPuffError } from '../core/errors.js';
 import { getConnector } from '../core/registry.js';
 import type { D1Like } from '../db/d1.js';
 
@@ -9,12 +9,12 @@ import type { D1Like } from '../db/d1.js';
  * Prompt versions.
  *
  * The live prompt is the text inside the connector options of the site's KV
- * config (`config:<site>`) — exactly where `murmur deploy` has always put it,
+ * config (`config:<site>`) — exactly where `helppuff deploy` has always put it,
  * so the chat path reads it the way it always has. Alongside it, a small
  * `prompt` block records which version that text is. Every version, with
  * who published it and from where, is kept in D1.
  *
- * Two writers publish: the CLI (`murmur deploy`, from prompt.md) and the
+ * Two writers publish: the CLI (`helppuff deploy`, from prompt.md) and the
  * dashboard. Each names the version it started from, and a publish that did
  * not start from the current one is refused — so neither can silently
  * overwrite the other's change. The CLI shares this file's hash and SQL so
@@ -62,7 +62,7 @@ export const PROMPT_SQL = {
 /**
  * Where a connector config keeps its prompt, and what is in it now.
  *
- * `editable` is false when Murmur does not own the prompt (Retell, an OpenAI
+ * `editable` is false when HelpPuff does not own the prompt (Retell, an OpenAI
  * stored prompt, the owner's own API), and when the option points at another
  * source (`{ kv }`, `{ url }`, `{ env }`) that is edited elsewhere.
  */
@@ -93,7 +93,7 @@ export function promptField(connector: ConnectorConfig): {
  * then drop the site's other sections), and a write that fails must not
  * look like a success.
  */
-export type PromptCtx = { config: MurmurConfig; kv: KvStore; now: () => number };
+export type PromptCtx = { config: HelpPuffConfig; kv: KvStore; now: () => number };
 
 export type PromptState = {
   site: string;
@@ -113,7 +113,7 @@ export type PromptState = {
 /** The live prompt, read fresh (no edge cache) — a publish decision must not act on a minute-old copy. */
 export async function readPromptState(ctx: PromptCtx, db: D1Like | null, site: string): Promise<PromptState> {
   const bundled = ctx.config.sites[site];
-  if (!bundled) throw new MurmurError('not_found', { message: 'No such site.', detail: 'admin_unknown_site' });
+  if (!bundled) throw new HelpPuffError('not_found', { message: 'No such site.', detail: 'admin_unknown_site' });
 
   const raw = await ctx.kv.get(siteConfigKey(site));
   let stored: StoredSiteConfig | null = null;
@@ -161,12 +161,12 @@ export type PublishResult =
 export async function publishPrompt(ctx: PromptCtx, db: D1Like, site: string, input: PublishInput): Promise<PublishResult> {
   const state = await readPromptState(ctx, db, site);
   if (!state.editable || !state.option) {
-    throw new MurmurError('bad_request', { message: state.reason ?? 'This prompt cannot be edited here.', detail: 'prompt_not_editable' });
+    throw new HelpPuffError('bad_request', { message: state.reason ?? 'This prompt cannot be edited here.', detail: 'prompt_not_editable' });
   }
   const text = normalizePrompt(input.text);
-  if (!text) throw new MurmurError('bad_request', { message: 'The prompt is empty.', detail: 'prompt_empty' });
+  if (!text) throw new HelpPuffError('bad_request', { message: 'The prompt is empty.', detail: 'prompt_empty' });
   if (text.length > PROMPT_LIMIT) {
-    throw new MurmurError('bad_request', {
+    throw new HelpPuffError('bad_request', {
       message: `The prompt is ${text.length} characters; the limit is ${PROMPT_LIMIT}. Move reference material into the knowledge base.`,
       detail: 'prompt_too_long',
     });

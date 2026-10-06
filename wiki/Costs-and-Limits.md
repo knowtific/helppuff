@@ -1,7 +1,7 @@
 # Costs and limits
 
-Murmur runs on your Cloudflare account, so you pay Cloudflare (and your AI
-provider, if you choose one), never Murmur. The default setup fits the
+HelpPuff runs on your Cloudflare account, so you pay Cloudflare (and your AI
+provider, if you choose one), never HelpPuff. The default setup fits the
 **Workers Free plan**.
 
 ## What the Free plan gives you
@@ -21,7 +21,7 @@ answers a day:
   per-conversation and daily limits and the conversation's history are read
   from the database, which records every turn anyway.
 
-Nothing a visitor waits for is a write: everything Murmur records about a
+Nothing a visitor waits for is a write: everything HelpPuff records about a
 message (the dashboard, usage, webhooks) happens after the reply.
 
 [Workers Paid](https://developers.cloudflare.com/workers/platform/pricing/)
@@ -31,7 +31,7 @@ you directly at their own prices.
 
 ## The daily AI budget
 
-With the default backend, Murmur tracks every neuron it spends (in D1, by
+With the default backend, HelpPuff tracks every neuron it spends (in D1, by
 UTC day) and steps down gracefully instead of failing:
 
 | Spent today (of `budget.dailyNeurons`, default 9,000) | Visitors get |
@@ -43,7 +43,7 @@ UTC day) and steps down gracefully instead of failing:
 [[Webhooks]] can tell you as it happens: `budget.warning` at 80% and
 `budget.exhausted` at 100%, each once a day.
 
-It resets at 00:00 UTC. The dashboard's Knowledge page and `murmur knowledge
+It resets at 00:00 UTC. The dashboard's Knowledge page and `helppuff knowledge
 status` show today's use. On Workers Paid, raise
 `backend.budget.dailyNeurons` to whatever you are happy to spend.
 
@@ -54,7 +54,7 @@ same budget, and is skipped once the budget is spent.
 
 ## Limits that protect you
 
-All in `security` in `murmur.json`; see the [[Configuration reference|Configuration-Reference#security]].
+All in `security` in `helppuff.json`; see the [[Configuration reference|Configuration-Reference#security]].
 
 | Limit | Default | |
 | --- | --- | --- |
@@ -66,10 +66,10 @@ All in `security` in `murmur.json`; see the [[Configuration reference|Configurat
 | `sessionTtlHours` | 24 | How long a chat can be continued |
 
 You (and your coding agent) are exempt from the per-visitor limits when
-testing with `murmur chat` or `murmur ask`, never from the daily caps.
+testing with `helppuff chat` or `helppuff ask`, never from the daily caps.
 
 ## Speed
 
 A reply usually starts streaming within 1–2 seconds with the default backend.
-`murmur ask "<question>" --timing` shows where the time goes; see
+`helppuff ask "<question>" --timing` shows where the time goes; see
 [[Workers AI|Provider-Workers-AI#speed]].

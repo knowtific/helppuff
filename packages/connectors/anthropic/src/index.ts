@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
-import { ground } from '@murmur/rag';
-import type { Message, SendRequest } from '@murmur/protocol';
+import { ground } from '@helppuff/rag';
+import type { Message, SendRequest } from '@helppuff/protocol';
 import {
   ConnectorError,
   RICH_TOOL_SCHEMAS,
@@ -23,7 +23,7 @@ import {
   type ConnectorContext,
   type PromptScope,
   type Turn,
-} from '@murmur/connector-types';
+} from '@helppuff/connector-types';
 
 /**
  * Claude, through the Anthropic Messages API and the official SDK.
@@ -60,8 +60,8 @@ export const anthropicOptionsSchema = z.object({
   /** Retry a safety decline on another model, server-side. Opus 5 / Fable 5.1 only. */
   fallbacks: z.boolean().default(true),
   /** Retrieve from a Cloudflare AI Search instance before each answer. */
-  /** `murmur`: retrieve from Murmur's own knowledge base (Vectorize + D1) instead of AI Search. */
-  retrieval: z.literal('murmur').optional(),
+  /** `helppuff`: retrieve from HelpPuff's own knowledge base (Vectorize + D1) instead of AI Search. */
+  retrieval: z.literal('helppuff').optional(),
   knowledge: aiSearchSourceSchema
     .extend({ maxResults: z.number().int().min(1).max(20).default(6) })
     .optional(),
@@ -106,7 +106,7 @@ type SearchChunk = { text?: unknown; item?: { key?: unknown } };
  * documents — so errors are logged and swallowed.
  */
 async function retrieve(ctx: ConnectorContext<AnthropicOptions>, history: Turn[], input: string): Promise<string> {
-  if (ctx.options.retrieval === 'murmur') {
+  if (ctx.options.retrieval === 'helppuff') {
     const grounding = await ground(ctx.env, ctx.siteId, input, { log: ctx.log, waitUntil: ctx.waitUntil });
     return grounding ? `<knowledge>\n${grounding.block}\n</knowledge>` : '';
   }

@@ -1,6 +1,6 @@
-import { readSse } from '@murmur/protocol';
-import { CONNECTOR_TIMEOUT_MS } from '@murmur/connector-types';
-import { reasoningInputs, thinkingRoom, type AiLike, type Reasoning } from '@murmur/rag';
+import { readSse } from '@helppuff/protocol';
+import { CONNECTOR_TIMEOUT_MS } from '@helppuff/connector-types';
+import { reasoningInputs, thinkingRoom, type AiLike, type Reasoning } from '@helppuff/rag';
 
 /**
  * One chat completion through the Workers AI binding.

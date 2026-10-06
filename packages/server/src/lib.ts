@@ -1,10 +1,10 @@
-/** Public entry for `murmur.config.ts` and for embedding the app elsewhere. */
+/** Public entry for `helppuff.config.ts` and for embedding the app elsewhere. */
 export { defineConfig, getSite, resolveSecrets, collectSecretNames } from './config/load.js';
 export { resolveSite, siteConfigKey, SITE_CONFIG_PREFIX } from './config/site.js';
 export * from './config/schema.js';
 export { createApp } from './app.js';
 export { createWorker } from './worker.js';
-export { MurmurError, isMurmurError, toMurmurError } from './core/errors.js';
+export { HelpPuffError, isHelpPuffError, toHelpPuffError } from './core/errors.js';
 export { memoryKv, resilientKv, hashIp, type Platform } from './core/platform.js';
 export { connectors, sinks, getConnector } from './core/registry.js';
 export { issueToken, verifyToken, newSessionId, type SessionTokenPayload } from './core/token.js';

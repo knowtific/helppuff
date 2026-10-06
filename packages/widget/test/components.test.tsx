@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/preact';
-import type { Message, WidgetConfig } from '@murmur/protocol';
+import type { Message, WidgetConfig } from '@helppuff/protocol';
 import { Composer } from '../src/components/Composer.js';
 import { ErrorNotice } from '../src/components/ErrorNotice.js';
 import { Header } from '../src/components/Header.js';
@@ -40,9 +40,9 @@ describe('Launcher', () => {
 
   it('shows an unread dot only while closed', () => {
     const { container, rerender } = render(<Launcher config={config()} open={false} unread={2} onClick={() => {}} />);
-    expect(container.querySelector('.mm-dot')).toBeTruthy();
+    expect(container.querySelector('.hp-dot')).toBeTruthy();
     rerender(<Launcher config={config()} open unread={2} onClick={() => {}} />);
-    expect(container.querySelector('.mm-dot')).toBeNull();
+    expect(container.querySelector('.hp-dot')).toBeNull();
   });
 
   it('reports expanded once open', () => {
@@ -121,9 +121,9 @@ describe('Thread', () => {
     ];
     const { container } = render(<Thread messages={messages} busy={false} pendingIds={new Set()} handlers={inertHandlers} t={t} />);
 
-    expect(container.querySelector('.mm-agent strong')?.textContent).toBe('there');
+    expect(container.querySelector('.hp-agent strong')?.textContent).toBe('there');
     // A user's own text is never parsed as markdown.
-    const user = container.querySelector('.mm-user');
+    const user = container.querySelector('.hp-user');
     expect(user?.textContent).toBe('Hi **back**');
     expect(user?.querySelector('strong')).toBeNull();
   });
@@ -149,16 +149,16 @@ describe('Thread', () => {
     const { container } = render(
       <Thread messages={[msg({ type: 'notice', text: 'Careful', tone: 'warn', role: 'system' })]} busy={false} pendingIds={new Set()} handlers={inertHandlers} t={t} />,
     );
-    expect(container.querySelector('.mm-notice')?.getAttribute('data-tone')).toBe('warn');
+    expect(container.querySelector('.hp-notice')?.getAttribute('data-tone')).toBe('warn');
   });
 
   it('renders nothing at all for a message type it cannot draw', () => {
     const unknown = { id: 'x', ts: 1, role: 'agent', type: 'hologram' } as unknown as Message;
     const { container } = render(<Thread messages={[unknown]} busy={false} pendingIds={new Set()} handlers={inertHandlers} t={t} />);
-    expect(container.querySelector('.mm-agent')).toBeNull();
+    expect(container.querySelector('.hp-agent')).toBeNull();
     // Regression: an empty row still costs a fade-in, a gap and a timestamp,
     // which a visitor sees as something flashing and vanishing.
-    expect(container.querySelector('.mm-row')).toBeNull();
+    expect(container.querySelector('.hp-row')).toBeNull();
   });
 
   it('keeps grouping correct across a message it cannot draw', () => {
@@ -171,7 +171,7 @@ describe('Thread', () => {
     const { container } = render(
       <Thread messages={messages} busy={false} pendingIds={new Set()} handlers={inertHandlers} t={t} />,
     );
-    const rows = [...container.querySelectorAll('.mm-row')];
+    const rows = [...container.querySelectorAll('.hp-row')];
     expect(rows).toHaveLength(2);
     // The two text messages are still adjacent, so the second groups.
     expect(rows[1]?.hasAttribute('data-grouped')).toBe(true);
@@ -179,9 +179,9 @@ describe('Thread', () => {
 
   it('shows the typing indicator only while busy', () => {
     const { container, rerender } = render(<Thread messages={[]} busy pendingIds={new Set()} handlers={inertHandlers} t={t} />);
-    expect(container.querySelector('.mm-typing')).toBeTruthy();
+    expect(container.querySelector('.hp-typing')).toBeTruthy();
     rerender(<Thread messages={[]} busy={false} pendingIds={new Set()} handlers={inertHandlers} t={t} />);
-    expect(container.querySelector('.mm-typing')).toBeNull();
+    expect(container.querySelector('.hp-typing')).toBeNull();
   });
 });
 
@@ -254,11 +254,11 @@ describe('Composer', () => {
     const { rerender, container } = render(
       <Composer value={'x'.repeat(899)} disabled={false} offline={false} placeholder="" t={t} onInput={() => {}} onSend={() => {}} />,
     );
-    expect(container.querySelector('.mm-counter')).toBeNull();
+    expect(container.querySelector('.hp-counter')).toBeNull();
     rerender(
       <Composer value={'x'.repeat(901)} disabled={false} offline={false} placeholder="" t={t} onInput={() => {}} onSend={() => {}} />,
     );
-    expect(container.querySelector('.mm-counter')?.textContent).toBe('99');
+    expect(container.querySelector('.hp-counter')?.textContent).toBe('99');
   });
 
   it('uses a 16px font so iOS does not zoom the host page', () => {
@@ -266,7 +266,7 @@ describe('Composer', () => {
       <Composer value="" disabled={false} offline={false} placeholder="" t={t} onInput={() => {}} onSend={() => {}} />,
     );
     // The rule lives in the stylesheet; assert the class the rule targets.
-    expect(container.querySelector('.mm-composer textarea')).toBeTruthy();
+    expect(container.querySelector('.hp-composer textarea')).toBeTruthy();
   });
 });
 
@@ -497,20 +497,20 @@ describe('theming', () => {
   it('derives a readable foreground for a light accent', async () => {
     const { themeOverrides } = await import('../src/styles/tokens.js');
     const css = themeOverrides(config({ brand: { accent: '#F4C20D' } }));
-    expect(css).toContain('--mm-accent:#F4C20D');
+    expect(css).toContain('--hp-accent:#F4C20D');
     // Yellow needs dark text, not the default white.
-    expect(css).toContain('--mm-accent-fg:#111114');
+    expect(css).toContain('--hp-accent-fg:#111114');
   });
 
   it('derives a readable foreground for a dark accent', async () => {
     const { themeOverrides } = await import('../src/styles/tokens.js');
-    expect(themeOverrides(config({ brand: { accent: '#111114' } }))).toContain('--mm-accent-fg:#FFFFFF');
+    expect(themeOverrides(config({ brand: { accent: '#111114' } }))).toContain('--hp-accent-fg:#FFFFFF');
   });
 
   it('passes through only allowlisted token overrides', async () => {
     const { themeOverrides } = await import('../src/styles/tokens.js');
     const css = themeOverrides(config({ brand: { tokens: { 'radius-md': '4px' } } }));
-    expect(css).toContain('--mm-radius-md:4px');
+    expect(css).toContain('--hp-radius-md:4px');
   });
 });
 
@@ -529,12 +529,12 @@ describe('stylesheet assembly', () => {
     const site = config({ brand: { accent: '#0F9D58' } });
     const sheet = BASE_TOKENS + RESET + LOADER_CSS + WIDGET_CSS + themeOverrides(site);
 
-    const override = sheet.lastIndexOf('--mm-accent:#0F9D58');
+    const override = sheet.lastIndexOf('--hp-accent:#0F9D58');
     expect(override, 'the site accent must be present').toBeGreaterThan(-1);
 
     // No later declaration of the same token may follow it.
     const after = sheet.slice(override + 1);
-    expect(after).not.toMatch(/--mm-accent\s*:/);
+    expect(after).not.toMatch(/--hp-accent\s*:/);
   });
 });
 

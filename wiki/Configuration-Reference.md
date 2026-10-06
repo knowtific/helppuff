@@ -1,9 +1,9 @@
-<!-- Generated from the murmur.json schema by `pnpm sync:plugin`. Change a field's `.describe()`, not this page. -->
+<!-- Generated from the helppuff.json schema by `pnpm sync:plugin`. Change a field's `.describe()`, not this page. -->
 
 # Configuration reference
 
-Every field of `murmur.json`. Generated from the schema `murmur` validates against, so it is
-always exact; `murmur schema` prints the same as JSON Schema. For what these files are and how
+Every field of `helppuff.json`. Generated from the schema `helppuff` validates against, so it is
+always exact; `helppuff schema` prints the same as JSON Schema. For what these files are and how
 they relate to the dashboard, see [[Configuration]].
 
 Secrets are never values here: a field marked `{ env }` takes the name of an environment
@@ -13,14 +13,14 @@ variable, e.g. `{ "env": "OPENAI_API_KEY" }`, whose value lives in `.env` and on
 
 | Field | Type | Default | Description |
 | --- | --- | --- | --- |
-| `$schema` | string |  | The JSON Schema for editors and agents. Written by murmur. |
-| `format` | integer |  | The murmur.json format version. Absent means 1; `murmur upgrade` updates it when a release changes the format. · ≥ 1 |
+| `$schema` | string |  | The JSON Schema for editors and agents. Written by helppuff. |
+| `format` | integer |  | The helppuff.json format version. Absent means 1; `helppuff upgrade` updates it when a release changes the format. · ≥ 1 |
 | `site` **(required)** | string |  | Site id: lowercase letters, digits and dashes. Appears in the embed snippet. |
 | `name` **(required)** | string |  | The business name, as visitors see it. · 1–60 chars |
 | `website` | string |  | The website the assistant is for, and learns from. · URL |
 | `origins` **(required)** | string[] |  | Every origin the widget may be embedded on. The preview page is added automatically. · ≥ 1 items |
-| `prompt` | string | `"prompt.md"` | Path to the system prompt, relative to murmur.json. |
-| `assistant` | object | `{}` | How the assistant behaves: goal, tone, answer length. Murmur writes these around prompt.md on every answer, so prompt.md holds only what is specific to the business. |
+| `prompt` | string | `"prompt.md"` | Path to the system prompt, relative to helppuff.json. |
+| `assistant` | object | `{}` | How the assistant behaves: goal, tone, answer length. HelpPuff writes these around prompt.md on every answer, so prompt.md holds only what is specific to the business. |
 | `assistant.goal` | `"callbacks"` \| `"answers"` \| `"bookings"` | `"callbacks"` | What the assistant is for: `callbacks` (help, then get the team in touch), `answers`, or `bookings`. |
 | `assistant.tone` | `"friendly"` \| `"professional"` \| `"casual"` | `"friendly"` | How it sounds. |
 | `assistant.length` | `"short"` \| `"detailed"` | `"short"` | `short`: a few sentences; `detailed`: complete answers with short lists. |
@@ -33,7 +33,7 @@ What answers visitors. `type` picks it; the other fields depend on the type.
 
 ### `"type": "workers-ai"`
 
-Workers AI with Murmur's own knowledge base. The default; runs on the Workers Free plan.
+Workers AI with HelpPuff's own knowledge base. The default; runs on the Workers Free plan.
 
 | Field | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -87,7 +87,7 @@ Cloudflare AI Search: retrieval and generation managed by Cloudflare.
 
 | Field | Type | Default | Description |
 | --- | --- | --- | --- |
-| `backend.instance` | string |  | Instance name on your account. Created by `murmur deploy` if it does not exist. |
+| `backend.instance` | string |  | Instance name on your account. Created by `helppuff deploy` if it does not exist. |
 | `backend.endpoint` | string |  | Use an existing public endpoint instead of a binding, e.g. https://search.example.com · URL |
 | `backend.model` | string |  | Workers AI model id, or an AI Gateway alias. Empty uses the instance's own model. |
 | `backend.maxResults` | integer |  | Passages AI Search retrieves per question. · 1–50 |
@@ -100,8 +100,8 @@ OpenAI (Responses API), or any compatible endpoint with `baseUrl`.
 | --- | --- | --- | --- |
 | `backend.model` | string | `"gpt-5-mini"` | The OpenAI model. |
 | `backend.apiKey` | `{ env }` | `{"env":"OPENAI_API_KEY"}` | Your OpenAI API key, by environment variable name. |
-| `backend.vectorStoreId` | string |  | Filled in by `murmur knowledge sync`. |
-| `backend.retrieval` | `"murmur"` |  | `murmur`: answer from Murmur's own knowledge base (crawled by the Worker) instead of a vector store. |
+| `backend.vectorStoreId` | string |  | Filled in by `helppuff knowledge sync`. |
+| `backend.retrieval` | `"helppuff"` |  | `helppuff`: answer from HelpPuff's own knowledge base (crawled by the Worker) instead of a vector store. |
 | `backend.promptId` | string |  | A stored prompt in the OpenAI dashboard; overrides prompt.md. |
 | `backend.baseUrl` | string |  | Another OpenAI-compatible Responses endpoint, e.g. Azure OpenAI. · URL |
 
@@ -113,12 +113,12 @@ Google Gemini, with File Search.
 | --- | --- | --- | --- |
 | `backend.model` | string | `"gemini-3-flash"` | The Gemini model. |
 | `backend.apiKey` | `{ env }` | `{"env":"GEMINI_API_KEY"}` | Your Gemini API key, by environment variable name. |
-| `backend.fileSearchStore` | string |  | Filled in by `murmur knowledge sync`. |
-| `backend.retrieval` | `"murmur"` |  | `murmur`: answer from Murmur's own knowledge base instead of File Search. |
+| `backend.fileSearchStore` | string |  | Filled in by `helppuff knowledge sync`. |
+| `backend.retrieval` | `"helppuff"` |  | `helppuff`: answer from HelpPuff's own knowledge base instead of File Search. |
 
 ### `"type": "anthropic"`
 
-Anthropic Claude, grounded in AI Search or Murmur's own knowledge base.
+Anthropic Claude, grounded in AI Search or HelpPuff's own knowledge base.
 
 | Field | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -126,8 +126,8 @@ Anthropic Claude, grounded in AI Search or Murmur's own knowledge base.
 | `backend.apiKey` | `{ env }` | `{"env":"ANTHROPIC_API_KEY"}` | Your Anthropic API key, by environment variable name. |
 | `backend.effort` | `"low"` \| `"medium"` \| `"high"` \| `"xhigh"` \| `"max"` |  | How hard Claude thinks before answering. Lower is faster and cheaper. |
 | `backend.knowledge` | boolean |  | Ground answers in a Cloudflare AI Search instance. On by default when there is knowledge. |
-| `backend.retrieval` | `"murmur"` |  | `murmur`: ground answers in Murmur's own knowledge base instead of AI Search. |
-| `backend.instance` | string |  | Instance name on your account. Created by `murmur deploy` if it does not exist. |
+| `backend.retrieval` | `"helppuff"` |  | `helppuff`: ground answers in HelpPuff's own knowledge base instead of AI Search. |
+| `backend.instance` | string |  | Instance name on your account. Created by `helppuff deploy` if it does not exist. |
 | `backend.endpoint` | string |  | Use an existing public endpoint instead of a binding, e.g. https://search.example.com · URL |
 
 ### `"type": "http"`
@@ -137,7 +137,7 @@ Your own API.
 | Field | Type | Default | Description |
 | --- | --- | --- | --- |
 | `backend.url` **(required)** | string |  | Your API's base URL. · URL |
-| `backend.mode` | `"murmur"` \| `"openai"` | `"murmur"` | `murmur`: your API speaks the Murmur backend protocol. `openai`: any /chat/completions endpoint. |
+| `backend.mode` | `"helppuff"` \| `"openai"` | `"helppuff"` | `helppuff`: your API speaks the HelpPuff backend protocol. `openai`: any /chat/completions endpoint. |
 | `backend.model` | string |  | `openai` mode: the model name your endpoint expects. |
 | `backend.token` | `{ env }` |  | Sent as `Authorization: Bearer …`. |
 | `backend.signingSecret` | `{ env }` |  | Signs every request with HMAC-SHA256 so your API can verify it. |
@@ -151,7 +151,7 @@ A Retell chat agent.
 | --- | --- | --- | --- |
 | `backend.agentId` **(required)** | string |  | The Retell chat agent id. |
 | `backend.apiKey` | `{ env }` | `{"env":"RETELL_API_KEY"}` | Your Retell API key, by environment variable name. |
-| `backend.retrieval` | `"murmur"` |  | `murmur`: crawl the site into Murmur's knowledge base; the agent searches it via a custom function (see `murmur status`). |
+| `backend.retrieval` | `"helppuff"` |  | `helppuff`: crawl the site into HelpPuff's knowledge base; the agent searches it via a custom function (see `helppuff status`). |
 
 ### `"type": "echo"`
 
@@ -172,7 +172,7 @@ What the assistant learns from: the website, and your own files.
 | `knowledge.website.exclude` | string[] |  | Never crawl URLs matching one of these. Defaults leave out privacy, terms, tags, carts and accounts. |
 | `knowledge.website.renderJs` | `"auto"` \| `"always"` \| `"never"` |  | workers-ai: render pages drawn by JavaScript with Browser Rendering (`auto` = only when needed). |
 | `knowledge.website.schedule` | `"off"` \| `"daily"` \| `"weekly"` \| `"monthly"` |  | workers-ai: re-crawl the selected pages on this schedule. |
-| `knowledge.files` | string[] | `[]` | Files and folders to index, relative to murmur.json. PDF, Markdown, text, HTML, DOCX. |
+| `knowledge.files` | string[] | `[]` | Files and folders to index, relative to helppuff.json. PDF, Markdown, text, HTML, DOCX. |
 
 ## `security`
 
@@ -212,12 +212,12 @@ The dashboard at <worker>/admin: conversations, leads, knowledge, analytics and 
 
 ## `cloudflare`
 
-Written by `murmur deploy`. Safe to commit; holds no secrets.
+Written by `helppuff deploy`. Safe to commit; holds no secrets.
 
 | Field | Type | Default | Description |
 | --- | --- | --- | --- |
 | `cloudflare.accountId` | string |  | The Cloudflare account deployed to. |
-| `cloudflare.workerName` | string |  | The Worker's name. Default: knowtific-murmur-<site>. |
+| `cloudflare.workerName` | string |  | The Worker's name. Default: knowtific-helppuff-<site>. |
 | `cloudflare.url` | string |  | Where the Worker answers. · URL |
 | `cloudflare.kvNamespaceId` | string |  | The KV namespace (live config, new-conversation counters). |
 | `cloudflare.d1DatabaseId` | string |  | The D1 database (conversations, leads, knowledge). |
@@ -225,7 +225,7 @@ Written by `murmur deploy`. Safe to commit; holds no secrets.
 
 ## `widget`
 
-Brand, launcher, home screen, lead form, flows — see `murmur schema`.
+Brand, launcher, home screen, lead form, flows — see `helppuff schema`.
 
 ### `widget.brand`
 
@@ -238,7 +238,7 @@ Names, colour and theme.
 | `widget.brand.avatar` | string |  | The assistant's picture: a square image URL. · 1–2048 chars |
 | `widget.brand.accent` | string | `"#5B5BF7"` | The main colour (hex). Text on it is made readable automatically. |
 | `widget.brand.theme` | `"light"` \| `"dark"` \| `"auto"` | `"auto"` | `auto` follows the visitor's system setting. |
-| `widget.brand.tokens` | map of string |  | Fine-grained styling: CSS custom properties without the `--mm-` prefix, e.g. `{ "radius-panel": "12px", "font": "Inter, sans-serif" }`. |
+| `widget.brand.tokens` | map of string |  | Fine-grained styling: CSS custom properties without the `--hp-` prefix, e.g. `{ "radius-panel": "12px", "font": "Inter, sans-serif" }`. |
 
 ### `widget.launcher`
 

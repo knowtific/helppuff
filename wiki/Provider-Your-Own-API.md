@@ -2,16 +2,16 @@
 
 `"backend": { "type": "http" }`
 
-Put Murmur's widget, dashboard, leads and webhooks in front of anything you
+Put HelpPuff's widget, dashboard, leads and webhooks in front of anything you
 have built: your own agent, a LangChain or LlamaIndex app, a local model, a
-gateway. Nothing about your stack goes into Murmur, and you need no fork.
+gateway. Nothing about your stack goes into HelpPuff, and you need no fork.
 
 Two shapes, chosen with `mode`.
 
 ## `mode: "openai"`: any Chat Completions endpoint
 
 vLLM, Ollama, LiteLLM, OpenRouter, DeepSeek, Together, or your own
-OpenAI-compatible server. Murmur keeps the conversation history (from its
+OpenAI-compatible server. HelpPuff keeps the conversation history (from its
 record of the conversation in D1, or KV without a database) and sends
 `prompt.md` as the system message.
 
@@ -21,13 +21,13 @@ record of the conversation in D1, or KV without a database) and sends
   "mode": "openai",
   "url": "https://llm.acme.com/v1",
   "model": "llama-3.3-70b",
-  "token": { "env": "MURMUR_BACKEND_TOKEN" }
+  "token": { "env": "HELPPUFF_BACKEND_TOKEN" }
 }
 ```
 
-## `mode: "murmur"`: your service owns everything
+## `mode: "helppuff"`: your service owns everything
 
-Your service decides what to say; Murmur carries the messages. It POSTs:
+Your service decides what to say; HelpPuff carries the messages. It POSTs:
 
 ```
 POST {url}/start    { siteId, sessionId, lead?, context, firstMessage? }
@@ -74,29 +74,29 @@ the conversation.
 ### Authentication
 
 - `token`: sent as `Authorization: Bearer …`. Store it with
-  `murmur secret set MURMUR_BACKEND_TOKEN`.
-- `signingSecret`: every request also carries `X-Murmur-Timestamp` and
-  `X-Murmur-Signature: sha256=<hex HMAC-SHA256 of "<timestamp>.<body>">`, so
+  `helppuff secret set HELPPUFF_BACKEND_TOKEN`.
+- `signingSecret`: every request also carries `X-HelpPuff-Timestamp` and
+  `X-HelpPuff-Signature: sha256=<hex HMAC-SHA256 of "<timestamp>.<body>">`, so
   your service can check the call came from your Worker.
 
 ```json
 "backend": {
   "type": "http",
-  "mode": "murmur",
-  "url": "https://agent.acme.com/murmur",
-  "token": { "env": "MURMUR_BACKEND_TOKEN" },
-  "signingSecret": { "env": "MURMUR_BACKEND_SECRET" }
+  "mode": "helppuff",
+  "url": "https://agent.acme.com/helppuff",
+  "token": { "env": "HELPPUFF_BACKEND_TOKEN" },
+  "signingSecret": { "env": "HELPPUFF_BACKEND_SECRET" }
 }
 ```
 
 ## Set up
 
 ```bash
-npx @knowtific/murmur init --url acme.com --backend http --http-url https://agent.acme.com/murmur --http-mode murmur --http-token "$TOKEN"
+npx @knowtific/helppuff init --url acme.com --backend http --http-url https://agent.acme.com/helppuff --http-mode helppuff --http-token "$TOKEN"
 ```
 
 Your API must answer within 25 seconds. Errors and timeouts become a polite
 "something went wrong" for the visitor; the details are only in the Worker's
 logs.
 
-For more ways to build on Murmur, see [[Extending]].
+For more ways to build on HelpPuff, see [[Extending]].

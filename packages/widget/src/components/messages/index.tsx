@@ -1,4 +1,4 @@
-import type { Action, Message, Option } from '@murmur/protocol';
+import type { Action, Message, Option } from '@helppuff/protocol';
 import { Card, Carousel } from './Card.js';
 import { FormMessage } from './Form.js';
 import { Links } from './Links.js';

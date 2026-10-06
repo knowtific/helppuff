@@ -9,7 +9,7 @@ import { Passages } from './Onboarding';
 
 /**
  * The knowledge base (workers-ai): what the assistant has learned, from
- * where, and what it costs today. Same API as `murmur knowledge …`.
+ * where, and what it costs today. Same API as `helppuff knowledge …`.
  */
 
 type Filter = 'all' | 'learned' | 'problems' | 'off';
@@ -61,7 +61,7 @@ export function Knowledge({ me }: { me: Me }) {
       <>
         <PageHeader title="Knowledge" />
         <Empty icon={<BookOpen />} title="Managed by your backend">
-          This assistant uses the {site.connector} backend, which keeps its own knowledge. Update it with <code>murmur knowledge sync</code>.
+          This assistant uses the {site.connector} backend, which keeps its own knowledge. Update it with <code>helppuff knowledge sync</code>.
         </Empty>
       </>
     );
@@ -162,7 +162,7 @@ export function Knowledge({ me }: { me: Me }) {
 
 /** Which sections are open, remembered in this browser only. */
 function useOpen(id: string, initial: boolean): [boolean, (open: boolean) => void] {
-  const key = `mm-knowledge-${id}`;
+  const key = `hp-knowledge-${id}`;
   const [open, setOpen] = useState(() => {
     try {
       const saved = localStorage.getItem(key);

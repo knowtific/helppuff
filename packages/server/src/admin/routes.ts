@@ -1,5 +1,5 @@
 import { Hono, type Context } from 'hono';
-import { MurmurError } from '../core/errors.js';
+import { HelpPuffError } from '../core/errors.js';
 import { getConnector } from '../core/registry.js';
 import { guidanceFor } from '../core/guidance.js';
 import { promptOverlaps } from './overlaps.js';
@@ -23,7 +23,7 @@ import { summarizeConversation, type AiRunner } from '../conversations/summary.j
 import { summaryModel } from '../conversations/complete.js';
 export { extractJson } from '../conversations/summary.js';
 import { PROMPT_LIMIT, PROMPT_SQL, publishPrompt, readPromptState, type PromptCtx, type PromptVersionRow, type PublishResult } from './prompts.js';
-import type { KvStore } from '@murmur/connector-types';
+import type { KvStore } from '@helppuff/connector-types';
 
 /**
  * The dashboard API, under `/admin/api`. Everything but sign-in needs a
@@ -41,15 +41,15 @@ adminRoutes.use('/admin/api/*', async (c, next) => {
   c.header('Cache-Control', 'no-store');
   c.header('X-Frame-Options', 'DENY');
   c.header('Referrer-Policy', 'same-origin');
-  if (dbFrom(c.get('mm').env)) await ensureSchema(dbFrom(c.get('mm').env)!);
+  if (dbFrom(c.get('helppuff').env)) await ensureSchema(dbFrom(c.get('helppuff').env)!);
   await next();
 });
 
 adminRoutes.post('/admin/api/login', async (c) => {
   assertSameOrigin(c);
-  const ctx = c.get('mm');
+  const ctx = c.get('helppuff');
   const secret = requireSecret(ctx);
-  // The owner's CLI (proven by MURMUR_SECRET) checks a new password took effect; it is not a guesser.
+  // The owner's CLI (proven by HELPPUFF_SECRET) checks a new password took effect; it is not a guesser.
   if (!(await ctx.isOwner())) {
     const verdict = await hitWindow(ctx.platform.kv, 'login', await ctx.ipKey(), 10, 900);
     if (!verdict.allowed) throw rateLimited(verdict, 'admin_login');
@@ -58,7 +58,7 @@ adminRoutes.post('/admin/api/login', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as { email?: unknown; password?: unknown };
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
   const password = typeof body.password === 'string' ? body.password : '';
-  const refuse = () => new MurmurError('unauthorized', { message: 'That email and password do not match.', detail: 'admin_bad_login' });
+  const refuse = () => new HelpPuffError('unauthorized', { message: 'That email and password do not match.', detail: 'admin_bad_login' });
   if (!email || !password) throw refuse();
 
   let ok: boolean;
@@ -84,9 +84,9 @@ adminRoutes.post('/admin/api/logout', (c) => {
 
 adminRoutes.get('/admin/api/me', async (c) => {
   const admin = await currentAdmin(c);
-  const config = c.get('mm').config;
+  const config = c.get('helppuff').config;
   const origin = new URL(c.req.url).origin;
-  const ctx = c.get('mm');
+  const ctx = c.get('helppuff');
   const sites = await Promise.all(
     Object.keys(config.sites).map(async (id) => {
       // The live config: the dashboard may have renamed or recoloured it since the deploy.
@@ -98,7 +98,7 @@ adminRoutes.get('/admin/api/me', async (c) => {
         avatar: site.widget.brand.avatar ?? null,
         embed: `<script src="${origin}/loader.js" data-site="${id}" async></script>`,
         connector: site.connector.type,
-        /** Murmur's own knowledge base (workers-ai) is on: the Knowledge page and onboarding apply. */
+        /** HelpPuff's own knowledge base (workers-ai) is on: the Knowledge page and onboarding apply. */
         knowledge: ownsKnowledge(site) && Boolean(knowledgeEnv(ctx.env)),
         website: site.knowledge.website ?? site.origins.find((o) => /^https:/.test(o) && !/workers\.dev/.test(o)) ?? null,
       };
@@ -115,7 +115,7 @@ function siteFilter(c: Context<HonoEnv>, column = 'site_id'): { sql: string; par
 adminRoutes.get('/admin/api/overview', async (c) => {
   await currentAdmin(c);
   const d = db(c);
-  const now = c.get('mm').platform.now();
+  const now = c.get('helppuff').platform.now();
   const days = Math.min(Math.max(Number(c.req.query('days') ?? 30) || 30, 1), 365);
   const offset = (Number(c.req.query('tz') ?? 0) || 0) * 60_000;
   const since = now - days * DAY;
@@ -255,7 +255,7 @@ adminRoutes.get('/admin/api/conversations', async (c) => {
 
 async function loadConversation(d: D1Like, id: string) {
   const conversation = await d.prepare('SELECT * FROM conversations WHERE id = ?').bind(id).first<Record<string, unknown>>();
-  if (!conversation) throw new MurmurError('not_found', { message: 'No such conversation.', detail: 'admin_conversation_missing' });
+  if (!conversation) throw new HelpPuffError('not_found', { message: 'No such conversation.', detail: 'admin_conversation_missing' });
   const [messages, lead, callbacks] = await Promise.all([
     d
       .prepare('SELECT id, role, type, text, payload, ts, feedback FROM messages WHERE conversation_id = ? ORDER BY ts, id')
@@ -280,10 +280,10 @@ adminRoutes.get('/admin/api/conversations/:id', async (c) => {
 adminRoutes.post('/admin/api/conversations/:id/summary', async (c) => {
   assertSameOrigin(c);
   await currentAdmin(c);
-  const ctx = c.get('mm');
+  const ctx = c.get('helppuff');
   const ai = ctx.env['AI'] as Partial<AiRunner> | undefined;
   if (!ai || typeof ai.run !== 'function') {
-    throw new MurmurError('not_found', { message: 'Summaries need Workers AI. Redeploy with `murmur deploy`.', detail: 'admin_no_ai' });
+    throw new HelpPuffError('not_found', { message: 'Summaries need Workers AI. Redeploy with `helppuff deploy`.', detail: 'admin_no_ai' });
   }
   const id = c.req.param('id');
   const { conversation } = await loadConversation(db(c), id);
@@ -292,9 +292,9 @@ adminRoutes.post('/admin/api/conversations/:id/summary', async (c) => {
   try {
     result = await summarizeConversation({ db: db(c), ai: ai as AiRunner, now: () => ctx.platform.now() }, id, model);
   } catch {
-    throw new MurmurError('connector_error', { message: 'The summary could not be generated. Try again.', detail: 'admin_summary_unparsable' });
+    throw new HelpPuffError('connector_error', { message: 'The summary could not be generated. Try again.', detail: 'admin_summary_unparsable' });
   }
-  if (!result) throw new MurmurError('bad_request', { message: 'Nothing to summarise yet.', detail: 'admin_empty' });
+  if (!result) throw new HelpPuffError('bad_request', { message: 'Nothing to summarise yet.', detail: 'admin_empty' });
   emit(ctx, result.siteId, 'conversation.summarized', { conversationId: id, ...result.summary });
   return c.json({ ...result.summary, lead: result.contact });
 });
@@ -351,7 +351,7 @@ adminRoutes.patch('/admin/api/leads/:id', async (c) => {
   const sets: string[] = [];
   const params: unknown[] = [];
   if (typeof body.status === 'string') {
-    if (!(LEAD_STATUSES as readonly string[]).includes(body.status)) throw new MurmurError('bad_request', { message: 'Unknown status.' });
+    if (!(LEAD_STATUSES as readonly string[]).includes(body.status)) throw new HelpPuffError('bad_request', { message: 'Unknown status.' });
     sets.push('status = ?');
     params.push(body.status);
   }
@@ -363,9 +363,9 @@ adminRoutes.patch('/admin/api/leads/:id', async (c) => {
     sets.push('name = ?');
     params.push(body.name.slice(0, 200));
   }
-  if (!sets.length) throw new MurmurError('bad_request', { message: 'Nothing to update.' });
+  if (!sets.length) throw new HelpPuffError('bad_request', { message: 'Nothing to update.' });
   sets.push('updated_at = ?');
-  params.push(c.get('mm').platform.now());
+  params.push(c.get('helppuff').platform.now());
   await db(c)
     .prepare(`UPDATE leads SET ${sets.join(', ')} WHERE id = ?`)
     .bind(...params, c.req.param('id'))
@@ -373,7 +373,7 @@ adminRoutes.patch('/admin/api/leads/:id', async (c) => {
   const lead = await db(c).prepare('SELECT * FROM leads WHERE id = ?').bind(c.req.param('id')).first<Record<string, unknown>>();
   if (lead) {
     const changed = Object.fromEntries((['status', 'notes', 'name'] as const).filter((k) => typeof body[k] === 'string').map((k) => [k, lead[k]]));
-    emit(c.get('mm'), String(lead['site_id']), 'lead.updated', { leadId: lead['id'], conversationId: lead['conversation_id'] ?? null, changed, lead: leadView(lead) });
+    emit(c.get('helppuff'), String(lead['site_id']), 'lead.updated', { leadId: lead['id'], conversationId: lead['conversation_id'] ?? null, changed, lead: leadView(lead) });
   }
   return c.json(lead);
 });
@@ -409,7 +409,7 @@ adminRoutes.get('/admin/api/leads.csv', async (c) => {
 
 adminRoutes.get('/admin/api/admins', async (c) => {
   const me = await currentAdmin(c);
-  const owner = String(c.get('mm').env['ADMIN_EMAIL'] ?? '').toLowerCase();
+  const owner = String(c.get('helppuff').env['ADMIN_EMAIL'] ?? '').toLowerCase();
   const rows = await db(c).prepare('SELECT email, name, created_at AS createdAt, last_login_at AS lastLoginAt FROM admins ORDER BY created_at').all();
   return c.json({ me: me.email, owner, admins: rows.results });
 });
@@ -417,9 +417,9 @@ adminRoutes.get('/admin/api/admins', async (c) => {
 // ------------------------------------------------------------ prompt versions
 
 function promptCtx(c: Context<HonoEnv>): PromptCtx {
-  const ctx = c.get('mm');
-  const kv = ctx.env['MURMUR_KV'] as KvStore | undefined;
-  if (!kv) throw new MurmurError('internal', { message: 'This deployment has no KV namespace.', detail: 'admin_no_kv' });
+  const ctx = c.get('helppuff');
+  const kv = ctx.env['HELPPUFF_KV'] as KvStore | undefined;
+  if (!kv) throw new HelpPuffError('internal', { message: 'This deployment has no KV namespace.', detail: 'admin_no_kv' });
   return { config: ctx.config, kv, now: () => ctx.platform.now() };
 }
 
@@ -437,12 +437,12 @@ function published(c: Context<HonoEnv>, result: PublishResult) {
 
 /**
  * Everything the model is told besides the owner's prompt, in order, for the
- * dashboard to show read-only: Murmur's settings and rules around it, then
+ * dashboard to show read-only: HelpPuff's settings and rules around it, then
  * what the backend adds. Null when the backend owns its prompt.
  */
 async function builtInView(c: Context<HonoEnv>, siteId: string, connector: { type: string; options?: unknown }): Promise<string | null> {
   try {
-    const ctx = c.get('mm');
+    const ctx = c.get('helppuff');
     const site = { ...(await resolveSite(ctx, siteId)), connector } as SiteConfig;
     const found = getConnector(connector.type);
     const options = found.parseOptions(resolveSecrets(connector.options ?? {}, ctx.env));
@@ -483,7 +483,7 @@ adminRoutes.get('/admin/api/prompt/versions/:version', async (c) => {
     .prepare(PROMPT_SQL.get)
     .bind(site, Number(c.req.param('version')))
     .first<PromptVersionRow & { text: string }>();
-  if (!row) throw new MurmurError('not_found', { message: 'No such version.', detail: 'admin_prompt_version_missing' });
+  if (!row) throw new HelpPuffError('not_found', { message: 'No such version.', detail: 'admin_prompt_version_missing' });
   return c.json(row);
 });
 
@@ -492,7 +492,7 @@ adminRoutes.post('/admin/api/prompt', async (c) => {
   const admin = await currentAdmin(c);
   const body = (await c.req.json().catch(() => ({}))) as { site?: unknown; text?: unknown; note?: unknown; baseVersion?: unknown };
   if (typeof body.text !== 'string' || typeof body.baseVersion !== 'number') {
-    throw new MurmurError('bad_request', { message: 'Send the new text and the version it was based on.', detail: 'admin_prompt_body' });
+    throw new HelpPuffError('bad_request', { message: 'Send the new text and the version it was based on.', detail: 'admin_prompt_body' });
   }
   const site = siteParam(c, body.site);
   const result = await publishPrompt(promptCtx(c), db(c), site, {
@@ -510,12 +510,12 @@ adminRoutes.post('/admin/api/prompt/restore', async (c) => {
   const admin = await currentAdmin(c);
   const body = (await c.req.json().catch(() => ({}))) as { site?: unknown; version?: unknown; baseVersion?: unknown };
   if (typeof body.version !== 'number' || typeof body.baseVersion !== 'number') {
-    throw new MurmurError('bad_request', { message: 'Send the version to restore and the current version.', detail: 'admin_prompt_body' });
+    throw new HelpPuffError('bad_request', { message: 'Send the version to restore and the current version.', detail: 'admin_prompt_body' });
   }
   const site = siteParam(c, body.site);
   const d = db(c);
   const row = await d.prepare(PROMPT_SQL.get).bind(site, body.version).first<{ text: string }>();
-  if (!row) throw new MurmurError('not_found', { message: 'No such version.', detail: 'admin_prompt_version_missing' });
+  if (!row) throw new HelpPuffError('not_found', { message: 'No such version.', detail: 'admin_prompt_version_missing' });
   const result = await publishPrompt(promptCtx(c), d, site, {
     text: row.text,
     baseVersion: body.baseVersion,

@@ -3,7 +3,7 @@ import { PACKAGE_NAME, VERSION } from './version.js';
 import {
   migrate,
   newer,
-  murmurConfigSchema,
+  helppuffConfigSchema,
   promptField,
   promptHash,
   readSettings,
@@ -11,8 +11,8 @@ import {
   siteConfigKey,
   type PromptMeta,
   type StoredSiteConfig,
-} from '@murmur/server';
-import { DEFAULT_RETRIEVAL, EMBEDDING_DIMENSIONS } from '@murmur/rag';
+} from '@helppuff/server';
+import { DEFAULT_RETRIEVAL, EMBEDDING_DIMENSIONS } from '@helppuff/rag';
 import { EXIT } from '../errors.js';
 import { adminApi, type AdminApi } from './admin-api.js';
 import { CliError } from '../errors.js';
@@ -47,7 +47,7 @@ import {
   needsDatabase,
   resourceName,
   updateProject,
-  usesMurmurKnowledge,
+  usesHelpPuffKnowledge,
   vectorizeIndexFor,
   workerNameFor,
   type LoadedProject,
@@ -57,7 +57,7 @@ import { readState, writeState } from './state.js';
 import { wranglerDeploy } from './wrangler.js';
 
 /**
- * `murmur deploy`, end to end. Safe to run again at any time: every step
+ * `helppuff deploy`, end to end. Safe to run again at any time: every step
  * finds what exists before creating anything.
  *
  *   1. Cloudflare session, workers.dev subdomain → the Worker's URL
@@ -69,7 +69,7 @@ import { wranglerDeploy } from './wrangler.js';
  *   7. A health check through the real protocol endpoint
  */
 
-/** Which pages to crawl after a workers-ai deploy. Omitted: none (the setup page or `murmur crawl` picks them). */
+/** Which pages to crawl after a workers-ai deploy. Omitted: none (the setup page or `helppuff crawl` picks them). */
 export type CrawlRequest =
   | { mode: 'suggested' | 'all' }
   | { mode: 'match'; include: string[] }
@@ -81,7 +81,7 @@ export type DeployOptions = {
   /**
    * No person is at the setup page to do onboarding (an AI agent, CI): when
    * the site has never been learned, start learning the suggested pages
-   * (murmur.json's `knowledge.website.include`/`exclude` shape the
+   * (helppuff.json's `knowledge.website.include`/`exclude` shape the
    * suggestion) and read the business details now, so the assistant is ready
    * without anyone opening the dashboard.
    */
@@ -129,7 +129,7 @@ async function ensureSubdomain(cf: CloudflareSession, progress?: Progress, readO
   const existing = await cf.api.subdomain(cf.accountId);
   if (existing) return existing;
   if (readOnly) return '<your-subdomain>';
-  const base = (cf.accountName ?? 'murmur').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'murmur';
+  const base = (cf.accountName ?? 'helppuff').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'helppuff';
   for (const candidate of [base, `${base}-${randomBytes(2).toString('hex')}`, `knowtific-${randomBytes(3).toString('hex')}`]) {
     try {
       progress?.(`Registering the workers.dev subdomain "${candidate}"…`);
@@ -139,19 +139,19 @@ async function ensureSubdomain(cf: CloudflareSession, progress?: Progress, readO
     }
   }
   throw new CliError('no_subdomain', 'Could not register a workers.dev subdomain for this account.', {
-    hint: 'Open Workers & Pages in the Cloudflare dashboard once to pick one, then run `murmur deploy` again.',
+    hint: 'Open Workers & Pages in the Cloudflare dashboard once to pick one, then run `helppuff deploy` again.',
   });
 }
 
 /**
  * A generated secret, kept in .env so redeploys reuse it:
- *  - MURMUR_SECRET signs session tokens (rotating it logs visitors out);
+ *  - HELPPUFF_SECRET signs session tokens (rotating it logs visitors out);
  *  - ADMIN_API_KEY is how this CLI (and agents) call the Worker's admin API.
  */
-function ensureGeneratedSecret(dir: string, env: Record<string, string>, name: 'MURMUR_SECRET' | 'ADMIN_API_KEY'): string {
-  const existing = env[name] ?? (name === 'ADMIN_API_KEY' ? env['MURMUR_ADMIN_API_KEY'] : undefined);
+function ensureGeneratedSecret(dir: string, env: Record<string, string>, name: 'HELPPUFF_SECRET' | 'ADMIN_API_KEY'): string {
+  const existing = env[name] ?? (name === 'ADMIN_API_KEY' ? env['HELPPUFF_ADMIN_API_KEY'] : undefined);
   if (existing && existing.length >= 32) return existing;
-  const secret = name === 'ADMIN_API_KEY' ? `mm_${randomBytes(32).toString('base64url')}` : randomBytes(32).toString('base64');
+  const secret = name === 'ADMIN_API_KEY' ? `hp_${randomBytes(32).toString('base64url')}` : randomBytes(32).toString('base64');
   writeEnvVar(dir, name, secret);
   env[name] = secret;
   return secret;
@@ -182,7 +182,7 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
   // a rollback is a choice, made with --allow-downgrade.
   const live = await liveVersion(url, doFetch);
   if (live.version && newer(live.version, VERSION) && !options.allowDowngrade) {
-    throw new CliError('downgrade', `The Worker runs murmur ${live.version}; this is ${VERSION}, which is older.`, {
+    throw new CliError('downgrade', `The Worker runs helppuff ${live.version}; this is ${VERSION}, which is older.`, {
       hint: `Upgrade instead: npx ${PACKAGE_NAME}@latest upgrade — or, to roll back on purpose, add --allow-downgrade.`,
       details: { live: live.version, cli: VERSION },
     });
@@ -191,16 +191,16 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
   // Secrets are checked up front: a Worker deployed without them answers
   // every visitor with an error.
   if (!options.dryRun) {
-    ensureGeneratedSecret(loaded.dir, env, 'MURMUR_SECRET');
+    ensureGeneratedSecret(loaded.dir, env, 'HELPPUFF_SECRET');
     if (needsDatabase(loaded.project)) ensureGeneratedSecret(loaded.dir, env, 'ADMIN_API_KEY');
   }
   const required = compile(loaded, { workerUrl: url }).secrets;
-  const missing = required.filter((name) => !env[name] && !(options.dryRun && (name === 'MURMUR_SECRET' || name === 'ADMIN_API_KEY')));
+  const missing = required.filter((name) => !env[name] && !(options.dryRun && (name === 'HELPPUFF_SECRET' || name === 'ADMIN_API_KEY')));
   if (missing.length) {
     throw new CliError('missing_secret', `Missing secret(s): ${missing.join(', ')}.`, {
       hint: missing
         .map((name) =>
-          name === 'ADMIN_PASSWORD_HASH' ? `murmur users reset ${loaded.project.dashboard.adminEmail ?? '<email>'}` : `murmur secret set ${name}`,
+          name === 'ADMIN_PASSWORD_HASH' ? `helppuff users reset ${loaded.project.dashboard.adminEmail ?? '<email>'}` : `helppuff secret set ${name}`,
         )
         .join('\n'),
       details: { missing },
@@ -238,14 +238,14 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
     const databaseId = d1DatabaseId;
     await migrate((sql, params) => cf.api.d1Query(cf.accountId, databaseId, sql, params));
   } else if (loaded.project.dashboard.enabled) {
-    warnings.push('The dashboard is on but has no admin: set it with `murmur config set dashboard.adminEmail you@example.com`.');
+    warnings.push('The dashboard is on but has no admin: set it with `helppuff config set dashboard.adminEmail you@example.com`.');
   }
   const vectorizeIndex = vectorizeIndexFor(loaded.project);
   if (vectorizeIndex) {
     const model = embeddingModelFor(loaded.project);
     const dimensions = EMBEDDING_DIMENSIONS[model];
     if (!dimensions) {
-      throw new CliError('unknown_embedding_model', `murmur does not know the vector size of ${model}.`, {
+      throw new CliError('unknown_embedding_model', `helppuff does not know the vector size of ${model}.`, {
         hint: `Use one of: ${Object.keys(EMBEDDING_DIMENSIONS).join(', ')}`,
         exitCode: EXIT.usage,
       });
@@ -279,13 +279,13 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
   }
 
   // Settings edited in the dashboard live only in KV until pulled; publishing
-  // murmur.json over them would silently undo the owner's changes.
+  // helppuff.json over them would silently undo the owner's changes.
   const { stored: liveStored } = await readLivePrompt(promptRemote, loaded.project.site).catch(() => ({ stored: null }));
   const liveSettings = liveStored?.settings;
-  // A deploy's own write (from any copy of murmur.json) may be replaced; anything else must be pulled first.
+  // A deploy's own write (from any copy of helppuff.json) may be replaced; anything else must be pulled first.
   if (liveSettings && liveSettings.by !== 'deploy' && liveSettings.hash !== state.settings?.hash && !options.overwriteSettings) {
     throw new CliError('settings_changed', `Settings were changed in the dashboard${liveSettings.by ? ` by ${liveSettings.by}` : ''} since this folder last saw them.`, {
-      hint: 'Run `murmur config pull` to bring them into murmur.json, then deploy. Or deploy with --overwrite-settings to discard them.',
+      hint: 'Run `helppuff config pull` to bring them into helppuff.json, then deploy. Or deploy with --overwrite-settings to discard them.',
       details: { changedAt: liveSettings.at, by: liveSettings.by },
     });
   }
@@ -302,7 +302,7 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
       if (knowledge.skipped.length) warnings.push(`Skipped: ${knowledge.skipped.join(', ')}`);
     } catch (thrown) {
       if (mode === 'force') throw thrown;
-      warnings.push(`Knowledge was not synced: ${(thrown as Error).message}. Run \`murmur knowledge sync\` to retry.`);
+      warnings.push(`Knowledge was not synced: ${(thrown as Error).message}. Run \`helppuff knowledge sync\` to retry.`);
     }
   };
   // OpenAI and Gemini stores are named in the config, so they come first.
@@ -352,7 +352,7 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
     promptMeta = recorded.meta;
     rollback = recorded.rollback;
   }
-  const settingsNow = await settingsHash(readSettings(murmurConfigSchema.parse(compiled.serverConfig).sites[compiled.site]!));
+  const settingsNow = await settingsHash(readSettings(helppuffConfigSchema.parse(compiled.serverConfig).sites[compiled.site]!));
   const stored = {
     ...(compiled.storedConfig as StoredSiteConfig),
     ...(promptMeta ? { prompt: promptMeta } : {}),
@@ -389,7 +389,7 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
   if (!healthy) {
     warnings.push(
       workerExists
-        ? 'The Worker did not answer the health check. Run `murmur doctor`.'
+        ? 'The Worker did not answer the health check. Run `helppuff doctor`.'
         : 'The Worker is deployed but not answering yet — a new workers.dev address can take a few minutes to go live.',
     );
   }
@@ -398,14 +398,14 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
   let setupUrl: string | null = null;
   let crawl: DeployResult['crawl'] = null;
   let files: DeployResult['files'] = null;
-  if (healthy && usesMurmurKnowledge(loaded.project)) {
+  if (healthy && usesHelpPuffKnowledge(loaded.project)) {
     const api = adminApi(loaded, { url, fetch: doFetch, env });
     await waitForAdminKey(api, progress);
     setupUrl = await mintSetupLink(api, warnings);
     if (loaded.project.knowledge.files.length) {
       progress?.('Adding your files to the knowledge base…');
       files = await uploadFilesToWorker(loaded, api, progress).catch((thrown: unknown) => {
-        warnings.push(`Files were not added: ${(thrown as Error).message}. Run \`murmur knowledge add\`.`);
+        warnings.push(`Files were not added: ${(thrown as Error).message}. Run \`helppuff knowledge add\`.`);
         return null;
       });
       if (files?.skipped.length) warnings.push(`Not added: ${files.skipped.join(', ')}`);
@@ -421,7 +421,7 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
         if (learned?.run) {
           progress?.('Re-learning your site for the new embedding model…');
           crawl = await api.send<{ runId: string; total: number }>('POST', '/admin/api/knowledge/crawl', {}).catch(() => null);
-          if (!crawl) warnings.push('The embedding model changed; run `murmur crawl` to re-learn your site.');
+          if (!crawl) warnings.push('The embedding model changed; run `helppuff crawl` to re-learn your site.');
         }
       }
       state.embeddingModel = model;
@@ -493,7 +493,7 @@ export async function mintSetupLink(api: AdminApi, warnings: string[]): Promise<
     return link.url;
   } catch (thrown) {
     if (thrown instanceof CliError && /already complete/i.test(thrown.message)) return null;
-    warnings.push(`No setup link: ${(thrown as Error).message}. Run \`murmur dashboard\` for a sign-in link.`);
+    warnings.push(`No setup link: ${(thrown as Error).message}. Run \`helppuff dashboard\` for a sign-in link.`);
     return null;
   }
 }
@@ -533,7 +533,7 @@ export async function startLearning(
   }
   if (!request) return null;
   const crawl = await startCrawlFromCli(api, request, progress).catch((thrown: unknown) => {
-    warnings.push(`The crawl did not start: ${(thrown as Error).message}. Run \`murmur crawl\`.`);
+    warnings.push(`The crawl did not start: ${(thrown as Error).message}. Run \`helppuff crawl\`.`);
     return null;
   });
   // What onboarding would have shown a person: the business details, read now rather than when the crawl ends.

@@ -1,9 +1,9 @@
-import { MurmurError } from '../core/errors.js';
+import { HelpPuffError } from '../core/errors.js';
 import {
   isSecretRef,
-  murmurConfigSchema,
-  type MurmurConfig,
-  type MurmurConfigInput,
+  helppuffConfigSchema,
+  type HelpPuffConfig,
+  type HelpPuffConfigInput,
   type SiteConfig,
 } from './schema.js';
 
@@ -11,13 +11,13 @@ import {
  * Validate a user's config at build time. Type errors surface in the editor;
  * shape errors surface the first time the Worker is bundled and run.
  */
-export function defineConfig(input: MurmurConfigInput): MurmurConfig {
-  const result = murmurConfigSchema.safeParse(input);
+export function defineConfig(input: HelpPuffConfigInput): HelpPuffConfig {
+  const result = helppuffConfigSchema.safeParse(input);
   if (!result.success) {
-    throw new Error(`murmur.config is invalid:\n${formatIssues(result.error.issues)}`);
+    throw new Error(`helppuff.config is invalid:\n${formatIssues(result.error.issues)}`);
   }
   if (Object.keys(result.data.sites).length === 0) {
-    throw new Error('murmur.config must define at least one site.');
+    throw new Error('helppuff.config must define at least one site.');
   }
   return result.data;
 }
@@ -26,9 +26,9 @@ function formatIssues(issues: readonly { path: PropertyKey[]; message: string }[
   return issues.map((issue) => `  • ${issue.path.join('.') || '(root)'}: ${issue.message}`).join('\n');
 }
 
-export function getSite(config: MurmurConfig, siteId: string): SiteConfig {
+export function getSite(config: HelpPuffConfig, siteId: string): SiteConfig {
   const site = config.sites[siteId];
-  if (!site) throw new MurmurError('not_found', { detail: 'unknown_site' });
+  if (!site) throw new HelpPuffError('not_found', { detail: 'unknown_site' });
   return site;
 }
 
@@ -41,7 +41,7 @@ export function resolveSecrets(value: unknown, env: Record<string, unknown>, pat
     const name = value.env;
     const resolved = env[name];
     if (typeof resolved !== 'string' || resolved.length === 0) {
-      throw new MurmurError('internal', { detail: `missing_secret:${name}` });
+      throw new HelpPuffError('internal', { detail: `missing_secret:${name}` });
     }
     return resolved;
   }

@@ -1,4 +1,4 @@
-import type { IconName, LauncherIconName } from '@murmur/protocol';
+import type { IconName, LauncherIconName } from '@helppuff/protocol';
 
 /**
  * The built-in icon set: 1.5px stroke on a 20px grid, rounded caps.

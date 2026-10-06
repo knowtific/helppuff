@@ -1,5 +1,5 @@
 {
-  "name": "murmur",
+  "name": "helppuff",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,11 +11,11 @@
   "scripts": {
     "ensure-config": "node scripts/ensure-config.mjs",
     "dev": "pnpm ensure-config && concurrently -n worker,widget -c cyan,magenta \"pnpm dev:server\" \"pnpm dev:widget\"",
-    "dev:server": "pnpm --filter @murmur/server dev",
-    "dev:widget": "pnpm --filter @murmur/widget dev",
-    "build": "pnpm ensure-config && pnpm --filter @murmur/widget build",
-    "build:cli": "pnpm --filter @knowtific/murmur build",
-    "murmur": "node packages/cli/dist/cli.js",
+    "dev:server": "pnpm --filter @helppuff/server dev",
+    "dev:widget": "pnpm --filter @helppuff/widget dev",
+    "build": "pnpm ensure-config && pnpm --filter @helppuff/widget build",
+    "build:cli": "pnpm --filter @knowtific/helppuff build",
+    "helppuff": "node packages/cli/dist/cli.js",
     "sync:plugin": "pnpm build:cli && node packages/cli/dist/cli.js skill print > plugin/skills/website-chatbot/SKILL.md && node packages/cli/dist/cli.js help agents > packages/cli/AGENTS.md && node packages/cli/dist/cli.js help wiki-cli > wiki/CLI-Reference.md && node packages/cli/dist/cli.js help wiki-config > wiki/Configuration-Reference.md",
     "test": "pnpm ensure-config && vitest run",
     "test:watch": "pnpm ensure-config && vitest",
@@ -25,7 +25,7 @@
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm e2e",
     "lint": "eslint .",
     "eval": "node packages/cli/dist/cli.js eval",
-    "pack:cli": "pnpm build:cli && pnpm --filter @knowtific/murmur pack --pack-destination \"$PWD\""
+    "pack:cli": "pnpm build:cli && pnpm --filter @knowtific/helppuff pack --pack-destination \"$PWD\""
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -50,6 +50,6 @@
     ]
   },
   "dependencies": {
-    "@murmur/server": "workspace:*"
+    "@helppuff/server": "workspace:*"
   }
 }

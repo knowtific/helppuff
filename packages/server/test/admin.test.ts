@@ -39,7 +39,7 @@ async function world(env: Record<string, unknown> = {}): Promise<World> {
   resetSchemaMemo();
   const db = d1();
   const pending: Promise<unknown>[] = [];
-  const bindings = testEnv({ MURMUR_DB: db, ADMIN_EMAIL: OWNER, ADMIN_PASSWORD_HASH: await hashPassword(PASSWORD, 10_000), ...env });
+  const bindings = testEnv({ HELPPUFF_DB: db, ADMIN_EMAIL: OWNER, ADMIN_PASSWORD_HASH: await hashPassword(PASSWORD, 10_000), ...env });
   const h = harness(testConfig(), bindings, ORIGIN, (p) => pending.push(p));
   const admin = harness(testConfig(), bindings, ADMIN_ORIGIN, (p) => pending.push(p));
   return { h, db, admin, settle: async () => void (await Promise.all(pending.splice(0))) };
@@ -169,7 +169,7 @@ describe('sign-in', () => {
     for (const path of ['/admin/api/me', '/admin/api/overview', '/admin/api/conversations', '/admin/api/leads', '/admin/api/leads.csv']) {
       expect((await w.admin.fetch(path)).status, path).toBe(401);
     }
-    expect((await get(w.admin, '/admin/api/me', 'mm_admin=forged.token')).status).toBe(401);
+    expect((await get(w.admin, '/admin/api/me', 'hp_admin=forged.token')).status).toBe(401);
   });
 
   it('refuses a cross-origin sign-in', async () => {
@@ -283,7 +283,7 @@ describe('the owner testing from the CLI', () => {
     expect((await h.post('/v1/sites/demo/sessions', startBody)).status).toBe(200);
     expect((await h.post('/v1/sites/demo/sessions', startBody)).status).toBe(429);
 
-    const owner = { headers: { [OWNER_HEADER]: await ownerToken(String(env.MURMUR_SECRET)) } };
+    const owner = { headers: { [OWNER_HEADER]: await ownerToken(String(env.HELPPUFF_SECRET)) } };
     expect((await h.post('/v1/sites/demo/sessions', startBody, owner)).status).toBe(200);
     expect((await h.post('/v1/sites/demo/sessions', startBody, owner)).status).toBe(200);
 
@@ -295,7 +295,7 @@ describe('the owner testing from the CLI', () => {
     const { ownerToken, OWNER_HEADER } = await import('../src/core/request.js');
     const env = testEnv();
     const h = harness(testConfig({ security: { limits: { messagesPerSitePerDay: 1 } } }), env);
-    const owner = { headers: { [OWNER_HEADER]: await ownerToken(String(env.MURMUR_SECRET)) } };
+    const owner = { headers: { [OWNER_HEADER]: await ownerToken(String(env.HELPPUFF_SECRET)) } };
     expect((await h.post('/v1/sites/demo/sessions', startBody, owner)).status).toBe(200);
     expect((await h.post('/v1/sites/demo/sessions', startBody, owner)).status).toBe(429);
   });
@@ -308,7 +308,7 @@ describe('prompt versions', () => {
     resetSchemaMemo();
     const db = d1();
     const kv = memoryKv();
-    const bindings = testEnv({ MURMUR_DB: db, MURMUR_KV: kv, ADMIN_EMAIL: OWNER, ADMIN_PASSWORD_HASH: await hashPassword(PASSWORD, 10_000) });
+    const bindings = testEnv({ HELPPUFF_DB: db, HELPPUFF_KV: kv, ADMIN_EMAIL: OWNER, ADMIN_PASSWORD_HASH: await hashPassword(PASSWORD, 10_000) });
     const admin = harness(testConfig({ connector: connector as never }), bindings, ADMIN_ORIGIN);
     const cookie = await login(admin);
     const state = async () => (await (await get(admin, '/admin/api/prompt', cookie)).json()) as PromptView;
@@ -378,7 +378,7 @@ describe('prompt versions', () => {
     expect(await old.json()).toMatchObject({ version: 2, text: 'Be brief.' });
   });
 
-  it('will not edit a prompt Murmur does not own', async () => {
+  it('will not edit a prompt HelpPuff does not own', async () => {
     const w = await promptWorld({ type: 'echo' });
     const view = await w.state();
     expect(view.editable).toBe(false);
@@ -427,7 +427,7 @@ describe('webhooks', () => {
   async function withHook(events?: string[]) {
     const w = await world();
     const cookie = await login(w.admin);
-    const created = await call({ ...w, cookie }, 'POST', '/admin/api/webhooks', { url: 'https://hooks.example.com/murmur', ...(events ? { events } : {}) });
+    const created = await call({ ...w, cookie }, 'POST', '/admin/api/webhooks', { url: 'https://hooks.example.com/helppuff', ...(events ? { events } : {}) });
     expect(created.status).toBe(201);
     const hook = (await created.json()) as { id: string; secret: string; events: string[] };
     return { ...w, cookie, hook };
@@ -517,10 +517,10 @@ describe('webhooks', () => {
     expect(first.body).toMatchObject({ site: 'demo', data: { conversationId: started.sessionId, firstMessage: 'Do you work weekends?', page: { url: 'https://example.com/pricing' } } });
 
     // The signature covers the timestamp and the exact body.
-    const timestamp = Number(first.headers.get('X-Murmur-Timestamp'));
-    expect(first.headers.get('X-Murmur-Signature')).toBe(await signDelivery(w.hook.secret, timestamp, JSON.stringify(first.body)));
-    expect(first.headers.get('X-Murmur-Event')).toBe('conversation.started');
-    expect(first.headers.get('X-Murmur-Delivery')).toBe(first.body.id);
+    const timestamp = Number(first.headers.get('X-HelpPuff-Timestamp'));
+    expect(first.headers.get('X-HelpPuff-Signature')).toBe(await signDelivery(w.hook.secret, timestamp, JSON.stringify(first.body)));
+    expect(first.headers.get('X-HelpPuff-Event')).toBe('conversation.started');
+    expect(first.headers.get('X-HelpPuff-Delivery')).toBe(first.body.id);
 
     const log = (await (await get(w.admin, `/admin/api/webhooks/${w.hook.id}/deliveries`, w.cookie)).json()) as { deliveries: { ok: boolean; event: string }[] };
     expect(log.deliveries.length).toBe(received.length);
@@ -570,7 +570,7 @@ describe('versions', () => {
   });
 
   it('says what runs, what is newest, and the command to upgrade', async () => {
-    const w = await world({ MURMUR_VERSION: '0.1.0' });
+    const w = await world({ HELPPUFF_VERSION: '0.1.0' });
     const cookie = await login(w.admin);
     vi.stubGlobal('fetch', async (input: RequestInfo | URL) =>
       String(input).startsWith('https://registry.npmjs.org/') ? Response.json({ version: '0.2.0' }) : new Response('no', { status: 500 }),
@@ -579,7 +579,7 @@ describe('versions', () => {
       const health = (await (await w.h.fetch('/healthz')).json()) as { version: string; schema: number };
       expect(health.version).toBe('0.1.0');
       const info = (await (await get(w.admin, '/admin/api/version', cookie)).json()) as Record<string, unknown>;
-      expect(info).toMatchObject({ current: '0.1.0', latest: '0.2.0', upgradeAvailable: true, command: 'npx @knowtific/murmur@latest upgrade', schema: { expected: health.schema } });
+      expect(info).toMatchObject({ current: '0.1.0', latest: '0.2.0', upgradeAvailable: true, command: 'npx @knowtific/helppuff@latest upgrade', schema: { expected: health.schema } });
     } finally {
       vi.unstubAllGlobals();
     }
@@ -642,7 +642,7 @@ describe('background jobs', () => {
     await w.admin.fetch('/admin/api/webhooks', {
       method: 'POST',
       headers: { Cookie: cookie, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: 'https://hooks.example.com/murmur', events: ['conversation.completed'] }),
+      body: JSON.stringify({ url: 'https://hooks.example.com/helppuff', events: ['conversation.completed'] }),
     });
     const started = await startSession(w.h, { ...startBody, firstMessage: 'Do you work weekends?' });
     await w.h.post('/v1/sessions/messages', { kind: 'text', text: 'Call me on 0412 345 678', clientId: 'c1' }, { headers: { Authorization: `Bearer ${started.sessionToken}` } });
@@ -697,7 +697,7 @@ describe('background jobs', () => {
       await w.admin.fetch('/admin/api/webhooks', {
         method: 'POST',
         headers: { Cookie: cookie, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: 'https://hooks.example.com/murmur' }),
+        body: JSON.stringify({ url: 'https://hooks.example.com/helppuff' }),
       })
     ).json()) as { id: string };
 
@@ -750,10 +750,10 @@ describe('the reply waits for no write', () => {
     const hangingKv = { ...kv, put: () => ((puts += 1), never) };
     const limited: string[] = [];
     const env = testEnv({
-      MURMUR_DB: db,
-      MURMUR_KV: hangingKv,
-      MURMUR_IP_LIMITER: { limit: async ({ key }: { key: string }) => (limited.push(key), { success: true }) },
-      MURMUR_IP_LIMIT: '10',
+      HELPPUFF_DB: db,
+      HELPPUFF_KV: hangingKv,
+      HELPPUFF_IP_LIMITER: { limit: async ({ key }: { key: string }) => (limited.push(key), { success: true }) },
+      HELPPUFF_IP_LIMIT: '10',
     });
     const h = harness(testConfig(), env);
     const started = await startSession(h);
@@ -764,7 +764,7 @@ describe('the reply waits for no write', () => {
   });
 
   it('refuses past the per-visitor minute limit when the binding says so', async () => {
-    const env = testEnv({ MURMUR_IP_LIMITER: { limit: async () => ({ success: false }) }, MURMUR_IP_LIMIT: '10' });
+    const env = testEnv({ HELPPUFF_IP_LIMITER: { limit: async () => ({ success: false }) }, HELPPUFF_IP_LIMIT: '10' });
     const h = harness(testConfig(), env);
     const started = await startSession(h);
     const blocked = await send(h, started.sessionToken);
@@ -773,7 +773,7 @@ describe('the reply waits for no write', () => {
   });
 
   it('ignores a binding deployed with a different limit than the live one', async () => {
-    const env = testEnv({ MURMUR_IP_LIMITER: { limit: async () => ({ success: false }) }, MURMUR_IP_LIMIT: '99' });
+    const env = testEnv({ HELPPUFF_IP_LIMITER: { limit: async () => ({ success: false }) }, HELPPUFF_IP_LIMIT: '99' });
     const h = harness(testConfig(), env);
     const started = await startSession(h);
     expect((await send(h, started.sessionToken)).status).toBe(200);
@@ -784,7 +784,7 @@ describe('the reply waits for no write', () => {
     const db = d1();
     const pending: Promise<unknown>[] = [];
     const settle = async () => void (await Promise.all(pending.splice(0)));
-    const h = harness(testConfig({ security: { limits: { messagesPerSession: 2, messagesPerSitePerDay: 3 } } }), testEnv({ MURMUR_DB: db }), ORIGIN, (p) =>
+    const h = harness(testConfig({ security: { limits: { messagesPerSession: 2, messagesPerSitePerDay: 3 } } }), testEnv({ HELPPUFF_DB: db }), ORIGIN, (p) =>
       pending.push(p),
     );
     const message = async (r: Response) => ((await r.json()) as { error: { message: string } }).error.message;

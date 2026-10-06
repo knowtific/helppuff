@@ -14,8 +14,8 @@ function wranglerBin(): string {
     const require = createRequire(import.meta.url);
     return join(dirname(require.resolve('wrangler/package.json')), 'bin', 'wrangler.js');
   } catch {
-    throw new CliError('wrangler_missing', 'Wrangler is not installed alongside murmur.', {
-      hint: 'Reinstall: npm i -D @knowtific/murmur (wrangler is a dependency of it).',
+    throw new CliError('wrangler_missing', 'Wrangler is not installed alongside helppuff.', {
+      hint: 'Reinstall: npm i -D @knowtific/helppuff (wrangler is a dependency of it).',
     });
   }
 }
@@ -56,7 +56,7 @@ export async function runWrangler(
   });
 }
 
-/** Deploy `.murmur/deploy`, returning the URL wrangler reports. */
+/** Deploy `.helppuff/deploy`, returning the URL wrangler reports. */
 export async function wranglerDeploy(dir: string, auth: WranglerEnv, onLine?: (line: string) => void): Promise<string | null> {
   const { code, output } = await runWrangler(['deploy', '--config', 'wrangler.json'], { cwd: dir, auth, ...(onLine ? { onLine } : {}) });
   if (code !== 0) {
@@ -68,13 +68,13 @@ export async function wranglerDeploy(dir: string, auth: WranglerEnv, onLine?: (l
 
 function explainWranglerFailure(output: string): string {
   if (/ai_search|AI Search/i.test(output) && /not found|does not exist/i.test(output)) {
-    return 'The AI Search instance does not exist yet. Run `murmur knowledge sync`, or check `backend.instance` in murmur.json.';
+    return 'The AI Search instance does not exist yet. Run `helppuff knowledge sync`, or check `backend.instance` in helppuff.json.';
   }
   if (/Authentication error|10000|not authorized/i.test(output)) {
-    return 'The Cloudflare token lacks a permission. Run `murmur doctor` to see which.';
+    return 'The Cloudflare token lacks a permission. Run `helppuff doctor` to see which.';
   }
   if (/workers\.dev subdomain/i.test(output)) {
     return 'Your account has no workers.dev subdomain. Open Workers & Pages in the Cloudflare dashboard once to create it, then retry.';
   }
-  return 'Run `murmur doctor` for a full check.';
+  return 'Run `helppuff doctor` for a full check.';
 }

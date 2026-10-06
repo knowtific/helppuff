@@ -16,7 +16,7 @@ import type { D1Like, Notify, VectorIndexLike } from './types.js';
  *   section  one step per ~16k characters: chunk, embed, store. Small steps
  *            keep each one inside the Workers Free CPU limit (10 ms a step).
  *
- * Each section is a page (`murmur://file/<id>#<n>`, source `file`), so a
+ * Each section is a page (`helppuff://file/<id>#<n>`, source `file`), so a
  * file's passages are found, shown and removed like any other. The cleaned
  * Markdown is kept, so a new embedding model re-embeds without a new upload.
  */
@@ -38,7 +38,7 @@ export const SECTION_CHARS = 16_000;
 
 export type FileStatus = 'queued' | 'reading' | 'learning' | 'indexed' | 'error';
 
-export const fileUrl = (id: string, section?: number) => `murmur://file/${id}${section ? `#${section}` : ''}`;
+export const fileUrl = (id: string, section?: number) => `helppuff://file/${id}${section ? `#${section}` : ''}`;
 export const uploadKey = (siteId: string, fileId: string) => `upload:${siteId}:${fileId}`;
 
 /** `Price list.PDF` → `pdf`; null for anything else. */

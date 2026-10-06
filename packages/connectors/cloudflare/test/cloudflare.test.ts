@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { messageSchema } from '@murmur/protocol';
-import { isConnectorError, markerFilter, type ConnectorContext } from '@murmur/connector-types';
+import { messageSchema } from '@helppuff/protocol';
+import { isConnectorError, markerFilter, type ConnectorContext } from '@helppuff/connector-types';
 import cloudflare, { completionText, readCompletionStream } from '../src/index.js';
 
 /** Built against developers.cloudflare.com/ai-search — see `src/index.ts`. */
@@ -204,7 +204,7 @@ describe('document names are not links', () => {
 
 describe('markers a model copies instead of writing', () => {
   it('reads an echoed history note as options and drops template placeholders', async () => {
-    const { parseMarkers } = await import('@murmur/connector-types');
+    const { parseMarkers } = await import('@helppuff/connector-types');
     const echoed = parseMarkers('We install hybrid.\n\n[Offered choices: Get a quote | Call me back]');
     expect(echoed.text).toBe('We install hybrid.');
     expect(echoed.messages).toMatchObject([{ type: 'options', options: [{ label: 'Get a quote' }, { label: 'Call me back' }] }]);

@@ -13,7 +13,7 @@ import type { MessageHandlers } from '../components/messages/index.js';
 import { log } from '../lib/env.js';
 import { trapFocus } from '../lib/focus.js';
 import { CaptchaError, getCaptchaToken } from '../lib/turnstile.js';
-import type { Action, Message, MessageBody, Option, Shortcut, WidgetConfig } from '@murmur/protocol';
+import type { Action, Message, MessageBody, Option, Shortcut, WidgetConfig } from '@helppuff/protocol';
 import type { Runtime } from '../loader.js';
 import { toWidgetError, type Api } from './api.js';
 import { clientId, pageContext, pathAllowed, currentPath } from './context.js';
@@ -177,7 +177,7 @@ export function App({
   // Two tabs stay in sync rather than clobbering each other.
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
-      if (event.key !== `mm:${siteId}`) return;
+      if (event.key !== `hp:${siteId}`) return;
       const restored = loadStored(siteId);
       if (restored) dispatch({ type: 'restore', restored });
       else dispatch({ type: 'reset' });
@@ -231,13 +231,13 @@ export function App({
     const viewport = window.visualViewport;
     if (!viewport || !state.open) return;
     const onResize = () => {
-      runtime.host.style.setProperty('--mm-viewport-h', `${viewport.height}px`);
+      runtime.host.style.setProperty('--hp-viewport-h', `${viewport.height}px`);
     };
     onResize();
     viewport.addEventListener('resize', onResize);
     return () => {
       viewport.removeEventListener('resize', onResize);
-      runtime.host.style.removeProperty('--mm-viewport-h');
+      runtime.host.style.removeProperty('--hp-viewport-h');
     };
   }, [state.open, runtime.host]);
 
@@ -445,7 +445,7 @@ export function App({
   /**
    * Deliver a message, collecting a lead first if the site requires one.
    *
-   * Every producer of a message ends up here — the composer, `Murmur.send`,
+   * Every producer of a message ends up here — the composer, `HelpPuff.send`,
    * a `reply` shortcut and a finished flow — so none of them can quietly
    * drop the visitor's words for want of a session.
    */
@@ -662,7 +662,7 @@ export function App({
   }, [siteId, api]);
 
   /**
-   * The handle the loader drives `window.Murmur` through.
+   * The handle the loader drives `window.HelpPuff` through.
    *
    * Published during render, not in an effect: the loader replays any queued
    * commands the moment `mount()` returns, which is before Preact has flushed
@@ -728,12 +728,12 @@ export function App({
 
       {state.open ? (
         <div
-          class="mm-panel"
-          id="mm-panel"
+          class="hp-panel"
+          id="hp-panel"
           ref={panel}
           role="dialog"
           aria-modal="false"
-          aria-labelledby="mm-title"
+          aria-labelledby="hp-title"
           data-position={config.launcher.position}
           {...(closing ? { 'data-closing': '' } : {})}
         >
@@ -746,7 +746,7 @@ export function App({
             onClose={close}
           />
 
-          <div class="mm-captcha" ref={captchaMount} data-active="no" />
+          <div class="hp-captcha" ref={captchaMount} data-active="no" />
 
           {state.screen === 'home' ? (
             <Home
@@ -760,8 +760,8 @@ export function App({
               onStart={onStart}
             />
           ) : state.screen === 'lead_form' ? (
-            <div class="mm-screen">
-              <div class="mm-scroll">
+            <div class="hp-screen">
+              <div class="hp-scroll">
                 <LeadForm
                   config={config}
                   initial={leadRef.current}
@@ -774,7 +774,7 @@ export function App({
               {state.error ? errorNotice() : null}
             </div>
           ) : (
-            <div class="mm-screen">
+            <div class="hp-screen">
               <Thread
                 messages={messages}
                 busy={busy}
@@ -786,9 +786,9 @@ export function App({
               {state.error ? errorNotice() : null}
 
               {state.flow ? (
-                <div class="mm-flow-bar">
+                <div class="hp-flow-bar">
                   <span>{t('flowRunning')}</span>
-                  <button type="button" class="mm-chip" onClick={cancelFlow}>
+                  <button type="button" class="hp-chip" onClick={cancelFlow}>
                     {t('cancel')}
                   </button>
                 </div>
@@ -839,10 +839,10 @@ export function App({
   }
 }
 
-const MURMUR_URL = 'https://github.com/murmur-chat/murmur';
+const HELPPUFF_URL = 'https://github.com/helppuff-chat/helppuff';
 
 /**
- * The footer credit. `true` is the Murmur credit (its wording still
+ * The footer credit. `true` is the HelpPuff credit (its wording still
  * overridable through `strings.poweredBy`); an object whitelabels it, and one
  * without a `url` renders as plain text rather than a link to nowhere.
  */
@@ -854,9 +854,9 @@ function PoweredBy({
   t: ReturnType<typeof makeStrings>;
 }) {
   const text = value === true ? t('poweredBy') : value.text;
-  const url = value === true ? MURMUR_URL : value.url;
+  const url = value === true ? HELPPUFF_URL : value.url;
   return (
-    <div class="mm-powered">
+    <div class="hp-powered">
       {url ? (
         <a href={url} target="_blank" rel="noopener noreferrer">
           {text}

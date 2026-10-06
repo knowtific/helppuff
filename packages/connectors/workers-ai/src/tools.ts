@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { CALLBACK_FORM, message, messageId, type ConnectorContext } from '@murmur/connector-types';
-import type { Message } from '@murmur/protocol';
+import { CALLBACK_FORM, message, messageId, type ConnectorContext } from '@helppuff/connector-types';
+import type { Message } from '@helppuff/protocol';
 import { localTime, openNow } from './hours.js';
 import type { ToolCall, ToolDef } from './chat.js';
 import type { WorkersAiOptions } from './options.js';

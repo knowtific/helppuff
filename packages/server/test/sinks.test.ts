@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import webhookSink from '@murmur/sink-webhook';
-import { signBody, type LeadEvent, type SinkContext } from '@murmur/sink-types';
+import webhookSink from '@helppuff/sink-webhook';
+import { signBody, type LeadEvent, type SinkContext } from '@helppuff/sink-types';
 import { ORIGIN, harness, startBody, testConfig, testEnv } from './helpers.js';
 
 const event: LeadEvent = {
@@ -76,7 +76,7 @@ describe('the webhook sink', () => {
       event,
     );
 
-    const signature = headers['X-Murmur-Signature'];
+    const signature = headers['X-HelpPuff-Signature'];
     expect(signature).toMatch(/^sha256=[0-9a-f]{64}$/);
     expect(signature).toBe(await signBody('shhh', body));
   });
@@ -88,7 +88,7 @@ describe('the webhook sink', () => {
       return ok();
     }) as unknown as typeof fetch;
     await webhookSink.onLead(ctx({ url: 'https://hook.example' }, doFetch), event);
-    expect(headers['X-Murmur-Signature']).toBeUndefined();
+    expect(headers['X-HelpPuff-Signature']).toBeUndefined();
   });
 
   it('swallows a non-2xx rather than throwing at the visitor', async () => {

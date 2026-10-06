@@ -1,5 +1,5 @@
 {
-  "name": "@murmur/connector-types",
+  "name": "@helppuff/connector-types",
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
@@ -8,7 +8,7 @@
   "exports": { ".": "./src/index.ts" },
   "scripts": { "typecheck": "tsc --noEmit" },
   "dependencies": {
-    "@murmur/protocol": "workspace:*",
+    "@helppuff/protocol": "workspace:*",
     "zod": "^3.25.76"
   }
 }

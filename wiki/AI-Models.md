@@ -24,7 +24,7 @@ change, never a code change.
 
 ## Choosing the answer model
 
-Measured in Murmur on 2026-10-05 against a real site, through the widget's
+Measured in HelpPuff on 2026-10-05 against a real site, through the widget's
 own API, on the Workers Free plan. Each model had the same conversation:
 a question the site answers, a follow-up that needs the earlier message, a
 question the site does not cover (it should say no or not sure, never
@@ -52,7 +52,7 @@ sample, so treat one right or wrong answer as noise.
   the knowledge search and everything else included.
 - **Neurons per answer** includes the search and each conversation's
   summary. **Answers a day** is the 10,000 free neurons divided by it;
-  Murmur's default budget stops at 9,000 to leave room for learning the
+  HelpPuff's default budget stops at 9,000 to leave room for learning the
   site.
 - **Wrong answers** were mostly the same three kinds: promising things the
   site does not offer, writing a tool call or an options line into the reply
@@ -153,7 +153,7 @@ off-topic questions ("the team will help with your poem").
 
 **So thinking is always on.** It costs about 4 seconds before the first
 words and ~55% more neurons, and buys answers that do not leak, promise or
-agree to things they should not. Murmur also no longer relies on the model
+agree to things they should not. HelpPuff also no longer relies on the model
 alone for the worst of these: a reply that repeats its instructions is
 replaced before it reaches the visitor, the built-in rules now cover
 off-topic questions, promises and false facts, and long questions are
@@ -164,13 +164,13 @@ lacked).
 
 The embedding model must make vectors the size the Vectorize index was
 created with (1024 by default): BGE-M3, Qwen3 Embedding 0.6B or
-BGE Large EN v1.5. Another size means deleting the index (`murmur deploy`
+BGE Large EN v1.5. Another size means deleting the index (`helppuff deploy`
 says how) and re-learning the site.
 
 ## Other backends
 
 With another backend, that provider's model writes the answers and you pay
-the provider. Murmur's own knowledge base (when used) still uses the
+the provider. HelpPuff's own knowledge base (when used) still uses the
 Workers AI models above for search.
 
 | Backend | Default answer model | Common alternatives |

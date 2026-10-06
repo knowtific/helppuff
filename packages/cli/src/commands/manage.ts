@@ -6,7 +6,7 @@ import { c } from '../output.js';
 import { chat, type ChatTurn } from '../engine/chat.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { applySettings, murmurConfigSchema, settingsSchema, upgradeSettings, type Settings } from '@murmur/server';
+import { applySettings, helppuffConfigSchema, settingsSchema, upgradeSettings, type Settings } from '@helppuff/server';
 import { adminApi } from '../engine/admin-api.js';
 import { readState, writeState } from '../engine/state.js';
 import { compile, DEV_PORT, devOrigin, embedSnippet } from '../engine/compile.js';
@@ -26,7 +26,7 @@ function target(ctx: Ctx, loaded: LoadedProject): { url: string; origin: string 
   const url = str(ctx.flags, 'url') ?? loaded.project.cloudflare.url;
   if (!url) {
     throw new CliError('not_deployed', 'This assistant has not been deployed yet.', {
-      hint: 'murmur deploy   (or `murmur dev` and then `murmur chat --local`)',
+      hint: 'helppuff deploy   (or `helppuff dev` and then `helppuff chat --local`)',
     });
   }
   // The Worker's own origin is always allowed: it is where the preview page lives.
@@ -40,17 +40,17 @@ export async function chatCommand(ctx: Ctx): Promise<number> {
   const message = ctx.positionals.join(' ').trim();
 
   if (message) {
-    const secret = loadEnv(loaded.dir)['MURMUR_SECRET'];
+    const secret = loadEnv(loaded.dir)['HELPPUFF_SECRET'];
     const turn = await chat({ url, site: loaded.project.site, origin, message, session: str(ctx.flags, 'session'), secret });
     ctx.out.result(
-      { reply: turn.reply, messages: turn.messages, session: turn.session, next: ['Continue with: murmur chat "<message>" --session <session> --json'] },
+      { reply: turn.reply, messages: turn.messages, session: turn.session, next: ['Continue with: helppuff chat "<message>" --session <session> --json'] },
       () => process.stdout.write(`${turn.reply || c.dim('(no reply)')}\n`),
     );
     return 0;
   }
 
   if (!ctx.interactive) {
-    throw new CliError('usage', 'Give the message to send: murmur chat "your question"', { exitCode: 2 });
+    throw new CliError('usage', 'Give the message to send: helppuff chat "your question"', { exitCode: 2 });
   }
   process.stdout.write(c.dim(`Chatting with ${url} as a visitor. Empty line or Ctrl-C to quit.\n\n`));
   const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -59,7 +59,7 @@ export async function chatCommand(ctx: Ctx): Promise<number> {
     for (;;) {
       const line = (await rl.question(c.cyan('you › '))).trim();
       if (!line) break;
-      const turn: ChatTurn = await chat({ url, site: loaded.project.site, origin, message: line, session, secret: loadEnv(loaded.dir)['MURMUR_SECRET'] });
+      const turn: ChatTurn = await chat({ url, site: loaded.project.site, origin, message: line, session, secret: loadEnv(loaded.dir)['HELPPUFF_SECRET'] });
       session = turn.session;
       process.stdout.write(`${c.bold('bot › ')}${turn.reply.replace(/\n/g, '\n      ')}\n\n`);
     }
@@ -100,10 +100,10 @@ export async function statusCommand(ctx: Ctx): Promise<number> {
     embed: url ? embedSnippet(url, project.site) : null,
     worker: workerNameFor(project),
     knowledge,
-    ...(url && project.backend.type === 'retell' && project.backend.retrieval === 'murmur'
+    ...(url && project.backend.type === 'retell' && project.backend.retrieval === 'helppuff'
       ? { retellKnowledgeFunction: { method: 'POST', url: `${url}/v1/sites/${project.site}/retell/kb`, parameters: { query: { type: 'string' } } } }
       : {}),
-    next: url ? ['murmur ask "<question>" --json', 'murmur doctor --json'] : ['murmur deploy --json'],
+    next: url ? ['helppuff ask "<question>" --json', 'helppuff doctor --json'] : ['helppuff deploy --json'],
   };
   ctx.out.result(status, () => {
     const backend = project.backend as Record<string, unknown>;
@@ -111,7 +111,7 @@ export async function statusCommand(ctx: Ctx): Promise<number> {
       `${c.bold(project.name)} ${c.dim(`(${project.site})`)}`,
       `  backend   ${backend['type']}${backend['model'] ? ` · ${String(backend['model'])}` : ''}`,
       `  website   ${project.website ?? c.dim('none')}`,
-      url ? `  preview   ${c.cyan(`${url}/`)}` : `  deployed  ${c.yellow('not yet')} — run ${c.cyan('murmur deploy')}`,
+      url ? `  preview   ${c.cyan(`${url}/`)}` : `  deployed  ${c.yellow('not yet')} — run ${c.cyan('helppuff deploy')}`,
       ...(url ? [`  embed     ${embedSnippet(url, project.site)}`] : []),
       ...(knowledge && 'chunks' in knowledge
         ? [
@@ -142,7 +142,7 @@ export async function embedCommand(ctx: Ctx): Promise<number> {
   assertKnown(ctx.flags, [], 'embed');
   const loaded = loadProject(ctx.cwd);
   const url = loaded.project.cloudflare.url;
-  if (!url) throw new CliError('not_deployed', 'Not deployed yet, so there is no snippet.', { hint: 'murmur deploy' });
+  if (!url) throw new CliError('not_deployed', 'Not deployed yet, so there is no snippet.', { hint: 'helppuff deploy' });
   const embed = embedSnippet(url, loaded.project.site);
   ctx.out.result({ embed, url }, () => process.stdout.write(`${embed}\n`));
   return 0;
@@ -203,7 +203,7 @@ export async function secretCommand(ctx: Ctx): Promise<number> {
   }
 
   if (sub !== 'set' || !name) {
-    throw new CliError('usage', 'Usage: murmur secret set <NAME> [--value <v>]  |  murmur secret list', { exitCode: 2 });
+    throw new CliError('usage', 'Usage: helppuff secret set <NAME> [--value <v>]  |  helppuff secret list', { exitCode: 2 });
   }
   if (!/^[A-Z][A-Z0-9_]*$/.test(name)) {
     throw new CliError('usage', `Secret names are UPPER_SNAKE_CASE; got "${name}".`, { exitCode: 2 });
@@ -247,13 +247,13 @@ function parseValue(text: string): unknown {
 type LiveSettings = { settings: Settings; hash: string; connector: string; meta: { at: number; by: string | null } | null };
 
 /**
- * Live settings → murmur.json, for exactly the fields the dashboard edits.
+ * Live settings → helppuff.json, for exactly the fields the dashboard edits.
  * The server's own `applySettings` produces the values, so a deploy right
  * after a pull compiles to the very settings that are live.
  */
 export function pullSettings(loaded: LoadedProject, live: Settings): LoadedProject {
   const compiled = compile(loaded);
-  const site = murmurConfigSchema.parse(compiled.serverConfig).sites[loaded.project.site]!;
+  const site = helppuffConfigSchema.parse(compiled.serverConfig).sites[loaded.project.site]!;
   const applied = applySettings(site, live);
   return updateProject(loaded, (raw) => {
     const obj = (parent: Record<string, unknown>, key: string) => {
@@ -300,8 +300,8 @@ export async function configCommand(ctx: Ctx): Promise<number> {
     const updated = pullSettings(loaded, settings);
     compile(updated);
     writeState(loaded.dir, { ...readState(loaded.dir), settings: { hash: live.hash } });
-    ctx.out.result({ pulled: true, settings, changedBy: live.meta?.by ?? null, next: ['murmur deploy --json'] }, () =>
-      ctx.out.success(`murmur.json now has the live settings${live.meta?.by && live.meta.by !== 'deploy' ? ` (changed by ${live.meta.by})` : ''}. Review the diff, then ${c.cyan('murmur deploy')}.`),
+    ctx.out.result({ pulled: true, settings, changedBy: live.meta?.by ?? null, next: ['helppuff deploy --json'] }, () =>
+      ctx.out.success(`helppuff.json now has the live settings${live.meta?.by && live.meta.by !== 'deploy' ? ` (changed by ${live.meta.by})` : ''}. Review the diff, then ${c.cyan('helppuff deploy')}.`),
     );
     return 0;
   }
@@ -315,7 +315,7 @@ export async function configCommand(ctx: Ctx): Promise<number> {
     return 0;
   }
   if (sub === 'import') {
-    if (!path) throw new CliError('usage', 'Usage: murmur config import <file.json>', { exitCode: 2 });
+    if (!path) throw new CliError('usage', 'Usage: helppuff config import <file.json>', { exitCode: 2 });
     let value: Record<string, unknown>;
     try {
       value = JSON.parse(readFileSync(resolve(ctx.cwd, path), 'utf8')) as Record<string, unknown>;
@@ -323,14 +323,14 @@ export async function configCommand(ctx: Ctx): Promise<number> {
       throw new CliError('usage', `Could not read ${path}: ${(thrown as Error).message}`, { exitCode: 2 });
     }
     if (looksLikeProject(value)) {
-      // A whole murmur.json: keep this deployment's own resource ids unless the file brings its own.
+      // A whole helppuff.json: keep this deployment's own resource ids unless the file brings its own.
       const next = { ...value, ...(value['cloudflare'] ? {} : { cloudflare: loaded.raw['cloudflare'] ?? {} }) };
       const updated = updateProject(loaded, (raw) => {
         for (const key of Object.keys(raw)) delete raw[key];
         Object.assign(raw, next);
       });
       compile(updated);
-      ctx.out.result({ imported: 'murmur.json', next: ['murmur deploy --json'] }, () => ctx.out.success(`Imported ${path} as murmur.json. Run ${c.cyan('murmur deploy')} to publish.`));
+      ctx.out.result({ imported: 'helppuff.json', next: ['helppuff deploy --json'] }, () => ctx.out.success(`Imported ${path} as helppuff.json. Run ${c.cyan('helppuff deploy')} to publish.`));
       return 0;
     }
     // A settings object (what `config export --live` prints): published live, then pulled.
@@ -338,7 +338,7 @@ export async function configCommand(ctx: Ctx): Promise<number> {
     const saved = await api.send<LiveSettings>('PUT', '/admin/api/settings', { settings: value });
     pullSettings(loaded, saved.settings);
     writeState(loaded.dir, { ...readState(loaded.dir), settings: { hash: saved.hash } });
-    ctx.out.result({ imported: 'settings', live: true, settings: saved.settings }, () => ctx.out.success('Settings are live and written to murmur.json.'));
+    ctx.out.result({ imported: 'settings', live: true, settings: saved.settings }, () => ctx.out.success('Settings are live and written to helppuff.json.'));
     return 0;
   }
 
@@ -358,14 +358,14 @@ export async function configCommand(ctx: Ctx): Promise<number> {
       node[keys.at(-1)!] = value;
     });
     compile(updated);
-    ctx.out.result({ path, value, next: ['murmur deploy --json'] }, () =>
-      ctx.out.success(`${path} = ${JSON.stringify(value)}. Run ${c.cyan('murmur deploy')} to publish.`),
+    ctx.out.result({ path, value, next: ['helppuff deploy --json'] }, () =>
+      ctx.out.success(`${path} = ${JSON.stringify(value)}. Run ${c.cyan('helppuff deploy')} to publish.`),
     );
     return 0;
   }
   throw new CliError(
     'usage',
-    'Usage: murmur config get [path] | set <path> <value> | pull | export [--live] | import <file> | schema',
+    'Usage: helppuff config get [path] | set <path> <value> | pull | export [--live] | import <file> | schema',
     { exitCode: 2 },
   );
 }
@@ -376,11 +376,11 @@ export async function validateCommand(ctx: Ctx): Promise<number> {
   const compiled = compile(loaded);
   writeSchemaFile(loaded.dir);
   const env = loadEnv(loaded.dir);
-  // MURMUR_SECRET and ADMIN_API_KEY are generated by deploy.
-  const missing = compiled.secrets.filter((n) => n !== 'MURMUR_SECRET' && n !== 'ADMIN_API_KEY' && !env[n]);
+  // HELPPUFF_SECRET and ADMIN_API_KEY are generated by deploy.
+  const missing = compiled.secrets.filter((n) => n !== 'HELPPUFF_SECRET' && n !== 'ADMIN_API_KEY' && !env[n]);
   ctx.out.result({ valid: true, site: compiled.site, secrets: compiled.secrets, missingSecrets: missing }, () => {
-    ctx.out.success(`murmur.json and ${loaded.project.prompt} are valid.`);
-    if (missing.length) ctx.out.warn(`Set before deploying: ${missing.map((m) => `murmur secret set ${m}`).join(', ')}`);
+    ctx.out.success(`helppuff.json and ${loaded.project.prompt} are valid.`);
+    if (missing.length) ctx.out.warn(`Set before deploying: ${missing.map((m) => `helppuff secret set ${m}`).join(', ')}`);
   });
   return 0;
 }

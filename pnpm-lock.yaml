@@ -8,7 +8,7 @@ importers:
 
   .:
     dependencies:
-      '@murmur/server':
+      '@helppuff/server':
         specifier: workspace:*
         version: link:packages/server
     devDependencies:
@@ -64,22 +64,22 @@ importers:
       '@clack/prompts':
         specifier: ^1.8.1
         version: 1.8.1
-      '@murmur/connector-types':
+      '@helppuff/connector-types':
         specifier: workspace:*
         version: link:../connectors/_types
-      '@murmur/connector-workers-ai':
+      '@helppuff/connector-workers-ai':
         specifier: workspace:*
         version: link:../connectors/workers-ai
-      '@murmur/protocol':
+      '@helppuff/protocol':
         specifier: workspace:*
         version: link:../protocol
-      '@murmur/rag':
+      '@helppuff/rag':
         specifier: workspace:*
         version: link:../rag
-      '@murmur/server':
+      '@helppuff/server':
         specifier: workspace:*
         version: link:../server
-      '@murmur/widget':
+      '@helppuff/widget':
         specifier: workspace:*
         version: link:../widget
       node-html-parser:
@@ -94,7 +94,7 @@ importers:
 
   packages/connectors/_types:
     dependencies:
-      '@murmur/protocol':
+      '@helppuff/protocol':
         specifier: workspace:*
         version: link:../../protocol
       zod:
@@ -106,13 +106,13 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.128.0
         version: 0.128.0(zod@3.25.76)
-      '@murmur/connector-types':
+      '@helppuff/connector-types':
         specifier: workspace:*
         version: link:../_types
-      '@murmur/protocol':
+      '@helppuff/protocol':
         specifier: workspace:*
         version: link:../../protocol
-      '@murmur/rag':
+      '@helppuff/rag':
         specifier: workspace:*
         version: link:../../rag
       zod:
@@ -121,10 +121,10 @@ importers:
 
   packages/connectors/cloudflare:
     dependencies:
-      '@murmur/connector-types':
+      '@helppuff/connector-types':
         specifier: workspace:*
         version: link:../_types
-      '@murmur/protocol':
+      '@helppuff/protocol':
         specifier: workspace:*
         version: link:../../protocol
       zod:
@@ -133,10 +133,10 @@ importers:
 
   packages/connectors/echo:
     dependencies:
-      '@murmur/connector-types':
+      '@helppuff/connector-types':
         specifier: workspace:*
         version: link:../_types
-      '@murmur/protocol':
+      '@helppuff/protocol':
         specifier: workspace:*
         version: link:../../protocol
       zod:
@@ -145,13 +145,13 @@ importers:
 
   packages/connectors/gemini:
     dependencies:
-      '@murmur/connector-types':
+      '@helppuff/connector-types':
         specifier: workspace:*
         version: link:../_types
-      '@murmur/protocol':
+      '@helppuff/protocol':
         specifier: workspace:*
         version: link:../../protocol
-      '@murmur/rag':
+      '@helppuff/rag':
         specifier: workspace:*
         version: link:../../rag
       zod:
@@ -160,10 +160,10 @@ importers:
 
   packages/connectors/http:
     dependencies:
-      '@murmur/connector-types':
+      '@helppuff/connector-types':
         specifier: workspace:*
         version: link:../_types
-      '@murmur/protocol':
+      '@helppuff/protocol':
         specifier: workspace:*
         version: link:../../protocol
       zod:
@@ -172,13 +172,13 @@ importers:
 
   packages/connectors/openai:
     dependencies:
-      '@murmur/connector-types':
+      '@helppuff/connector-types':
         specifier: workspace:*
         version: link:../_types
-      '@murmur/protocol':
+      '@helppuff/protocol':
         specifier: workspace:*
         version: link:../../protocol
-      '@murmur/rag':
+      '@helppuff/rag':
         specifier: workspace:*
         version: link:../../rag
       zod:
@@ -187,10 +187,10 @@ importers:
 
   packages/connectors/retell:
     dependencies:
-      '@murmur/connector-types':
+      '@helppuff/connector-types':
         specifier: workspace:*
         version: link:../_types
-      '@murmur/protocol':
+      '@helppuff/protocol':
         specifier: workspace:*
         version: link:../../protocol
       zod:
@@ -199,13 +199,13 @@ importers:
 
   packages/connectors/workers-ai:
     dependencies:
-      '@murmur/connector-types':
+      '@helppuff/connector-types':
         specifier: workspace:*
         version: link:../_types
-      '@murmur/protocol':
+      '@helppuff/protocol':
         specifier: workspace:*
         version: link:../../protocol
-      '@murmur/rag':
+      '@helppuff/rag':
         specifier: workspace:*
         version: link:../../rag
       zod:
@@ -260,43 +260,43 @@ importers:
 
   packages/server:
     dependencies:
-      '@murmur/connector-anthropic':
+      '@helppuff/connector-anthropic':
         specifier: workspace:*
         version: link:../connectors/anthropic
-      '@murmur/connector-cloudflare':
+      '@helppuff/connector-cloudflare':
         specifier: workspace:*
         version: link:../connectors/cloudflare
-      '@murmur/connector-echo':
+      '@helppuff/connector-echo':
         specifier: workspace:*
         version: link:../connectors/echo
-      '@murmur/connector-gemini':
+      '@helppuff/connector-gemini':
         specifier: workspace:*
         version: link:../connectors/gemini
-      '@murmur/connector-http':
+      '@helppuff/connector-http':
         specifier: workspace:*
         version: link:../connectors/http
-      '@murmur/connector-openai':
+      '@helppuff/connector-openai':
         specifier: workspace:*
         version: link:../connectors/openai
-      '@murmur/connector-retell':
+      '@helppuff/connector-retell':
         specifier: workspace:*
         version: link:../connectors/retell
-      '@murmur/connector-types':
+      '@helppuff/connector-types':
         specifier: workspace:*
         version: link:../connectors/_types
-      '@murmur/connector-workers-ai':
+      '@helppuff/connector-workers-ai':
         specifier: workspace:*
         version: link:../connectors/workers-ai
-      '@murmur/protocol':
+      '@helppuff/protocol':
         specifier: workspace:*
         version: link:../protocol
-      '@murmur/rag':
+      '@helppuff/rag':
         specifier: workspace:*
         version: link:../rag
-      '@murmur/sink-types':
+      '@helppuff/sink-types':
         specifier: workspace:*
         version: link:../sinks/_types
-      '@murmur/sink-webhook':
+      '@helppuff/sink-webhook':
         specifier: workspace:*
         version: link:../sinks/webhook
       hono:
@@ -315,7 +315,7 @@ importers:
 
   packages/sinks/_types:
     dependencies:
-      '@murmur/protocol':
+      '@helppuff/protocol':
         specifier: workspace:*
         version: link:../../protocol
       zod:
@@ -324,7 +324,7 @@ importers:
 
   packages/sinks/webhook:
     dependencies:
-      '@murmur/sink-types':
+      '@helppuff/sink-types':
         specifier: workspace:*
         version: link:../_types
       zod:
@@ -337,7 +337,7 @@ importers:
         specifier: ^10.27.0
         version: 10.29.8
     devDependencies:
-      '@murmur/protocol':
+      '@helppuff/protocol':
         specifier: workspace:*
         version: link:../protocol
       typescript:

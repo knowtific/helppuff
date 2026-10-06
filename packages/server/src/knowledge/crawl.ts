@@ -9,9 +9,9 @@ import {
   selectedBy,
   type CrawlParams,
   type Discovery,
-} from '@murmur/rag';
+} from '@helppuff/rag';
 import type { SiteConfig } from '../config/schema.js';
-import { MurmurError } from '../core/errors.js';
+import { HelpPuffError } from '../core/errors.js';
 import { aiSettingsFor, ownsKnowledge, websiteFor, type KnowledgeEnv } from './env.js';
 
 /**
@@ -37,7 +37,7 @@ export const userAgentFor = (workerUrl?: string) =>
 export async function discoverSite(env: KnowledgeEnv, siteId: string, site: SiteConfig, workerUrl?: string): Promise<Discovery> {
   const website = websiteFor(site);
   if (!website) {
-    throw new MurmurError('bad_request', { message: 'Set the website address first (knowledge.website).', detail: 'knowledge_no_website' });
+    throw new HelpPuffError('bad_request', { message: 'Set the website address first (knowledge.website).', detail: 'knowledge_no_website' });
   }
   const found = await discover(website, { userAgent: userAgentFor(workerUrl), maxUrls: 1000 });
   // The configured exclusions untick (but still list) matching pages.
@@ -57,7 +57,7 @@ async function selectedPages(env: KnowledgeEnv, siteId: string): Promise<{ url: 
 
 export async function startCrawl(env: KnowledgeEnv, siteId: string, site: SiteConfig, request: StartCrawl, now: number): Promise<{ runId: string; total: number }> {
   if (!env.workflow) {
-    throw new MurmurError('internal', { message: 'This deployment has no crawl workflow. Run `murmur deploy` again.', detail: 'knowledge_no_workflow' });
+    throw new HelpPuffError('internal', { message: 'This deployment has no crawl workflow. Run `helppuff deploy` again.', detail: 'knowledge_no_workflow' });
   }
   const website = websiteFor(site);
   let pages: { url: string; category: string }[];
@@ -66,7 +66,7 @@ export async function startCrawl(env: KnowledgeEnv, siteId: string, site: SiteCo
       .map((u) => canonicalUrl(u))
       .filter((u): u is string => Boolean(u) && (!website || sameSite(u!, website)))
       .map((url) => ({ url, category: categorise({ url }) }));
-    if (!pages.length) throw new MurmurError('bad_request', { message: 'None of those addresses are pages of this website.', detail: 'knowledge_bad_urls' });
+    if (!pages.length) throw new HelpPuffError('bad_request', { message: 'None of those addresses are pages of this website.', detail: 'knowledge_bad_urls' });
   } else {
     pages = await selectedPages(env, siteId);
     if (!pages.length) {
@@ -76,7 +76,7 @@ export async function startCrawl(env: KnowledgeEnv, siteId: string, site: SiteCo
   }
   if (request.include?.length || request.exclude?.length) pages = pages.filter((p) => selectedBy(p.url, request.include, request.exclude));
   pages = [...new Map(pages.map((p) => [p.url, p])).values()].slice(0, site.knowledge.maxPages);
-  if (!pages.length) throw new MurmurError('bad_request', { message: 'No pages are selected to crawl.', detail: 'knowledge_nothing_selected' });
+  if (!pages.length) throw new HelpPuffError('bad_request', { message: 'No pages are selected to crawl.', detail: 'knowledge_nothing_selected' });
 
   // One crawl at a time per site: a new one supersedes whatever is running.
   await env.db.prepare("UPDATE crawl_runs SET status = 'cancelled', finished_at = ? WHERE site_id = ? AND status IN ('queued', 'running')").bind(now, siteId).run();
@@ -105,7 +105,7 @@ export async function startCrawl(env: KnowledgeEnv, siteId: string, site: SiteCo
     await env.workflow.create({ id: `${runId}-0`, params });
   } catch (thrown) {
     await env.db.prepare("UPDATE crawl_runs SET status = 'failed', error = ?, finished_at = ? WHERE id = ?").bind(String((thrown as Error)?.message ?? thrown).slice(0, 300), now, runId).run();
-    throw new MurmurError('internal', { message: 'The crawl could not start. Try again in a minute.', detail: 'knowledge_workflow_create_failed' });
+    throw new HelpPuffError('internal', { message: 'The crawl could not start. Try again in a minute.', detail: 'knowledge_workflow_create_failed' });
   }
   return { runId, total: pages.length };
 }

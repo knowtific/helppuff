@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { messageSchema } from '@murmur/protocol';
-import { isConnectorError, type ConnectorContext } from '@murmur/connector-types';
+import { messageSchema } from '@helppuff/protocol';
+import { isConnectorError, type ConnectorContext } from '@helppuff/connector-types';
 import anthropic, { mapAnthropicContent } from '../src/index.js';
 
 type Call = { url: string; init: RequestInit; headers: Headers };

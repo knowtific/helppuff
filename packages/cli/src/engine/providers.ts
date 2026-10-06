@@ -81,7 +81,7 @@ async function json<T>(doFetch: typeof fetch, url: string, init: RequestInit, wh
     throw new CliError(
       response.status === 401 || response.status === 403 ? 'provider_auth' : 'provider_error',
       `${what} failed (HTTP ${response.status}): ${text.slice(0, 300)}`,
-      response.status === 401 ? { hint: 'Check the API key: `murmur secret set <NAME>`.' } : {},
+      response.status === 401 ? { hint: 'Check the API key: `helppuff secret set <NAME>`.' } : {},
     );
   }
   return (text ? JSON.parse(text) : {}) as T;
@@ -174,7 +174,7 @@ export async function syncGeminiStore(
   let done = 0;
   await pool(opts.docs, 4, async (doc) => {
     // Multipart upload: JSON metadata, then the bytes.
-    const boundary = `murmur${Math.random().toString(36).slice(2)}`;
+    const boundary = `helppuff${Math.random().toString(36).slice(2)}`;
     const head = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({ displayName: doc.name, mimeType: doc.type })}\r\n--${boundary}\r\nContent-Type: ${doc.type}\r\n\r\n`;
     const tail = `\r\n--${boundary}--\r\n`;
     const body = new Blob([head, doc.data as BlobPart, tail]);

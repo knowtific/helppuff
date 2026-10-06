@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { messageSchema, type Message } from '@murmur/protocol';
-import { isConnectorError, parseMarkers, type ConnectorContext } from '@murmur/connector-types';
-import { indexDocument, usageDay, type AiLike } from '@murmur/rag';
+import { messageSchema, type Message } from '@helppuff/protocol';
+import { isConnectorError, parseMarkers, type ConnectorContext } from '@helppuff/connector-types';
+import { indexDocument, usageDay, type AiLike } from '@helppuff/rag';
 import connector, { citations, openNow, parseHours, readStream, withoutRepeatedParagraphs } from '../src/index.js';
 import { textCalls } from '../src/chat.js';
 import { fakeAi, fakeVectors, sqliteD1 } from '../../../rag/test/helpers.js';
@@ -62,7 +62,7 @@ async function world(replies: Reply[], options: Record<string, unknown> = {}) {
     options: connector.parseOptions({ instructions: 'You are Acme Plumbing’s assistant.', timezone: 'Australia/Melbourne', ...options }),
     siteId: 'acme',
     sessionId: 's1',
-    env: { AI: ai, VECTORS: vectors, MURMUR_DB: db },
+    env: { AI: ai, VECTORS: vectors, HELPPUFF_DB: db },
     kv: {
       get: async (k) => kv.get(k) ?? null,
       put: async (k, v) => void kv.set(k, v),

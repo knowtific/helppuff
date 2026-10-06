@@ -16,7 +16,7 @@ import { CliError, EXIT } from '../errors.js';
 
 const API = 'https://api.cloudflare.com/client/v4';
 
-/** The permissions `murmur` asks for, as named in the dashboard's token editor. */
+/** The permissions `helppuff` asks for, as named in the dashboard's token editor. */
 export const TOKEN_PERMISSIONS = [
   'Account › Workers Scripts › Edit',
   'Account › Workers KV Storage › Edit',
@@ -242,7 +242,7 @@ export class CloudflareApi {
     }
     if (!existing) {
       await this.call('POST', `/accounts/${accountId}/vectorize/v2/indexes`, {
-        json: { name, description: 'Murmur knowledge base', config: { dimensions, metric: 'cosine' } },
+        json: { name, description: 'HelpPuff knowledge base', config: { dimensions, metric: 'cosine' } },
       });
     }
     const listed = await this.call<{ metadataIndexes?: { propertyName?: string }[] }>(

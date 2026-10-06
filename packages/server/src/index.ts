@@ -1,4 +1,4 @@
-import config from '../../../murmur.config.js';
+import config from '../../../helppuff.config.js';
 import { createWorker } from './worker.js';
 
 export { CrawlWorkflow } from './workflows/crawl.js';

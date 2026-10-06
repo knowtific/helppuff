@@ -7,7 +7,7 @@ import { Badge, Button, Card, Empty, ErrorNote, Input, Skeleton } from './ui';
 /**
  * Settings → Webhooks: endpoints that receive what happens — chats, messages,
  * leads, callbacks, ratings, learning — as signed JSON. The same API as
- * `murmur webhooks`.
+ * `helppuff webhooks`.
  */
 
 type Webhook = {
@@ -67,8 +67,8 @@ export function Webhooks() {
       <Card className="space-y-2 px-4 py-3 text-xs text-muted-foreground">
         <p className="text-[13px] font-medium text-foreground">Checking it came from us</p>
         <p>
-          Every delivery is a JSON <code>POST</code> with <code>X-Murmur-Event</code>, <code>X-Murmur-Delivery</code>, <code>X-Murmur-Timestamp</code> and{' '}
-          <code>X-Murmur-Signature</code>. The signature is <code>sha256=</code> + the hex HMAC-SHA256 of <code>timestamp + "." + body</code> with the webhook’s signing secret.
+          Every delivery is a JSON <code>POST</code> with <code>X-HelpPuff-Event</code>, <code>X-HelpPuff-Delivery</code>, <code>X-HelpPuff-Timestamp</code> and{' '}
+          <code>X-HelpPuff-Signature</code>. The signature is <code>sha256=</code> + the hex HMAC-SHA256 of <code>timestamp + "." + body</code> with the webhook’s signing secret.
           Reject timestamps older than five minutes; use the body’s <code>id</code> to ignore a repeat.
         </p>
       </Card>

@@ -1,6 +1,6 @@
 # Leads and callbacks
 
-A **lead** is a person who left their details. Murmur turns conversations
+A **lead** is a person who left their details. HelpPuff turns conversations
 into leads in three ways, keeps them in the dashboard, and can send them
 anywhere else.
 
@@ -55,7 +55,7 @@ conversation it came from.
   over time, from different chats.
 - Webhooks: `callback.requested` when one is made, `callback.updated` when it
   is closed, reopened or its note changes.
-- In the terminal: `murmur callbacks` lists them; `murmur callbacks done <id>
+- In the terminal: `helppuff callbacks` lists them; `helppuff callbacks done <id>
   --note "…"` closes one.
 
 ## Sending leads elsewhere
@@ -63,7 +63,7 @@ conversation it came from.
 - **[[Webhooks]]** (Settings → Webhooks): every event as signed JSON, including
   `lead.captured`, `callback.requested` and `lead.updated`. The way to connect
   Zapier, Make, n8n, a CRM or Slack.
-- **`leads.webhook`** in `murmur.json`: a simpler, older option that POSTs each
+- **`leads.webhook`** in `helppuff.json`: a simpler, older option that POSTs each
   lead to one URL:
 
   ```json
@@ -74,7 +74,7 @@ Because one person can produce several `lead.captured` events (the form, then
 a phone number typed later), update the contact by email in your CRM rather
 than always creating a new one.
 
-## The form, in `murmur.json`
+## The form, in `helppuff.json`
 
 ```json
 "widget": {
@@ -101,6 +101,6 @@ for details only when arranging a callback.
 ## Privacy
 
 Leads and transcripts are stored in the D1 database on **your** Cloudflare
-account, nowhere else. Murmur stores no IP addresses (only the country), and
+account, nowhere else. HelpPuff stores no IP addresses (only the country), and
 its logs never contain message text or contact details. To delete everything:
-`murmur destroy --yes`.
+`helppuff destroy --yes`.

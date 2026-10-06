@@ -1,4 +1,4 @@
-# Murmur
+# HelpPuff
 
 **An open-source AI chat assistant for your website, running on your own
 Cloudflare account.** One command sets up the chat widget, a knowledge base
@@ -7,7 +7,7 @@ default setup runs on the **Workers Free plan**
 ([what fits in it](../../wiki/Cloudflare-Free-Plan)).
 
 ```bash
-npx @knowtific/murmur
+npx @knowtific/helppuff
 ```
 
 It asks for your website, deploys everything to your Cloudflare account, and
@@ -16,7 +16,7 @@ pages to learn from, and check the details it found. Then paste one script
 tag on your site.
 
 Or ask your coding agent: with the Claude Code plugin (or
-`npx -y @knowtific/murmur skill install`), "add an AI chatbot to my website"
+`npx -y @knowtific/helppuff skill install`), "add an AI chatbot to my website"
 is enough.
 
 ## What you get
@@ -35,8 +35,8 @@ is enough.
 - **Your choice of AI**: Workers AI by default, or Cloudflare AI Search,
   OpenAI, Gemini, Claude, Retell, or your own API.
 - **Built for agents**: every command speaks `--json`, missing answers come
-  back as questions, and `murmur mcp` serves the same engine as MCP tools.
-- **Safe upgrades**: `npx @knowtific/murmur@latest upgrade` keeps your data,
+  back as questions, and `helppuff mcp` serves the same engine as MCP tools.
+- **Safe upgrades**: `npx @knowtific/helppuff@latest upgrade` keeps your data,
   notes a database restore point, and can be rolled back.
 
 ## Documentation
@@ -47,7 +47,7 @@ Everything is in the **[wiki](../../wiki)**:
 - [Configuration](../../wiki/Configuration) · [Configuration reference](../../wiki/Configuration-Reference) · [CLI reference](../../wiki/CLI-Reference)
 - [Providers](../../wiki/Providers) · [Knowledge base](../../wiki/Knowledge-Base) · [The widget](../../wiki/Widget) · [Leads](../../wiki/Leads) · [Webhooks](../../wiki/Webhooks)
 - [Deployment](../../wiki/Deployment) · [Upgrading](../../wiki/Upgrading) · [Costs and limits](../../wiki/Costs-and-Limits) · [Cloudflare Free plan limits](../../wiki/Cloudflare-Free-Plan) · [Security](../../wiki/Security) · [Troubleshooting](../../wiki/Troubleshooting)
-- [Extending Murmur](../../wiki/Extending) · [Protocol](../../wiki/Protocol) · [Contributing](../../wiki/Contributing)
+- [Extending HelpPuff](../../wiki/Extending) · [Protocol](../../wiki/Protocol) · [Contributing](../../wiki/Contributing)
 
 The wiki's source is the [`wiki/`](wiki) folder of this repository.
 
@@ -69,7 +69,7 @@ the AI backend through a connector. Sessions are stateless (signed tokens),
 so there is no session store to run. Nothing leaves your Cloudflare account
 except calls to an AI provider you chose.
 
-## Working on Murmur
+## Working on HelpPuff
 
 ```bash
 pnpm install

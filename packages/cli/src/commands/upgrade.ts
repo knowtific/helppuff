@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import * as p from '@clack/prompts';
-import { MIGRATIONS, newer } from '@murmur/server';
+import { MIGRATIONS, newer } from '@helppuff/server';
 import { assertKnown, bool } from '../args.js';
 import { CliError, EXIT } from '../errors.js';
 import { c } from '../output.js';
@@ -13,19 +13,19 @@ import { latestVersion, PACKAGE_NAME, VERSION } from '../engine/version.js';
 import type { Ctx } from './context.js';
 
 /**
- * `murmur upgrade` — bring a deployed assistant to this release, safely.
+ * `helppuff upgrade` — bring a deployed assistant to this release, safely.
  *
  *   1. What is live (the Worker's /healthz), what this CLI is, what is newest.
- *   2. The plan: murmur.json format changes, D1 migrations still to apply.
+ *   2. The plan: helppuff.json format changes, D1 migrations still to apply.
  *   3. A restore point: D1 Time Travel is always on, so the time just before
  *      the upgrade is enough to put the database back (`wrangler d1
  *      time-travel restore … --timestamp=…`, kept 7 days on the Free plan).
- *   4. The deploy itself — the same as `murmur deploy`: migrations first,
+ *   4. The deploy itself — the same as `helppuff deploy`: migrations first,
  *      then the new Worker, then config.
  *
  * `--check` stops after step 2. Migrations only ever add (see the policy in
  * server/src/db/migrations.ts), so the previous release keeps working on the
- * upgraded database: rolling back is `npx @knowtific/murmur@<version> deploy
+ * upgraded database: rolling back is `npx @knowtific/helppuff@<version> deploy
  * --allow-downgrade`.
  */
 
@@ -51,18 +51,18 @@ export async function upgradeCommand(ctx: Ctx): Promise<number> {
   assertKnown(ctx.flags, ['check', 'yes', 'y', 'allow-downgrade'], 'upgrade');
   const loaded = loadProject(ctx.cwd);
   const url = loaded.project.cloudflare.url;
-  if (!url) throw new CliError('not_deployed', 'Nothing is deployed from this folder yet.', { hint: 'murmur deploy' });
+  if (!url) throw new CliError('not_deployed', 'Nothing is deployed from this folder yet.', { hint: 'helppuff deploy' });
 
   ctx.out.progress('Checking versions…');
   const [live, latest] = await Promise.all([liveVersion(url), latestVersion()]);
   if (latest && newer(latest, VERSION)) {
-    throw new CliError('cli_outdated', `This is murmur ${VERSION}; ${latest} is the latest release.`, {
+    throw new CliError('cli_outdated', `This is helppuff ${VERSION}; ${latest} is the latest release.`, {
       hint: `Run the latest: npx ${PACKAGE_NAME}@latest upgrade`,
       details: { cli: VERSION, latest },
     });
   }
   if (live.version && newer(live.version, VERSION) && !ctx.flags['allow-downgrade']) {
-    throw new CliError('downgrade', `The Worker already runs murmur ${live.version}, newer than this ${VERSION}.`, {
+    throw new CliError('downgrade', `The Worker already runs helppuff ${live.version}, newer than this ${VERSION}.`, {
       hint: `Use the newer CLI: npx ${PACKAGE_NAME}@latest upgrade`,
     });
   }
@@ -85,7 +85,7 @@ export async function upgradeCommand(ctx: Ctx): Promise<number> {
       [
         `${c.bold('Deployed')}  ${live.version ?? c.dim('unknown (a release from before version reporting)')}`,
         `${c.bold('Upgrade to')} ${VERSION}${latest && latest === VERSION ? c.dim(' (latest)') : ''}`,
-        ...(project.changes.length ? [`${c.bold('murmur.json')}`, ...project.changes.map((change) => `  • ${change}`)] : []),
+        ...(project.changes.length ? [`${c.bold('helppuff.json')}`, ...project.changes.map((change) => `  • ${change}`)] : []),
         migrations.pending.length
           ? `${c.bold('Database')}  ${migrations.pending.length} migration(s): ${migrations.pending.map((m) => m.name).join(', ')}`
           : `${c.bold('Database')}  ${migrations.source === 'unknown' ? c.dim('checked during the deploy') : 'up to date'}`,
@@ -145,7 +145,7 @@ export async function upgradeCommand(ctx: Ctx): Promise<number> {
 
   ctx.out.result({ ...plan, restore, deploy: result }, () => {
     for (const warning of result.warnings) process.stdout.write(`${c.yellow('!')} ${warning}\n`);
-    ctx.out.success(`Now on murmur ${VERSION}${live.version ? ` (was ${live.version})` : ''}.`);
+    ctx.out.success(`Now on helppuff ${VERSION}${live.version ? ` (was ${live.version})` : ''}.`);
     if (restore) process.stdout.write(c.dim(`To put the database back as it was (within 7 days): ${restore.command}\n`));
   });
   return 0;

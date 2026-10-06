@@ -3,15 +3,15 @@
 `"backend": { "type": "openai" }`
 
 Answers with OpenAI's [Responses API](https://platform.openai.com/docs/api-reference/responses).
-Knowledge comes from an OpenAI vector store (File Search), or from Murmur's
+Knowledge comes from an OpenAI vector store (File Search), or from HelpPuff's
 own knowledge base.
 
 ## Set up
 
 ```bash
-npx @knowtific/murmur init --url acme.com --backend openai --api-key "$OPENAI_API_KEY"
+npx @knowtific/helppuff init --url acme.com --backend openai --api-key "$OPENAI_API_KEY"
 # or later:
-murmur secret set OPENAI_API_KEY
+helppuff secret set OPENAI_API_KEY
 ```
 
 ```json
@@ -26,19 +26,19 @@ murmur secret set OPENAI_API_KEY
 | --- | --- | --- |
 | `model` | `gpt-5-mini` | Any Responses model |
 | `apiKey` | `{ "env": "OPENAI_API_KEY" }` | By environment variable name |
-| `retrieval` | — | `"murmur"`: answer from Murmur's knowledge base (crawled on your Cloudflare account) instead of a vector store |
-| `vectorStoreId` | — | Filled in by `murmur knowledge sync` |
+| `retrieval` | — | `"helppuff"`: answer from HelpPuff's knowledge base (crawled on your Cloudflare account) instead of a vector store |
+| `vectorStoreId` | — | Filled in by `helppuff knowledge sync` |
 | `promptId` | — | A stored prompt in the OpenAI dashboard; used instead of `prompt.md` |
 | `baseUrl` | OpenAI's | Another Responses-compatible endpoint, e.g. Azure OpenAI |
 
 ## Knowledge: two ways
 
-**OpenAI File Search** (the default for this backend). `murmur knowledge sync`
+**OpenAI File Search** (the default for this backend). `helppuff knowledge sync`
 crawls your site (up to `knowledge.website.maxPages`, default 50) and uploads
 it, with `knowledge.files`, to a vector store it creates; the id is written to
 `vectorStoreId`. Run it again to refresh.
 
-**Murmur's knowledge base** (`"retrieval": "murmur"`). Your site is crawled
+**HelpPuff's knowledge base** (`"retrieval": "helppuff"`). Your site is crawled
 into Vectorize and D1 on your Cloudflare account, exactly as with the default
 backend, with the same dashboard tools (choose pages, files, facts, test a
 question). OpenAI only writes the answer: the passages are added to its
@@ -47,7 +47,7 @@ choice: retrieval stays free and on your account, and switching models later
 changes nothing else.
 
 ```bash
-murmur config set backend.retrieval murmur && murmur deploy
+helppuff config set backend.retrieval helppuff && helppuff deploy
 ```
 
 ## The prompt

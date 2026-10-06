@@ -1,12 +1,12 @@
 import { z } from 'zod';
-import type { VisitorContext } from '@murmur/protocol';
+import type { VisitorContext } from '@helppuff/protocol';
 import { renderTemplate } from './helpers.js';
 import type { ConnectorContext } from './index.js';
 
 /**
  * Where a system prompt comes from.
  *
- * Murmur carries transport and UI. A prompt is *content* — it changes on a
+ * HelpPuff carries transport and UI. A prompt is *content* — it changes on a
  * different clock from the code, it differs per site, and in a hosted
  * service it belongs to the customer rather than to this repository. So it
  * is never hard-coded: a connector asks for a `PromptSource` and this
@@ -52,7 +52,7 @@ export type PromptScope = {
 };
 
 /**
- * What Murmur says around the owner's prompt (`server/src/core/guidance.ts`):
+ * What HelpPuff says around the owner's prompt (`server/src/core/guidance.ts`):
  * `before` from settings (who, goal, tone, length), `after` the rules every
  * answer follows. Both may use the same `{{…}}` placeholders.
  */
@@ -76,7 +76,7 @@ export async function resolvePrompt(
   const template = source === undefined ? null : await readSource(ctx, source);
   const owner = template === null ? '' : renderTemplate(template, scope as Record<string, unknown>).trim();
   if (!ctx.guidance) return owner || undefined;
-  // The owner's words sit between Murmur's settings and its rules, so the rules have the last word.
+  // The owner's words sit between HelpPuff's settings and its rules, so the rules have the last word.
   const render = (text: string) => renderTemplate(text, scope as Record<string, unknown>).trim();
   return [render(ctx.guidance.before), owner ? `## Instructions from the business\n${owner}` : '', render(ctx.guidance.after)].filter(Boolean).join('\n\n');
 }

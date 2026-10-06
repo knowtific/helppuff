@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { readSse, SseIdleTimeout, type Message, type SendRequest } from '@murmur/protocol';
+import { readSse, SseIdleTimeout, type Message, type SendRequest } from '@helppuff/protocol';
 import {
   CONNECTOR_TIMEOUT_MS,
   ConnectorError,
@@ -23,7 +23,7 @@ import {
   type ConnectorContext,
   type PromptScope,
   type Turn,
-} from '@murmur/connector-types';
+} from '@helppuff/connector-types';
 
 /**
  * Cloudflare AI Search — retrieval and generation in one call, on the same

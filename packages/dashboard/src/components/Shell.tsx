@@ -152,7 +152,7 @@ export function Shell({ me, route, onLogout, children }: { me: Me; route: Route;
             <ArrowUpCircle className="size-4 shrink-0 text-primary" aria-hidden />
             <span>
               <span className="block font-medium text-foreground">Update available</span>
-              Murmur {version.latest}
+              HelpPuff {version.latest}
             </span>
           </a>
         )}

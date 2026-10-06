@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping. This page is for working **on** Murmur. For building on
+Thanks for helping. This page is for working **on** HelpPuff. For building on
 top of it without changing it, see [[Extending]].
 
 ## Setup
@@ -16,19 +16,19 @@ Then open:
 
 | URL | |
 | --- | --- |
-| http://localhost:5173 | **Playground**: the real widget on a page, buttons for every `window.Murmur` call, an event log, one-click fail-safe checks |
+| http://localhost:5173 | **Playground**: the real widget on a page, buttons for every `window.HelpPuff` call, an event log, one-click fail-safe checks |
 | http://localhost:5173/gallery.html | **Gallery**: every surface of the widget rendered with the real components, with a live theme and colour picker |
 | http://localhost:5173/fixtures/ | **Hostile host pages**: aggressive CSS, patched prototypes, double include, SPA routing |
 
 The dashboard needs a database, which `pnpm dev` does not have: run
-`murmur dev` in a test assistant's folder (a local Worker with D1), then
-`pnpm --filter @murmur/dashboard dev`, which serves the dashboard with hot
-reload on :5174 and sends its API calls to :8787 (`MURMUR_DEV_URL` to change).
+`helppuff dev` in a test assistant's folder (a local Worker with D1), then
+`pnpm --filter @helppuff/dashboard dev`, which serves the dashboard with hot
+reload on :5174 and sends its API calls to :8787 (`HELPPUFF_DEV_URL` to change).
 
 The `echo` backend needs no key and answers `/options`, `/multi`, `/card`,
 `/carousel`, `/links`, `/form`, `/notice`, `/slow`, `/long`, `/multipart` and
 `/error`, one for each widget feature. The dev server's config is
-`murmur.config.ts` (gitignored; created from `murmur.config.demo.ts` on first
+`helppuff.config.ts` (gitignored; created from `helppuff.config.demo.ts` on first
 run). Secrets for local development go in `packages/server/.dev.vars` (copy
 `.dev.vars.example`).
 
@@ -60,7 +60,7 @@ A pnpm monorepo, TypeScript strict, ESM.
 | `packages/sinks/*` | Lead destinations |
 | `packages/widget` | The Preact widget, in a shadow root: a tiny loader plus a lazily loaded app |
 | `packages/dashboard` | The React + Tailwind dashboard served at `/admin/` |
-| `packages/cli` | `@knowtific/murmur`, the published CLI: commands, deploy engine, MCP server, help text |
+| `packages/cli` | `@knowtific/helppuff`, the published CLI: commands, deploy engine, MCP server, help text |
 | `plugin/`, `.claude-plugin/` | The Claude Code plugin; its `SKILL.md` is generated from `packages/cli/src/skill.ts` |
 | `e2e/` | Playwright suites |
 | `wiki/` | This wiki, published to GitHub's wiki by CI. `CLI-Reference.md` and `Configuration-Reference.md` are generated |
@@ -80,7 +80,7 @@ repository, with recipes for common changes.
   and `zod` (plus provider SDKs already present). Ask before adding one.
 - **No `console`** in shipped code. The server logs through the injected
   `log`, and never logs message text or lead data.
-- **Server errors** leave as the JSON error envelope (throw `MurmurError`), never HTML.
+- **Server errors** leave as the JSON error envelope (throw `HelpPuffError`), never HTML.
 - **Secrets** are referenced by environment variable name (`{ env }`), never written into config.
 - **Provider APIs:** check the provider's current documentation; do not
   write against a remembered shape.
@@ -97,7 +97,7 @@ previous release keeps working on an upgraded database: that is what makes a
 rollback safe. Renaming or removing takes two releases. Every statement must
 be safe to run twice. The rules are at the top of the file; see also [[Upgrading]].
 
-**`murmur.json`'s format.** A field that moves or changes meaning bumps
+**`helppuff.json`'s format.** A field that moves or changes meaning bumps
 `PROJECT_FORMAT` and adds a step to `PROJECT_UPGRADES` in
 `packages/cli/src/engine/project.ts`, with a test.
 
@@ -122,8 +122,8 @@ API, never around it.
    does (migrations, re-learning) and, for a major release, what users must change.
 3. `pnpm sync:plugin`, then `pnpm check`.
 4. Try it like a user: `pnpm pack:cli`, install the tarball in a test project,
-   `npx murmur upgrade` against a deployed test assistant.
-5. Publish: `pnpm --filter @knowtific/murmur publish --access public`, and tag
+   `npx helppuff upgrade` against a deployed test assistant.
+5. Publish: `pnpm --filter @knowtific/helppuff publish --access public`, and tag
    the release.
 
 Deployed assistants learn of the release within 12 hours (Settings → Updates).

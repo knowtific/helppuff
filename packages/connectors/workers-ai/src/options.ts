@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { promptSourceSchema } from '@murmur/connector-types';
-import { ANSWER_REASONING, DEFAULT_RETRIEVAL } from '@murmur/rag';
+import { promptSourceSchema } from '@helppuff/connector-types';
+import { ANSWER_REASONING, DEFAULT_RETRIEVAL } from '@helppuff/rag';
 
 /**
- * Options for the `workers-ai` connector: Murmur's own RAG (Vectorize + D1
+ * Options for the `workers-ai` connector: HelpPuff's own RAG (Vectorize + D1
  * on the site's account) with generation on Workers AI. Every default runs
  * on the Workers Free plan; model ids are data, so a newer model is a config
  * change, never a code change.
@@ -78,7 +78,7 @@ export const workersAiOptionsSchema = z
       .default({})
       .describe('The daily Workers AI spend guard. Past it, visitors get your contact details and a callback form instead of answers.'),
     bindings: z
-      .object({ ai: z.string().default('AI'), vectors: z.string().default('VECTORS'), db: z.string().default('MURMUR_DB') })
+      .object({ ai: z.string().default('AI'), vectors: z.string().default('VECTORS'), db: z.string().default('HELPPUFF_DB') })
       .strict()
       .default({}),
   })

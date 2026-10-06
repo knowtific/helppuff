@@ -29,7 +29,7 @@ test.describe('the playground', () => {
     const { notFound, errors } = watch(page);
     await page.goto('/', { waitUntil: 'networkidle' });
 
-    await expect(page.getByRole('heading', { name: 'Murmur playground' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'HelpPuff playground' })).toBeVisible();
     await expect(launcher(page)).toBeVisible();
     expect(notFound).toEqual([]);
     expect(errors).toEqual([]);
@@ -65,7 +65,7 @@ test.describe('the component gallery', () => {
     const { notFound, errors } = watch(page);
     await page.goto('/gallery.html', { waitUntil: 'networkidle' });
 
-    await expect(page.getByRole('heading', { name: 'Murmur component gallery' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'HelpPuff component gallery' })).toBeVisible();
     expect(notFound).toEqual([]);
     expect(errors).toEqual([]);
   });
@@ -112,7 +112,7 @@ test.describe('the component gallery', () => {
     const accentOf = () =>
       page.evaluate(() => {
         const host = document.querySelector('.shadow-host') as HTMLElement;
-        const orb = host.shadowRoot?.querySelector('.mm-orb') as HTMLElement;
+        const orb = host.shadowRoot?.querySelector('.hp-orb') as HTMLElement;
         return getComputedStyle(orb).backgroundColor;
       });
 
@@ -124,7 +124,7 @@ test.describe('the component gallery', () => {
   test('the mobile frame loads', async ({ page }) => {
     await page.goto('/gallery.html', { waitUntil: 'networkidle' });
     const frame = page.frameLocator('iframe[title="Mobile"]');
-    await expect(frame.locator('.mm-panel')).toBeVisible();
+    await expect(frame.locator('.hp-panel')).toBeVisible();
   });
 });
 

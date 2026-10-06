@@ -99,7 +99,7 @@ describe('crawl', () => {
     const { db } = await crawled();
     const facts = Object.fromEntries((await readFacts(db, 'acme')).map((f) => [f.key, f.value]));
     expect(facts['phone']).toBe('03 9876 5432');
-    const factsChunk = db.raw.prepare("SELECT content FROM chunks WHERE url = 'murmur://facts'").get() as { content: string };
+    const factsChunk = db.raw.prepare("SELECT content FROM chunks WHERE url = 'helppuff://facts'").get() as { content: string };
     expect(factsChunk.content).toContain('Phone: 03 9876 5432');
   });
 
@@ -125,7 +125,7 @@ describe('crawl', () => {
     const queue: CrawlParams[] = [{ siteId: 'acme', runId: 'run3', part: 0, options: { embeddingModel: DEFAULT_RETRIEVAL.embeddingModel } }];
     while (queue.length) await runCrawlPart(inlineSteps(), { db, ai, vectors, fetch, startNext: async (p) => void queue.push(p) }, queue.shift()!);
     const urls = (db.raw.prepare('SELECT DISTINCT url FROM chunks ORDER BY url').all() as { url: string }[]).map((r) => r.url);
-    expect(urls).toEqual(['https://acme.test/contact', 'murmur://facts']);
+    expect(urls).toEqual(['helppuff://facts', 'https://acme.test/contact']);
     expect(vectors.store.size).toBe((db.raw.prepare('SELECT count(*) AS n FROM chunks').get() as { n: number }).n);
   });
 

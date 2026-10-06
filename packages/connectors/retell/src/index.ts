@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Message, SendRequest } from '@murmur/protocol';
+import type { Message, SendRequest } from '@helppuff/protocol';
 import {
   ConnectorError,
   defineConnector,
@@ -11,7 +11,7 @@ import {
   toolCallToMessage,
   type Connector,
   type ConnectorContext,
-} from '@murmur/connector-types';
+} from '@helppuff/connector-types';
 
 /**
  * Retell chat agents.
@@ -43,10 +43,10 @@ export const retellOptionsSchema = z.object({
   /** Parse `[[options: A | B]]` markers when the agent has no tools. */
   inlineMarkers: z.boolean().default(false),
   /**
-   * `murmur`: deploy Murmur's knowledge base for this site and let the agent
+   * `helppuff`: deploy HelpPuff's knowledge base for this site and let the agent
    * search it through a custom function at `/v1/sites/<site>/retell/kb`.
    */
-  retrieval: z.literal('murmur').optional(),
+  retrieval: z.literal('helppuff').optional(),
   baseUrl: z.string().url().default(BASE_URL),
 });
 
@@ -172,7 +172,7 @@ const retell: Connector<RetellOptions, RetellState> = {
           const vars = dynamicVariables(ctx.options, { lead: input.lead, context: input.context });
           return vars ? { retell_llm_dynamic_variables: vars } : {};
         })(),
-        metadata: { murmur_session: ctx.sessionId, murmur_site: ctx.siteId },
+        metadata: { helppuff_session: ctx.sessionId, helppuff_site: ctx.siteId },
       }),
     });
     if (!response.ok) await fail(response, 'create_chat');

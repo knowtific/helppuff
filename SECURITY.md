@@ -11,12 +11,12 @@ issues in a patch release, crediting you unless you prefer otherwise.
 
 ## Supported versions
 
-Fixes go into the latest release of `@knowtific/murmur`. Upgrade with
-`npx @knowtific/murmur@latest upgrade`.
+Fixes go into the latest release of `@knowtific/helppuff`. Upgrade with
+`npx @knowtific/helppuff@latest upgrade`.
 
 ## Scope
 
-Murmur runs on each user's own Cloudflare account. In scope: the widget, the
+HelpPuff runs on each user's own Cloudflare account. In scope: the widget, the
 Worker (chat API, admin API, dashboard, webhooks), the CLI and the knowledge
 base. The threat model, what each layer protects and the known limits are in
 the wiki: [Security](../../wiki/Security).

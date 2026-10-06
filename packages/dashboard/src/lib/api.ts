@@ -165,7 +165,7 @@ export type PromptView = {
   meta: { version: number; at: number; by: string | null; source: PromptSource } | null;
   limit: number;
   versions: PromptVersion[];
-  /** What Murmur adds to this prompt on every answer (read-only); null when it adds nothing. */
+  /** What HelpPuff adds to this prompt on every answer (read-only); null when it adds nothing. */
   builtIn: string | null;
   /** Lines of the live prompt that settings or built-in rules already cover. */
   overlaps: { line: number; text: string; why: string }[];
@@ -281,7 +281,7 @@ export type Settings = {
   launcherIcon: string;
   leads: { enabled: boolean; fields: LeadField[] };
   assistant: { model: string; locale: string | null; timezone: string | null; rerank: boolean; reasoning: 'low' | 'medium' | 'high' } | null;
-  /** How the assistant behaves; Murmur writes it around the prompt. */
+  /** How the assistant behaves; HelpPuff writes it around the prompt. */
   behaviour: { goal: 'callbacks' | 'answers' | 'bookings'; tone: 'friendly' | 'professional' | 'casual'; length: 'short' | 'detailed'; prices: 'share' | 'quote'; bookingUrl?: string };
   crawl: { schedule: 'off' | 'daily' | 'weekly' | 'monthly'; include: string[]; exclude: string[]; renderJs: 'auto' | 'always' | 'never' };
 };

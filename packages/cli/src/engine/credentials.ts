@@ -28,7 +28,7 @@ export async function cloudflareSession(
   const source = apiToken ? 'api-token' : 'login';
   if (!token) {
     throw new CliError('needs_cloudflare_token', 'Not connected to Cloudflare.', {
-      hint: `${LOGIN_HINT}\n${TOKEN_HELP}\nthen: murmur secret set CLOUDFLARE_API_TOKEN`,
+      hint: `${LOGIN_HINT}\n${TOKEN_HELP}\nthen: helppuff secret set CLOUDFLARE_API_TOKEN`,
       exitCode: EXIT.auth,
     });
   }

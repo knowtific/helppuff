@@ -111,14 +111,14 @@ export type SyncResult = {
   pages: number;
   files: number;
   skipped: string[];
-  /** Fields to write back into murmur.json's `backend`. */
+  /** Fields to write back into helppuff.json's `backend`. */
   backendUpdate?: Record<string, unknown>;
 };
 
 /**
  * How a new instance should learn the website: Cloudflare's own crawler when
  * the domain is a zone on this account (it re-syncs on a schedule, renders
- * JavaScript if needed, and runs in the background), else null — murmur
+ * JavaScript if needed, and runs in the background), else null — helppuff
  * crawls and uploads the pages itself.
  */
 export async function crawlerFor(
@@ -132,7 +132,7 @@ export async function crawlerFor(
   const settings = typeof project.knowledge.website === 'object' ? project.knowledge.website : null;
   const [sitemap, home] = await Promise.all([
     hasSitemap(project.website, doFetch),
-    doFetch(project.website, { headers: { 'User-Agent': 'MurmurSetup/1.0' } }).then((r) => r.text()).catch(() => ''),
+    doFetch(project.website, { headers: { 'User-Agent': 'HelpPuffSetup/1.0' } }).then((r) => r.text()).catch(() => ''),
   ]);
   return {
     host,
@@ -209,7 +209,7 @@ export async function syncKnowledge(
   const progress = deps.progress;
 
   // workers-ai: the Worker crawls the site itself, and files go up through the admin API (`uploadFilesToWorker`).
-  if (!hasKnowledge(project) || backend.type === 'workers-ai' || ('retrieval' in backend && backend.retrieval === 'murmur')) {
+  if (!hasKnowledge(project) || backend.type === 'workers-ai' || ('retrieval' in backend && backend.retrieval === 'helppuff')) {
     return { target: 'none', uploaded: 0, removed: 0, pages: 0, files: 0, skipped: [] };
   }
 
@@ -218,7 +218,7 @@ export async function syncKnowledge(
       throw new CliError(
         'knowledge_external',
         'This project answers from an AI Search public endpoint, so its content is managed where that instance lives.',
-        { hint: 'Add content in the Cloudflare dashboard (AI Search → your instance → Items), or remove `endpoint` to let murmur manage an instance.' },
+        { hint: 'Add content in the Cloudflare dashboard (AI Search → your instance → Items), or remove `endpoint` to let helppuff manage an instance.' },
       );
     }
     if (!deps.cf) throw new CliError('no_cloudflare', 'Cloudflare credentials are needed to sync knowledge.');
@@ -278,7 +278,7 @@ export async function syncKnowledge(
     const key = deps.env[keyName];
     if (!key) {
       throw new CliError('missing_secret', `${keyName} is not set, so knowledge cannot be uploaded.`, {
-        hint: `murmur secret set ${keyName}`,
+        hint: `helppuff secret set ${keyName}`,
       });
     }
     const gathered = await gatherDocs(loaded, { ...(deps.fetch ? { fetch: deps.fetch } : {}), ...(progress ? { progress } : {}) });
@@ -351,7 +351,7 @@ export async function knowledgeMissing(
 ): Promise<boolean> {
   if (!hasKnowledge(project)) return false;
   const backend = project.backend;
-  if ('retrieval' in backend && backend.retrieval === 'murmur') return false;
+  if ('retrieval' in backend && backend.retrieval === 'helppuff') return false;
   if (backend.type === 'openai') return !backend.vectorStoreId;
   if (backend.type === 'gemini') return !backend.fileSearchStore;
   const instance = aiSearchInstanceFor(project);
@@ -359,7 +359,7 @@ export async function knowledgeMissing(
   const found = await cf.api.aiSearchInstance(cf.accountId, instance);
   if (!found) return true;
   const items = await cf.api.aiSearchItems(cf.accountId, instance).catch(() => []);
-  // Our own uploads are what can be missing: pages when murmur crawls, and files either way.
+  // Our own uploads are what can be missing: pages when helppuff crawls, and files either way.
   const ours = (prefix: string) => items.some((item) => item.key.startsWith(prefix));
   if (project.knowledge.files.length > 0 && !ours(FILE_PREFIX)) return true;
   if (found.type === 'web-crawler') return false;
@@ -377,9 +377,9 @@ export type FilesSynced = { uploaded: number; unchanged: number; removed: number
  *
  *  - Text formats become hand-written entries, indexed at once.
  *  - PDF and Word documents are uploaded; the Worker reads, cleans and
- *    learns them in the background (`murmur knowledge files` shows progress).
+ *    learns them in the background (`helppuff knowledge files` shows progress).
  *  - A file whose bytes have not changed since the last deploy is left alone
- *    (`.murmur/state.json` remembers each one's hash and id), and one taken
+ *    (`.helppuff/state.json` remembers each one's hash and id), and one taken
  *    out of `knowledge.files` is removed from the knowledge base.
  */
 export async function uploadFilesToWorker(loaded: LoadedProject, api: Pick<AdminApi, 'send' | 'upload'>, progress?: Progress): Promise<FilesSynced> {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { messageSchema, type StartSessionRequest } from '@murmur/protocol';
-import { isConnectorError, type ConnectorContext } from '@murmur/connector-types';
+import { messageSchema, type StartSessionRequest } from '@helppuff/protocol';
+import { isConnectorError, type ConnectorContext } from '@helppuff/connector-types';
 import echo from '../src/index.js';
 
 function ctx(options: unknown = {}): ConnectorContext<unknown> {

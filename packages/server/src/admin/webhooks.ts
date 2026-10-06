@@ -1,6 +1,6 @@
 import { Hono, type Context } from 'hono';
-import { ALL_WEBHOOK_EVENTS, WEBHOOK_EVENTS, isWebhookEvent } from '@murmur/protocol';
-import { MurmurError } from '../core/errors.js';
+import { ALL_WEBHOOK_EVENTS, WEBHOOK_EVENTS, isWebhookEvent } from '@helppuff/protocol';
+import { HelpPuffError } from '../core/errors.js';
 import type { HonoEnv } from '../core/request.js';
 import { ensureSchema } from '../db/d1.js';
 import { deliver, envelope, eventsOf, forgetWebhooks, type WebhookRow } from '../webhooks/deliver.js';
@@ -8,7 +8,7 @@ import { assertSameOrigin, currentAdmin, db, jsonBody, siteParam } from './guard
 
 /**
  * Webhooks, managed in the dashboard (Settings → Webhooks) or with
- * `murmur webhooks`. Stored in D1 per site; delivered by `webhooks/deliver.ts`.
+ * `helppuff webhooks`. Stored in D1 per site; delivered by `webhooks/deliver.ts`.
  */
 
 export const webhookRoutes = new Hono<HonoEnv>();
@@ -35,21 +35,21 @@ function validUrl(value: unknown): string {
   try {
     url = new URL(raw);
   } catch {
-    throw new MurmurError('bad_request', { message: 'Enter the full address, starting with https://', detail: 'webhook_url' });
+    throw new HelpPuffError('bad_request', { message: 'Enter the full address, starting with https://', detail: 'webhook_url' });
   }
   if (url.protocol !== 'https:' || !url.hostname.includes('.') || raw.length > 2000 || url.username || url.password) {
-    throw new MurmurError('bad_request', { message: 'The address must start with https:// and name a real host.', detail: 'webhook_url' });
+    throw new HelpPuffError('bad_request', { message: 'The address must start with https:// and name a real host.', detail: 'webhook_url' });
   }
   return url.toString();
 }
 
 function validEvents(value: unknown): string[] {
   if (value === undefined || value === null) return [ALL_WEBHOOK_EVENTS];
-  if (!Array.isArray(value)) throw new MurmurError('bad_request', { message: 'Events must be a list.', detail: 'webhook_events' });
+  if (!Array.isArray(value)) throw new HelpPuffError('bad_request', { message: 'Events must be a list.', detail: 'webhook_events' });
   const events = [...new Set(value.filter((e): e is string => typeof e === 'string'))];
   const unknown = events.filter((e) => e !== ALL_WEBHOOK_EVENTS && !isWebhookEvent(e));
-  if (unknown.length) throw new MurmurError('bad_request', { message: `Unknown event: ${unknown.join(', ')}.`, detail: 'webhook_events' });
-  if (!events.length) throw new MurmurError('bad_request', { message: 'Pick at least one event.', detail: 'webhook_events' });
+  if (unknown.length) throw new HelpPuffError('bad_request', { message: `Unknown event: ${unknown.join(', ')}.`, detail: 'webhook_events' });
+  if (!events.length) throw new HelpPuffError('bad_request', { message: 'Pick at least one event.', detail: 'webhook_events' });
   return events.includes(ALL_WEBHOOK_EVENTS) ? [ALL_WEBHOOK_EVENTS] : events;
 }
 
@@ -57,7 +57,7 @@ const newSecret = () => `whsec_${[...crypto.getRandomValues(new Uint8Array(24))]
 
 async function hookOf(c: Context<HonoEnv>, siteId: string): Promise<WebhookRow> {
   const row = await db(c).prepare('SELECT * FROM webhooks WHERE id = ? AND site_id = ?').bind(c.req.param('id'), siteId).first<WebhookRow>();
-  if (!row) throw new MurmurError('not_found', { message: 'No such webhook.', detail: 'webhook_unknown' });
+  if (!row) throw new HelpPuffError('not_found', { message: 'No such webhook.', detail: 'webhook_unknown' });
   return row;
 }
 
@@ -80,8 +80,8 @@ webhookRoutes.post('/admin/api/webhooks', async (c) => {
   const d = db(c);
   await ensureSchema(d);
   const count = (await d.prepare('SELECT count(*) AS n FROM webhooks WHERE site_id = ?').bind(siteId).first<{ n: number }>())?.n ?? 0;
-  if (count >= MAX_PER_SITE) throw new MurmurError('bad_request', { message: `Up to ${MAX_PER_SITE} webhooks per site.`, detail: 'webhook_limit' });
-  const now = c.get('mm').platform.now();
+  if (count >= MAX_PER_SITE) throw new HelpPuffError('bad_request', { message: `Up to ${MAX_PER_SITE} webhooks per site.`, detail: 'webhook_limit' });
+  const now = c.get('helppuff').platform.now();
   const id = `wh_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`;
   await d
     .prepare('INSERT INTO webhooks (id, site_id, url, description, events, secret, enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)')
@@ -107,7 +107,7 @@ webhookRoutes.patch('/admin/api/webhooks/:id', async (c) => {
   };
   await db(c)
     .prepare('UPDATE webhooks SET url = ?, events = ?, enabled = ?, description = ?, secret = ?, updated_at = ? WHERE id = ?')
-    .bind(next.url, next.events, next.enabled, next.description, next.secret, c.get('mm').platform.now(), row.id)
+    .bind(next.url, next.events, next.enabled, next.description, next.secret, c.get('helppuff').platform.now(), row.id)
     .run();
   forgetWebhooks(siteId);
   return c.json(view({ ...row, ...next }));
@@ -133,9 +133,9 @@ webhookRoutes.post('/admin/api/webhooks/:id/test', async (c) => {
   const body = await jsonBody(c);
   const siteId = siteParam(c, body['site'] ?? c.req.query('site'));
   const row = await hookOf(c, siteId);
-  const ctx = c.get('mm');
+  const ctx = c.get('helppuff');
   const now = () => ctx.platform.now();
-  const event = envelope(siteId, 'test.ping', { message: 'A test from your Murmur dashboard. Deliveries like this one are signed: check X-Murmur-Signature.' }, now());
+  const event = envelope(siteId, 'test.ping', { message: 'A test from your HelpPuff dashboard. Deliveries like this one are signed: check X-HelpPuff-Signature.' }, now());
   const result = await deliver(db(c), row, event, globalThis.fetch.bind(globalThis), now);
   return c.json({ ...result, eventId: event.id });
 });

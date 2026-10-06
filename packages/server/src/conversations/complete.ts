@@ -1,4 +1,4 @@
-import type { StepLike } from '@murmur/rag';
+import type { StepLike } from '@helppuff/rag';
 import { resolveSite } from '../config/site.js';
 import type { RequestCtx } from '../core/request.js';
 import type { D1Like } from '../db/d1.js';
@@ -52,9 +52,9 @@ export type ConversationJobDeps = {
   retry?: ((params: WebhookRetryParams) => Promise<void>) | undefined;
 };
 
-/** The model summaries use: MURMUR_SUMMARY_MODEL, else the site's own chat model. */
+/** The model summaries use: HELPPUFF_SUMMARY_MODEL, else the site's own chat model. */
 export async function summaryModel(ctx: RequestCtx, siteId: string): Promise<string> {
-  const configured = ctx.env['MURMUR_SUMMARY_MODEL'];
+  const configured = ctx.env['HELPPUFF_SUMMARY_MODEL'];
   if (typeof configured === 'string' && configured) return configured;
   return aiSettingsFor(await resolveSite(ctx, siteId)).chatModel;
 }

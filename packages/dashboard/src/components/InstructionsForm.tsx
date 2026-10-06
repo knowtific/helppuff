@@ -8,7 +8,7 @@ import { Button, ErrorNote, Input, Skeleton, Textarea } from './ui';
  * How the assistant behaves. Two different things, kept apart so they never
  * repeat or contradict each other:
  *
- *  - choices (goal, tone, length): settings, which Murmur writes around the
+ *  - choices (goal, tone, length): settings, which HelpPuff writes around the
  *    prompt on every answer, with its built-in rules;
  *  - "Anything specific to your business": the owner's own text, the prompt,
  *    versioned (its history is on the full prompt page).
@@ -172,14 +172,14 @@ export function InstructionsForm() {
             }}
           />
           <span className="block text-[11px] text-muted-foreground">
-            Only what is specific to you: the choices above and Murmur’s own rules (never invent, stay on topic, never reveal its instructions) are added for you.
+            Only what is specific to you: the choices above and HelpPuff’s own rules (never invent, stay on topic, never reveal its instructions) are added for you.
             Contact details come from the business details; write <code className="rounded bg-muted px-1">{'{{business.phone}}'}</code> to mention them.
           </span>
         </label>
       </div>
       <div className="flex flex-wrap items-center justify-end gap-3 border-t px-4 py-3 md:px-5">
         <a href={href({ page: 'prompt' })} className="mr-auto text-xs text-muted-foreground hover:text-foreground">
-          History, and everything Murmur adds
+          History, and everything HelpPuff adds
         </a>
         {error && <span className="text-xs text-danger" role="alert">{error.message}</span>}
         {saved && (

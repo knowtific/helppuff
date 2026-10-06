@@ -1,5 +1,5 @@
 import { relative } from 'node:path';
-import { promptHash, promptOverlaps } from '@murmur/server';
+import { promptHash, promptOverlaps } from '@helppuff/server';
 import { assertKnown, str } from '../args.js';
 import { CliError } from '../errors.js';
 import { c } from '../output.js';
@@ -20,7 +20,7 @@ import { readState } from '../engine/state.js';
 import type { Ctx } from './context.js';
 
 /**
- * `murmur prompt` — prompt.md against the live, versioned prompt.
+ * `helppuff prompt` — prompt.md against the live, versioned prompt.
  *
  *   status              in sync, ahead (deploy publishes), behind or diverged (pull first)
  *   pull [--version N]  write the live prompt (or version N, to restore it) into prompt.md
@@ -29,12 +29,12 @@ import type { Ctx } from './context.js';
  */
 
 const NEXT: Record<PromptSync, string> = {
-  not_deployed: 'murmur deploy',
-  untracked: 'murmur deploy — it records the first version',
-  in_sync: 'edit prompt.md, then murmur deploy',
-  ahead: 'murmur deploy — it publishes prompt.md as a new version',
-  behind: 'murmur prompt pull',
-  diverged: 'murmur prompt pull — your prompt.md is kept as prompt.mine.md to merge',
+  not_deployed: 'helppuff deploy',
+  untracked: 'helppuff deploy — it records the first version',
+  in_sync: 'edit prompt.md, then helppuff deploy',
+  ahead: 'helppuff deploy — it publishes prompt.md as a new version',
+  behind: 'helppuff prompt pull',
+  diverged: 'helppuff prompt pull — your prompt.md is kept as prompt.mine.md to merge',
 };
 
 const DESCRIBE: Record<PromptSync, string> = {
@@ -62,7 +62,7 @@ export async function promptCommand(ctx: Ctx): Promise<number> {
   const file = relative(ctx.cwd, promptFile(loaded)) || promptFile(loaded);
 
   if (!['status', 'pull', 'history', 'show'].includes(sub)) {
-    throw new CliError('usage', `Unknown subcommand "prompt ${sub}".`, { exitCode: 2, hint: 'murmur prompt --help' });
+    throw new CliError('usage', `Unknown subcommand "prompt ${sub}".`, { exitCode: 2, hint: 'helppuff prompt --help' });
   }
 
   if (sub === 'status' && !loaded.project.cloudflare.kvNamespaceId) {
@@ -76,7 +76,7 @@ export async function promptCommand(ctx: Ctx): Promise<number> {
     const base = readState(loaded.dir).prompt;
     const status = live && !live.editable ? null : promptSync(await promptHash(readLocalPrompt(loaded)), base, live);
     if (!status) {
-      ctx.out.result({ status: 'not_versioned', file }, () => ctx.out.info('This backend keeps its prompt outside Murmur, so it is not versioned here.'));
+      ctx.out.result({ status: 'not_versioned', file }, () => ctx.out.info('This backend keeps its prompt outside HelpPuff, so it is not versioned here.'));
       return 0;
     }
     const data = {
@@ -95,7 +95,7 @@ export async function promptCommand(ctx: Ctx): Promise<number> {
       if (base) ctx.out.info(`  based on  version ${base.version}`);
       ctx.out.info(`  next      ${c.cyan(NEXT[status])}`);
       if (data.overlaps.length) {
-        ctx.out.info(c.yellow(`\n${data.overlaps.length} line${data.overlaps.length === 1 ? '' : 's'} of ${file} repeat what Murmur already adds (keep only what is specific to the business):`));
+        ctx.out.info(c.yellow(`\n${data.overlaps.length} line${data.overlaps.length === 1 ? '' : 's'} of ${file} repeat what HelpPuff already adds (keep only what is specific to the business):`));
         for (const o of data.overlaps) ctx.out.info(`  line ${o.line}  ${c.dim(o.text.slice(0, 70))}\n           ${o.why}`);
       }
     });
@@ -110,13 +110,13 @@ export async function promptCommand(ctx: Ctx): Promise<number> {
         ...result,
         file,
         backup: result.backup ? relative(ctx.cwd, result.backup) : null,
-        next: restoring ? `murmur deploy — publishes version ${result.pulled}'s text as a new version` : 'edit prompt.md, then murmur deploy',
+        next: restoring ? `helppuff deploy — publishes version ${result.pulled}'s text as a new version` : 'edit prompt.md, then helppuff deploy',
       },
       () => {
         if (result.backup) ctx.out.warn(`Your unpublished edits are saved in ${relative(ctx.cwd, result.backup)} — merge what you need into ${file}.`);
         ctx.out.success(
           restoring
-            ? `${file} now holds version ${result.pulled}. Run ${c.cyan('murmur deploy')} to make it live again (as version ${result.live + 1}).`
+            ? `${file} now holds version ${result.pulled}. Run ${c.cyan('helppuff deploy')} to make it live again (as version ${result.live + 1}).`
             : result.changed
               ? `${file} updated to live version ${result.live}.`
               : `${file} is already live version ${result.live}.`,
@@ -130,7 +130,7 @@ export async function promptCommand(ctx: Ctx): Promise<number> {
     const limit = Math.min(Math.max(Number(str(ctx.flags, 'limit') ?? 20) || 20, 1), 200);
     const versions = await promptHistory(remote, site, limit);
     ctx.out.result({ versions }, () => {
-      if (!versions.length) ctx.out.info('No versions yet — the next `murmur deploy` records the first.');
+      if (!versions.length) ctx.out.info('No versions yet — the next `helppuff deploy` records the first.');
       for (const v of versions) {
         const when = new Date(v.createdAt).toISOString().slice(0, 16).replace('T', ' ');
         const origin = v.source === 'restore' ? `restored v${v.restoredFrom}` : v.source;
@@ -143,7 +143,7 @@ export async function promptCommand(ctx: Ctx): Promise<number> {
   // show
   const version = versionFlag(ctx, ctx.positionals[1]);
   const { live } = await readLivePrompt(remote, site);
-  if (!live) throw new CliError('not_deployed', 'There is no live prompt yet.', { hint: 'murmur deploy' });
+  if (!live) throw new CliError('not_deployed', 'There is no live prompt yet.', { hint: 'helppuff deploy' });
   const text = version === undefined || version === live.version ? live.text : await promptVersionText(remote, site, version);
   ctx.out.result({ version: version ?? live.version, text }, () => process.stdout.write(`${text}\n`));
   return 0;

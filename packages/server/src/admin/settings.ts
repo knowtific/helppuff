@@ -1,22 +1,22 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { iconNames, type WidgetConfig } from '@murmur/protocol';
-import type { KvStore } from '@murmur/connector-types';
-import { ANSWER_REASONING, answerReasoning } from '@murmur/rag';
+import { iconNames, type WidgetConfig } from '@helppuff/protocol';
+import type { KvStore } from '@helppuff/connector-types';
+import { ANSWER_REASONING, answerReasoning } from '@helppuff/rag';
 import { assistantConfigSchema, storedSiteConfigSchema, type SiteConfig, type StoredSiteConfig } from '../config/schema.js';
 import { resolveSite, siteConfigKey } from '../config/site.js';
-import { MurmurError } from '../core/errors.js';
+import { HelpPuffError } from '../core/errors.js';
 import type { HonoEnv } from '../core/request.js';
 import { assertSameOrigin, currentAdmin, jsonBody, siteParam } from './guard.js';
 
 /**
  * The assistant's settings as one flat object — what the onboarding
- * screens confirm and the Settings page edits, and what `murmur config pull`
- * writes back into murmur.json. Each field lives in exactly one place in the
+ * screens confirm and the Settings page edits, and what `helppuff config pull`
+ * writes back into helppuff.json. Each field lives in exactly one place in the
  * site config; `readSettings` and `applySettings` are the only mapping.
  *
  * Saved to KV (`config:<site>`), which is live within a minute and survives
- * redeploys only if the CLI has pulled it: `murmur deploy` refuses to
+ * redeploys only if the CLI has pulled it: `helppuff deploy` refuses to
  * overwrite settings changed here since it last looked (`settings` meta).
  */
 
@@ -97,7 +97,7 @@ export const settingsSchema = z
       })
       .strict()
       .nullable(),
-    /** How the assistant behaves (the `assistant` site section): Murmur writes it around the prompt, which never repeats it. */
+    /** How the assistant behaves (the `assistant` site section): HelpPuff writes it around the prompt, which never repeats it. */
     behaviour: assistantConfigSchema,
     crawl: z
       .object({
@@ -225,7 +225,7 @@ export const settingsRoutes = new Hono<HonoEnv>();
 
 settingsRoutes.get('/admin/api/settings', async (c) => {
   await currentAdmin(c);
-  const ctx = c.get('mm');
+  const ctx = c.get('helppuff');
   const siteId = siteParam(c, c.req.query('site'));
   const site = await resolveSite(ctx, siteId);
   const settings = readSettings(site);
@@ -234,7 +234,7 @@ settingsRoutes.get('/admin/api/settings', async (c) => {
 });
 
 async function readStored(env: Record<string, unknown>, siteId: string): Promise<StoredSiteConfig | null> {
-  const kv = env['MURMUR_KV'] as KvStore | undefined;
+  const kv = env['HELPPUFF_KV'] as KvStore | undefined;
   const raw = await kv?.get(siteConfigKey(siteId));
   if (!raw) return null;
   try {
@@ -248,16 +248,16 @@ async function readStored(env: Record<string, unknown>, siteId: string): Promise
 settingsRoutes.put('/admin/api/settings', async (c) => {
   assertSameOrigin(c);
   const admin = await currentAdmin(c);
-  const ctx = c.get('mm');
+  const ctx = c.get('helppuff');
   const body = await jsonBody(c);
   const siteId = siteParam(c, body['site']);
   const parsed = settingsPatchSchema.safeParse(body['settings']);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
-    throw new MurmurError('bad_request', { message: `Check ${issue?.path.join('.') || 'the settings'}: ${issue?.message ?? 'invalid'}.`, detail: 'settings_invalid' });
+    throw new HelpPuffError('bad_request', { message: `Check ${issue?.path.join('.') || 'the settings'}: ${issue?.message ?? 'invalid'}.`, detail: 'settings_invalid' });
   }
-  const kv = ctx.env['MURMUR_KV'] as KvStore | undefined;
-  if (!kv) throw new MurmurError('internal', { message: 'This deployment has no KV namespace.', detail: 'admin_no_kv' });
+  const kv = ctx.env['HELPPUFF_KV'] as KvStore | undefined;
+  if (!kv) throw new HelpPuffError('internal', { message: 'This deployment has no KV namespace.', detail: 'admin_no_kv' });
 
   const site = await resolveSite(ctx, siteId);
   const next = applySettings(site, parsed.data);

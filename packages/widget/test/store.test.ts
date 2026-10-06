@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { widgetConfigSchema, type Message, type WidgetConfig } from '@murmur/protocol';
+import { widgetConfigSchema, type Message, type WidgetConfig } from '@helppuff/protocol';
 import {
   MAX_STORED_MESSAGES,
   fillName,
