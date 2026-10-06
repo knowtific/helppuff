@@ -29,8 +29,9 @@ The `echo` backend needs no key and answers `/options`, `/multi`, `/card`,
 `/carousel`, `/links`, `/form`, `/notice`, `/slow`, `/long`, `/multipart` and
 `/error`, one for each widget feature. The dev server's config is
 `helppuff.config.ts` (gitignored; created from `helppuff.config.demo.ts` on first
-run). Secrets for local development go in `packages/server/.dev.vars` (copy
-`.dev.vars.example`).
+run). Secrets for local development go in `packages/server/.dev.vars`, also
+created on first run from `.dev.vars.example` with a random `HELPPUFF_SECRET`;
+add provider keys there.
 
 ## Commands
 
@@ -135,9 +136,10 @@ While working, add user-visible changes under `## [Unreleased]` in
 3. `pnpm sync:docs`, then `pnpm check`.
 4. Try it like a user: `pnpm pack:cli`, install the tarball in a test project,
    `npx helppuff upgrade` against a deployed test assistant.
-5. Merge. The workflow sees a version that has not been released, runs the
-   full checks, stages it on npm with provenance, and creates the `vx.y.z`
-   tag and GitHub release from the changelog section.
+5. Merge. Once CI passes on that commit, the Release workflow sees a
+   version that has not been released, stages it on npm with provenance, and
+   creates the `vx.y.z` tag and GitHub release from the changelog section.
+   If a release step fails, use "Re-run jobs" on that Release run.
 6. Approve it: on npmjs.com (the package's staged versions) or with the
    `npm stage approve <id>` command in the workflow run's summary. It needs
    your 2FA. Only then is it live for `npx @knowtific/helppuff`.

@@ -1,7 +1,10 @@
 name: Release
 
 # Releases @knowtific/helppuff when a push to main carries a version of
-# packages/cli/package.json that has not been released yet. Every other push
+# packages/cli/package.json that has not been released yet. It starts only
+# after CI has passed on that commit (so the suite runs once, not twice), and
+# releases exactly the commit CI tested. A failed release is retried with
+# "Re-run jobs" on its run. Every other push
 # (docs, refactors, work between releases) stops at the first job, so a
 # release is always a deliberate version bump: deployed assistants show
 # "Update available" for each one. See wiki/Contributing.md → Releasing.
@@ -16,9 +19,10 @@ name: Release
 # dist-tag" unchecked (stage-only). No npm token is stored here.
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
-  workflow_dispatch:
 
 concurrency:
   group: release
@@ -27,14 +31,22 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # The commit CI tested (GITHUB_SHA here is main's latest, which may be newer).
+  SHA: ${{ github.event.workflow_run.head_sha }}
+
 jobs:
   version:
+    # Only a CI run that passed, for a push (not a pull request) to main.
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.check.outputs.version }}
       publish: ${{ steps.check.outputs.publish }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
 
       - name: Is this version new?
         id: check
@@ -70,7 +82,7 @@ jobs:
     needs: version
     if: needs.version.outputs.publish == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     environment: npm
     permissions:
       contents: write # the tag and the GitHub release
@@ -79,6 +91,8 @@ jobs:
       VERSION: ${{ needs.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
 
       - uses: pnpm/action-setup@v4
 
@@ -93,14 +107,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # The same checks as ci.yml, on the exact commit being published.
-      - run: pnpm lint
-      - run: pnpm typecheck
-      - run: pnpm test
-      - run: pnpm build
-      - run: pnpm build:cli
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm e2e
+      # CI already ran every check on this commit; only the package is built here.
+      - name: Build the CLI
+        run: pnpm ensure-config && pnpm build:cli
 
       # pnpm packs (replacing workspace:* ranges); npm stages it, with OIDC and provenance.
       # A prerelease (1.2.0-beta.1) gets the "next" tag so `npx @knowtific/helppuff` keeps the stable one.
@@ -134,4 +143,4 @@ jobs:
           ' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
           prerelease=""
           case "$VERSION" in *-*) prerelease="--prerelease" ;; esac
-          gh release create "v$VERSION" --target "$GITHUB_SHA" --title "v$VERSION" --notes-file "$RUNNER_TEMP/notes.md" $prerelease
+          gh release create "v$VERSION" --target "$SHA" --title "v$VERSION" --notes-file "$RUNNER_TEMP/notes.md" $prerelease

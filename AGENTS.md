@@ -43,7 +43,7 @@ as few questions as possible.
 | `instructions.md` | | The cross-agent install, deploy, test and upgrade workflow linked from the README and wiki. No plugin, skill or MCP setup is required. |
 | `e2e/` | | Playwright suites against real Worker + widget |
 | `wiki/` | | The user docs, published to the GitHub wiki |
-| `scripts/` | | `ensure-config.mjs` (creates `helppuff.config.ts` for `pnpm dev`) |
+| `scripts/` | | `ensure-config.mjs` (creates `helppuff.config.ts` and `packages/server/.dev.vars` with a random `HELPPUFF_SECRET` when missing; every dev/test/build script runs it) |
 | `private/` | | Gitignored maintainers' notes. Never reference it from published files |
 
 ### Request flow
@@ -100,8 +100,8 @@ Retell, OpenAI `promptId` and `http` in `helppuff` mode own their prompt and
 are not versioned.
 
 Secrets are always referenced by env var name (`{ env: 'X' }`), never written
-into config. Repo dev: `packages/server/.dev.vars` (gitignored, copy from
-`.dev.vars.example`). CLI projects: `.env` and `helppuff secret set`.
+into config. Repo dev: `packages/server/.dev.vars` (gitignored; `pnpm ensure-config`
+creates it from `.dev.vars.example`). CLI projects: `.env` and `helppuff secret set`.
 
 ### Versions and upgrades
 
