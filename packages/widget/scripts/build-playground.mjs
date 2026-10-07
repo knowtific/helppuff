@@ -4,8 +4,8 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * The hosted playground: the static site GitHub Pages publishes
- * (`.github/workflows/playground.yml`), at `dist-playground/`.
+ * The hosted playground, at `dist-playground/`: the website copies it to
+ * `/playground/` (`website/scripts/build.mjs`, `.github/workflows/website.yml`).
  *
  * 1. The widget's production build (`build.mjs`, size budgets and all), so the
  *    preview runs exactly the `loader.js` and app chunk a real site gets.

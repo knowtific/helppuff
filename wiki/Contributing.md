@@ -17,9 +17,15 @@ Then open:
 | URL | |
 | --- | --- |
 | http://localhost:5173 | **Playground**: the real widget on a page, buttons for every `window.HelpPuff` call, an event log, one-click fail-safe checks |
-| http://localhost:5173/playground.html | **Options playground**: every widget option beside a live preview, with JSON editing, a reference generated from the schema and an export. Needs no Worker (an in-page API answers with the echo backend), which is why it is also the public demo: `pnpm build:playground` builds it, and `.github/workflows/playground.yml` publishes it to [GitHub Pages](https://knowtific.github.io/helppuff/) |
+| http://localhost:5173/playground.html | **Options playground**: every widget option beside a live preview (itself a page of buttons for every message type and the whole JavaScript API, with an event log), with JSON editing, a reference generated from the schema and an export. Needs no Worker (an in-page API answers with the echo backend), which is why it is also the public demo: `pnpm build:playground` builds it, and the website publishes it at [/playground/](https://knowtific.github.io/helppuff/playground/) |
 | http://localhost:5173/gallery.html | **Gallery**: every surface of the widget rendered with the real components, with a live theme and colour picker |
 | http://localhost:5173/fixtures/ | **Hostile host pages**: aggressive CSS, patched prototypes, double include, SPA routing |
+
+The website (landing page, these docs, the playground) is `website/`:
+`pnpm dev:website` serves it with hot reload, and `pnpm build:website` builds
+what GitHub Pages publishes. The docs pages are this wiki, so edit `wiki/`;
+the site's pictures of the widget are real screenshots, regenerated with
+`pnpm build:playground && pnpm --filter @helppuff/website screenshots`.
 
 The dashboard needs a database, which `pnpm dev` does not have: run
 `helppuff dev` in a test assistant's folder (a local Worker with D1), then

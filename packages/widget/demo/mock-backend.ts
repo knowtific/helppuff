@@ -1,6 +1,6 @@
 import echo from '@helppuff/connector-echo';
 import { ConnectorError, type ConnectorContext } from '@helppuff/connector-types';
-import type { SendRequest, StartSessionRequest } from '@helppuff/protocol';
+import type { Message, SendRequest, StartSessionRequest } from '@helppuff/protocol';
 import { STREAM_MEDIA_TYPE, sseFrame } from '@helppuff/protocol/sse';
 
 /**
@@ -29,6 +29,12 @@ export type MockOptions = {
   delayMs: number;
   /** Told about every request, for the playground's event log. */
   onRequest?: (line: string) => void;
+  /**
+   * Scripted answers (`showcase.ts`) in place of echo's. A chat then starts
+   * with no greeting of its own (the site's welcome message stands alone),
+   * and anything the script returns `null` for still goes to echo.
+   */
+  respond?: (text: string) => Message[] | null;
 };
 
 const GREETING = 'Hi! This is the HelpPuff playground. Ask anything, or try /options, /card, /carousel, /links, /form, /slow, /long or /error.';
@@ -62,6 +68,23 @@ function respond(
     },
   });
   return new Response(body, { headers: { 'Content-Type': STREAM_MEDIA_TYPE } });
+}
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Stream scripted text the way echo streams its own: a word at a time. */
+async function streamScripted(messages: Message[], onText?: (delta: string) => void): Promise<void> {
+  if (!onText) return sleep(500);
+  let first = true;
+  for (const item of messages) {
+    if (item.type !== 'text') continue;
+    if (!first) onText('\n\n');
+    first = false;
+    for (const word of item.text.split(/(?<=\s)/)) {
+      onText(word);
+      await sleep(18);
+    }
+  }
 }
 
 function errorMessage(error: unknown): string {
@@ -102,7 +125,12 @@ export function installMockBackend(options: MockOptions): void {
     if (method === 'POST' && /^\/v1\/sites\/[^/]+\/sessions$/.test(url.pathname)) {
       const sessionId = `pg_${crypto.randomUUID()}`;
       return respond(streamed, async (onText) => {
-        const { state, messages } = await echo.start(context(sessionId, onText), body as StartSessionRequest);
+        const input = body as StartSessionRequest;
+        const scripted = options.respond && (input.firstMessage ? options.respond(input.firstMessage) : []);
+        if (scripted) await streamScripted(scripted, onText);
+        const { state, messages } = scripted
+          ? { state: { turn: scripted.length }, messages: scripted }
+          : await echo.start(context(sessionId, onText), input);
         const sessionToken = crypto.randomUUID();
         sessions.set(sessionToken, state);
         return { sessionToken, sessionId, expiresAt: Date.now() + 24 * 3600_000, messages, capabilities };
@@ -112,7 +140,13 @@ export function installMockBackend(options: MockOptions): void {
     if (url.pathname === '/v1/sessions/messages' && method === 'POST') {
       if (!sessions.has(token)) return failure('session_expired', 'This chat has ended. Start a new one.', 401);
       return respond(streamed, async (onText) => {
-        const result = await echo.send(context(token, onText), sessions.get(token), body as SendRequest);
+        const input = body as SendRequest;
+        const scripted = options.respond?.(input.kind === 'text' ? input.text : input.value);
+        if (scripted) {
+          await streamScripted(scripted, onText);
+          return { messages: scripted };
+        }
+        const result = await echo.send(context(token, onText), sessions.get(token), input);
         if (result.state !== undefined) sessions.set(token, result.state);
         return { messages: result.messages };
       });

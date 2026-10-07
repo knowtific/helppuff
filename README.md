@@ -2,6 +2,8 @@
 
 ### Your website's AI assistant — deployed by your AI agent, owned by you.
 
+**[Website](https://knowtific.github.io/helppuff/)** · **[Docs](https://knowtific.github.io/helppuff/docs/)** · **[Playground](https://knowtific.github.io/helppuff/playground/)**
+
 HelpPuff is an open-source AI chat assistant for websites. It learns your
 content, answers visitors, captures leads and gives your team a practical CRM
 dashboard. The entire default stack runs inside **your Cloudflare account** and
@@ -29,7 +31,7 @@ business decision is required.
 
 ## Try it in your browser
 
-**[Open the playground →](https://knowtific.github.io/helppuff/)**
+**[Open the playground →](https://knowtific.github.io/helppuff/playground/)**
 
 The real widget on a sample page, beside a panel of every option it has:
 brand, colours and theme, the launcher, the teaser bubble, the home screen
@@ -189,7 +191,8 @@ agent follow [the agent workflow](wiki/AI-Agents.md).
 
 ## Documentation
 
-Everything is in the **[wiki](wiki/)**:
+Everything is on the **[website](https://knowtific.github.io/helppuff/docs/)**, with search,
+and in the **[wiki](wiki/)**; both are built from the same files:
 
 - [Getting started](wiki/Getting-Started.md) · [Using with AI agents](wiki/AI-Agents.md) · [Dashboard](wiki/Dashboard.md)
 - [Configuration](wiki/Configuration.md) · [Configuration reference](wiki/Configuration-Reference.md) · [CLI reference](wiki/CLI-Reference.md)

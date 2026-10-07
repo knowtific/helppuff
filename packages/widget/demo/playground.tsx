@@ -10,7 +10,7 @@ import { OPTIONS, describe } from './reference.js';
  *
  * The preview is an iframe (`preview.html`) running the real loader and app
  * against an in-page copy of the API, so this works as a static page with no
- * Worker — the hosted copy on GitHub Pages is this file. Changing an option
+ * Worker — the copy on the website (`/playground/`) is this file. Changing an option
  * reloads the frame, and the config travels in the URL so a link reproduces
  * it.
  */
@@ -20,7 +20,7 @@ type Embed = { fill: boolean };
 type Tab = 'options' | 'json' | 'reference' | 'export';
 
 const REPO = 'https://github.com/knowtific/helppuff';
-const WIKI = `${REPO}/wiki`;
+const DOCS = 'https://knowtific.github.io/helppuff/docs';
 
 // ---------------------------------------------------------------------------
 // Config paths
@@ -415,7 +415,7 @@ function Reference() {
     <div class="reference">
       <p class="hint">
         Every widget option, generated from the schema HelpPuff validates with. The full <code>helppuff.json</code> reference, including backends,
-        knowledge and security, is in the <a href={`${WIKI}/Configuration-Reference`} target="_blank" rel="noopener">wiki</a>.
+        knowledge and security, is in the <a href={`${DOCS}/Configuration-Reference`} target="_blank" rel="noopener">docs</a>.
       </p>
       <input type="search" placeholder={`Filter ${OPTIONS.length} options…`} aria-label="Filter options" value={query} onInput={(e) => setQuery((e.target as HTMLInputElement).value)} />
       <dl>
@@ -482,16 +482,6 @@ function Export({ widget, embed, share }: { widget: WidgetJson; embed: Embed; sh
 // ---------------------------------------------------------------------------
 // The page
 
-const API_CALLS: { label: string; method: string; args: unknown[] }[] = [
-  { label: 'open()', method: 'open', args: [] },
-  { label: 'close()', method: 'close', args: [] },
-  { label: "send('/card')", method: 'send', args: ['/card'] },
-  { label: 'identify(…)', method: 'identify', args: [{ name: 'Ada Lovelace', email: 'ada@example.com' }] },
-  { label: 'reset()', method: 'reset', args: [] },
-];
-
-const ECHO_COMMANDS = ['/options', '/multi', '/card', '/carousel', '/links', '/form', '/notice', '/slow', '/long', '/multipart', '/error'];
-
 function Playground() {
   const initial = useMemo(() => decode(location.hash), []);
   const [widget, setWidget] = useState<WidgetJson>(() => initial?.widget ?? clone(PRESETS[0]!.widget));
@@ -500,7 +490,6 @@ function Playground() {
   const [tab, setTab] = useState<Tab>('options');
   const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop');
   const [frameKey, setFrameKey] = useState(0);
-  const [events, setEvents] = useState<string[]>([]);
   const [preset, setPreset] = useState(initial ? (initial.preset ?? '') : PRESETS[0]!.id);
   const frame = useRef<HTMLIFrameElement>(null);
   const isOpen = useRef(false);
@@ -546,9 +535,6 @@ function Playground() {
       } else if (data?.type === 'hp-pg:event') {
         if (data.name === 'open') isOpen.current = true;
         if (data.name === 'close') isOpen.current = false;
-        const detail = data.detail === undefined ? '' : ` ${typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail)}`;
-        const line = `${new Date().toLocaleTimeString()}  ${data.name}${detail}`;
-        setEvents((list) => [line, ...list].slice(0, 60));
       }
     };
     window.addEventListener('message', onMessage);
@@ -560,14 +546,10 @@ function Playground() {
     setWidget((current) => setPath(current, path, value));
   };
 
-  const call = (method: string, args: unknown[]) =>
-    frame.current?.contentWindow?.postMessage({ type: 'hp-pg:call', method, args } satisfies ToPreview, location.origin);
-
   const restart = () => {
     isOpen.current = false;
     setup.current = { ...setup.current, open: false };
     setFrameKey((k) => k + 1);
-    setEvents([]);
   };
 
   return (
@@ -596,7 +578,7 @@ function Playground() {
             </select>
           </label>
           <a href="gallery.html">Component gallery</a>
-          <a href={`${WIKI}/Widget`} target="_blank" rel="noopener">Widget docs</a>
+          <a href={`${DOCS}/Widget`} target="_blank" rel="noopener">Widget docs</a>
           <a href={REPO} target="_blank" rel="noopener">GitHub</a>
         </div>
       </header>
@@ -626,29 +608,13 @@ function Playground() {
                 <button key={d} type="button" role="radio" aria-checked={device === d} onClick={() => setDevice(d)}>{d}</button>
               ))}
             </div>
+            <p class="toolbar-hint">Message types, the JavaScript API and the event log are in the preview page.</p>
             <div class="api">
-              {API_CALLS.map((c) => (
-                <button key={c.label} type="button" onClick={() => call(c.method, c.args)}>
-                  <code>{c.label}</code>
-                </button>
-              ))}
               <button type="button" onClick={restart}>Restart</button>
             </div>
           </div>
           <div class={`device ${device}`}>
             <iframe key={frameKey} ref={frame} src="preview.html" title="Widget preview" />
-          </div>
-          <div class="below">
-            <div class="commands">
-              <b>Try in the chat:</b>
-              {ECHO_COMMANDS.map((c) => (
-                <button key={c} type="button" onClick={() => call('send', [c])}><code>{c}</code></button>
-              ))}
-            </div>
-            <details class="events">
-              <summary>Events and requests ({events.length})</summary>
-              <div class="log">{events.length ? events.map((line, i) => <div key={i}>{line}</div>) : <div class="muted">Use the widget; its events appear here.</div>}</div>
-            </details>
           </div>
         </section>
       </main>

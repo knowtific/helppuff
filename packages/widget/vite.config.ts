@@ -33,7 +33,7 @@ function demoRoutes(): Plugin {
 
 export default defineConfig(({ command }) => ({
   root: __dirname,
-  // Relative, so the built pages work from any path: GitHub Pages serves them under /helppuff/.
+  // Relative, so the built pages work from any path: the website serves them under /helppuff/playground/.
   base: command === 'build' ? './' : '/',
   plugins: [demoRoutes()],
   server: { port: 5173, strictPort: true },

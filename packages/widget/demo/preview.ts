@@ -1,14 +1,25 @@
+import { renderControls } from './controls.js';
 import { MOCK_API, installMockBackend } from './mock-backend.js';
 import { PRESETS } from './presets.js';
+import { showcaseReply } from './showcase.js';
 
 /**
- * The page inside the options playground's preview frame: a stand-in host
- * site that embeds the widget the way a real one does, with a script tag.
+ * The page inside the options playground's preview frame: the host site,
+ * embedding the widget the way a real one does, with a script tag. Its own
+ * content is the controls (`controls.ts`): every message type, the
+ * JavaScript API and an event log.
  *
  * The playground posts the config here; this installs the in-page API that
  * serves it (`mock-backend.ts`) and then adds the loader. A config change
  * reloads the frame, so every change boots the widget from scratch, exactly
  * as a visitor's page load would.
+ *
+ * It also works on its own, configured by its URL — the website embeds it and
+ * the screenshot script drives it this way:
+ *   ?preset=trades          a preset from `presets.ts`
+ *   ?setup=<base64url JSON> a whole `PreviewSetup` (overrides the preset)
+ *   &open=1 &fill=1 &stream=0
+ *   &demo=showcase          scripted answers from `showcase.ts` instead of echo's
  */
 
 /** `/src/loader.ts` under the dev server, the built `widget/loader.js` on the hosted page. */
@@ -22,6 +33,8 @@ export type PreviewSetup = {
   open: boolean;
   /** `data-fill`: the chat fills the frame, with no launcher. */
   fill: boolean;
+  /** Answer with `showcase.ts` rather than echo. */
+  showcase?: boolean;
 };
 
 export type ToPreview = { type: 'hp-pg:setup'; setup: PreviewSetup } | { type: 'hp-pg:call'; method: string; args: unknown[] };
@@ -57,11 +70,20 @@ function boot(setup: PreviewSetup): void {
   if (booted) return;
   booted = true;
   forgetVisit();
+  const controls = renderControls(document.getElementById('controls')!, {
+    widget: setup.widget,
+    showcase: setup.showcase === true,
+    fill: setup.fill,
+  });
   installMockBackend({
     widget: setup.widget,
     stream: setup.stream,
     delayMs: setup.delayMs,
-    onRequest: (line) => post({ type: 'hp-pg:event', name: 'request', detail: line }),
+    ...(setup.showcase ? { respond: showcaseReply } : {}),
+    onRequest: (line) => {
+      controls.log(line);
+      post({ type: 'hp-pg:event', name: 'request', detail: line });
+    },
   });
 
   // The queue pattern a host page uses: calls before the loader finishes are replayed.
@@ -71,7 +93,10 @@ function boot(setup: PreviewSetup): void {
   }
   window.HelpPuff = api;
   for (const name of ['open', 'close', 'lead', 'message']) {
-    (api['on'] as Method)(name, (detail: unknown) => post({ type: 'hp-pg:event', name, detail }));
+    (api['on'] as Method)(name, (detail: unknown) => {
+      controls.log(detail === undefined ? name : `${name} ${JSON.stringify(detail)}`);
+      post({ type: 'hp-pg:event', name, detail });
+    });
   }
 
   const loader = __HELPPUFF_PLAYGROUND_LOADER__;
@@ -99,7 +124,36 @@ window.addEventListener('message', (event: MessageEvent<ToPreview>) => {
 
 const fallback: PreviewSetup = { widget: PRESETS[0]!.widget, stream: true, delayMs: 0, open: false, fill: false };
 
-if (embedded) {
+/** A setup from the URL, or null when the URL does not configure one. */
+function fromUrl(): PreviewSetup | null {
+  const params = new URLSearchParams(location.search);
+  const preset = PRESETS.find((p) => p.id === params.get('preset'));
+  const raw = params.get('setup');
+  if (!preset && !raw) return null;
+  let given: Partial<PreviewSetup> = {};
+  try {
+    if (raw) {
+      const binary = atob(raw.replace(/-/g, '+').replace(/_/g, '/'));
+      given = JSON.parse(new TextDecoder().decode(Uint8Array.from(binary, (c) => c.charCodeAt(0)))) as Partial<PreviewSetup>;
+    }
+  } catch {
+    // An unreadable setup falls back to the preset, or the default.
+  }
+  return {
+    ...fallback,
+    ...(preset ? { widget: preset.widget } : {}),
+    open: params.get('open') === '1',
+    fill: params.get('fill') === '1',
+    stream: params.get('stream') !== '0',
+    showcase: params.get('demo') === 'showcase',
+    ...given,
+  };
+}
+
+const configured = fromUrl();
+if (configured) {
+  boot(configured);
+} else if (embedded) {
   post({ type: 'hp-pg:ready' });
   // Opened outside the playground's frame, or the playground never answered.
   setTimeout(() => boot(fallback), 2000);

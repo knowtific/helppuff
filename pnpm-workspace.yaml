@@ -2,3 +2,4 @@ packages:
   - 'packages/*'
   - 'packages/connectors/*'
   - 'packages/sinks/*'
+  - 'website'

@@ -14,8 +14,10 @@ account. Product direction: one shared instruction file for coding agents,
 an agent-native CLI (`--json`, `needs_input`), Cloudflare-first defaults, and
 as few questions as possible.
 
-- User docs: the GitHub wiki, whose source is [wiki/](wiki/) (published by
-  `.github/workflows/wiki.yml`). `wiki/CLI-Reference.md` and
+- User docs: [wiki/](wiki/) is the only copy. It is published twice: as the
+  GitHub wiki (`.github/workflows/wiki.yml`) and as the website's docs, with
+  search (`website/`, `.github/workflows/website.yml`). Write wiki Markdown
+  (`[[Text|Page]]` links); `website/.vitepress/wiki.ts` translates it. `wiki/CLI-Reference.md` and
   `wiki/Configuration-Reference.md` are **generated** by `pnpm sync:docs`
   from `cli/src/help.ts` and the schemas' `.describe()` text: edit those, not
   the pages. A test fails when they are stale.
@@ -40,6 +42,7 @@ as few questions as possible.
 | `packages/widget` | `@helppuff/widget` | Preact widget in a shadow root. `src/loader.ts` (tiny loader, no Preact, owns fail-safe) → lazy `src/app/` (store, api, persist, strings, validate) + `components/` + `flows/` + `lib/` (markdown, safe, turnstile…) + `styles/` (CSS in TS template literals). `demo/` = playground (local Worker), options playground (`playground.html` + `preview.html`, an in-page API on the echo connector; published to GitHub Pages by `pnpm build:playground` / `.github/workflows/playground.yml`), gallery, hostile-host fixtures |
 | `packages/dashboard` | `@helppuff/dashboard` | React + Tailwind v4 dashboard served at `/admin/`: Home (test chat), Conversations, Leads, Knowledge, Analytics, Settings (sub-pages, incl. Webhooks and Updates). Look: shadcn / Notion / Twenty, minimal |
 | `packages/cli` | `@knowtific/helppuff` | The published CLI. `src/cli.ts` (command table), `commands/` (incl. `upgrade.ts`, `webhooks.ts`), `engine/` (init, deploy, compile, admin-api, knowledge, cloudflare, wrangler, doctor, `version.ts`, `reference.ts` (wiki config page)…), `help.ts` (the wiki's CLI page is generated from it by `pnpm sync:docs`) |
+| `website` | `@helppuff/website` | The site on GitHub Pages (VitePress): landing page (`.vitepress/theme/components/Landing.vue`), docs generated from `wiki/` into the gitignored `docs/` (`.vitepress/wiki.ts`, sidebar from `wiki/_Sidebar.md`), the playground copied to `/playground/`. Pictures in `public/shots/` are real screenshots from `scripts/screenshots.mjs` (rerun after a visual widget change) |
 | `instructions.md` | | The cross-agent install, deploy, test and upgrade workflow linked from the README and wiki. No plugin, skill or MCP setup is required. |
 | `e2e/` | | Playwright suites against real Worker + widget |
 | `wiki/` | | The user docs, published to the GitHub wiki |
@@ -128,7 +131,9 @@ pnpm typecheck      # every package
 pnpm lint           # eslint, type-aware
 pnpm build          # widget bundles + size budgets (fails if over)
 pnpm build:cli      # CLI bundle: widget + dashboard + server runtime
-pnpm build:playground  # the static options playground GitHub Pages publishes
+pnpm build:playground  # the static options playground
+pnpm build:website  # playground + VitePress site, what GitHub Pages publishes
+pnpm dev:website    # the site with hot reload (wiki edits included)
 pnpm e2e            # playwright (needs `npx playwright install chromium` once)
 pnpm check          # lint + typecheck + test + build + e2e (what CI runs)
 ```

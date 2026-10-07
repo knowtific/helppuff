@@ -8,7 +8,7 @@ Code specifics.
 
 - Start from the map in AGENTS.md and open only the files for the task; don't
   re-survey the whole repo.
-- `.wrangler/`, `dist/`, `dist-demo/`, `dist-playground/`, `test-results/` and `node_modules/` are
+- `.wrangler/`, `dist/`, `dist-demo/`, `dist-playground/`, `website/docs/`, `website/public/playground/`, `test-results/` and `node_modules/` are
   generated. Skip them when searching.
 - Before calling work done, run the narrowest relevant checks (the single
   vitest file, `pnpm typecheck`, `pnpm lint`), and `pnpm build` if the widget

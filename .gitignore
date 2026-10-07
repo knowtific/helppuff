@@ -17,6 +17,13 @@ helppuff.config.ts
 .DS_Store
 dist-demo/
 dist-playground/
+
+# The website's build, cache and the playground copied into it.
+website/.vitepress/cache/
+website/.vitepress/dist/
+website/public/playground/
+# Written from wiki/ by website/.vitepress/wiki.ts.
+website/docs/
 test-results/
 playwright-report/
 

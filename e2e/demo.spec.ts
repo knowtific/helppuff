@@ -105,6 +105,30 @@ test.describe('the options playground', () => {
     await expect(frame.locator('helppuff-widget .hp-agent').last()).toContainText('You said: hello there');
   });
 
+  test('a message-type button answers straight away, past a required pre-chat form', async ({ page }) => {
+    // The default preset asks for a name and phone before the chat.
+    await page.goto('/playground.html');
+    const frame = preview(page);
+    await showPreview(page);
+    await frame.getByRole('button', { name: /^Card \/card/ }).click();
+    await expect(frame.locator('helppuff-widget').getByText('Emergency callout')).toBeVisible();
+    await expect(frame.locator('helppuff-widget form input[type="tel"]')).toHaveCount(0);
+  });
+
+  test('the API buttons drive the widget, and the page logs its events', async ({ page }) => {
+    await page.goto('/playground.html');
+    const frame = preview(page);
+    await expect(frame.locator('helppuff-widget .hp-orb')).toBeVisible();
+    await showPreview(page);
+    await frame.getByRole('button', { name: 'open()' }).click();
+    await expect(frame.locator('helppuff-widget .hp-panel')).toBeVisible();
+    await expect(frame.getByRole('log')).toContainText('open');
+    // On a phone the open chat covers the page, as it does for a visitor: close it from the chat.
+    if (page.viewportSize()!.width < 600) await frame.locator('helppuff-widget').getByRole('button', { name: /close/i }).first().click();
+    else await frame.getByRole('button', { name: 'close()' }).click();
+    await expect(frame.getByRole('log')).toContainText('close');
+  });
+
   test('flags an invalid config instead of applying it', async ({ page }) => {
     await page.goto('/playground.html');
     await page.getByRole('tab', { name: 'JSON' }).click();

@@ -1,18 +1,21 @@
-name: Playground
+name: Website
 
-# Publishes the widget playground (every option, live, no server) to GitHub
-# Pages: https://knowtific.github.io/helppuff/. One-time setup: in the
+# Publishes https://knowtific.github.io/helppuff/ to GitHub Pages: the landing
+# page, the docs (rendered from wiki/, the same files the GitHub wiki shows)
+# and the widget playground at /playground/. One-time setup: in the
 # repository's Settings → Pages, set Source to "GitHub Actions".
 
 on:
   push:
     branches: [main]
     paths:
+      - 'wiki/**'
+      - 'website/**'
       - 'packages/widget/**'
       - 'packages/protocol/**'
       - 'packages/connectors/echo/**'
       - 'packages/connectors/_types/**'
-      - '.github/workflows/playground.yml'
+      - '.github/workflows/website.yml'
   workflow_dispatch:
 
 permissions:
@@ -40,12 +43,12 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # The production widget bundle (size budgets enforced) plus the demo pages.
-      - run: pnpm build:playground
+      # The playground (production widget bundle, size budgets enforced), then the site around it.
+      - run: pnpm build:website
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: packages/widget/dist-playground
+          path: website/.vitepress/dist
 
   deploy:
     needs: build

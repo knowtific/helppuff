@@ -156,10 +156,11 @@
       .stage { display: flex; flex-direction: column; gap: 12px; padding: 16px 20px 24px; min-width: 0; }
       .toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; align-items: center; }
       .api { display: flex; flex-wrap: wrap; gap: 6px; }
-      .api button, .commands button {
+      .toolbar-hint { margin: 0; flex: 1; text-align: center; color: var(--ink-3); font-size: 12.5px; }
+      .api button {
         border: 1px solid var(--line-2); background: var(--card); border-radius: 7px; padding: 4px 9px; cursor: pointer;
       }
-      .api button:hover, .commands button:hover { border-color: var(--brand); }
+      .api button:hover { border-color: var(--brand); }
       .device {
         flex: 1; display: flex; justify-content: center; min-height: 560px;
       }
@@ -168,15 +169,9 @@
         background: #f4f4f1; box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 12px 32px -12px rgba(0,0,0,.18);
       }
       .device.mobile iframe { width: 390px; max-width: 100%; height: 760px; flex: none; border-radius: 28px; border-width: 8px; border-color: #1c1c22; }
-      .below { display: grid; gap: 10px; }
-      .commands { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; color: var(--ink-2); font-size: 13px; }
-      .commands b { font-weight: 500; margin-right: 4px; }
-      .events summary { cursor: pointer; color: var(--ink-2); font-size: 13px; }
-      .log { margin-top: 8px; max-height: 180px; overflow: auto; font-family: var(--mono); font-size: 11.5px; color: var(--ink-2); background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
-      .log div { padding: 2px 0; border-bottom: 1px solid var(--line); word-break: break-all; }
-      .log div:last-child { border-bottom: 0; }
 
       @media (max-width: 860px) {
+        .toolbar-hint { display: none; }
         .layout { grid-template-columns: 1fr; }
         .panel { position: static; height: auto; max-height: none; border-right: 0; border-bottom: 1px solid var(--line); }
         .tab-body { max-height: 60vh; }
