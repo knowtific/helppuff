@@ -17,6 +17,7 @@ export default tseslint.config(
       '**/.vitepress/cache/**',
       '**/.vitepress/dist/**',
       'website/public/playground/**',
+      'website/public/dashboard-demo/**',
       '**/node_modules/**',
       '**/.wrangler/**',
       'test-results/**',

@@ -42,7 +42,7 @@ const CONFIG = parseConfig({
       { name: 'notes', label: 'Anything else?', type: 'textarea', placeholder: 'Tell us a little more…' },
     ],
     submitLabel: 'Start chat',
-    privacy: { text: 'We only use this to reply to you.', url: 'https://example.com/privacy' },
+    privacy: { text: 'We only use this to reply to you.', url: 'https://knowtific.com/privacy-policy' },
     askFirstMessage: true,
   },
   chat: { placeholder: 'Type a message…', fallbackContact: { phone: '+61400000000', email: 'hello@example.com' } },
@@ -61,7 +61,7 @@ const CONVERSATION: Message[] = [
     {
       type: 'text',
       text:
-        'Happy to help with that.\n\nA standard drain callout in Richmond is **$180 + GST**, which covers:\n\n- the callout itself\n- up to 30 minutes on site\n- a camera inspection if needed\n\nIf it turns out to need jetting, that is quoted separately before any work starts. You can read the full [pricing breakdown](https://example.com/pricing) or call `1300 000 000`.',
+        'Happy to help with that.\n\nA standard drain callout in Richmond is **$180 + GST**, which covers:\n\n- the callout itself\n- up to 30 minutes on site\n- a camera inspection if needed\n\nIf it turns out to need jetting, that is quoted separately before any work starts. You can read the full [pricing breakdown](https://knowtific.com/pricing) or call `1300 000 000`.',
     },
     2,
   ),
@@ -72,7 +72,7 @@ const CONVERSATION: Message[] = [
 const MARKDOWN: Message[] = [
   m({ type: 'text', text: 'Plain paragraph text, which is the common case.' }, 0),
   m({ type: 'text', text: '**Bold**, *italic*, and `inline code` all render inline.' }, 1),
-  m({ type: 'text', text: 'A [safe link](https://example.com) opens in a new tab with rel=noopener.' }, 2),
+  m({ type: 'text', text: 'A [safe link](https://knowtific.com) opens in a new tab with rel=noopener.' }, 2),
   m({ type: 'text', text: 'We cover:\n- Blocked drains\n- Hot water\n- Burst pipes' }, 3),
   m({ type: 'text', text: 'Two paragraphs.\n\nSeparated by a blank line.' }, 4),
   m({ type: 'text', text: 'Unsafe links stay as text: [x](javascript:alert(1)) — and <script>alert(1)</script> is escaped.' }, 5),

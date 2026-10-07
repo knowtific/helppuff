@@ -5,6 +5,10 @@ Every deploy includes a dashboard at `https://<your worker>/admin/`. Its data
 account. Everything it does is also available from the terminal through the
 same admin API, so an agent can do it too.
 
+**See it first:** the [dashboard demo](https://knowtific.github.io/helppuff/dashboard-demo/)
+is the real dashboard with sample data, and the [tour](https://knowtific.github.io/helppuff/dashboard)
+walks through each page.
+
 **Signing in.** The first account is created from the one-time setup link
 that `deploy` prints. After that, sign in with email and password, or run
 `npx @knowtific/helppuff dashboard` in the project folder for a one-time sign-in

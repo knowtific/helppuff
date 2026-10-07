@@ -8,27 +8,35 @@ import { fileURLToPath } from 'node:url';
  * The website's pictures of the widget: real screenshots of the production
  * bundle, not mock-ups, so they are only ever as good as the widget is.
  *
- *   pnpm build:playground && pnpm --filter @helppuff/website screenshots
+ *   pnpm build:playground && pnpm --filter @helppuff/dashboard build:demo
+ *   pnpm --filter @helppuff/website screenshots
  *
- * Each shot boots the playground's preview page with a setup in its URL,
- * talks to it through `showcase.ts`'s scripted answers, and crops the
- * widget on a transparent background. Output: `website/public/shots/`.
+ * Widget shots boot the playground's preview page with a setup in its URL,
+ * talk to it through `showcase.ts`'s scripted answers, and crop the widget
+ * on a transparent background. Dashboard shots are the dashboard demo, with
+ * its sample data. Output: `website/public/shots/`.
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
-const site = join(here, '../../packages/widget/dist-playground');
+const MOUNTS = {
+  '/playground/': join(here, '../../packages/widget/dist-playground'),
+  '/dashboard-demo/': join(here, '../../packages/dashboard/dist-demo'),
+};
 const out = join(here, '../public/shots');
-if (!existsSync(join(site, 'preview.html'))) {
-  console.error('Build the playground first: pnpm build:playground');
+if (!existsSync(join(MOUNTS['/playground/'], 'preview.html')) || !existsSync(join(MOUNTS['/dashboard-demo/'], 'demo.html'))) {
+  console.error('Build the playground and the dashboard demo first: pnpm build:playground && pnpm --filter @helppuff/dashboard build:demo');
   process.exit(1);
 }
 mkdirSync(out, { recursive: true });
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml' };
 const server = createServer((req, res) => {
+  // The same paths as the website: /playground/ and /dashboard-demo/.
   const path = normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname)).replace(/^(\.\.[/\\])+/, '');
-  let file = join(site, path);
-  if (existsSync(file) && statSync(file).isDirectory()) file = join(file, 'index.html');
+  const mount = Object.keys(MOUNTS).find((prefix) => path.startsWith(prefix));
+  if (!mount) return res.writeHead(404).end();
+  let file = join(MOUNTS[mount], path.slice(mount.length));
+  if (existsSync(file) && statSync(file).isDirectory()) file = join(file, mount === '/dashboard-demo/' ? 'demo.html' : 'index.html');
   if (!existsSync(file)) return res.writeHead(404).end();
   res.writeHead(200, { 'Content-Type': TYPES[extname(file)] ?? 'application/octet-stream' }).end(readFileSync(file));
 });
@@ -36,7 +44,7 @@ await new Promise((resolve) => server.listen(0, resolve));
 const origin = `http://localhost:${server.address().port}`;
 
 const encode = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
-const previewUrl = (setup) => `${origin}/preview.html?demo=showcase&setup=${encode({ stream: false, open: true, ...setup })}`;
+const previewUrl = (setup) => `${origin}/playground/preview.html?demo=showcase&setup=${encode({ stream: false, open: true, ...setup })}`;
 
 /** Hide the stand-in page so only the widget, and its shadow, is captured. */
 const ISOLATE = 'html, body { background: transparent !important; } body > :not(helppuff-widget) { visibility: hidden !important; }';
@@ -125,9 +133,9 @@ await shot('home-teal', {
         { id: 'book', label: 'Book a session', description: 'See this week’s openings.', icon: 'calendar', action: { id: 'b', kind: 'reply', label: 'Book a session', value: 'book' } },
         { id: 'price', label: 'Prices', description: 'Consults from $95.', icon: 'quote', action: { id: 'p', kind: 'reply', label: 'Prices', value: 'price' } },
         { id: 'call', label: 'Call the clinic', description: 'Mon–Sat, 7am–7pm.', icon: 'phone', action: { id: 'c', kind: 'tel', label: 'Call', phone: '+61400000000' } },
-        { id: 'find', label: 'Find us', description: '12 Wharf St, Balmain.', icon: 'pin', action: { id: 'f', kind: 'url', label: 'Map', url: 'https://example.com/map' } },
+        { id: 'find', label: 'Find us', description: '12 Wharf St, Balmain.', icon: 'pin', action: { id: 'f', kind: 'url', label: 'Map', url: 'https://knowtific.com/contact' } },
       ],
-      links: { title: 'Popular', items: [{ label: 'Sports injuries', url: 'https://example.com/sports', description: 'Assessment and rehab plans.' }] },
+      links: { title: 'Popular', items: [{ label: 'Sports injuries', url: 'https://knowtific.com/services', description: 'Assessment and rehab plans.' }] },
     },
     leadForm: { enabled: false },
   },
@@ -146,7 +154,7 @@ await shot('lead-form', {
         { name: 'occasion', label: 'Occasion', type: 'select', options: ['Birthday', 'Anniversary', 'Sympathy', 'Just because'] },
       ],
       submitLabel: 'Start chat',
-      privacy: { text: 'We only use this to reply to you.', url: 'https://example.com/privacy' },
+      privacy: { text: 'We only use this to reply to you.', url: 'https://knowtific.com/privacy-policy' },
       askFirstMessage: true,
     },
   },
@@ -184,7 +192,7 @@ await shot('mobile', {
 {
   const page = await browser.newPage({ viewport: { width: 1440, height: 880 }, deviceScaleFactor: 2 });
   await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: 'light' });
-  await page.goto(`${origin}/#p=trades`, { waitUntil: 'networkidle' });
+  await page.goto(`${origin}/playground/#p=trades`, { waitUntil: 'networkidle' });
   const frame = page.frameLocator('iframe[title="Widget preview"]');
   await frame.locator('helppuff-widget .hp-orb').click();
   await page.waitForTimeout(1200);
@@ -192,6 +200,35 @@ await shot('mobile', {
   console.log('  ✓ playground.png');
   await page.close();
 }
+
+// The dashboard demo, page by page.
+async function dashboard(name, route, { dark = false, before } = {}) {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
+  await page.addInitScript((theme) => localStorage.setItem('hp-theme', theme), dark ? 'dark' : 'light');
+  await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: dark ? 'dark' : 'light' });
+  await page.goto(`${origin}/dashboard-demo/#/${route}`, { waitUntil: 'networkidle' });
+  await before?.(page);
+  await page.waitForTimeout(700);
+  // The demo's "sample data" note is not part of the product.
+  await page.evaluate(() => document.querySelector('[role="note"]')?.remove());
+  await page.screenshot({ path: join(out, `${name}.png`) });
+  console.log(`  ✓ ${name}.png`);
+  await page.close();
+}
+
+/** A conversation with a lead and a summary, opened beside the list. */
+const openConversation = async (page) => {
+  await page.locator('a[href^="#/conversations/"]').filter({ hasNotText: 'Visitor' }).first().click();
+  await page.waitForLoadState('networkidle');
+};
+
+await dashboard('dash-conversation', 'conversations', { before: openConversation });
+await dashboard('dash-conversation-dark', 'conversations', { dark: true, before: openConversation });
+await dashboard('dash-leads', 'leads');
+await dashboard('dash-analytics', 'analytics');
+await dashboard('dash-callbacks', 'callbacks');
+await dashboard('dash-knowledge', 'knowledge');
+await dashboard('dash-prompt', 'prompt');
 
 await browser.close();
 server.close();

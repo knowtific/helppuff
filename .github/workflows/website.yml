@@ -12,6 +12,7 @@ on:
       - 'wiki/**'
       - 'website/**'
       - 'packages/widget/**'
+      - 'packages/dashboard/**'
       - 'packages/protocol/**'
       - 'packages/connectors/echo/**'
       - 'packages/connectors/_types/**'

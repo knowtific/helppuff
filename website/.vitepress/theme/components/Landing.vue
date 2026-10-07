@@ -116,6 +116,16 @@ const FEATURES = [
   { icon: 'refresh', title: 'Safe upgrades', text: 'Additive database migrations, compatibility checks, restore points and downgrade protection.', link: 'Upgrading' },
 ];
 
+const DASH_TABS = [
+  { id: 'conversation', label: 'Conversations', caption: 'Every chat summarised and labelled: intent, sentiment, lead quality, next step, and the questions it could not answer.' },
+  { id: 'leads', label: 'Leads', caption: 'One lead per person, moved through your pipeline from new to won, with notes and CSV export.' },
+  { id: 'callbacks', label: 'Callbacks', caption: '“Please call me” becomes a task: tap to call, mark it done with a note, or dismiss it.' },
+  { id: 'analytics', label: 'Analytics', caption: 'Conversations, leads and conversion against the previous period, top pages, countries and the latest questions.' },
+  { id: 'knowledge', label: 'Knowledge', caption: 'What it learned from your site, the files you gave it, your own answers, and a box to test any question.' },
+];
+const dashTab = ref(DASH_TABS[0]!.id);
+const dashCaption = computed(() => DASH_TABS.find((t) => t.id === dashTab.value)?.caption ?? '');
+
 const STACK = [
   { name: 'Workers', role: 'Chat API, widget and dashboard from one deployment' },
   { name: 'Workers AI', role: 'Answers, summaries, embeddings and reranking' },
@@ -307,6 +317,45 @@ const ICONS: Record<string, string> = {
           <b>{{ f.title }}</b>
           <span>{{ f.text }}</span>
         </a>
+      </div>
+    </section>
+
+    <!-- Dashboard -->
+    <section class="wrap block" id="dashboard">
+      <header class="section-head">
+        <p class="kicker">The dashboard</p>
+        <h2>A CRM that <span class="grad">fills itself.</span></h2>
+        <p>
+          Every deployment includes a dashboard for your team: conversations arrive summarised, contact details become
+          leads, and callback requests become tasks. Its data lives in your own D1 database.
+        </p>
+      </header>
+      <div class="dash">
+        <div class="dash-tabs" role="tablist" aria-label="Dashboard pages">
+          <button
+            v-for="t in DASH_TABS"
+            :id="`dash-tab-${t.id}`"
+            :key="t.id"
+            type="button"
+            role="tab"
+            :aria-selected="dashTab === t.id"
+            aria-controls="dash-panel"
+            @click="dashTab = t.id"
+          >
+            {{ t.label }}
+          </button>
+        </div>
+        <div id="dash-panel" class="dash-panel" role="tabpanel" :aria-labelledby="`dash-tab-${dashTab}`">
+          <div class="browser">
+            <div class="browser-bar" aria-hidden="true"><i /><i /><i /><span>your-assistant.workers.dev/admin</span></div>
+            <img :src="shot(`dash-${dashTab}`)" :alt="`The ${dashTab} page of the HelpPuff dashboard, with sample data`" width="1440" height="900" />
+          </div>
+          <p class="dash-caption">{{ dashCaption }}</p>
+        </div>
+        <div class="ctas center">
+          <a class="btn primary" :href="withBase('/dashboard-demo/')" target="_self">Open the live dashboard demo</a>
+          <a class="btn ghost" :href="withBase('/dashboard')">Take the tour</a>
+        </div>
       </div>
     </section>
 
@@ -563,6 +612,14 @@ figcaption b { display: block; font-size: 16px; color: var(--ink); margin-bottom
 .f-icon svg { width: 20px; height: 20px; }
 .f-icon.big { width: 52px; height: 52px; border-radius: 15px; }
 .f-icon.big svg { width: 24px; height: 24px; }
+
+/* Dashboard */
+.dash { display: grid; gap: 20px; }
+.dash-tabs { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; padding: 4px; margin: 0 auto; border-radius: 999px; border: 1px solid var(--line); background: var(--soft); width: fit-content; max-width: 100%; }
+.dash-tabs button { padding: 8px 18px; border-radius: 999px; font-size: 14px; font-weight: 500; color: var(--ink-2); }
+.dash-tabs button[aria-selected='true'] { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+.dash-panel .browser img { display: block; width: 100%; height: auto; }
+.dash-caption { margin: 16px auto 0; max-width: 680px; text-align: center; color: var(--ink-2); font-size: 15.5px; line-height: 1.6; }
 
 /* Agents */
 .agents { margin-top: 120px; padding: 100px 0; background: radial-gradient(1200px 500px at 80% 0%, rgba(124, 124, 255, 0.35), transparent 60%), #0e0e1a; color: #e9e9f5; }

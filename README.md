@@ -2,7 +2,7 @@
 
 ### Your website's AI assistant — deployed by your AI agent, owned by you.
 
-**[Website](https://knowtific.github.io/helppuff/)** · **[Docs](https://knowtific.github.io/helppuff/docs/)** · **[Playground](https://knowtific.github.io/helppuff/playground/)**
+**[Website](https://knowtific.github.io/helppuff/)** · **[Docs](https://knowtific.github.io/helppuff/docs/)** · **[Widget playground](https://knowtific.github.io/helppuff/playground/)** · **[Dashboard demo](https://knowtific.github.io/helppuff/dashboard-demo/)**
 
 HelpPuff is an open-source AI chat assistant for websites. It learns your
 content, answers visitors, captures leads and gives your team a practical CRM

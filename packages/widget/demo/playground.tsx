@@ -20,7 +20,13 @@ type Embed = { fill: boolean };
 type Tab = 'options' | 'json' | 'reference' | 'export';
 
 const REPO = 'https://github.com/knowtific/helppuff';
-const DOCS = 'https://knowtific.github.io/helppuff/docs';
+/**
+ * The website this page belongs to. Published, the playground sits at
+ * `<site>/playground/`, so the site is one level up (which also keeps a
+ * fork's copy pointing at itself); under the dev server, the public site.
+ */
+const SITE = location.pathname.includes('/playground/') ? new URL('../', location.href).href : 'https://knowtific.github.io/helppuff/';
+const DOCS = `${SITE}docs`;
 
 // ---------------------------------------------------------------------------
 // Config paths
@@ -556,7 +562,18 @@ function Playground() {
     <div class="app">
       <header class="top">
         <div class="title">
-          <h1>HelpPuff playground</h1>
+          <h1>
+            <a class="home" href={SITE} title="HelpPuff website">
+              <svg viewBox="0 0 64 64" aria-hidden="true">
+                <path d="M32 6c14.36 0 26 10.3 26 23s-11.64 23-26 23c-2.6 0-5.1-.33-7.46-.95L12.5 57.5c-1.5.8-3.2-.55-2.75-2.2l2.6-9.05C8.4 42.1 6 35.8 6 29 6 16.3 17.64 6 32 6Z" fill="#5B5BF7" />
+                <circle cx="22" cy="29.5" r="3.6" fill="#fff" />
+                <circle cx="32" cy="29.5" r="3.6" fill="#fff" />
+                <circle cx="42" cy="29.5" r="3.6" fill="#fff" />
+              </svg>
+              HelpPuff
+            </a>{' '}
+            playground
+          </h1>
           <p>Try every widget option on the real widget. Nothing to install; this page talks to no server.</p>
         </div>
         <div class="top-actions">
@@ -577,8 +594,9 @@ function Playground() {
               {PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
             </select>
           </label>
+          <a href={SITE}>Website</a>
+          <a href={`${DOCS}/Widget`}>Widget docs</a>
           <a href="gallery.html">Component gallery</a>
-          <a href={`${DOCS}/Widget`} target="_blank" rel="noopener">Widget docs</a>
           <a href={REPO} target="_blank" rel="noopener">GitHub</a>
         </div>
       </header>

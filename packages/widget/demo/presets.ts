@@ -49,8 +49,8 @@ export const CHAT_SHORTCUTS = [
 export const HOME_LINKS = {
   title: 'Might help',
   items: [
-    { label: 'Pricing', url: 'https://example.com/pricing', description: 'What a callout costs.' },
-    { label: 'Service areas', url: 'https://example.com/areas', description: 'Suburbs we cover.' },
+    { label: 'Pricing', url: 'https://knowtific.com/pricing', description: 'What a callout costs.' },
+    { label: 'Service areas', url: 'https://knowtific.com/services', description: 'Suburbs we cover.' },
   ],
 };
 
@@ -63,7 +63,7 @@ export const FIELD_LIBRARY = [
   { name: 'service', label: 'What do you need?', type: 'select', options: ['A quote', 'A booking', 'Something else'] },
 ];
 
-export const PRIVACY = { text: 'We only use this to reply to you.', url: 'https://example.com/privacy' };
+export const PRIVACY = { text: 'We only use this to reply to you.', url: 'https://knowtific.com/privacy-policy' };
 
 /** The flow and form the shortcuts open. Harmless when nothing opens them. */
 const SUPPORT = {
@@ -161,7 +161,7 @@ export const PRESETS: Preset[] = [
         title: 'Welcome to Harbour Physio',
         subtitle: 'Ask about treatments, or book a session.',
         shortcuts: HOME_SHORTCUTS.slice(2, 3),
-        links: { title: 'Popular', items: [{ label: 'Treatments', url: 'https://example.com/treatments' }, { label: 'Our team', url: 'https://example.com/team' }] },
+        links: { title: 'Popular', items: [{ label: 'Treatments', url: 'https://knowtific.com/services' }, { label: 'Our team', url: 'https://knowtific.com/about' }] },
       },
       leadForm: { enabled: true, fields: [FIELD_LIBRARY[0], FIELD_LIBRARY[2]], privacy: PRIVACY },
       chat: { initialMessages: ['Hi, I’m Mia. How can I help today?'] },

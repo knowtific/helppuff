@@ -80,8 +80,8 @@ export default defineConfig({
           links: {
             title: 'Might help',
             items: [
-              { label: 'Pricing', url: 'https://example.com/pricing', description: 'What a callout costs.' },
-              { label: 'Service areas', url: 'https://example.com/areas', description: 'Suburbs we cover.' },
+              { label: 'Pricing', url: 'https://knowtific.com/pricing', description: 'What a callout costs.' },
+              { label: 'Service areas', url: 'https://knowtific.com/services', description: 'Suburbs we cover.' },
             ],
           },
           shortcuts: [
@@ -111,7 +111,7 @@ export default defineConfig({
               label: 'Read the docs',
               description: 'Opens in a new tab.',
               icon: 'book',
-              action: { id: 'docs', kind: 'url', label: 'Docs', url: 'https://example.com/docs' },
+              action: { id: 'docs', kind: 'url', label: 'Docs', url: 'https://knowtific.com' },
             },
           ],
         },

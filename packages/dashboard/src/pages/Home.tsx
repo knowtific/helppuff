@@ -7,6 +7,9 @@ import { api, type Me, type SettingsView } from '../lib/api';
 import { cn, href, pathOf } from '../lib/utils';
 import { CopyBlock } from './Settings';
 
+/** The live test chat. The dashboard demo on the website points it (and the demo link) elsewhere. */
+const chatUrl = (import.meta.env['VITE_HELPPUFF_CHAT_URL'] as string | undefined) ?? '/chat.html';
+
 /**
  * Home: try the assistant, then put it on the site. The live chat is the
  * real widget (the Worker's preview page), so what you test is what visitors
@@ -16,7 +19,7 @@ import { CopyBlock } from './Settings';
 export function Home({ me }: { me: Me }) {
   const site = me.sites[0]!;
   const { status } = useKnowledgeStatus(site.knowledge);
-  const demo = `${window.location.origin}/`;
+  const demo = (import.meta.env['VITE_HELPPUFF_DEMO_URL'] as string | undefined) ?? `${window.location.origin}/`;
   const learning = status?.run?.status === 'queued' || status?.run?.status === 'running';
   const notStarted = site.knowledge && status && !status.run;
   useStarterQuestions(site.knowledge && (status?.chunks ?? 0) > 0);
@@ -51,7 +54,7 @@ export function Home({ me }: { me: Me }) {
             </div>
           </div>
         ) : (
-          <iframe src="/chat.html" title="Your chat assistant, live" className="w-full flex-1 bg-background" />
+          <iframe src={chatUrl} title="Your chat assistant, live" className="w-full flex-1 bg-background" />
         )}
       </Card>
 

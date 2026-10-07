@@ -69,7 +69,7 @@ async function respond(command: string, raw: string, delayMs: number): Promise<M
           actions: [
             { id: 'book', kind: 'reply', label: 'Book it', value: 'book emergency callout' },
             { id: 'call', kind: 'tel', label: 'Call now', phone: '+61400000000' },
-            { id: 'more', kind: 'url', label: 'Details', url: 'https://example.com/emergency', newTab: true },
+            { id: 'more', kind: 'url', label: 'Details', url: 'https://knowtific.com/services', newTab: true },
           ],
         }),
       ];
@@ -107,8 +107,8 @@ async function respond(command: string, raw: string, delayMs: number): Promise<M
           type: 'links',
           title: 'Might help',
           links: [
-            { label: 'Pricing', url: 'https://example.com/pricing', description: 'What a callout costs.' },
-            { label: 'Service areas', url: 'https://example.com/areas', description: 'Suburbs we cover.' },
+            { label: 'Pricing', url: 'https://knowtific.com/pricing', description: 'What a callout costs.' },
+            { label: 'Service areas', url: 'https://knowtific.com/services', description: 'Suburbs we cover.' },
             { label: 'Email us', url: 'mailto:hello@example.com' },
           ],
         }),

@@ -22,6 +22,7 @@ dist-playground/
 website/.vitepress/cache/
 website/.vitepress/dist/
 website/public/playground/
+website/public/dashboard-demo/
 # Written from wiki/ by website/.vitepress/wiki.ts.
 website/docs/
 test-results/

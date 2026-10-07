@@ -69,9 +69,9 @@ export default defineConfig({
 
     nav: [
       { text: 'Docs', link: '/docs/Getting-Started', activeMatch: '^/docs/' },
+      { text: 'Dashboard', link: '/dashboard' },
       // The playground is its own static app beside the site: `target` keeps the router out of it.
       { text: 'Playground', link: '/playground/', target: '_self' },
-      { text: 'Providers', link: '/docs/Providers' },
       { text: 'Changelog', link: `${REPO}/blob/main/CHANGELOG.md` },
     ],
 
