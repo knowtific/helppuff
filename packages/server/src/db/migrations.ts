@@ -341,6 +341,27 @@ export const MIGRATIONS: readonly Migration[] = [
       'CREATE INDEX IF NOT EXISTS callbacks_lead ON callbacks (lead_id)',
     ],
   },
+  {
+    id: 8,
+    name: 'abuse limits',
+    // Dashboard sessions are signed cookies; signing out records the
+    // session's id here until it would have expired anyway, so a copied
+    // cookie stops working at once.
+    // `visitor` is the salted hash of the IP that started a conversation (the
+    // same key the rate limits use, never the IP): the per-visitor daily
+    // limits are counted from it, with no KV write per message. `ended_at`
+    // makes `conversation.ended` fire once per conversation.
+    statements: [
+      `CREATE TABLE IF NOT EXISTS admin_signed_out (
+        id TEXT PRIMARY KEY,
+        expires_at INTEGER NOT NULL
+      )`,
+      'CREATE INDEX IF NOT EXISTS admin_signed_out_expiry ON admin_signed_out (expires_at)',
+      'ALTER TABLE conversations ADD COLUMN visitor TEXT',
+      'ALTER TABLE conversations ADD COLUMN ended_at INTEGER',
+      'CREATE INDEX IF NOT EXISTS conversations_visitor ON conversations (site_id, visitor, started_at)',
+    ],
+  },
 ];
 
 export const LATEST_MIGRATION = MIGRATIONS[MIGRATIONS.length - 1]!.id;

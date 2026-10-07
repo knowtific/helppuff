@@ -1,9 +1,11 @@
-import type { Field, Lead } from '@helppuff/protocol';
+import { cleanText, type Field, type Lead } from '@helppuff/protocol';
 import { HelpPuffError } from './errors.js';
 
-/** Each lead value is capped independently of the field's own rules; a message box gets more room. */
+/** Each lead value is capped independently of the field's own rules; a message box gets more room (`security.limits`). */
 export const MAX_LEAD_VALUE_LENGTH = 200;
 export const MAX_LEAD_TEXTAREA_LENGTH = 2000;
+type LeadLimits = { maxLeadFieldLength: number; maxLeadMessageLength: number };
+const DEFAULT_LEAD_LIMITS: LeadLimits = { maxLeadFieldLength: MAX_LEAD_VALUE_LENGTH, maxLeadMessageLength: MAX_LEAD_TEXTAREA_LENGTH };
 const EMAIL_RE = /^[^@\s]+@[^@\s.]+\.[^@\s]{2,}$/;
 const TEL_RE = /^[+()\-.\s\d]{6,40}$/;
 
@@ -12,13 +14,13 @@ const TEL_RE = /^[+()\-.\s\d]{6,40}$/;
  * are dropped rather than rejected, so a stale widget cannot break a site by
  * sending a field that was just removed from the config.
  */
-export function validateLead(lead: Lead | undefined, fields: readonly Field[]): Lead {
+export function validateLead(lead: Lead | undefined, fields: readonly Field[], limits: LeadLimits = DEFAULT_LEAD_LIMITS): Lead {
   const submitted = lead ?? {};
   const out: Lead = {};
 
   for (const field of fields) {
     const raw = submitted[field.name];
-    const value = typeof raw === 'string' ? raw.trim() : '';
+    const value = typeof raw === 'string' ? cleanText(raw, field.type === 'textarea' ? 'input' : 'line') : '';
 
     if (!value) {
       if (field.required) {
@@ -30,7 +32,7 @@ export function validateLead(lead: Lead | undefined, fields: readonly Field[]): 
       continue;
     }
 
-    if (value.length > (field.type === 'textarea' ? MAX_LEAD_TEXTAREA_LENGTH : MAX_LEAD_VALUE_LENGTH)) {
+    if (value.length > (field.type === 'textarea' ? limits.maxLeadMessageLength : limits.maxLeadFieldLength)) {
       throw new HelpPuffError('bad_request', {
         message: `${field.label} is too long.`,
         detail: `lead_too_long:${field.name}`,

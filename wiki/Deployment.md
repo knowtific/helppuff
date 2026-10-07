@@ -85,8 +85,9 @@ app file anywhere, and point the script at the Worker with `data-api`:
 2. `security.limits.messagesPerSitePerDay` is a number you are happy to pay
    for (or, on Workers AI, the daily neuron budget). It is the backstop when
    everything else fails.
-3. Turnstile (`security.captcha`) is on for a busy public site. It is the
-   only layer that tells a person from a script; see [[Security]].
+3. Turnstile is on. It is the only layer that tells a person from a script,
+   and it protects the dashboard's sign-in too. See [[Turn on Turnstile|Turnstile]];
+   the dashboard's Home page shows **Before you go live** until it is.
 4. Business details are right (Settings → Business details), so visitors can
    still reach you when the assistant cannot help.
 5. `helppuff doctor` passes.

@@ -8,7 +8,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./url": "./src/url.ts",
-    "./sse": "./src/sse.ts"
+    "./sse": "./src/sse.ts",
+    "./text": "./src/text.ts",
+    "./forms": "./src/forms.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

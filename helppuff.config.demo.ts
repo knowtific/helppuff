@@ -39,7 +39,9 @@ export default defineConfig({
       security: {
         limits: {
           messagesPerIpPerMinute: 600,
+          messagesPerIpPerDay: 100_000,
           sessionsPerIpPerHour: 1000,
+          sessionsPerIpPerDay: 10_000,
           messagesPerSession: 60,
           messagesPerSitePerDay: 100_000,
           maxMessageLength: 1000,

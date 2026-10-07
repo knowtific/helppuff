@@ -5,9 +5,9 @@ import { guidanceFor } from '../core/guidance.js';
 import { promptOverlaps } from './overlaps.js';
 import type { SiteConfig } from '../config/schema.js';
 import { resolveSecrets } from '../config/load.js';
-import { hitWindow, rateLimited } from '../core/ratelimit.js';
 import { requireSecret, type HonoEnv } from '../core/request.js';
-import { issueSession, sessionCookie, verifyPassword } from './auth.js';
+import { cookieValue, issueSession, readSession, SESSION_COOKIE, sessionCookie, verifyPassword } from './auth.js';
+import { assertAccountOpen, assertSignInCaptcha, recordFailure, signInPolicy, signInRoutes, throttleIp } from './signin.js';
 import { assertSameOrigin, currentAdmin, db, isSecure, siteParam } from './guard.js';
 import { knowledgeRoutes } from './knowledge.js';
 import { resolveSite } from '../config/site.js';
@@ -40,6 +40,7 @@ export const LEAD_STATUSES = ['new', 'contacted', 'qualified', 'won', 'lost'] as
 adminRoutes.use('/admin/api/*', async (c, next) => {
   c.header('Cache-Control', 'no-store');
   c.header('X-Frame-Options', 'DENY');
+  c.header('X-Content-Type-Options', 'nosniff');
   c.header('Referrer-Policy', 'same-origin');
   if (dbFrom(c.get('helppuff').env)) await ensureSchema(dbFrom(c.get('helppuff').env)!);
   await next();
@@ -49,35 +50,55 @@ adminRoutes.post('/admin/api/login', async (c) => {
   assertSameOrigin(c);
   const ctx = c.get('helppuff');
   const secret = requireSecret(ctx);
-  // The owner's CLI (proven by HELPPUFF_SECRET) checks a new password took effect; it is not a guesser.
-  if (!(await ctx.isOwner())) {
-    const verdict = await hitWindow(ctx.platform.kv, 'login', await ctx.ipKey(), 10, 900);
-    if (!verdict.allowed) throw rateLimited(verdict, 'admin_login');
-  }
+  const policy = await signInPolicy(c);
+  // Every attempt counts against the IP; the owner's CLI (proven by HELPPUFF_SECRET) checks a new password took effect and is exempt.
+  await throttleIp(c, policy, 'login');
 
-  const body = (await c.req.json().catch(() => ({}))) as { email?: unknown; password?: unknown };
-  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
-  const password = typeof body.password === 'string' ? body.password : '';
+  const body = (await c.req.json().catch(() => ({}))) as { email?: unknown; password?: unknown; captchaToken?: unknown };
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase().slice(0, 320) : '';
+  const password = typeof body.password === 'string' ? body.password.slice(0, 1024) : '';
   const refuse = () => new HelpPuffError('unauthorized', { message: 'That email and password do not match.', detail: 'admin_bad_login' });
   if (!email || !password) throw refuse();
+  await assertSignInCaptcha(c, policy, body.captchaToken);
+  // Failures count against the email from any IP: spreading guesses over many addresses does not help.
+  await assertAccountOpen(c, policy, email);
 
   let ok: boolean;
+  let hash: string;
   const owner = String(ctx.env['ADMIN_EMAIL'] ?? '').toLowerCase();
   const ownerHash = String(ctx.env['ADMIN_PASSWORD_HASH'] ?? '');
-  if (owner && email === owner && ownerHash) ok = await verifyPassword(ownerHash, password);
-  else {
+  if (owner && email === owner && ownerHash) {
+    hash = ownerHash;
+    ok = await verifyPassword(ownerHash, password);
+  } else {
     const row = await db(c).prepare('SELECT password_hash FROM admins WHERE email = ?').bind(email).first<{ password_hash: string }>();
+    hash = row?.password_hash ?? '';
     // Hash anyway on a miss, so timing does not reveal which emails exist.
     ok = await verifyPassword(row?.password_hash ?? 'pbkdf2$100000$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', password);
     if (ok) await db(c).prepare('UPDATE admins SET last_login_at = ? WHERE email = ?').bind(ctx.platform.now(), email).run();
   }
-  if (!ok) throw refuse();
+  if (!ok) {
+    await recordFailure(c, policy, email);
+    throw refuse();
+  }
 
-  c.header('Set-Cookie', sessionCookie(await issueSession(secret, email, ctx.platform.now()), isSecure(c)));
+  c.header('Set-Cookie', sessionCookie(await issueSession(secret, email, ctx.platform.now(), hash), isSecure(c)));
   return c.json({ email });
 });
 
-adminRoutes.post('/admin/api/logout', (c) => {
+/** Ends this session everywhere: its id is recorded until it would have expired, so a copied cookie stops working too. */
+adminRoutes.post('/admin/api/logout', async (c) => {
+  assertSameOrigin(c);
+  const ctx = c.get('helppuff');
+  const now = ctx.platform.now();
+  const session = ctx.secret.length >= 32 ? await readSession(ctx.secret, cookieValue(c.req.header('Cookie'), SESSION_COOKIE), now) : null;
+  const d = dbFrom(ctx.env);
+  if (session && d) {
+    await d.batch([
+      d.prepare('INSERT OR IGNORE INTO admin_signed_out (id, expires_at) VALUES (?, ?)').bind(session.id, session.exp),
+      d.prepare('DELETE FROM admin_signed_out WHERE expires_at < ?').bind(now),
+    ]);
+  }
   c.header('Set-Cookie', sessionCookie('', isSecure(c), 0));
   return c.json({ ok: true });
 });
@@ -101,11 +122,32 @@ adminRoutes.get('/admin/api/me', async (c) => {
         /** HelpPuff's own knowledge base (workers-ai) is on: the Knowledge page and onboarding apply. */
         knowledge: ownsKnowledge(site) && Boolean(knowledgeEnv(ctx.env)),
         website: site.knowledge.website ?? site.origins.find((o) => /^https:/.test(o) && !/workers\.dev/.test(o)) ?? null,
+        /** The dashboard's "Before you go live" checklist. */
+        production: {
+          turnstile: Boolean(site.security.captcha),
+          // What a Turnstile widget for this site needs: the public hosts the chat is on, and the dashboard's.
+          hostnames: turnstileHostnames(site.origins, origin),
+          dailyCap: site.security.limits.messagesPerSitePerDay,
+        },
       };
     }),
   );
   return c.json({ admin, sites, summaries: Boolean(ctx.env['AI']) });
 });
+
+/** Public hostnames (no localhost or bare IPs), the dashboard's last; at most 10, Turnstile's limit. */
+export function turnstileHostnames(origins: readonly string[], dashboard: string): string[] {
+  const hosts = new Set<string>();
+  for (const value of [...origins, dashboard]) {
+    try {
+      const host = new URL(value).hostname;
+      if (host !== 'localhost' && !/^[\d.]+$|:/.test(host) && host.includes('.')) hosts.add(host);
+    } catch {
+      // Not a URL: skipped.
+    }
+  }
+  return [...hosts].slice(0, 10);
+}
 
 function siteFilter(c: Context<HonoEnv>, column = 'site_id'): { sql: string; params: unknown[] } {
   const site = c.req.query('site');
@@ -380,9 +422,9 @@ adminRoutes.patch('/admin/api/leads/:id', async (c) => {
 
 const csvCell = (value: unknown) => {
   const text = value === null || value === undefined ? '' : String(value);
-  // A leading =, +, - or @ would run as a formula in a spreadsheet.
-  const safe = /^[=+\-@]/.test(text) ? `'${text}` : text;
-  return /[",\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+  // A leading =, +, -, @, tab or carriage return would run as a formula in a spreadsheet.
+  const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+  return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 };
 
 adminRoutes.get('/admin/api/leads.csv', async (c) => {
@@ -532,6 +574,7 @@ adminRoutes.post('/admin/api/prompt/restore', async (c) => {
 adminRoutes.route('/', knowledgeRoutes);
 adminRoutes.route('/', settingsRoutes);
 adminRoutes.route('/', setupRoutes);
+adminRoutes.route('/', signInRoutes);
 adminRoutes.route('/', webhookRoutes);
 adminRoutes.route('/', callbackRoutes);
 adminRoutes.route('/', versionRoutes);

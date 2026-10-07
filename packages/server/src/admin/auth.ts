@@ -8,8 +8,12 @@
  * `ADMIN_PASSWORD_HASH`); further accounts live in the `admins` table and
  * are managed with `helppuff users`.
  *
- * Sessions are stateless: `base64url(payload).base64url(hmac)`, keyed from
- * HELPPUFF_SECRET, valid for seven days.
+ * Sessions are signed cookies: `base64url(payload).base64url(hmac)`, keyed
+ * from HELPPUFF_SECRET, valid for seven days. The payload carries a random
+ * session id and a fingerprint of the account's password hash, so:
+ *  - signing out records the id (D1 `admin_signed_out`) and that cookie
+ *    stops working everywhere, even if it was copied;
+ *  - changing a password (or removing the account) ends every session it had.
  */
 
 const encoder = new TextEncoder();
@@ -67,10 +71,16 @@ async function hmac(secret: string, data: string): Promise<Uint8Array> {
   return new Uint8Array(await crypto.subtle.sign('HMAC', key, encoder.encode(data)));
 }
 
-export type AdminSession = { email: string; exp: number };
+export type AdminSession = { email: string; exp: number; id: string; fingerprint: string };
 
-export async function issueSession(secret: string, email: string, now: number): Promise<string> {
-  const payload = b64url(encoder.encode(JSON.stringify({ e: email, x: now + SESSION_TTL_MS })));
+/** A short keyed digest of the account's password hash: changes when the password does, reveals nothing about it. */
+export async function passwordFingerprint(secret: string, passwordHash: string): Promise<string> {
+  return b64url((await hmac(secret, `password:${passwordHash}`)).slice(0, 12));
+}
+
+export async function issueSession(secret: string, email: string, now: number, passwordHash: string): Promise<string> {
+  const id = b64url(crypto.getRandomValues(new Uint8Array(16)));
+  const payload = b64url(encoder.encode(JSON.stringify({ e: email, x: now + SESSION_TTL_MS, j: id, p: await passwordFingerprint(secret, passwordHash) })));
   return `${payload}.${b64url(await hmac(secret, payload))}`;
 }
 
@@ -80,9 +90,10 @@ export async function readSession(secret: string, token: string | undefined, now
   if (!payload || !signature) return null;
   try {
     if (!equal(await hmac(secret, payload), fromB64url(signature))) return null;
-    const data = JSON.parse(new TextDecoder().decode(fromB64url(payload))) as { e?: unknown; x?: unknown };
-    if (typeof data.e !== 'string' || typeof data.x !== 'number' || data.x <= now) return null;
-    return { email: data.e, exp: data.x };
+    const data = JSON.parse(new TextDecoder().decode(fromB64url(payload))) as { e?: unknown; x?: unknown; j?: unknown; p?: unknown };
+    // A cookie from before sessions had an id and a fingerprint is no longer accepted: sign in again.
+    if (typeof data.e !== 'string' || typeof data.x !== 'number' || data.x <= now || typeof data.j !== 'string' || typeof data.p !== 'string') return null;
+    return { email: data.e, exp: data.x, id: data.j, fingerprint: data.p };
   } catch {
     return null;
   }

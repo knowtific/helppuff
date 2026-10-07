@@ -85,6 +85,8 @@ export function writeWorker(
   cpSync(join(runtime, 'widget'), join(out, 'assets'), { recursive: true });
   if (project.dashboard.enabled && existsSync(join(runtime, 'dashboard'))) {
     cpSync(join(runtime, 'dashboard'), join(out, 'assets', 'admin'), { recursive: true });
+    const headers = join(out, 'assets', '_headers');
+    writeFileSync(headers, `${existsSync(headers) ? `${readFileSync(headers, 'utf8').trimEnd()}\n\n` : ''}${DASHBOARD_HEADERS}`);
   }
   writeFileSync(join(out, 'assets', 'index.html'), previewPage(project));
   writeFileSync(join(out, 'assets', 'preview.html'), previewPage(project));
@@ -101,6 +103,34 @@ export function writeWorker(
   }
   return out;
 }
+
+/**
+ * The dashboard's pages: never framed (clickjacking), scripts only from this
+ * origin and Turnstile, no plugins, no MIME sniffing. Styles allow inline:
+ * React sets style attributes. The test chat is a same-origin iframe.
+ */
+export const DASHBOARD_HEADERS = [
+  '/admin/*',
+  '  X-Frame-Options: DENY',
+  [
+    "  Content-Security-Policy: default-src 'self'",
+    "script-src 'self' https://challenges.cloudflare.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' data: blob: https:",
+    "connect-src 'self'",
+    "frame-src 'self' https://challenges.cloudflare.com",
+    "frame-ancestors 'none'",
+    "base-uri 'none'",
+    "form-action 'self'",
+    "object-src 'none'",
+  ].join('; '),
+  '  X-Content-Type-Options: nosniff',
+  '  Referrer-Policy: same-origin',
+  '  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()',
+  '  Cross-Origin-Opener-Policy: same-origin',
+  '',
+].join('\n');
 
 const escape = (value: string) =>
   value.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);

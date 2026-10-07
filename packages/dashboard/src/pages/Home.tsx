@@ -1,9 +1,9 @@
-import { ArrowRight, CheckCircle2, ExternalLink, Loader2 } from 'lucide-react';
+import { ArrowRight, CheckCircle2, ExternalLink, Loader2, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { CrawlProgress, useKnowledgeStatus } from '../components/knowledge';
 import { HelpLink } from '../components/Shell';
 import { Button, Card, CardHeader, ErrorNote } from '../components/ui';
-import { api, type Me, type SettingsView } from '../lib/api';
+import { api, type Me, type SettingsView, type Site } from '../lib/api';
 import { cn, href, pathOf } from '../lib/utils';
 import { CopyBlock } from './Settings';
 
@@ -95,8 +95,66 @@ export function Home({ me }: { me: Me }) {
             </Step>
           </ol>
         </Card>
+
+        {site.production && <GoLiveChecklist production={site.production} />}
       </aside>
     </div>
+  );
+}
+
+/**
+ * What to settle before real visitors arrive. Testing works without any of it
+ * (and an agent cannot do the Turnstile step: it needs the Cloudflare
+ * dashboard), so this warns rather than blocks.
+ */
+function GoLiveChecklist({ production }: { production: NonNullable<Site['production']> }) {
+  return (
+    <Card>
+      <CardHeader title="Before you go live" description="Fine to skip while you test." action={<HelpLink page="Turnstile" />} />
+      <ul className="space-y-4 px-4 pb-4">
+        <li className="flex gap-3">
+          {production.turnstile ? (
+            <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[#16a34a]" aria-hidden />
+          ) : (
+            <ShieldAlert className="mt-0.5 size-4 shrink-0 text-[#d97706]" aria-hidden />
+          )}
+          <div className="min-w-0 flex-1 space-y-2">
+            <div>
+              <h2 className="text-[13px] font-medium">{production.turnstile ? 'Turnstile is on' : 'Turn on Turnstile'}</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {production.turnstile
+                  ? 'New chats and dashboard sign-ins are checked for bots.'
+                  : 'Off now. Without it, a script can start chats and use up your daily cap, and try passwords on this dashboard. Free, about five minutes, in your Cloudflare dashboard.'}
+              </p>
+            </div>
+            {!production.turnstile && (
+              <>
+                {production.hostnames.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-[11px] text-muted-foreground">Hostnames to add to the widget:</p>
+                    <CopyBlock text={production.hostnames.join('\n')} label="hostnames" />
+                  </div>
+                )}
+                <HelpLink page="Turnstile" label="How to turn it on" />
+              </>
+            )}
+          </div>
+        </li>
+        <li className="flex gap-3">
+          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <h2 className="text-[13px] font-medium">Daily cap: {production.dailyCap.toLocaleString()} messages</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              The most the whole site can use in a day. Set it to what you’re happy to pay for in{' '}
+              <a href={href({ page: 'settings', id: 'advanced' })} className="underline underline-offset-2 hover:text-foreground">
+                Settings → Advanced
+              </a>
+              .
+            </p>
+          </div>
+        </li>
+      </ul>
+    </Card>
   );
 }
 

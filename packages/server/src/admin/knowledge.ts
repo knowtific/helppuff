@@ -186,6 +186,7 @@ knowledgeRoutes.get('/admin/api/usage', async (c) => {
 
 /** What retrieval finds for a question, with scores: `helppuff ask` and the dashboard's test panel show it. */
 knowledgeRoutes.post('/admin/api/knowledge/search', async (c) => {
+  assertSameOrigin(c);
   await currentAdmin(c);
   const body = await jsonBody(c);
   const { siteId, site, env } = await siteOf(c, body['site']);
@@ -448,6 +449,7 @@ knowledgeRoutes.get('/admin/api/install-check', async (c) => {
  * model is unavailable or the knowledge base is still empty.
  */
 knowledgeRoutes.post('/admin/api/knowledge/suggest-questions', async (c) => {
+  assertSameOrigin(c);
   await currentAdmin(c);
   const body = await jsonBody(c);
   const { siteId, site, env } = await siteOf(c, body['site']);
@@ -506,6 +508,7 @@ knowledgeRoutes.post('/admin/api/knowledge/suggest-questions', async (c) => {
  * `helppuff doctor --speed` reads to pick models by data, not by guess.
  */
 knowledgeRoutes.post('/admin/api/diagnostics/models', async (c) => {
+  assertSameOrigin(c);
   await currentAdmin(c);
   const body = await jsonBody(c);
   const { site, env } = await siteOf(c, body['site']);

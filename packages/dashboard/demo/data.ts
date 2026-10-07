@@ -15,6 +15,7 @@ export const SITE = {
   connector: 'workers-ai',
   knowledge: true,
   website: 'https://harbourplumbing.example',
+  production: { turnstile: false, hostnames: ['harbourplumbing.example', 'www.harbourplumbing.example', 'knowtific-helppuff-harbour.example.workers.dev'], dailyCap: 500 },
 };
 
 const DAY = 86_400_000;

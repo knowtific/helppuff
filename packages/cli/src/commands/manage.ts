@@ -6,7 +6,7 @@ import { c } from '../output.js';
 import { chat, type ChatTurn } from '../engine/chat.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { applySettings, helppuffConfigSchema, settingsSchema, upgradeSettings, type Settings } from '@helppuff/server';
+import { applySettings, helppuffConfigSchema, securitySchema, settingsSchema, upgradeSettings, type Settings } from '@helppuff/server';
 import { adminApi } from '../engine/admin-api.js';
 import { readState, writeState } from '../engine/state.js';
 import { compile, DEV_PORT, devOrigin, embedSnippet } from '../engine/compile.js';
@@ -281,6 +281,25 @@ export function pullSettings(loaded: LoadedProject, live: Settings): LoadedProje
         if (options[key] === undefined) delete backend[key];
         else backend[key] = options[key];
       }
+    }
+    // Limits and lists from the Advanced page; only what differs from the defaults, so helppuff.json stays short.
+    if (live.security) {
+      const security = obj(raw, 'security');
+      const defaults = securitySchema.parse({});
+      const changed = <T extends Record<string, unknown>>(value: T, base: T) => Object.fromEntries(Object.entries(value).filter(([key, v]) => v !== base[key]));
+      const limits = changed(applied.security.limits, defaults.limits);
+      const signIn = changed(applied.security.signIn, defaults.signIn);
+      for (const [key, value] of [['limits', limits], ['signIn', signIn]] as const) {
+        if (Object.keys(value).length) security[key] = value;
+        else delete security[key];
+      }
+      for (const key of ['allowIps', 'blockIps'] as const) {
+        if (applied.security[key].length) security[key] = applied.security[key];
+        else delete security[key];
+      }
+      if (applied.security.sessionTtlHours !== defaults.sessionTtlHours) security['sessionTtlHours'] = applied.security.sessionTtlHours;
+      else delete security['sessionTtlHours'];
+      if (!Object.keys(security).length) delete raw['security'];
     }
     const knowledge = obj(raw, 'knowledge');
     if (knowledge['website'] !== false || live.crawl.schedule !== 'off') {

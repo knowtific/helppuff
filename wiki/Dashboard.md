@@ -67,7 +67,8 @@ Conversations and leads over time, conversion, top pages, countries, recent
 questions. Choose 7, 30 or 90 days. **Became a lead** is the share of
 conversations linked to a person who provided contact details; **messages per
 conversation** counts visitor and assistant messages together. Countries come
-from Cloudflare's request metadata; HelpPuff does not store visitor IP addresses.
+from Cloudflare's request metadata; HelpPuff does not store visitor IP addresses
+(only a salted hash of each, which the per-visitor limits count by).
 
 ## Settings
 
@@ -80,7 +81,7 @@ Opens as a menu in the sidebar:
 | **Lead form** | The form before the chat: on/off, its fields, which are required, your own extra fields |
 | **Instructions** | What it is mainly for, tone and answer length (settings HelpPuff adds around the prompt), and a box for anything specific to your business (the prompt itself). The full prompt, its version history and everything HelpPuff adds are one click away. See [[Prompt and instructions|Prompts-and-Instructions]] |
 | **Business details** | Phone, email, address, hours, service areas: read from your site, yours to correct (a crawl never overwrites your changes) |
-| **Advanced** | The AI model (see [[AI models|AI-Models]]), thinking (low, medium, high), "double-check answers before replying" (the reranker), how often the site is re-learned, time zone and language |
+| **Advanced** | The AI model (see [[AI models|AI-Models]]), thinking (low, medium, high), "double-check answers before replying" (the reranker), how often the site is re-learned, time zone and language. **Limits and access**: every rate limit and cap, how long a chat lasts, IP addresses (or ranges) that are never limited or are blocked, and the sign-in limits and Turnstile on the sign-in form. See [[Security|Security#every-limit]] |
 | **Webhooks** | Endpoints that receive every event as signed JSON; see [[Webhooks]] |
 | **Team & security** | Who can sign in, and what to do when locked out |
 | **Updates** | Checks the version running against the latest npm release, shows an update notice and command, and links to the [[upgrade instructions|Upgrading]] |
@@ -97,7 +98,17 @@ teammates from the project folder with `helppuff users add <email>` and
 `helppuff users remove <email>`; reset a password with
 `helppuff users reset <email>`. `helppuff dashboard` creates a one-time sign-in
 link when someone is locked out. Password hashes and the admin API key remain
-Worker secrets; the dashboard never shows them. See [[Security]].
+Worker secrets; the dashboard never shows them.
+
+Signing out ends that session everywhere, even if the cookie was copied, and
+changing a password (`helppuff users reset`) signs that account out of every
+device. Wrong passwords are limited per address and per account; after five
+for one email in 15 minutes (Settings → Advanced changes both) that account
+waits, and a one-time link from `helppuff dashboard` still works. With
+Turnstile set up (`security.captcha`), the sign-in form shows its check too:
+add the dashboard's hostname to the Turnstile widget. Until Turnstile is on,
+the Home page shows a **Before you go live** checklist with the hostnames to
+add; see [[Turn on Turnstile|Turnstile]] and [[Security]].
 
 ## Turning it off
 

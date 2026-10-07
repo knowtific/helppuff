@@ -180,17 +180,39 @@ Rate limits, daily cap, Turnstile. The defaults are safe for a public site.
 
 | Field | Type | Default | Description |
 | --- | --- | --- | --- |
-| `security.captcha` | object |  | Check new chats with Cloudflare Turnstile (invisible for most visitors). |
+| `security.captcha` | object |  | Check new chats (and dashboard sign-ins) with Cloudflare Turnstile (invisible for most visitors). Strongly recommended: without it, a script can start chats. |
 | `security.captcha.provider` **(required)** | `"turnstile"` |  | Cloudflare Turnstile. |
 | `security.captcha.siteKey` **(required)** | string |  | The Turnstile site key (public). · 1–200 chars |
 | `security.captcha.secret` **(required)** | `{ env }` |  | The Turnstile secret key, by environment variable name. |
 | `security.limits` | object | `{}` | Per-visitor and per-site limits. The daily cap is the cost backstop. |
+| `security.signIn` | object | `{}` | Dashboard sign-in limits. |
+| `security.signIn.attemptsPerIp` | integer | `10` | Sign-in attempts (and one-time link checks) one IP may make per window. · 1–1000 |
+| `security.signIn.attemptsPerAccount` | integer | `5` | Failed sign-ins one email may have per window, from anywhere. Counts failures only. · 1–1000 |
+| `security.signIn.windowMinutes` | integer | `15` | The window both sign-in limits count over, in minutes. · 1–1440 |
+| `security.signIn.captcha` | boolean | `true` | Ask for Turnstile on the sign-in form when `security.captcha` is set. Add the dashboard's hostname to the Turnstile widget. |
+| `security.allowIps` | string[] | `[]` | IP addresses or CIDR ranges exempt from the per-visitor limits (your office, a monitor). The per-chat and daily caps still apply. · ≤ 500 items |
+| `security.blockIps` | string[] | `[]` | IP addresses or CIDR ranges refused by the chat. The dashboard is not affected. · ≤ 500 items |
+| `security.sessionTtlHours` | number | `24` | How long a chat can be continued (the widget keeps it across pages and reloads). · 0.25–720 |
+
+### `security.limits`
+
+Per-visitor and per-site limits. The daily cap is the cost backstop.
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
 | `security.limits.messagesPerIpPerMinute` | integer | `10` | Messages one visitor (IP) may send a minute. · 1–600 |
+| `security.limits.messagesPerIpPerDay` | integer | `100` | Messages one visitor (IP) may send a day (UTC), so one visitor cannot use up the daily cap. · 1–100000 |
 | `security.limits.sessionsPerIpPerHour` | integer | `5` | New chats one visitor (IP) may start an hour. · 1–1000 |
+| `security.limits.sessionsPerIpPerDay` | integer | `20` | New chats one visitor (IP) may start a day (UTC). · 1–10000 |
 | `security.limits.messagesPerSession` | integer | `60` | Messages in one chat before the visitor must start another. · 1–1000 |
 | `security.limits.messagesPerSitePerDay` | integer | `500` | The cost backstop. Always set this. · 1–1000000 |
 | `security.limits.maxMessageLength` | integer | `1000` | The longest message a visitor may send, in characters. · 1–4000 |
-| `security.sessionTtlHours` | number | `24` | How long a chat can be continued (the widget keeps it across pages and reloads). · 0.25–720 |
+| `security.limits.maxLeadFieldLength` | integer | `200` | The longest answer to one form field, in characters (a message box gets `maxLeadMessageLength`). · 20–2000 |
+| `security.limits.maxLeadMessageLength` | integer | `2000` | The longest answer to a message box in a form, in characters. · 20–4000 |
+| `security.limits.feedbackPerIpPerMinute` | integer | `30` | Thumbs up or down one visitor (IP) may give a minute. · 1–600 |
+| `security.limits.pollsPerIpPerMinute` | integer | `120` | Checks for new messages one visitor (IP) may make a minute (backends that reply later, like Retell). · 1–600 |
+| `security.limits.endsPerIpPerMinute` | integer | `10` | Chats one visitor (IP) may close a minute. · 1–600 |
+| `security.limits.retellLookupsPerMinute` | integer | `120` | Knowledge-base lookups a Retell agent may make a minute, for the whole site. · 1–6000 |
 
 ## `leads`
 

@@ -2,7 +2,7 @@ import type { Context } from 'hono';
 import { HelpPuffError } from '../core/errors.js';
 import { requireSecret, type HonoEnv } from '../core/request.js';
 import { dbFrom, type D1Like } from '../db/d1.js';
-import { cookieValue, readSession, SESSION_COOKIE } from './auth.js';
+import { cookieValue, passwordFingerprint, readSession, SESSION_COOKIE } from './auth.js';
 
 /**
  * Who may use the dashboard API, and the checks every handler shares.
@@ -61,16 +61,34 @@ export async function viaApiKey(c: Context<HonoEnv>): Promise<boolean> {
 export async function currentAdmin(c: Context<HonoEnv>): Promise<Admin> {
   if (await viaApiKey(c)) return { email: 'api-key', owner: true, via: 'api-key' };
   const ctx = c.get('helppuff');
-  const session = await readSession(requireSecret(ctx), cookieValue(c.req.header('Cookie'), SESSION_COOKIE), ctx.platform.now());
+  const secret = requireSecret(ctx);
+  const session = await readSession(secret, cookieValue(c.req.header('Cookie'), SESSION_COOKIE), ctx.platform.now());
   if (!session) throw new HelpPuffError('unauthorized', { message: 'Please sign in.', detail: 'admin_no_session' });
   const owner = String(ctx.env['ADMIN_EMAIL'] ?? '').toLowerCase();
-  if (owner && session.email === owner) return { email: session.email, owner: true, via: 'session' };
-  // Removed accounts lose access at their next request, not in seven days.
-  const row = await db(c).prepare('SELECT email FROM admins WHERE email = ?').bind(session.email).first();
-  if (!row) throw new HelpPuffError('unauthorized', { message: 'Please sign in.', detail: 'admin_revoked' });
+  const isOwner = Boolean(owner) && session.email === owner;
+  const d = db(c);
+  // Removed accounts, changed passwords and signed-out sessions lose access at their next request, not in seven days.
+  const [row, signedOut] = await Promise.all([
+    isOwner ? null : d.prepare('SELECT email, password_hash FROM admins WHERE email = ?').bind(session.email).first<{ email: string; password_hash: string }>(),
+    d.prepare('SELECT 1 AS x FROM admin_signed_out WHERE id = ?').bind(session.id).first(),
+  ]);
+  if (!isOwner && !row) throw new HelpPuffError('unauthorized', { message: 'Please sign in.', detail: 'admin_revoked' });
+  const hash = isOwner ? String(ctx.env['ADMIN_PASSWORD_HASH'] ?? '') : row!.password_hash;
+  if (signedOut || session.fingerprint !== (await passwordFingerprint(secret, hash))) {
+    throw new HelpPuffError('unauthorized', { message: 'Please sign in.', detail: signedOut ? 'admin_signed_out' : 'admin_password_changed' });
+  }
+  if (isOwner) return { email: session.email, owner: true, via: 'session' };
   // Without an owner in Worker config, the first account (made at setup) is the owner.
-  const first = owner ? null : await db(c).prepare('SELECT email FROM admins ORDER BY created_at LIMIT 1').first<{ email: string }>();
+  const first = owner ? null : await d.prepare('SELECT email FROM admins ORDER BY created_at LIMIT 1').first<{ email: string }>();
   return { email: session.email, owner: first?.email === session.email, via: 'session' };
+}
+
+/** The password hash a session for `email` is tied to: the owner's Worker secret, or the account's row. Null for no such account. */
+export async function passwordHashOf(c: Context<HonoEnv>, email: string): Promise<string | null> {
+  const owner = String(c.get('helppuff').env['ADMIN_EMAIL'] ?? '').toLowerCase();
+  if (owner && email === owner) return String(c.get('helppuff').env['ADMIN_PASSWORD_HASH'] ?? '');
+  const row = await db(c).prepare('SELECT password_hash FROM admins WHERE email = ?').bind(email).first<{ password_hash: string }>();
+  return row?.password_hash ?? null;
 }
 
 /** The site asked for, or the only one — a CLI deployment has exactly one. */

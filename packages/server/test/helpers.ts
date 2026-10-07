@@ -1,6 +1,7 @@
 import { defineConfig } from '../src/config/load.js';
 import { createApp } from '../src/app.js';
 import { memoryKv } from '../src/core/platform.js';
+import { issueToken, verifyToken } from '../src/core/token.js';
 import type { Bindings } from '../src/core/request.js';
 import type { HelpPuffConfigInput } from '../src/config/schema.js';
 
@@ -76,4 +77,14 @@ export async function startSession(h: Harness, body: unknown = startBody) {
   const response = await h.post('/v1/sites/demo/sessions', body);
   const json = (await response.json()) as { sessionToken: string; sessionId: string; messages: unknown[] };
   return { response, ...json };
+}
+
+/**
+ * The session token as if the server had shown these forms (their message
+ * ids): a submitted form is only honoured for a form the chat was offered.
+ */
+export async function withForms(sessionToken: string, forms: string[]): Promise<string> {
+  const payload = await verifyToken(SECRET, sessionToken);
+  const { token } = await issueToken(SECRET, { ...payload, forms: [...(payload.forms ?? []), ...forms], ttlMs: payload.exp - Date.now(), now: Date.now() });
+  return token;
 }

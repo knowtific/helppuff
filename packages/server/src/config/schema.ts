@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { widgetConfigSchema } from '@helppuff/protocol';
+import { isIpOrRange } from '../core/ip.js';
 
 /**
  * A reference to an environment variable. Secrets are never written into the
@@ -18,15 +19,41 @@ export function isSecretRef(value: unknown): value is SecretRef {
   );
 }
 
-/** Defaults are deliberately conservative — a site that sets nothing is still bounded. */
+/**
+ * Every abuse bound the Worker enforces. Defaults are deliberately
+ * conservative — a site that sets nothing is still bounded. Per-visitor
+ * limits are keyed by a salted hash of the IP and scoped by site; the
+ * per-site ones bound cost. `wiki/Security.md` lists them all.
+ */
 export const limitsSchema = z.object({
   messagesPerIpPerMinute: z.number().int().min(1).max(600).default(10).describe('Messages one visitor (IP) may send a minute.'),
+  messagesPerIpPerDay: z.number().int().min(1).max(100_000).default(100).describe('Messages one visitor (IP) may send a day (UTC), so one visitor cannot use up the daily cap.'),
   sessionsPerIpPerHour: z.number().int().min(1).max(1000).default(5).describe('New chats one visitor (IP) may start an hour.'),
+  sessionsPerIpPerDay: z.number().int().min(1).max(10_000).default(20).describe('New chats one visitor (IP) may start a day (UTC).'),
   messagesPerSession: z.number().int().min(1).max(1000).default(60).describe('Messages in one chat before the visitor must start another.'),
   messagesPerSitePerDay: z.number().int().min(1).max(1_000_000).default(500).describe('The cost backstop. Always set this.'),
   maxMessageLength: z.number().int().min(1).max(4000).default(1000).describe('The longest message a visitor may send, in characters.'),
+  maxLeadFieldLength: z.number().int().min(20).max(2000).default(200).describe('The longest answer to one form field, in characters (a message box gets `maxLeadMessageLength`).'),
+  maxLeadMessageLength: z.number().int().min(20).max(4000).default(2000).describe('The longest answer to a message box in a form, in characters.'),
+  feedbackPerIpPerMinute: z.number().int().min(1).max(600).default(30).describe('Thumbs up or down one visitor (IP) may give a minute.'),
+  pollsPerIpPerMinute: z.number().int().min(1).max(600).default(120).describe('Checks for new messages one visitor (IP) may make a minute (backends that reply later, like Retell).'),
+  endsPerIpPerMinute: z.number().int().min(1).max(600).default(10).describe('Chats one visitor (IP) may close a minute.'),
+  retellLookupsPerMinute: z.number().int().min(1).max(6000).default(120).describe('Knowledge-base lookups a Retell agent may make a minute, for the whole site.'),
 });
 export type Limits = z.infer<typeof limitsSchema>;
+
+/** Dashboard sign-in: the bounds on guessing a password, and Turnstile on the form. */
+export const signInSchema = z.object({
+  attemptsPerIp: z.number().int().min(1).max(1000).default(10).describe('Sign-in attempts (and one-time link checks) one IP may make per window.'),
+  attemptsPerAccount: z.number().int().min(1).max(1000).default(5).describe('Failed sign-ins one email may have per window, from anywhere. Counts failures only.'),
+  windowMinutes: z.number().int().min(1).max(1440).default(15).describe('The window both sign-in limits count over, in minutes.'),
+  captcha: z.boolean().default(true).describe('Ask for Turnstile on the sign-in form when `security.captcha` is set. Add the dashboard\'s hostname to the Turnstile widget.'),
+});
+export type SignInLimits = z.infer<typeof signInSchema>;
+
+const ipListSchema = z
+  .array(z.string().trim().min(1).max(64).refine(isIpOrRange, { message: 'an IP address or CIDR range, like 203.0.113.7 or 2001:db8::/32' }))
+  .max(500);
 
 export const captchaSchema = z.object({
   provider: z.literal('turnstile').describe('Cloudflare Turnstile.'),
@@ -35,8 +62,11 @@ export const captchaSchema = z.object({
 });
 
 export const securitySchema = z.object({
-  captcha: captchaSchema.optional().describe('Check new chats with Cloudflare Turnstile (invisible for most visitors).'),
+  captcha: captchaSchema.optional().describe('Check new chats (and dashboard sign-ins) with Cloudflare Turnstile (invisible for most visitors). Strongly recommended: without it, a script can start chats.'),
   limits: limitsSchema.default({}).describe('Per-visitor and per-site limits. The daily cap is the cost backstop.'),
+  signIn: signInSchema.default({}).describe('Dashboard sign-in limits.'),
+  allowIps: ipListSchema.default([]).describe('IP addresses or CIDR ranges exempt from the per-visitor limits (your office, a monitor). The per-chat and daily caps still apply.'),
+  blockIps: ipListSchema.default([]).describe('IP addresses or CIDR ranges refused by the chat. The dashboard is not affected.'),
   sessionTtlHours: z.number().min(0.25).max(720).default(24).describe('How long a chat can be continued (the widget keeps it across pages and reloads).'),
 });
 export type SecurityConfig = z.infer<typeof securitySchema>;

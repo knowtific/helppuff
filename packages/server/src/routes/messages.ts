@@ -1,10 +1,13 @@
 import { Hono } from 'hono';
 import {
   TOKEN_HEADER,
+  cleanText,
   feedbackRequestSchema,
+  stripChatTokens,
   sendRequestSchema,
   type Message,
   type PollResponse,
+  type SendRequest,
   type SendResponse,
   type StreamedSendDone,
 } from '@helppuff/protocol';
@@ -15,15 +18,17 @@ import { assertAllowedOrigin } from '../core/origin.js';
 import { requireSecret, type RequestCtx, type HonoEnv } from '../core/request.js';
 import { connectorContext, prepareConnector, runConnector, type PreparedConnector } from '../core/run.js';
 import { streamResponse, textRelay, wantsStream } from '../core/stream.js';
-import { sanitizeConnectorMessages } from '../core/sanitize.js';
+import { guardReplies, sanitizeConnectorMessages } from '../core/sanitize.js';
 import { issueToken, verifyToken, type SessionTokenPayload } from '../core/token.js';
-import { hitDaily, hitLimiter, hitTotal, hitWindow, ipLimiter, rateLimited, quotaExceeded, recordedCaps, sessionMessageKey } from '../core/ratelimit.js';
+import { hitDaily, hitLimiter, hitMemory, hitTotal, hitWindow, ipLimiter, rateLimited, quotaExceeded, recordedCaps, sessionMessageKey } from '../core/ratelimit.js';
 import type { SiteConfig } from '../config/schema.js';
 import { readJsonBody } from './sessions.js';
 import { formLead, recordFeedback, recordLead, recordTurn } from '../admin/record.js';
 import { dbFrom } from '../db/d1.js';
 import { dispatchLead } from '../core/sinks.js';
 import { emit } from '../webhooks/deliver.js';
+import { formWasOffered, isFormSubmission, offeredForms } from '../core/forms.js';
+import { visitorStanding } from '../core/visitor.js';
 
 export const messageRoutes = new Hono<HonoEnv>();
 
@@ -48,12 +53,13 @@ async function authenticate(ctx: RequestCtx, authorization: string | undefined):
   return { payload, site, prepared: prepareConnector(ctx, site), secret };
 }
 
-async function refreshToken(ctx: RequestCtx, session: Session, state: unknown, count: number): Promise<string> {
+async function refreshToken(ctx: RequestCtx, session: Session, state: unknown, count: number, messages: Message[]): Promise<string> {
   const { token } = await issueToken(session.secret, {
     siteId: session.payload.siteId,
     sessionId: session.payload.sessionId,
     state,
     count,
+    forms: offeredForms(session.payload.forms, messages),
     // Keep the original expiry — a session cannot extend itself indefinitely.
     ttlMs: Math.max(session.payload.exp - ctx.platform.now(), 1000),
   });
@@ -65,21 +71,28 @@ messageRoutes.post('/v1/sessions/messages', async (c) => {
   const session = await ctx.timing.span('auth', () => authenticate(ctx, c.req.header('Authorization')));
   const { site, payload } = session;
 
-  // 3. Body shape and length cap.
+  // 3. Body shape, cleaned (`cleanText`), and length cap.
   const parsed = sendRequestSchema.safeParse(await readJsonBody(c.req.raw));
   if (!parsed.success) throw new HelpPuffError('bad_request', { detail: 'send_body_invalid' });
-  const input = parsed.data;
+  const input = cleanSend(parsed.data);
 
   const length = input.kind === 'text' ? input.text.length : input.value.length;
+  if (length === 0 || (input.kind === 'action' && !input.label)) throw new HelpPuffError('bad_request', { message: 'That message is empty.', detail: 'message_empty' });
   if (length > site.security.limits.maxMessageLength) {
     throw new HelpPuffError('bad_request', {
       message: 'That message is a little too long.',
       detail: 'message_too_long',
     });
   }
+  // A form is answered only if this chat was shown it (see core/forms.ts).
+  if (isFormSubmission(input) && !formWasOffered(input.actionId, payload.forms, site.widget.forms)) {
+    ctx.platform.log('form.not_offered', { siteId: payload.siteId });
+    throw new HelpPuffError('bad_request', { message: 'This form has expired. Please refresh the page and try again.', detail: 'form_not_offered' });
+  }
 
-  // 4. Limits, cheapest first.
+  // 4. Limits, cheapest first. A blocked IP stops here.
   const limits = site.security.limits;
+  const standing = await visitorStanding(ctx, site.security);
   const ipKey = await ctx.ipKey();
 
   /*
@@ -96,19 +109,27 @@ messageRoutes.post('/v1/sessions/messages', async (c) => {
   const limiter = ipLimiter(ctx.env, limits.messagesPerIpPerMinute);
   const ipBucket = `${payload.siteId}:${ipKey}`;
   const checkLimits = async (): Promise<number> => {
-    const owner = await ctx.isOwner();
-    const [perIp, [perSession, daily]] = await ctx.timing.span('limits', () =>
+    const exempt = standing === 'exempt';
+    const pass = Promise.resolve({ allowed: true, count: 0 });
+    const [perIp, [perIpDay, perSession, daily]] = await ctx.timing.span('limits', () =>
       Promise.all([
-        owner
-          ? Promise.resolve({ allowed: true, count: 0 })
+        exempt
+          ? pass
           : limiter
             ? hitLimiter(limiter, ipBucket)
             : hitWindow(ctx.platform.kv, 'msg', ipBucket, limits.messagesPerIpPerMinute, 60, undefined, defer),
+        // With a database, one read of what it records (the visitor's messages today come from their chats' salted IP hash).
         db
-          ? recordedCaps(db, payload.siteId, payload.sessionId, { perSession: limits.messagesPerSession, perDay: limits.messagesPerSitePerDay }).then(
-              (caps) => [caps.session, caps.daily] as const,
-            )
+          ? recordedCaps(
+              db,
+              payload.siteId,
+              payload.sessionId,
+              { perSession: limits.messagesPerSession, perDay: limits.messagesPerSitePerDay, perIpDay: limits.messagesPerIpPerDay },
+              ctx.platform.now(),
+              exempt ? null : ipKey,
+            ).then((caps) => [caps.ipDay, caps.session, caps.daily] as const)
           : Promise.all([
+              exempt ? pass : hitWindow(ctx.platform.kv, 'msgd', ipBucket, limits.messagesPerIpPerDay, 86_400, undefined, defer),
               hitTotal(ctx.platform.kv, sessionMessageKey(payload.sessionId), limits.messagesPerSession, ttlSeconds, defer),
               hitDaily(ctx.platform.kv, payload.siteId, limits.messagesPerSitePerDay, undefined, defer),
             ]),
@@ -118,6 +139,10 @@ messageRoutes.post('/v1/sessions/messages', async (c) => {
     if (!perIp.allowed) {
       ctx.platform.log('limit.messages_per_ip', { siteId: payload.siteId });
       throw rateLimited(perIp, 'messages_per_ip_per_minute');
+    }
+    if (!perIpDay.allowed) {
+      ctx.platform.log('limit.messages_per_ip_day', { siteId: payload.siteId });
+      throw rateLimited(perIpDay, 'messages_per_ip_per_day');
     }
     if (!perSession.allowed) {
       ctx.platform.log('limit.messages_per_session', { siteId: payload.siteId });
@@ -160,11 +185,11 @@ messageRoutes.post('/v1/sessions/messages', async (c) => {
     const count = await verdict;
 
     // 6. Sanitize.
-    const messages = sanitizeConnectorMessages(result.messages, ctx.platform);
+    const messages = guardReplies(sanitizeConnectorMessages(result.messages, ctx.platform), session.prepared.guidance, ctx.platform);
 
     // 7. Refresh the token whenever state or the message count changed.
     const state = result.state === undefined ? payload.state : result.state;
-    const token = await refreshToken(ctx, session, state, count);
+    const token = await refreshToken(ctx, session, state, count, messages);
 
     ctx.platform.log('message.sent', { siteId: payload.siteId, sessionId: payload.sessionId, count });
     recordTurn(ctx, { siteId: payload.siteId, sessionId: payload.sessionId, request: input, messages });
@@ -180,7 +205,7 @@ messageRoutes.post('/v1/sessions/messages', async (c) => {
     await verdict;
     work = finish();
   }
-  const submitted = formLead(input);
+  const submitted = formLead(input, limits);
   // The callback form is itself the request: recorded once, here, whatever the model says next.
   if (submitted) reportLead(input.kind === 'action' && isCallbackForm(input.actionId) ? { ...submitted, request: 'callback' } : submitted, 'form');
 
@@ -201,6 +226,12 @@ messageRoutes.post('/v1/sessions/messages', async (c) => {
   return c.json(body);
 });
 
+/** A visitor's message, cleaned: typed text as `input`, an action's label as one line, its value as given (form answers are JSON). */
+function cleanSend(input: SendRequest): SendRequest {
+  if (input.kind === 'text') return { ...input, text: stripChatTokens(cleanText(input.text, 'input')) };
+  return { ...input, label: cleanText(input.label, 'line'), value: cleanText(input.value, 'output') };
+}
+
 messageRoutes.get('/v1/sessions/messages', async (c) => {
   const ctx = c.get('helppuff');
   const session = await authenticate(ctx, c.req.header('Authorization'));
@@ -210,12 +241,19 @@ messageRoutes.get('/v1/sessions/messages', async (c) => {
     throw new HelpPuffError('bad_request', { detail: 'poll_not_supported' });
   }
 
+  // In memory: a KV write per poll would cost more than the poll.
+  if ((await visitorStanding(ctx, session.site.security)) === 'limited') {
+    const perIp = hitMemory('poll', `${session.payload.siteId}:${await ctx.ipKey()}`, session.site.security.limits.pollsPerIpPerMinute, 60, ctx.platform.now());
+    if (!perIp.allowed) throw rateLimited(perIp, 'polls_per_ip');
+  }
+
+  // Forms delivered here are not added to the token (a poll returns none); backends that poll send text.
   const after = c.req.query('after');
   const cctx = connectorContext(ctx, session.prepared, session.payload.siteId, session.payload.sessionId);
   const result = await runConnector(ctx, 'poll', () => poll(cctx, session.payload.state, after));
 
   const body: PollResponse = {
-    messages: sanitizeConnectorMessages(result.messages, ctx.platform, { allowEmpty: true }),
+    messages: guardReplies(sanitizeConnectorMessages(result.messages, ctx.platform, { allowEmpty: true }), session.prepared.guidance, ctx.platform),
   };
   return c.json(body);
 });
@@ -225,9 +263,14 @@ messageRoutes.post('/v1/sessions/end', async (c) => {
   const ctx = c.get('helppuff');
   const session = await authenticate(ctx, c.req.header('Authorization'));
   const end = session.prepared.connector.end;
+  const { siteId, sessionId } = session.payload;
+  if ((await visitorStanding(ctx, session.site.security)) === 'limited') {
+    const perIp = hitMemory('end', `${siteId}:${await ctx.ipKey()}`, session.site.security.limits.endsPerIpPerMinute, 60, ctx.platform.now());
+    if (!perIp.allowed) throw rateLimited(perIp, 'ends_per_ip');
+  }
 
   if (end) {
-    const cctx = connectorContext(ctx, session.prepared, session.payload.siteId, session.payload.sessionId);
+    const cctx = connectorContext(ctx, session.prepared, siteId, sessionId);
     ctx.platform.waitUntil(
       end(cctx, session.payload.state).catch(() => {
         ctx.platform.log('connector.end_failed');
@@ -235,8 +278,24 @@ messageRoutes.post('/v1/sessions/end', async (c) => {
     );
   }
 
-  ctx.platform.log('session.ended', { siteId: session.payload.siteId, sessionId: session.payload.sessionId });
-  emit(ctx, session.payload.siteId, 'conversation.ended', { conversationId: session.payload.sessionId });
+  ctx.platform.log('session.ended', { siteId, sessionId });
+  // Once per conversation, decided by the database (webhooks live there too): a token replayed here fans out nothing.
+  const db = dbFrom(ctx.env);
+  if (db) {
+    const now = ctx.platform.now();
+    ctx.platform.waitUntil(
+      (async () => {
+        const result = (await db
+          .prepare(
+            `INSERT INTO conversations (id, site_id, started_at, last_at, message_count, ended_at) VALUES (?, ?, ?, ?, 0, ?)
+             ON CONFLICT (id) DO UPDATE SET ended_at = excluded.ended_at WHERE conversations.ended_at IS NULL`,
+          )
+          .bind(sessionId, siteId, now, now, now)
+          .run()) as { meta?: { changes?: number }; changes?: number } | undefined;
+        if ((result?.meta?.changes ?? result?.changes ?? 0) > 0) emit(ctx, siteId, 'conversation.ended', { conversationId: sessionId });
+      })().catch(() => ctx.platform.log('record.failed')),
+    );
+  }
   return c.body(null, 204);
 });
 
@@ -248,8 +307,10 @@ messageRoutes.post('/v1/sessions/feedback', async (c) => {
   if (!parsed.success) throw new HelpPuffError('bad_request', { detail: 'feedback_body_invalid' });
   const db = dbFrom(ctx.env);
   if (!db) throw new HelpPuffError('not_found', { detail: 'feedback_not_recorded' });
-  const perIp = await hitWindow(ctx.platform.kv, 'fb', `${session.payload.siteId}:${await ctx.ipKey()}`, 30, 60);
-  if (!perIp.allowed) throw rateLimited(perIp, 'feedback_per_ip');
+  if ((await visitorStanding(ctx, session.site.security)) === 'limited') {
+    const perIp = hitMemory('fb', `${session.payload.siteId}:${await ctx.ipKey()}`, session.site.security.limits.feedbackPerIpPerMinute, 60, ctx.platform.now());
+    if (!perIp.allowed) throw rateLimited(perIp, 'feedback_per_ip');
+  }
   const found = await recordFeedback(db, session.payload.sessionId, parsed.data.messageId, parsed.data.value);
   if (!found) throw new HelpPuffError('not_found', { detail: 'feedback_message_unknown' });
   emit(ctx, session.payload.siteId, 'feedback.received', {

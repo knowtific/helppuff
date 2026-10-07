@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { actionSchema } from './actions.js';
 import { httpUrl, safeUrl } from './url-schema.js';
+import { cleanDeep } from './text.js';
 
 export const roleSchema = z.enum(['user', 'agent', 'system']);
 export type Role = z.infer<typeof roleSchema>;
@@ -111,6 +112,8 @@ export const messagesSchema = z.array(messageSchema).max(20);
 
 /**
  * Drop anything a connector returned that does not satisfy the protocol.
+ * Every string is cleaned first (`cleanText`: no control, bidi-override or
+ * hidden characters), so a message that is only invisible text is dropped.
  * Returns the surviving messages plus the indexes that were dropped so
  * the caller can log a count without logging content.
  */
@@ -119,7 +122,7 @@ export function sanitizeMessages(input: unknown): { messages: Message[]; dropped
   const messages: Message[] = [];
   let dropped = 0;
   for (const candidate of input.slice(0, 20)) {
-    const result = messageSchema.safeParse(candidate);
+    const result = messageSchema.safeParse(cleanDeep(candidate));
     if (result.success) messages.push(result.data);
     else dropped += 1;
   }

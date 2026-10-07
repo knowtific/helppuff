@@ -60,10 +60,16 @@ All in `security` in `helppuff.json`; see the [[Configuration reference|Configur
 | --- | --- | --- |
 | `limits.messagesPerSitePerDay` | 500 | The cost backstop. When it trips, visitors see your contact details |
 | `limits.messagesPerIpPerMinute` | 10 | One visitor, per minute |
+| `limits.messagesPerIpPerDay` | 100 | One visitor, per day, so nobody uses up the cap alone |
 | `limits.sessionsPerIpPerHour` | 5 | New chats from one visitor, per hour |
+| `limits.sessionsPerIpPerDay` | 20 | New chats from one visitor, per day |
 | `limits.messagesPerSession` | 60 | One conversation |
 | `limits.maxMessageLength` | 1000 | Characters per message |
 | `sessionTtlHours` | 24 | How long a chat can be continued |
+
+[[Security|Security#every-limit]] lists every limit (ratings, polls, form
+lengths, dashboard sign-in, IP allow and block lists) and how each is
+counted. All of them are also on the dashboard's **Settings → Advanced** page.
 
 You (and your coding agent) are exempt from the per-visitor limits when
 testing with `helppuff chat` or `helppuff ask`, never from the daily caps.

@@ -12,6 +12,9 @@ import { HelpPuffError } from './errors.js';
  *  - messages per conversation and per site a day: from what the database
  *    already records about each turn (`recordedCaps`), so they cost one read
  *    and no write;
+ *  - messages and new chats per visitor a day (and chats an hour): from the
+ *    conversations the database records with the visitor's salted IP hash;
+ *  - polls, ratings and closing a chat: in this isolate's memory (`hitMemory`);
  *  - otherwise (no binding, no database: `pnpm dev`, older deployments), KV
  *    counters, written after the response.
  *
@@ -149,38 +152,92 @@ export async function hitLimiter(limiter: RateLimiter, key: string, now = Date.n
 }
 
 /**
- * The per-conversation and daily caps, from what the server records after
- * every turn (`admin/record.ts`): the conversation's visitor messages and
- * the site's `usage_daily.messages`. One read, no write. Verdicts are for
- * this message, counted as the KV ones are. A database that cannot answer
- * lets the request through: these bound cost, the model's own budget is
- * the backstop.
+ * The per-conversation, daily and per-visitor caps, from what the server
+ * records after every turn (`admin/record.ts`): the conversation's visitor
+ * messages, the site's `usage_daily.messages`, and the conversations (and
+ * their messages) started by this visitor (`conversations.visitor`, the
+ * salted IP hash). One read, no write. Verdicts are for this message or
+ * chat, counted as the KV ones are. A database that cannot answer lets the
+ * request through: these bound cost, the model's own budget is the backstop.
  */
+export type RecordedLimits = {
+  perSession: number;
+  perDay: number;
+  /** With a visitor key: their messages today (UTC), and chats started in the last hour and today. */
+  perIpDay?: number;
+  sessionsPerIpHour?: number;
+  sessionsPerIpDay?: number;
+};
+export type RecordedCaps = { session: LimitVerdict; daily: LimitVerdict; ipDay: LimitVerdict; ipSessionsHour: LimitVerdict; ipSessionsDay: LimitVerdict };
+
 export async function recordedCaps(
   db: D1Like,
   siteId: string,
   sessionId: string | null,
-  limits: { perSession: number; perDay: number },
+  limits: RecordedLimits,
   now = Date.now(),
-): Promise<{ session: LimitVerdict; daily: LimitVerdict }> {
-  let row: { daily: number | null; session: number | null } | null = null;
+  visitor: string | null = null,
+): Promise<RecordedCaps> {
+  type Row = { daily: number | null; session: number | null; ipDay: number | null; ipHour: number | null; ipSessions: number | null };
+  let row: Row | null = null;
+  const dayStart = now - (now % 86_400_000);
   try {
     row = await db
       .prepare(
         `SELECT (SELECT messages FROM usage_daily WHERE day = ? AND site_id = ?) AS daily,
-                (SELECT COUNT(*) FROM messages WHERE conversation_id = ? AND role = 'user') AS session`,
+                (SELECT COUNT(*) FROM messages WHERE conversation_id = ? AND role = 'user') AS session,
+                (SELECT COUNT(*) FROM messages m JOIN conversations c ON c.id = m.conversation_id
+                  WHERE c.site_id = ? AND c.visitor = ? AND c.last_at >= ? AND m.role = 'user' AND m.ts >= ?) AS ipDay,
+                (SELECT COUNT(*) FROM conversations WHERE site_id = ? AND visitor = ? AND started_at >= ?) AS ipHour,
+                (SELECT COUNT(*) FROM conversations WHERE site_id = ? AND visitor = ? AND started_at >= ?) AS ipSessions`,
       )
-      .bind(usageDay(now), siteId, sessionId ?? '')
-      .first<{ daily: number | null; session: number | null }>();
+      .bind(usageDay(now), siteId, sessionId ?? '', siteId, visitor ?? '', dayStart, dayStart, siteId, visitor ?? '', now - 3_600_000, siteId, visitor ?? '', dayStart)
+      .first<Row>();
   } catch {
     // No schema yet (nothing recorded), or D1 unavailable.
   }
   const daily = row?.daily ?? 0;
   const session = sessionId ? (row?.session ?? 0) : 0;
+  const cap = (count: number, limit: number | undefined, retryAfter?: number): LimitVerdict =>
+    visitor && limit !== undefined && count >= limit ? { allowed: false, count, ...(retryAfter ? { retryAfter } : {}) } : { allowed: true, count: count + 1 };
   return {
     session: session >= limits.perSession ? { allowed: false, count: session } : { allowed: true, count: session + 1 },
     daily: daily >= limits.perDay ? { allowed: false, count: daily, retryAfter: untilMidnight(now) } : { allowed: true, count: daily + 1 },
+    ipDay: cap(row?.ipDay ?? 0, limits.perIpDay, untilMidnight(now)),
+    ipSessionsHour: cap(row?.ipHour ?? 0, limits.sessionsPerIpHour, 3600),
+    ipSessionsDay: cap(row?.ipSessions ?? 0, limits.sessionsPerIpDay, untilMidnight(now)),
   };
+}
+
+/**
+ * A window counted in this isolate's memory: no KV write, no network trip.
+ * For cheap endpoints (polls, ratings, closing a chat), where a KV write per
+ * request would cost more than what it protects. Best effort: a visitor
+ * reaching several isolates gets each one's allowance; the per-chat and daily
+ * caps are what bound cost.
+ */
+const memory = new Map<string, { count: number; until: number }>();
+const MEMORY_KEYS = 10_000;
+
+export function hitMemory(scope: string, key: string, limit: number, windowSeconds: number, now = Date.now()): LimitVerdict {
+  const id = `${scope}:${key}`;
+  let entry = memory.get(id);
+  if (!entry || entry.until <= now) {
+    if (memory.size >= MEMORY_KEYS) {
+      for (const [k, v] of memory) if (v.until <= now) memory.delete(k);
+      if (memory.size >= MEMORY_KEYS) memory.clear();
+    }
+    entry = { count: 0, until: now + windowSeconds * 1000 };
+    memory.set(id, entry);
+  }
+  if (entry.count >= limit) return { allowed: false, count: entry.count, retryAfter: Math.max(1, Math.ceil((entry.until - now) / 1000)) };
+  entry.count += 1;
+  return { allowed: true, count: entry.count };
+}
+
+/** Test hook: forget every in-memory window. */
+export function resetMemoryLimits(): void {
+  memory.clear();
 }
 
 export function rateLimited(verdict: LimitVerdict, detail: string): HelpPuffError {

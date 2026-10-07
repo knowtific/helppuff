@@ -39,7 +39,7 @@ const DESCRIPTIONS: Record<SettingsSection, string> = {
   leads: 'A short form before the chat: every conversation becomes a lead, and the assistant knows who it’s talking to.',
   instructions: 'How it talks and what it’s for.',
   business: 'Read from your website. The assistant always has these; your changes are never overwritten.',
-  advanced: 'The model, how answers are checked, and how often your site is re-read.',
+  advanced: 'The model, how often your site is re-read, rate limits, blocked IPs and sign-in protection.',
   webhooks: 'Send chats, messages, leads and callbacks to other tools as they happen.',
   team: 'Who can sign in, and what to do if you’re locked out.',
   updates: 'The version running, and how to upgrade it.',

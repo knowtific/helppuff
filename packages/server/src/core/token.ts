@@ -13,6 +13,12 @@ export type SessionTokenPayload = {
   state: unknown;
   /** Messages already counted against `messagesPerSession`. */
   count: number;
+  /**
+   * Ids of the forms this chat was shown (the latest few). A submitted form
+   * must be one of them, so a script cannot post leads or callback requests
+   * into a chat that never offered a form.
+   */
+  forms?: string[];
   iat: number;
   exp: number;
 };
@@ -83,9 +89,13 @@ export type IssueTokenInput = {
   sessionId: string;
   state: unknown;
   count: number;
+  forms?: readonly string[] | undefined;
   ttlMs: number;
   now?: number;
 };
+
+/** How many offered form ids a token remembers. */
+export const MAX_TOKEN_FORMS = 5;
 
 export async function issueToken(secret: string, input: IssueTokenInput): Promise<{ token: string; expiresAt: number }> {
   assertSecret(secret);
@@ -96,6 +106,7 @@ export async function issueToken(secret: string, input: IssueTokenInput): Promis
     sessionId: input.sessionId,
     state: input.state ?? null,
     count: input.count,
+    ...(input.forms?.length ? { forms: input.forms.slice(-MAX_TOKEN_FORMS) } : {}),
     iat: now,
     exp: now + input.ttlMs,
   };
@@ -153,6 +164,7 @@ function isPayload(value: unknown): value is SessionTokenPayload {
     typeof p['siteId'] === 'string' &&
     typeof p['sessionId'] === 'string' &&
     typeof p['count'] === 'number' &&
+    (p['forms'] === undefined || (Array.isArray(p['forms']) && p['forms'].every((f) => typeof f === 'string'))) &&
     typeof p['iat'] === 'number' &&
     typeof p['exp'] === 'number'
   );

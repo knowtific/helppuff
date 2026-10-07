@@ -1,4 +1,4 @@
-import type { Message, SendRequest, VisitorContext } from '@helppuff/protocol';
+import { cleanText, type Message, type SendRequest, type VisitorContext } from '@helppuff/protocol';
 import { usageDay } from '@helppuff/rag';
 import type { RequestCtx } from '../core/request.js';
 import { dbFrom, ensureSchema, type D1Like, type D1Statement } from '../db/d1.js';
@@ -73,7 +73,11 @@ function countMessage(db: D1Like, siteId: string, now: number): D1Statement {
  * Record what a conversation told us about the visitor. A lead is a person:
  * the email is the key, so a visitor who comes back (or gives their email in
  * a second chat) enriches the lead they already have, and the conversation
- * points at it. Details are filled in, never overwritten; form fields merge.
+ * points at it. Details are filled in, never overwritten: an email typed in a
+ * chat proves nothing, so a stranger who types a customer's address can add
+ * a conversation to that contact but cannot change their name, phone or
+ * answers. Form fields merge the same way: new keys are added, existing
+ * ones keep their first value (the new one stays in that conversation).
  *
  * Statements, for a `db.batch` (so they apply together, in order):
  *  - with an email that another lead already has, any email-less lead this
@@ -100,7 +104,7 @@ export function leadStatements(
   const merge = `name = COALESCE(leads.name, excluded.name),
          email = COALESCE(leads.email, excluded.email),
          phone = COALESCE(leads.phone, excluded.phone),
-         fields = CASE WHEN leads.fields IS NULL THEN excluded.fields WHEN excluded.fields IS NULL THEN leads.fields ELSE json_patch(leads.fields, excluded.fields) END,
+         fields = CASE WHEN leads.fields IS NULL THEN excluded.fields WHEN excluded.fields IS NULL THEN leads.fields ELSE json_patch(excluded.fields, leads.fields) END,
          updated_at = excluded.updated_at`;
 
   if (!email) {
@@ -108,7 +112,7 @@ export function leadStatements(
       db
         .prepare(
           `UPDATE leads SET name = COALESCE(name, ?), phone = COALESCE(phone, ?),
-             fields = CASE WHEN ? IS NULL THEN fields WHEN fields IS NULL THEN ? ELSE json_patch(fields, ?) END, updated_at = ?
+             fields = CASE WHEN ? IS NULL THEN fields WHEN fields IS NULL THEN ? ELSE json_patch(?, fields) END, updated_at = ?
            WHERE id = ${current}`,
         )
         .bind(name, phone, fields, fields, fields, now, conversationId),
@@ -173,6 +177,8 @@ export function recordStart(
   input: {
     siteId: string;
     sessionId: string;
+    /** The salted IP hash the rate limits use (never the IP): per-visitor daily limits count from it. */
+    visitor?: string;
     lead: Record<string, string>;
     context: VisitorContext;
     firstMessage?: string | undefined;
@@ -187,8 +193,8 @@ export function recordStart(
       db
         .prepare(
           `INSERT OR IGNORE INTO conversations
-           (id, site_id, started_at, last_at, page_url, page_title, referrer, utm, locale, country, first_message, message_count)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (id, site_id, started_at, last_at, page_url, page_title, referrer, utm, locale, country, first_message, message_count, visitor)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           input.sessionId,
@@ -203,6 +209,7 @@ export function recordStart(
           input.country,
           input.firstMessage?.slice(0, 500) ?? null,
           (input.firstMessage ? 1 : 0) + input.messages.length,
+          input.visitor ?? null,
         ),
     ];
     if (input.firstMessage) statements.push(visitorMessage(input.sessionId, input.firstMessage, now - 1, db), countMessage(db, input.siteId, now));
@@ -238,14 +245,17 @@ export function recordStart(
  * Contact details in a submitted inline form: the widget sends the fields as
  * a JSON object in the action's value. Only plain string fields count.
  */
-export function formLead(request: SendRequest): Record<string, string> | null {
+export function formLead(request: SendRequest, limits = { maxLeadFieldLength: 200, maxLeadMessageLength: 2000 }): Record<string, string> | null {
   if (request.kind !== 'action' || !request.value.trim().startsWith('{')) return null;
   try {
     const value = JSON.parse(request.value) as unknown;
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
     const lead: Record<string, string> = {};
+    // A form has at most 12 fields (the protocol's limit), each named like a field.
     for (const [key, raw] of Object.entries(value as Record<string, unknown>).slice(0, 12)) {
-      if (typeof raw === 'string' && raw.trim() && key.length <= 64) lead[key] = raw.trim().slice(0, 200);
+      if (typeof raw !== 'string' || !/^[\w-]{1,64}$/.test(key)) continue;
+      const text = cleanText(raw, key === 'message' ? 'input' : 'line').slice(0, key === 'message' ? limits.maxLeadMessageLength : limits.maxLeadFieldLength);
+      if (text) lead[key] = text;
     }
     const typed = contactIn(`${lead['email'] ?? ''} ${lead['phone'] ?? ''}`);
     return typed.email || typed.phone ? lead : null;

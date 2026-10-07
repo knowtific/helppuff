@@ -43,6 +43,8 @@ export type Site = {
   /** The workers-ai knowledge base is on: Knowledge page and onboarding apply. */
   knowledge: boolean;
   website: string | null;
+  /** The "Before you go live" checklist. Absent from older Workers. */
+  production?: { turnstile: boolean; hostnames: string[]; dailyCap: number };
 };
 export type Me = { admin: { email: string; owner: boolean }; sites: Site[]; summaries: boolean };
 
@@ -284,8 +286,32 @@ export type Settings = {
   /** How the assistant behaves; HelpPuff writes it around the prompt. */
   behaviour: { goal: 'callbacks' | 'answers' | 'bookings'; tone: 'friendly' | 'professional' | 'casual'; length: 'short' | 'detailed'; prices: 'share' | 'quote'; bookingUrl?: string };
   crawl: { schedule: 'off' | 'daily' | 'weekly' | 'monthly'; include: string[]; exclude: string[]; renderJs: 'auto' | 'always' | 'never' };
+  /** Limits, sign-in and IP lists (`security` in helppuff.json, Turnstile keys aside). Absent from older Workers. */
+  security?: SecuritySettings;
 };
-export type SettingsView = { site: string; connector: string; settings: Settings; hash: string; meta: { at: number; by: string | null } | null };
+export type Limits = {
+  messagesPerIpPerMinute: number;
+  messagesPerIpPerDay: number;
+  sessionsPerIpPerHour: number;
+  sessionsPerIpPerDay: number;
+  messagesPerSession: number;
+  messagesPerSitePerDay: number;
+  maxMessageLength: number;
+  maxLeadFieldLength: number;
+  maxLeadMessageLength: number;
+  feedbackPerIpPerMinute: number;
+  pollsPerIpPerMinute: number;
+  endsPerIpPerMinute: number;
+  retellLookupsPerMinute: number;
+};
+export type SecuritySettings = {
+  limits: Limits;
+  signIn: { attemptsPerIp: number; attemptsPerAccount: number; windowMinutes: number; captcha: boolean };
+  allowIps: string[];
+  blockIps: string[];
+  sessionTtlHours: number;
+};
+export type SettingsView = { site: string; connector: string; settings: Settings; hash: string; meta: { at: number; by: string | null } | null; /** Turnstile is set up (`security.captcha`). */ captcha?: boolean };
 
 export type CallbackStatus = 'open' | 'done' | 'dismissed';
 export type Callback = {

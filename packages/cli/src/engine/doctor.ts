@@ -58,6 +58,18 @@ export async function doctor(cwd: string, doFetch: typeof fetch = fetch): Promis
     ...(missing.length ? { fix: missing.map((name) => `helppuff secret set ${name}`).join('\n') } : {}),
   });
 
+  // Origin checks stop other websites, not scripts: without Turnstile, a script can start chats and use up the daily cap.
+  checks.push(
+    project.security.captcha
+      ? { name: 'turnstile', status: 'pass', detail: 'new chats and dashboard sign-ins are checked with Turnstile' }
+      : {
+          name: 'turnstile',
+          status: 'warn',
+          detail: 'off (fine for testing): before going live, turn it on, or a script can start chats and try dashboard passwords, slowed only by the limits',
+          fix: 'The site owner creates a Turnstile widget in the Cloudflare dashboard (an agent cannot: wrangler login has no Turnstile permission), then: helppuff config set security.captcha \'{"provider":"turnstile","siteKey":"<Site Key>","secret":{"env":"TURNSTILE_SECRET"}}\' && helppuff secret set TURNSTILE_SECRET && helppuff deploy. Guide: https://github.com/knowtific/helppuff/wiki/Turnstile',
+        },
+  );
+
   const keyName = PROVIDER_KEYS[project.backend.type];
   if (keyName && env[keyName]) {
     const provider = project.backend.type as 'openai' | 'gemini' | 'anthropic' | 'retell';

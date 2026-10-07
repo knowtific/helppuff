@@ -53,7 +53,7 @@ retellRoutes.post('/v1/sites/:siteId/retell/kb', async (c) => {
   if (site.connector.type !== 'retell' || !ownsKnowledge(site)) {
     throw new HelpPuffError('not_found', { detail: 'retell_kb_not_enabled' });
   }
-  const verdict = await hitWindow(ctx.platform.kv, 'retellkb', siteId, 120, 60);
+  const verdict = await hitWindow(ctx.platform.kv, 'retellkb', siteId, site.security.limits.retellLookupsPerMinute, 60);
   if (!verdict.allowed) throw rateLimited(verdict, 'retell_kb_per_minute');
 
   const raw = await c.req.text();

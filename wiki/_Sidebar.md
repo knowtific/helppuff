@@ -28,6 +28,7 @@
 
 **Operate**
 - [[Deployment]]
+- [[Turn on Turnstile|Turnstile]]
 - [[Upgrading]]
 - [[Costs and limits|Costs-and-Limits]]
 - [[Cloudflare Free plan limits|Cloudflare-Free-Plan]]

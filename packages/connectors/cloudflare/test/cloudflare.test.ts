@@ -61,7 +61,8 @@ describe('requests', () => {
     });
 
     expect(calls[0]?.messages[0]).toMatchObject({ role: 'system' });
-    expect(calls[0]?.messages[0]?.content).toContain('You help Ada at Acme.');
+    // The visitor's values are quoted: data, not prompt text.
+    expect(calls[0]?.messages[0]?.content).toContain('You help "Ada" at Acme.');
     expect(calls[0]?.messages.at(-1)).toEqual({ role: 'user', content: 'What does it cost?' });
     expect(started.messages[0]).toMatchObject({ type: 'text', text: 'Hi Ada.' });
   });

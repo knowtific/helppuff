@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { iconNames, type WidgetConfig } from '@helppuff/protocol';
 import type { KvStore } from '@helppuff/connector-types';
 import { ANSWER_REASONING, answerReasoning } from '@helppuff/rag';
-import { assistantConfigSchema, storedSiteConfigSchema, type SiteConfig, type StoredSiteConfig } from '../config/schema.js';
+import { assistantConfigSchema, securitySchema, storedSiteConfigSchema, type SiteConfig, type StoredSiteConfig } from '../config/schema.js';
 import { resolveSite, siteConfigKey } from '../config/site.js';
 import { HelpPuffError } from '../core/errors.js';
 import type { HonoEnv } from '../core/request.js';
@@ -65,6 +65,14 @@ export function upgradeSettings(raw: unknown): unknown {
   return s;
 }
 
+/**
+ * The Advanced page: every limit, the sign-in bounds, and the IP lists.
+ * Turnstile keys stay in helppuff.json (`security.captcha`): the secret is a
+ * Worker secret, never something the dashboard holds.
+ */
+export const securitySettingsSchema = securitySchema.omit({ captcha: true }).strict();
+export type SecuritySettings = z.infer<typeof securitySettingsSchema>;
+
 export const settingsSchema = z
   .object({
     botName: z.string().trim().min(1).max(60),
@@ -107,6 +115,8 @@ export const settingsSchema = z
         renderJs: z.enum(['auto', 'always', 'never']),
       })
       .strict(),
+    /** Absent from Workers older than the Advanced page. */
+    security: securitySettingsSchema.optional(),
   })
   .strict();
 export type Settings = z.infer<typeof settingsSchema>;
@@ -128,6 +138,17 @@ export const settingsPatchSchema = settingsSchema.partial().extend({
     .nullable()
     .optional(),
   crawl: settingsSchema.shape.crawl.partial().optional(),
+  /** Merged one level deep (limits and sign-in field by field), then checked whole: see `mergeSecurity`. */
+  security: z
+    .object({
+      limits: z.record(z.string(), z.number()).optional(),
+      signIn: z.record(z.string(), z.union([z.number(), z.boolean()])).optional(),
+      allowIps: z.array(z.string().max(64)).max(500).optional(),
+      blockIps: z.array(z.string().max(64)).max(500).optional(),
+      sessionTtlHours: z.number().optional(),
+    })
+    .strict()
+    .optional(),
 });
 export type SettingsPatch = z.infer<typeof settingsPatchSchema>;
 
@@ -161,7 +182,24 @@ export function readSettings(site: SiteConfig): Settings {
         : null,
     behaviour: site.assistant,
     crawl: { schedule: site.knowledge.schedule, include: site.knowledge.include, exclude: site.knowledge.exclude, renderJs: site.knowledge.renderJs },
+    security: securityOf(site),
   };
+}
+
+function securityOf(site: SiteConfig): SecuritySettings {
+  const { limits, signIn, allowIps, blockIps, sessionTtlHours } = site.security;
+  return { limits, signIn, allowIps, blockIps, sessionTtlHours };
+}
+
+/** The site's security with a patch applied, validated whole. Throws a ZodError for a bad value (the route turns it into a 400). */
+export function mergeSecurity(site: SiteConfig, patch: SettingsPatch['security']): SiteConfig['security'] {
+  const current = site.security;
+  return securitySchema.parse({
+    ...current,
+    ...(patch ?? {}),
+    limits: { ...current.limits, ...(patch?.limits ?? {}) },
+    signIn: { ...current.signIn, ...(patch?.signIn ?? {}) },
+  });
 }
 
 /** Drop nulls and empty strings, so an unset field is absent rather than stored as "". */
@@ -169,7 +207,7 @@ const compact = (value: Record<string, unknown>) =>
   Object.fromEntries(Object.entries(value).filter(([, v]) => v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)));
 
 /** The site config sections that carry these settings, rewritten. */
-export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<SiteConfig, 'widget' | 'connector' | 'knowledge' | 'assistant'> {
+export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<SiteConfig, 'widget' | 'connector' | 'knowledge' | 'assistant' | 'security'> {
   const current = readSettings(site);
   const s: Settings = {
     ...current,
@@ -178,6 +216,7 @@ export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<Site
     behaviour: assistantConfigSchema.parse({ ...current.behaviour, ...patch.behaviour }),
     assistant: current.assistant && { ...current.assistant, ...(patch.assistant ?? {}) },
     crawl: { ...current.crawl, ...patch.crawl },
+    security: current.security,
   } as Settings;
 
   const widget: WidgetConfig = structuredClone(site.widget);
@@ -213,7 +252,7 @@ export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<Site
     };
   }
   const knowledge = { ...site.knowledge, ...s.crawl };
-  return { widget, connector, knowledge, assistant: s.behaviour };
+  return { widget, connector, knowledge, assistant: s.behaviour, security: mergeSecurity(site, patch.security) };
 }
 
 export async function settingsHash(settings: Settings): Promise<string> {
@@ -230,7 +269,7 @@ settingsRoutes.get('/admin/api/settings', async (c) => {
   const site = await resolveSite(ctx, siteId);
   const settings = readSettings(site);
   const stored = await readStored(ctx.env, siteId);
-  return c.json({ site: siteId, connector: site.connector.type, settings, hash: await settingsHash(settings), meta: stored?.settings ?? null });
+  return c.json({ site: siteId, connector: site.connector.type, settings, hash: await settingsHash(settings), meta: stored?.settings ?? null, captcha: Boolean(site.security.captcha) });
 });
 
 async function readStored(env: Record<string, unknown>, siteId: string): Promise<StoredSiteConfig | null> {
@@ -260,6 +299,12 @@ settingsRoutes.put('/admin/api/settings', async (c) => {
   if (!kv) throw new HelpPuffError('internal', { message: 'This deployment has no KV namespace.', detail: 'admin_no_kv' });
 
   const site = await resolveSite(ctx, siteId);
+  try {
+    mergeSecurity(site, parsed.data.security);
+  } catch (thrown) {
+    const issue = thrown instanceof z.ZodError ? thrown.issues[0] : undefined;
+    throw new HelpPuffError('bad_request', { message: `Check security.${issue?.path.join('.') || 'settings'}: ${issue?.message ?? 'invalid'}.`, detail: 'settings_invalid' });
+  }
   const next = applySettings(site, parsed.data);
   const settings = readSettings({ ...site, ...next });
   const hash = await settingsHash(settings);
@@ -270,8 +315,9 @@ settingsRoutes.put('/admin/api/settings', async (c) => {
     connector: next.connector,
     knowledge: next.knowledge,
     assistant: next.assistant,
+    security: next.security,
     settings: { at: ctx.platform.now(), by: admin.via === 'api-key' ? 'cli' : admin.email, hash },
   });
   await kv.put(siteConfigKey(siteId), JSON.stringify(record));
-  return c.json({ site: siteId, settings, hash, meta: record.settings });
+  return c.json({ site: siteId, connector: next.connector.type, settings, hash, meta: record.settings, captcha: Boolean(next.security.captcha) });
 });

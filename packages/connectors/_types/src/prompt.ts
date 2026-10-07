@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { VisitorContext } from '@helppuff/protocol';
 import { renderTemplate } from './helpers.js';
+import { promptValue, quotedValue } from './untrusted.js';
 import type { ConnectorContext } from './index.js';
 
 /**
@@ -74,11 +75,20 @@ export async function resolvePrompt(
   scope: PromptScope,
 ): Promise<string | undefined> {
   const template = source === undefined ? null : await readSource(ctx, source);
-  const owner = template === null ? '' : renderTemplate(template, scope as Record<string, unknown>).trim();
+  const owner = template === null ? '' : renderTemplate(template, scope as Record<string, unknown>, scopeValue).trim();
   if (!ctx.guidance) return owner || undefined;
   // The owner's words sit between HelpPuff's settings and its rules, so the rules have the last word.
-  const render = (text: string) => renderTemplate(text, scope as Record<string, unknown>).trim();
+  const render = (text: string) => renderTemplate(text, scope as Record<string, unknown>, scopeValue).trim();
   return [render(ctx.guidance.before), owner ? `## Instructions from the business\n${owner}` : '', render(ctx.guidance.after)].filter(Boolean).join('\n\n');
+}
+
+/**
+ * A placeholder's value in a system prompt. The visitor's (`lead.*`,
+ * `context.*`) is quoted, so it reads as data and cannot add a line to the
+ * prompt; the business's own details and the site id are cleaned lines.
+ */
+function scopeValue(value: unknown, path: string): string {
+  return /^(?:lead|context)\./.test(path) ? quotedValue(value) : promptValue(value, 2000);
 }
 
 async function readSource(
@@ -149,19 +159,20 @@ async function fetchPrompt(
 export function promptVariables(scope: PromptScope): Record<string, string> {
   const out: Record<string, string> = {};
 
+  // Each value is one cleaned line (`promptValue`): the provider puts them into its own prompt.
   for (const [key, value] of Object.entries(scope.lead ?? {})) {
-    if (typeof value === 'string' && value) out[`lead_${key}`] = value.slice(0, 500);
+    if (typeof value === 'string' && value && /^[\w-]{1,64}$/.test(key)) out[`lead_${key}`] = promptValue(value, 500);
   }
 
   const context = scope.context;
   if (context) {
-    if (context.pageUrl) out['page_url'] = context.pageUrl.slice(0, 500);
-    if (context.pageTitle) out['page_title'] = context.pageTitle.slice(0, 300);
-    if (context.referrer) out['referrer'] = context.referrer.slice(0, 500);
-    if (context.locale) out['locale'] = context.locale;
-    if (context.timezone) out['timezone'] = context.timezone;
+    if (context.pageUrl) out['page_url'] = promptValue(context.pageUrl, 500);
+    if (context.pageTitle) out['page_title'] = promptValue(context.pageTitle, 300);
+    if (context.referrer) out['referrer'] = promptValue(context.referrer, 500);
+    if (context.locale) out['locale'] = promptValue(context.locale, 35);
+    if (context.timezone) out['timezone'] = promptValue(context.timezone, 64);
     for (const [key, value] of Object.entries(context.utm ?? {})) {
-      if (value) out[`utm_${key}`] = value.slice(0, 200);
+      if (value && /^[\w-]{1,64}$/.test(key)) out[`utm_${key}`] = promptValue(value, 200);
     }
   }
 

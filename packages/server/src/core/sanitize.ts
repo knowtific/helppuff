@@ -1,4 +1,5 @@
 import { sanitizeMessages, type Message } from '@helppuff/protocol';
+import { promptLeak, type PromptGuidance } from '@helppuff/connector-types';
 import type { Platform } from './platform.js';
 
 /** Shown when a connector replied but nothing it sent was usable. */
@@ -31,4 +32,30 @@ export function sanitizeConnectorMessages(
   if (messages.length > 0) return messages;
   if (options.allowEmpty && dropped === 0) return [];
   return [fallbackNotice(platform.now())];
+}
+
+/** Said instead of a reply that started repeating the assistant's instructions. */
+export const LEAK_REPLY_TEXT = 'Sorry, I can’t share that. Is there something about the business I can help you with?';
+
+const leakChecks = new WeakMap<PromptGuidance, (reply: string) => boolean>();
+
+/**
+ * The last check on every backend's replies: an agent message that repeats a
+ * line of HelpPuff's settings or rules (`guidance`) is replaced. A visitor can
+ * talk a model into printing its instructions; this check cannot be talked
+ * out of. (workers-ai also checks the owner's prompt, and stops a streamed
+ * reply as it leaks; the final messages replace what was streamed.)
+ */
+export function guardReplies(messages: Message[], guidance: PromptGuidance | undefined, platform: Pick<Platform, 'log' | 'now'>): Message[] {
+  if (!guidance) return messages;
+  let leaks = leakChecks.get(guidance);
+  if (!leaks) {
+    leaks = promptLeak(`${guidance.before}\n${guidance.after}`, 1);
+    leakChecks.set(guidance, leaks);
+  }
+  return messages.map((message) => {
+    if (message.role !== 'agent' || !('text' in message) || typeof message.text !== 'string' || !leaks(message.text)) return message;
+    platform.log('reply.prompt_leak');
+    return { id: message.id, ts: message.ts, role: 'agent', type: 'text', text: LEAK_REPLY_TEXT } satisfies Message;
+  });
 }

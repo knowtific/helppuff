@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { startSessionRequestSchema, type StartSessionResponse } from '@helppuff/protocol';
+import { cleanText, startSessionRequestSchema, stripChatTokens, type StartSessionRequest, type StartSessionResponse } from '@helppuff/protocol';
 import { resolveSite } from '../config/site.js';
 import { HelpPuffError } from '../core/errors.js';
 import { validateLead } from '../core/lead.js';
@@ -8,13 +8,15 @@ import { requireSecret, type HonoEnv } from '../core/request.js';
 import { dbFrom } from '../db/d1.js';
 import { capabilitiesOf, connectorContext, prepareConnector, runConnector } from '../core/run.js';
 import { streamResponse, textRelay, wantsStream } from '../core/stream.js';
-import { sanitizeConnectorMessages } from '../core/sanitize.js';
+import { guardReplies, sanitizeConnectorMessages } from '../core/sanitize.js';
 import { issueToken, newSessionId } from '../core/token.js';
 import { hitDaily, hitWindow, rateLimited, quotaExceeded, recordedCaps } from '../core/ratelimit.js';
 import { assertTurnstile } from '../core/turnstile.js';
 import { resolveSecrets } from '../config/load.js';
 import { dispatchLead } from '../core/sinks.js';
 import { recordLead, recordStart } from '../admin/record.js';
+import { offeredForms } from '../core/forms.js';
+import { visitorStanding } from '../core/visitor.js';
 
 export const sessionRoutes = new Hono<HonoEnv>();
 
@@ -31,53 +33,68 @@ sessionRoutes.post('/v1/sites/:siteId/sessions', async (c) => {
   // 2. Origin allowlist.
   assertAllowedOrigin(ctx.origin, site.origins);
 
-  // 3. Body shape.
+  // 3. Body shape, cleaned (`cleanText`: no control or hidden characters).
   const parsed = startSessionRequestSchema.safeParse(await readJsonBody(c.req.raw));
   if (!parsed.success) {
     throw new HelpPuffError('bad_request', { detail: 'session_body_invalid' });
   }
-  const input = parsed.data;
+  const input = cleanStart(parsed.data);
+  const limits = site.security.limits;
 
   // 4. Lead fields against the site's configured form.
   const lead = site.widget.leadForm.enabled
-    ? validateLead(input.lead, site.widget.leadForm.fields)
+    ? validateLead(input.lead, site.widget.leadForm.fields, limits)
     : {};
 
-  if (input.firstMessage && input.firstMessage.length > site.security.limits.maxMessageLength) {
+  if (input.firstMessage && input.firstMessage.length > limits.maxMessageLength) {
     throw new HelpPuffError('bad_request', {
       message: 'That message is a little too long.',
       detail: 'first_message_too_long',
     });
   }
 
-  // 5. Rate limits, before anything that costs money.
-  const limits = site.security.limits;
+  // 5. Rate limits, before anything that costs money. A blocked IP stops here.
+  const standing = await visitorStanding(ctx, site.security);
   const ipKey = await ctx.ipKey();
 
   // Scoped by site: each site configures its own limit and its own budget,
   // so one site's traffic must not consume another's.
   // Read together; the counter writes happen after the response (see messages.ts).
   // The daily count comes from the database when there is one (no KV write);
-  // sessions an hour stay in KV, a window longer than the Rate Limiting binding's.
   const db = dbFrom(ctx.env);
   // Limits and the captcha make one verdict; a gated connector overlaps its
   // cheap preparation with it and waits for it before the model.
   const defer = ctx.platform.waitUntil;
   const verdict = (async () => {
-    const owner = await ctx.isOwner();
-    const [perIp, daily] = await ctx.timing.span('limits', () =>
-      Promise.all([
-        owner
-          ? Promise.resolve({ allowed: true, count: 0 })
-          : hitWindow(ctx.platform.kv, 'sess', `${siteId}:${ipKey}`, limits.sessionsPerIpPerHour, 3600, undefined, defer),
-        db
-          ? recordedCaps(db, siteId, null, { perSession: limits.messagesPerSession, perDay: limits.messagesPerSitePerDay }).then((caps) => caps.daily)
-          : hitDaily(ctx.platform.kv, siteId, limits.messagesPerSitePerDay, undefined, defer),
-      ]),
-    );
+    const exempt = standing === 'exempt';
+    const pass = { allowed: true, count: 0 };
+    // With a database, every count is one read of what it records (the visitor's chats carry their salted IP hash);
+    // without one, KV counters written after the response.
+    const [perIp, perIpDay, daily] = await ctx.timing.span('limits', async () => {
+      if (db) {
+        const caps = await recordedCaps(
+          db,
+          siteId,
+          null,
+          { perSession: limits.messagesPerSession, perDay: limits.messagesPerSitePerDay, sessionsPerIpHour: limits.sessionsPerIpPerHour, sessionsPerIpDay: limits.sessionsPerIpPerDay },
+          ctx.platform.now(),
+          exempt ? null : ipKey,
+        );
+        return [caps.ipSessionsHour, caps.ipSessionsDay, caps.daily] as const;
+      }
+      return Promise.all([
+        exempt ? pass : hitWindow(ctx.platform.kv, 'sess', `${siteId}:${ipKey}`, limits.sessionsPerIpPerHour, 3600, undefined, defer),
+        exempt ? pass : hitWindow(ctx.platform.kv, 'sessd', `${siteId}:${ipKey}`, limits.sessionsPerIpPerDay, 86_400, undefined, defer),
+        hitDaily(ctx.platform.kv, siteId, limits.messagesPerSitePerDay, undefined, defer),
+      ]);
+    });
     if (!perIp.allowed) {
       ctx.platform.log('limit.sessions_per_ip', { siteId });
       throw rateLimited(perIp, 'sessions_per_ip_per_hour');
+    }
+    if (!perIpDay.allowed) {
+      ctx.platform.log('limit.sessions_per_ip_day', { siteId });
+      throw rateLimited(perIpDay, 'sessions_per_ip_per_day');
     }
     // The cost backstop. When this trips the widget shows the fallback contact.
     if (!daily.allowed) {
@@ -115,7 +132,7 @@ sessionRoutes.post('/v1/sites/:siteId/sessions', async (c) => {
     // Nothing is recorded for a request the limits refused.
     await verdict;
 
-    const messages = sanitizeConnectorMessages(started.messages, ctx.platform, { allowEmpty: true });
+    const messages = guardReplies(sanitizeConnectorMessages(started.messages, ctx.platform, { allowEmpty: true }), prepared.guidance, ctx.platform);
 
     // 8. Sign and respond.
     const { token, expiresAt } = await issueToken(secret, {
@@ -123,6 +140,7 @@ sessionRoutes.post('/v1/sites/:siteId/sessions', async (c) => {
       sessionId,
       state: started.state,
       count: 0,
+      forms: offeredForms(undefined, messages),
       ttlMs: site.security.sessionTtlHours * 3600_000,
     });
 
@@ -132,6 +150,7 @@ sessionRoutes.post('/v1/sites/:siteId/sessions', async (c) => {
     recordStart(ctx, {
       siteId,
       sessionId,
+      visitor: ipKey,
       lead,
       context: input.context,
       firstMessage: input.firstMessage,
@@ -170,6 +189,24 @@ sessionRoutes.post('/v1/sites/:siteId/sessions', async (c) => {
   c.header('Server-Timing', ctx.timing.header());
   return c.json(body);
 });
+
+/** A new chat's text, cleaned: the first message as typed text, the rest single lines. */
+function cleanStart(input: StartSessionRequest): StartSessionRequest {
+  const line = (value: string | undefined) => (value === undefined ? undefined : cleanText(value, 'line'));
+  const context = input.context;
+  return {
+    ...input,
+    ...(input.firstMessage === undefined ? {} : { firstMessage: stripChatTokens(cleanText(input.firstMessage, 'input')) || undefined }),
+    ...(input.lead ? { lead: Object.fromEntries(Object.entries(input.lead).map(([key, value]) => [key, typeof value === 'string' ? cleanText(value, 'input') : value])) } : {}),
+    context: {
+      ...context,
+      pageUrl: line(context.pageUrl) || context.pageUrl,
+      ...(context.pageTitle === undefined ? {} : { pageTitle: line(context.pageTitle) }),
+      ...(context.referrer === undefined ? {} : { referrer: line(context.referrer) }),
+      ...(context.utm ? { utm: Object.fromEntries(Object.entries(context.utm).map(([key, value]) => [key, typeof value === 'string' ? cleanText(value, 'line') : value])) } : {}),
+    },
+  };
+}
 
 export async function readJsonBody(request: Request): Promise<unknown> {
   try {

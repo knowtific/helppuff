@@ -1,4 +1,5 @@
 import { isSafeUrl } from '@helppuff/protocol';
+import { cleanText } from '@helppuff/protocol/text';
 
 /**
  * The markdown subset of the protocol: paragraphs, line breaks, bold, italic, inline
@@ -147,7 +148,8 @@ const bulletText = (line: string) => line.replace(/^\s*[-*]\s+/, '');
 export function renderMarkdown(input: string): string {
   if (typeof input !== 'string' || !input) return '';
 
-  const escaped = escapeHtml(input.replace(/\0/g, '').replace(/\r\n?/g, '\n'));
+  // Streamed text has not been through the server's message check yet: clean it here too (no hidden or bidi-override characters).
+  const escaped = escapeHtml(cleanText(input, 'output'));
   const blocks = escaped.split(/\n{2,}/);
   const html: string[] = [];
 

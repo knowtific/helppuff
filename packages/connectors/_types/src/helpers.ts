@@ -1,5 +1,6 @@
 import { readSse, SseIdleTimeout, type Message, type MessageBody, type Option, type Role } from '@helppuff/protocol';
 import { ConnectorError } from './errors.js';
+import { promptValue } from './untrusted.js';
 
 /** Outbound calls from a connector time out at 25s. */
 export const CONNECTOR_TIMEOUT_MS = 25_000;
@@ -82,8 +83,17 @@ export async function readJson<T = unknown>(response: Response): Promise<T> {
   }
 }
 
-/** Render `{{lead.name}}` / `{{context.pageUrl}}` style templates. */
-export function renderTemplate(template: string, scope: Record<string, unknown>): string {
+/**
+ * Render `{{lead.name}}` / `{{context.pageUrl}}` style templates. Values are
+ * often the visitor's own words, so each is formatted for a prompt (one
+ * cleaned line, no chat-template tokens: `promptValue`) unless the caller
+ * says otherwise; `format` gets the placeholder's path too.
+ */
+export function renderTemplate(
+  template: string,
+  scope: Record<string, unknown>,
+  format: (value: unknown, path: string) => string = (value) => promptValue(value),
+): string {
   return template.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_match, path: string) => {
     const value = path.split('.').reduce<unknown>((acc, key) => {
       if (acc && typeof acc === 'object' && key in (acc as Record<string, unknown>)) {
@@ -91,7 +101,7 @@ export function renderTemplate(template: string, scope: Record<string, unknown>)
       }
       return undefined;
     }, scope);
-    return value === undefined || value === null ? '' : String(value);
+    return value === undefined || value === null ? '' : format(value, path);
   });
 }
 

@@ -14,6 +14,8 @@ import { log } from '../lib/env.js';
 import { trapFocus } from '../lib/focus.js';
 import { CaptchaError, getCaptchaToken } from '../lib/turnstile.js';
 import type { Action, Message, MessageBody, Option, Shortcut, WidgetConfig } from '@helppuff/protocol';
+import { cleanText } from '@helppuff/protocol/text';
+import { localFormId } from '@helppuff/protocol/forms';
 import type { Runtime } from '../loader.js';
 import { toWidgetError, type Api } from './api.js';
 import { clientId, pageContext, pathAllowed, currentPath } from './context.js';
@@ -23,7 +25,7 @@ import { GREETING_PREFIX } from './store.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-/i;
 /** Ids the widget made itself (greetings, flow steps, local notes) never reach the server's records. */
-const isServerMessage = (id: string) => !id.startsWith(GREETING_PREFIX) && !isFlowMessage(id) && !UUID.test(id) && !id.startsWith('c_');
+const isServerMessage = (id: string) => !id.startsWith(GREETING_PREFIX) && !isFlowMessage(id) && !UUID.test(id) && !id.startsWith('c_') && !id.startsWith('wf_');
 import {
   findFlow,
   isComplete,
@@ -451,7 +453,8 @@ export function App({
    */
   const sendText = useCallback(
     (text: string) => {
-      const trimmed = text.trim();
+      // The same cleaning the server applies (no control or hidden characters), so what is shown is what is sent.
+      const trimmed = cleanText(text, 'input');
       if (!trimmed) return;
       const current = stateRef.current;
       if (current.session) {
@@ -567,14 +570,16 @@ export function App({
         if (action.kind === 'form') {
           const form = config.forms?.[action.formId];
           if (!form) return;
-          addLocal(
-            localMessage({
+          addLocal({
+            ...localMessage({
               type: 'form',
               fields: form.fields,
               ...(form.title ? { title: form.title } : {}),
               ...(form.submitLabel ? { submitLabel: form.submitLabel } : {}),
             }),
-          );
+            // Named for its form, so the server knows the submission answers a form this site offers.
+            id: localFormId(action.formId, Math.random().toString(36).slice(2, 8)),
+          });
           return;
         }
         if (action.kind === 'flow') startFlowRef.current(action.flowId);

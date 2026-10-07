@@ -8,6 +8,47 @@ never needs you to change anything. Upgrade with
 
 ## [Unreleased]
 
+Security hardening. Adds D1 migration 8 (`abuse limits`), applied by
+`helppuff upgrade`.
+
+### Added
+
+- Per-visitor daily limits (`messagesPerIpPerDay`, `sessionsPerIpPerDay`), so
+  one visitor cannot use up the site's daily cap; counted from what D1 records,
+  with no KV write per message.
+- IP allow and block lists (`security.allowIps`, `security.blockIps`), single
+  addresses or CIDR ranges, IPv4 or IPv6.
+- Every limit is a setting (`security.limits`, `security.signIn`) and on the
+  dashboard's Settings → Advanced page; `config pull` brings them back. The
+  wiki's Security page lists them all.
+- Dashboard sign-in: a per-account limit on wrong passwords, and Turnstile on
+  the form when `security.captcha` is set.
+- A "Before you go live" checklist on the dashboard's Home page, and a warning on
+  Settings → Advanced, while Turnstile is off (it stays off by default, so trying
+  HelpPuff needs no setup); `helppuff doctor` warns too. New wiki page: Turn on
+  Turnstile.
+
+### Changed
+
+- A submitted form is honoured only when the chat was shown that form, so a
+  script cannot post leads or callback requests into any chat.
+- A second chat with a contact's email no longer overwrites that contact's form
+  answers.
+- Signing out of the dashboard ends that session everywhere; changing a
+  password ends all of the account's sessions. Everyone signs in once after
+  upgrading.
+- `conversation.ended` fires once per conversation; ratings, polls and closing
+  a chat are rate limited.
+- Text is cleaned both ways: no control, bidi-override, zero-width or hidden
+  tag characters, and no chat-template tokens in visitors' messages.
+- Prompt-injection guardrails: the visitor's values are quoted in prompts,
+  website passages are fenced and neutralised, the rules say all of it is
+  information rather than instructions, and every backend's replies are
+  checked for leaked rules. Owner prompts that use `{{lead.*}}` or
+  `{{context.*}}` now receive the value in quotes.
+- The dashboard is served with a strict Content Security Policy and is never
+  framed; CSV export also guards cells starting with a tab or carriage return.
+
 ## [0.2.0] - 2026-10-07
 
 AI agents now set HelpPuff up from one shared instruction file instead of a

@@ -4,7 +4,7 @@ import { defineConfig } from '../src/config/load.js';
 import { resetSchemaMemo } from '../src/db/d1.js';
 import { memoryKv } from '../src/core/platform.js';
 import { siteConfigKey } from '../src/config/site.js';
-import { harness, ORIGIN, SECRET, startSession, type Harness } from './helpers.js';
+import { harness, ORIGIN, SECRET, startSession, withForms, type Harness } from './helpers.js';
 import { fakeAi, fakeVectors, inlineSteps, site as fakeSite, sqliteD1 } from '../../rag/test/helpers.js';
 
 const API_KEY = 'k'.repeat(40);
@@ -354,7 +354,7 @@ describe('feedback and form leads', () => {
     await h.post(
       '/v1/sessions/messages',
       { kind: 'action', actionId: 'form', value: JSON.stringify({ name: 'Sam', phone: '0400 111 222' }), label: 'Sent the form', clientId: 'c2' },
-      { headers: { Authorization: `Bearer ${sessionToken}` } },
+      { headers: { Authorization: `Bearer ${await withForms(sessionToken, ['form'])}` } },
     );
     await settle();
     expect(db.raw.prepare('SELECT name, phone, source FROM leads WHERE conversation_id = ?').get(sessionId)).toEqual({ name: 'Sam', phone: '0400 111 222', source: 'form' });

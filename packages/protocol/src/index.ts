@@ -1,6 +1,8 @@
 export const PROTOCOL_VERSION = 'v1' as const;
 
 export * from './url.js';
+export * from './text.js';
+export * from './forms.js';
 export * from './sse.js';
 export * from './url-schema.js';
 export * from './actions.js';

@@ -47,6 +47,13 @@ export async function ownerToken(secret: string): Promise<string> {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+/** Constant-time comparison of two strings (the owner header against its expected value). */
+function sameText(a: string, b: string): boolean {
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  return diff === 0;
+}
+
 /** Cloudflare's own header. Other platforms set their own in an adapter. */
 function extractIp(c: Context<HonoEnv>): string | null {
   return c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For')?.split(',')[0]?.trim() ?? null;
@@ -91,7 +98,7 @@ export function buildRequestCtx(c: Context<HonoEnv>, config: HelpPuffConfig): Re
     },
     timing: new Timing(),
     isOwner: () => {
-      cachedOwner ??= presented && secret.length >= 32 ? ownerToken(secret).then((t) => t === presented) : Promise.resolve(false);
+      cachedOwner ??= presented && secret.length >= 32 ? ownerToken(secret).then((t) => sameText(t, presented)) : Promise.resolve(false);
       return cachedOwner;
     },
   };

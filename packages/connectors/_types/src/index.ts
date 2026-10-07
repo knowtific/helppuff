@@ -5,6 +5,7 @@ import type { PromptGuidance } from './prompt.js';
 
 export * from './errors.js';
 export * from './helpers.js';
+export * from './untrusted.js';
 export * from './rich.js';
 export * from './prompt.js';
 export * from './history.js';

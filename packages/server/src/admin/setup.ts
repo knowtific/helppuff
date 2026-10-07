@@ -1,9 +1,9 @@
 import { Hono, type Context } from 'hono';
 import { HelpPuffError } from '../core/errors.js';
-import { hitWindow, rateLimited } from '../core/ratelimit.js';
 import { requireSecret, type HonoEnv } from '../core/request.js';
 import { b64url, hashPassword, issueSession, sessionCookie } from './auth.js';
-import { assertSameOrigin, currentAdmin, db, isSecure, jsonBody, viaApiKey } from './guard.js';
+import { assertSameOrigin, currentAdmin, db, isSecure, jsonBody, passwordHashOf, viaApiKey } from './guard.js';
+import { signInPolicy, throttleIp } from './signin.js';
 
 /**
  * One-time links: the setup link `helppuff deploy` prints, and the login
@@ -57,10 +57,9 @@ async function spend(c: Context<HonoEnv>, row: TokenRow): Promise<void> {
   if (result?.meta?.changes === 0) throw notFound();
 }
 
+/** Link checks share the sign-in limit per IP (`security.signIn.attemptsPerIp`). */
 async function throttle(c: Context<HonoEnv>): Promise<void> {
-  const ctx = c.get('helppuff');
-  const verdict = await hitWindow(ctx.platform.kv, 'admin-link', await ctx.ipKey(), 20, 900);
-  if (!verdict.allowed) throw rateLimited(verdict, 'admin_link');
+  await throttleIp(c, await signInPolicy(c), 'admin-link');
 }
 
 /** Mint a link. API key only: this is what `helppuff deploy` and `helppuff dashboard` call. */
@@ -116,11 +115,12 @@ setupRoutes.post('/admin/api/setup', async (c) => {
   const ctx = c.get('helppuff');
   const now = ctx.platform.now();
   const name = typeof body['name'] === 'string' ? body['name'].trim().slice(0, 100) || null : null;
+  const hash = await hashPassword(password);
   await db(c)
     .prepare('INSERT INTO admins (email, password_hash, name, created_at, last_login_at) VALUES (?, ?, ?, ?, ?)')
-    .bind(email, await hashPassword(password), name, now, now)
+    .bind(email, hash, name, now, now)
     .run();
-  c.header('Set-Cookie', sessionCookie(await issueSession(requireSecret(ctx), email, now), isSecure(c)));
+  c.header('Set-Cookie', sessionCookie(await issueSession(requireSecret(ctx), email, now, hash), isSecure(c)));
   return c.json({ email });
 });
 
@@ -131,9 +131,11 @@ setupRoutes.post('/admin/api/login-link', async (c) => {
   const body = await jsonBody(c);
   const row = await liveToken(c, body['token'], 'login');
   if (!row.email) throw notFound();
+  const hash = await passwordHashOf(c, row.email);
+  if (hash === null) throw notFound();
   await spend(c, row);
   const ctx = c.get('helppuff');
-  c.header('Set-Cookie', sessionCookie(await issueSession(requireSecret(ctx), row.email, ctx.platform.now()), isSecure(c)));
+  c.header('Set-Cookie', sessionCookie(await issueSession(requireSecret(ctx), row.email, ctx.platform.now(), hash), isSecure(c)));
   return c.json({ email: row.email });
 });
 

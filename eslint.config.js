@@ -23,6 +23,8 @@ export default tseslint.config(
       'test-results/**',
       'playwright-report/**',
       'private/**',
+      // Plain browser scripts copied as-is (the dashboard's theme, before first paint).
+      'packages/dashboard/public/**',
     ],
   },
 

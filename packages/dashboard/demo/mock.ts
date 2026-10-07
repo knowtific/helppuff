@@ -41,6 +41,27 @@ let settings: Settings = {
   assistant: { model: '@cf/zai-org/glm-4.7-flash', locale: 'en-AU', timezone: 'Australia/Sydney', rerank: true, reasoning: 'low' },
   behaviour: { goal: 'callbacks', tone: 'friendly', length: 'short', prices: 'share' },
   crawl: { schedule: 'weekly', include: [], exclude: ['/blog/tag/**'], renderJs: 'auto' },
+  security: {
+    limits: {
+      messagesPerIpPerMinute: 10,
+      messagesPerIpPerDay: 100,
+      sessionsPerIpPerHour: 5,
+      sessionsPerIpPerDay: 20,
+      messagesPerSession: 60,
+      messagesPerSitePerDay: 500,
+      maxMessageLength: 1000,
+      maxLeadFieldLength: 200,
+      maxLeadMessageLength: 2000,
+      feedbackPerIpPerMinute: 30,
+      pollsPerIpPerMinute: 120,
+      endsPerIpPerMinute: 10,
+      retellLookupsPerMinute: 120,
+    },
+    signIn: { attemptsPerIp: 10, attemptsPerAccount: 5, windowMinutes: 15, captcha: true },
+    allowIps: [],
+    blockIps: [],
+    sessionTtlHours: 24,
+  },
 };
 let settingsAt = NOW - 6 * DAY;
 
@@ -186,6 +207,7 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
 
   if (path === '/me') return json({ admin: { email: OWNER, owner: true }, sites: [SITE], summaries: true });
   if (['/login', '/logout', '/login-link'].includes(path)) return json({ ok: true });
+  if (path === '/login/options') return json({ captcha: null });
   if (path === '/version') {
     return json({ current: __HELPPUFF_VERSION__, latest: __HELPPUFF_VERSION__, upgradeAvailable: false, schema: { applied: 9, expected: 9 }, command: 'npx @knowtific/helppuff upgrade', releaseNotes: '' });
   }
@@ -283,7 +305,7 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
       settings = { ...settings, ...(body['settings'] as Partial<Settings>) };
       settingsAt = Date.now();
     }
-    return json({ site: SITE.id, connector: SITE.connector, settings, hash: String(settingsAt), meta: { at: settingsAt, by: OWNER } });
+    return json({ site: SITE.id, connector: SITE.connector, settings, hash: String(settingsAt), meta: { at: settingsAt, by: OWNER }, captcha: true });
   }
 
   if (head === 'prompt') {

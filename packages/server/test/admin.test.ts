@@ -7,7 +7,7 @@ import { forgetWebhooks, signDelivery } from '../src/webhooks/deliver.js';
 import { extractJson as extractJsonForTest } from '../src/admin/routes.js';
 import { memoryKv } from '../src/core/platform.js';
 import { recordedHistory } from '../src/conversations/history.js';
-import { harness, ORIGIN, startBody, startSession, testConfig, testEnv, type Harness } from './helpers.js';
+import { harness, ORIGIN, startBody, startSession, testConfig, testEnv, withForms, type Harness } from './helpers.js';
 
 /**
  * The dashboard, against a real SQLite database: D1 is SQLite, so the
@@ -436,17 +436,18 @@ describe('webhooks', () => {
   it('counts a submitted callback form as one callback request, whatever the assistant says next', async () => {
     const w = await withHook(['lead.captured', 'callback.requested']);
     const started = await startSession(w.h);
+    const token = await withForms(started.sessionToken, ['callback_abc123', 'm_other']);
     await w.settle();
     received = [];
     const form = { kind: 'action', actionId: 'callback_abc123', label: 'Request callback', value: JSON.stringify({ name: 'Sam', phone: '0400 111 222', message: 'A quote' }), clientId: 'c1' };
-    expect((await w.h.post('/v1/sessions/messages', form, { headers: { Authorization: `Bearer ${started.sessionToken}` } })).status).toBe(200);
+    expect((await w.h.post('/v1/sessions/messages', form, { headers: { Authorization: `Bearer ${token}` } })).status).toBe(200);
     await w.settle();
 
     expect(received.map((r) => r.body.type).sort()).toEqual(['callback.requested', 'lead.captured']);
     expect(received.find((r) => r.body.type === 'callback.requested')!.body.data).toMatchObject({ callbackId: expect.stringMatching(/^cb_/), name: 'Sam', phone: '0400 111 222', message: 'A quote' });
     // Any other form is a lead, not a callback request.
     received = [];
-    await w.h.post('/v1/sessions/messages', { ...form, actionId: 'm_other', clientId: 'c2' }, { headers: { Authorization: `Bearer ${started.sessionToken}` } });
+    await w.h.post('/v1/sessions/messages', { ...form, actionId: 'm_other', clientId: 'c2' }, { headers: { Authorization: `Bearer ${token}` } });
     await w.settle();
     expect(received.map((r) => r.body.type)).toEqual(['lead.captured']);
   });
@@ -454,7 +455,7 @@ describe('webhooks', () => {
   it('keeps callback requests as tasks: one waiting per conversation, labelled on the contact and the conversation, closed with a note', async () => {
     const w = await withHook(['callback.requested', 'callback.updated']);
     const started = await startSession(w.h);
-    const auth = { headers: { Authorization: `Bearer ${started.sessionToken}` } };
+    const auth = { headers: { Authorization: `Bearer ${await withForms(started.sessionToken, ['callback_c1', 'callback_c2', 'callback_c3', 'callback_c4', 'callback_c5'])}` } };
     const form = (reason: string, clientId: string) => ({
       kind: 'action',
       actionId: `callback_${clientId}`,
@@ -825,7 +826,7 @@ describe('the reply waits for no write', () => {
     await send(w.h, started.sessionToken, { kind: 'text', text: '/options', clientId: 'c1' });
     await w.settle();
     await pause();
-    await send(w.h, started.sessionToken, { kind: 'action', actionId: 'f', label: 'Send', value: '{"email":"ada@example.com"}', clientId: 'c2' });
+    await send(w.h, await withForms(started.sessionToken, ['f']), { kind: 'action', actionId: 'f', label: 'Send', value: '{"email":"ada@example.com"}', clientId: 'c2' });
     await w.settle();
 
     const turns = await recordedHistory(w.db, started.sessionId);

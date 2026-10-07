@@ -2,6 +2,7 @@ import { Check, Loader2, Plus, Sparkles, X } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { api, type LeadField, type Settings, type SettingsView } from '../lib/api';
 import { Button, ErrorNote, Input, Select, Skeleton, Textarea } from './ui';
+import { SecurityForm } from './SecurityForm';
 
 /**
  * The settings object, one topic at a time: what the chat says, how it looks,
@@ -430,6 +431,13 @@ export function SettingsForm({ knowledge, section }: { knowledge: boolean; secti
             )}
           </div>
         </Section>
+      )}
+      {section === 'advanced' && draft.security && (
+        <div className="border-t">
+          <Section title="Limits and access">
+            <SecurityForm value={draft.security} captcha={view.captcha ?? false} onChange={(security) => set({ security })} />
+          </Section>
+        </div>
       )}
 
       <div className="flex flex-wrap items-center justify-end gap-3 border-t px-4 py-3 md:px-5">

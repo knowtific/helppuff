@@ -218,7 +218,7 @@ export function compile(
   // Local testing makes many sessions from one IP; production limits would
   // start refusing them within minutes.
   const security = options.dev
-    ? { ...project.security, limits: { ...project.security.limits, messagesPerIpPerMinute: 600, sessionsPerIpPerHour: 1000 } }
+    ? { ...project.security, limits: { ...project.security.limits, messagesPerIpPerMinute: 600, messagesPerIpPerDay: 100_000, sessionsPerIpPerHour: 1000, sessionsPerIpPerDay: 10_000 } }
     : project.security;
   const knowledge = knowledgeFor(project);
   const stored = { connector, sinks, security, widget, assistant: project.assistant, ...(knowledge ? { knowledge } : {}) };
