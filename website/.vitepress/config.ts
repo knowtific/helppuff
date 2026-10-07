@@ -70,8 +70,8 @@ export default defineConfig({
     nav: [
       { text: 'Docs', link: '/docs/Getting-Started', activeMatch: '^/docs/' },
       { text: 'Dashboard', link: '/dashboard' },
-      // The playground is its own static app beside the site: `target` keeps the router out of it.
-      { text: 'Playground', link: '/playground/', target: '_self' },
+      // The playground is its own static app beside the site. Demos open in a new tab, which also keeps the router out of it.
+      { text: 'Playground', link: '/playground/', target: '_blank', rel: 'noopener' },
       { text: 'Changelog', link: `${REPO}/blob/main/CHANGELOG.md` },
     ],
 
@@ -104,7 +104,7 @@ export default defineConfig({
 
     footer: {
       message: 'MIT licensed. Runs in your own Cloudflare account.',
-      copyright: 'HelpPuff by Knowtific',
+      copyright: 'HelpPuff by <a href="https://knowtific.com.au" target="_blank" rel="noopener">Knowtific</a>',
     },
   },
 });

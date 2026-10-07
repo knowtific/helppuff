@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { withBase } from 'vitepress';
+import Zoom from './Zoom.vue';
 
 /**
  * The landing page. Every picture of the widget is a real screenshot
@@ -10,6 +11,9 @@ import { withBase } from 'vitepress';
 
 const REPO = 'https://github.com/knowtific/helppuff';
 const shot = (name: string) => withBase(`/shots/${name}.png`);
+/** The live demos a screenshot can open, always in a new tab. */
+const WIDGET_DEMO = { href: withBase('/playground/'), label: 'Open the live demo' };
+const dashDemo = (route: string) => ({ href: withBase(`/dashboard-demo/#/${route}`), label: 'Open the live demo' });
 const docs = (page: string) => withBase(`/docs/${page}`);
 
 // ---------------------------------------------------------------------------
@@ -125,6 +129,8 @@ const DASH_TABS = [
 ];
 const dashTab = ref(DASH_TABS[0]!.id);
 const dashCaption = computed(() => DASH_TABS.find((t) => t.id === dashTab.value)?.caption ?? '');
+/** The demo's route for a tab: the screenshot names a single conversation, the dashboard calls the page `conversations`. */
+const dashRoute = computed(() => (dashTab.value === 'conversation' ? 'conversations' : dashTab.value));
 
 const STACK = [
   { name: 'Workers', role: 'Chat API, widget and dashboard from one deployment' },
@@ -192,7 +198,7 @@ const ICONS: Record<string, string> = {
           </p>
           <div class="ctas">
             <a class="btn primary" :href="docs('Getting-Started')">Get started <svg viewBox="0 0 24 24"><path :d="ICONS.arrow" /></svg></a>
-            <a class="btn ghost" :href="withBase('/playground/')" target="_self">Try every option live</a>
+            <a class="btn ghost" :href="WIDGET_DEMO.href" target="_blank" rel="noopener">Try every option live</a>
           </div>
           <button class="install" type="button" :aria-label="`Copy ${INSTALL}`" @click="copy(INSTALL, 'install')">
             <span class="prompt">$</span>
@@ -206,8 +212,8 @@ const ICONS: Record<string, string> = {
         </div>
 
         <div class="hero-art">
-          <img class="art back" :src="shot('card-dark')" alt="The widget in dark mode with an orange accent, showing an emergency callout card" width="464" height="816" />
-          <img class="art front" :src="shot('chat-light')" alt="The widget answering a pricing question with a list and booking options" width="464" height="816" />
+          <Zoom class="art back" :src="shot('card-dark')" alt="The widget in dark mode with an orange accent, showing an emergency callout card" width="464" height="816" :demo="WIDGET_DEMO" />
+          <Zoom class="art front" :src="shot('chat-light')" alt="The widget answering a pricing question with a list and booking options" width="464" height="816" :demo="WIDGET_DEMO" />
         </div>
       </div>
     </section>
@@ -262,25 +268,26 @@ const ICONS: Record<string, string> = {
         </header>
         <div class="gallery">
           <figure>
-            <img :src="shot('home-teal')" alt="A home screen with four shortcuts in a serif font and teal accent" loading="lazy" width="464" height="816" />
+            <Zoom :src="shot('home-teal')" alt="A home screen with four shortcuts in a serif font and teal accent" lazy width="464" height="816" caption="A home screen that sells: shortcuts for the questions you get most, calls and links." :demo="WIDGET_DEMO" />
             <figcaption><b>A home screen that sells</b>Shortcuts for the questions you get most, calls and links.</figcaption>
           </figure>
           <figure>
-            <img :src="shot('lead-form')" alt="A pre-chat form asking for name, email and occasion, with a privacy note" loading="lazy" width="464" height="816" />
+            <Zoom :src="shot('lead-form')" alt="A pre-chat form asking for name, email and occasion, with a privacy note" lazy width="464" height="816" caption="Leads before the first message: your fields, your wording, a privacy note." :demo="WIDGET_DEMO" />
             <figcaption><b>Leads before the first message</b>Your fields, your wording, a privacy note.</figcaption>
           </figure>
           <figure class="phone">
-            <img :src="shot('mobile')" alt="The widget full screen on a phone, with a carousel of services" loading="lazy" width="390" height="780" />
+            <Zoom :src="shot('mobile')" alt="The widget full screen on a phone, with a carousel of services" lazy width="390" height="780" caption="Made for phones: full screen, thumb-friendly, keyboard-aware." :demo="WIDGET_DEMO" />
             <figcaption><b>Made for phones</b>Full screen, thumb-friendly, keyboard-aware.</figcaption>
           </figure>
         </div>
-        <a class="playground-card" :href="withBase('/playground/')" target="_self">
-          <img :src="shot('playground')" alt="The HelpPuff playground: a panel of every widget option beside a live preview" loading="lazy" width="1440" height="880" />
-          <span class="pg-cta">
+        <div class="playground-card">
+          <Zoom :src="shot('playground')" alt="The HelpPuff playground: a panel of every widget option beside a live preview" lazy width="1440" height="880" caption="The playground: every widget option beside the real widget, with a button for every message type." :demo="WIDGET_DEMO" />
+          <div class="pg-cta">
             <b>Every option, live, in the playground</b>
-            <span>Change anything and see it instantly, then copy the config. <em>Open the playground →</em></span>
-          </span>
-        </a>
+            <span>Change anything and see it instantly, then copy the config.</span>
+            <a :href="WIDGET_DEMO.href" target="_blank" rel="noopener">Open the playground →</a>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -348,12 +355,19 @@ const ICONS: Record<string, string> = {
         <div id="dash-panel" class="dash-panel" role="tabpanel" :aria-labelledby="`dash-tab-${dashTab}`">
           <div class="browser">
             <div class="browser-bar" aria-hidden="true"><i /><i /><i /><span>your-assistant.workers.dev/admin</span></div>
-            <img :src="shot(`dash-${dashTab}`)" :alt="`The ${dashTab} page of the HelpPuff dashboard, with sample data`" width="1440" height="900" />
+            <Zoom
+              :src="shot(`dash-${dashTab}`)"
+              :alt="`The ${dashTab} page of the HelpPuff dashboard, with sample data`"
+              width="1440"
+              height="900"
+              :caption="dashCaption"
+              :demo="dashDemo(dashRoute)"
+            />
           </div>
           <p class="dash-caption">{{ dashCaption }}</p>
         </div>
         <div class="ctas center">
-          <a class="btn primary" :href="withBase('/dashboard-demo/')" target="_self">Open the live dashboard demo</a>
+          <a class="btn primary" :href="withBase('/dashboard-demo/')" target="_blank" rel="noopener">Open the live dashboard demo</a>
           <a class="btn ghost" :href="withBase('/dashboard')">Take the tour</a>
         </div>
       </div>
@@ -571,21 +585,22 @@ h3 { margin: 18px 0 8px; font-size: 22px; font-weight: 700; letter-spacing: -0.0
 .showcase .section-head { margin-bottom: 40px; }
 .gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; align-items: end; }
 .gallery figure { margin: 0; text-align: center; }
-.gallery img { width: 100%; max-width: 330px; height: auto; margin: 0 auto; filter: drop-shadow(0 24px 40px rgba(30, 30, 80, 0.16)); transition: transform 300ms; }
-.gallery figure:hover img { transform: translateY(-6px); }
-.gallery .phone img { max-width: 250px; border-radius: 34px; border: 9px solid #18181f; background: #18181f; }
+.gallery .hp-zoom { width: 100%; max-width: 330px; margin: 0 auto; filter: drop-shadow(0 24px 40px rgba(30, 30, 80, 0.16)); transition: transform 300ms; }
+.gallery figure:hover .hp-zoom { transform: translateY(-6px); }
+.gallery .phone .hp-zoom { max-width: 250px; }
+.gallery .phone :deep(img) { border-radius: 34px; border: 9px solid #18181f; background: #18181f; }
 figcaption { margin-top: 18px; font-size: 14px; color: var(--ink-2); }
 figcaption b { display: block; font-size: 16px; color: var(--ink); margin-bottom: 2px; }
 
 .playground-card {
   display: grid; grid-template-columns: 1.6fr 1fr; align-items: center; gap: 32px; margin-top: 72px; padding: 18px; border-radius: 26px;
-  border: 1px solid var(--line); background: var(--card); color: inherit; transition: border-color 200ms, transform 200ms, box-shadow 200ms;
+  border: 1px solid var(--line); background: var(--card); color: inherit; transition: border-color 200ms, box-shadow 200ms;
 }
-.playground-card:hover { border-color: var(--hp-indigo); transform: translateY(-2px); box-shadow: 0 30px 60px -30px rgba(91, 91, 247, 0.45); }
-.playground-card img { width: 100%; height: auto; border-radius: 14px; border: 1px solid var(--line); }
+.playground-card:hover { border-color: var(--hp-indigo); box-shadow: 0 30px 60px -30px rgba(91, 91, 247, 0.45); }
+.playground-card :deep(img) { border-radius: 14px; border: 1px solid var(--line); }
+.pg-cta a { display: inline-block; margin-top: 14px; font-weight: 600; color: var(--vp-c-brand-1); }
 .pg-cta b { display: block; font-size: 26px; line-height: 1.2; letter-spacing: -0.025em; color: var(--ink); }
 .pg-cta span { display: block; margin-top: 10px; font-size: 16px; color: var(--ink-2); line-height: 1.6; }
-.pg-cta em { font-style: normal; font-weight: 600; color: var(--vp-c-brand-1); }
 
 /* Demo */
 .demo { display: grid; gap: 18px; }
@@ -618,7 +633,7 @@ figcaption b { display: block; font-size: 16px; color: var(--ink); margin-bottom
 .dash-tabs { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; padding: 4px; margin: 0 auto; border-radius: 999px; border: 1px solid var(--line); background: var(--soft); width: fit-content; max-width: 100%; }
 .dash-tabs button { padding: 8px 18px; border-radius: 999px; font-size: 14px; font-weight: 500; color: var(--ink-2); }
 .dash-tabs button[aria-selected='true'] { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
-.dash-panel .browser img { display: block; width: 100%; height: auto; }
+.dash-panel .hp-zoom { width: 100%; }
 .dash-caption { margin: 16px auto 0; max-width: 680px; text-align: center; color: var(--ink-2); font-size: 15.5px; line-height: 1.6; }
 
 /* Agents */

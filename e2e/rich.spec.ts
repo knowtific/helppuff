@@ -166,7 +166,7 @@ test.describe('shortcuts', () => {
   test('a url shortcut is a real link, not a message', async ({ page }) => {
     await openWidget(page);
     const tile = page.locator('helppuff-widget .hp-tile', { hasText: 'Read the docs' });
-    await expect(tile).toHaveAttribute('href', 'https://example.com/docs');
+    await expect(tile).toHaveAttribute('href', 'https://knowtific.com');
     await expect(tile).toHaveAttribute('target', '_blank');
   });
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { withBase } from 'vitepress';
+import Zoom from './Zoom.vue';
 
 /**
  * The dashboard page: what the team works in after the widget goes live.
@@ -10,6 +11,7 @@ import { withBase } from 'vitepress';
 const shot = (name: string) => withBase(`/shots/${name}.png`);
 const docs = (page: string) => withBase(`/docs/${page}`);
 const DEMO = withBase('/dashboard-demo/');
+const demo = (route: string) => ({ href: `${DEMO}#/${route}`, label: 'Open the live demo' });
 
 const AREAS = [
   {
@@ -125,14 +127,20 @@ const AREAS = [
             own Cloudflare account, and its data lives in your D1 database.
           </p>
           <div class="ctas">
-            <a class="btn primary" :href="DEMO" target="_self">Open the live demo</a>
+            <a class="btn primary" :href="DEMO" target="_blank" rel="noopener">Open the live demo</a>
             <a class="btn ghost" :href="docs('Dashboard')">Read the docs</a>
           </div>
           <p class="note">The demo is the real dashboard with sample data for a made-up plumber. Click around and change things: it all stays in your browser.</p>
         </div>
-        <a class="intro-shot" :href="DEMO" target="_self" aria-label="Open the live dashboard demo">
-          <img :src="shot('dash-conversation-dark')" alt="The dashboard in dark mode, showing a summarised conversation and the visitor’s details" width="1440" height="900" />
-        </a>
+        <Zoom
+          class="intro-shot"
+          :src="shot('dash-conversation-dark')"
+          alt="The dashboard in dark mode, showing a summarised conversation and the visitor’s details"
+          width="1440"
+          height="900"
+          caption="Conversations, in dark mode: the AI summary and labels, the transcript, and the visitor’s details."
+          :demo="demo('conversations')"
+        />
       </div>
     </section>
 
@@ -149,13 +157,11 @@ const AREAS = [
           <li v-for="p in a.points" :key="p">{{ p }}</li>
         </ul>
         <div class="area-links">
-          <a :href="`${DEMO}#/${a.route}`" target="_self">Try it in the demo →</a>
+          <a :href="`${DEMO}#/${a.route}`" target="_blank" rel="noopener">Try it in the demo →</a>
           <a :href="docs(a.doc)">Docs</a>
         </div>
       </div>
-      <a class="frame" :href="`${DEMO}#/${a.route}`" target="_self" :aria-label="`Open ${a.kicker} in the demo`">
-        <img :src="shot(a.image)" :alt="a.alt" loading="lazy" width="1440" height="900" />
-      </a>
+      <Zoom class="frame" :src="shot(a.image)" :alt="a.alt" lazy width="1440" height="900" :caption="`${a.kicker}: ${a.text}`" :demo="demo(a.route)" />
     </section>
 
     <section class="wrap">
@@ -168,7 +174,7 @@ const AREAS = [
           </p>
         </div>
         <div class="ctas">
-          <a class="btn primary" :href="DEMO" target="_self">Open the live demo</a>
+          <a class="btn primary" :href="DEMO" target="_blank" rel="noopener">Open the live demo</a>
           <a class="btn ghost" :href="docs('Getting-Started')">Get started</a>
         </div>
       </div>
@@ -200,8 +206,9 @@ h2 { margin: 0 0 12px; font-size: clamp(26px, 3.2vw, 36px); line-height: 1.12; l
 .glow span:nth-child(2) { width: 380px; height: 380px; left: 10%; top: 0; background: #93c5fd; }
 .dark .glow { opacity: 0.25; }
 .intro-grid { position: relative; display: grid; grid-template-columns: 1fr 1.1fr; gap: 48px; align-items: center; }
-.intro-shot img, .frame img { display: block; width: 100%; height: auto; border-radius: 14px; border: 1px solid var(--line); box-shadow: 0 40px 80px -40px rgba(20, 20, 60, 0.5); transition: transform 300ms; }
-.intro-shot:hover img, .frame:hover img { transform: translateY(-4px); }
+.intro-shot :deep(img), .frame :deep(img) { border-radius: 14px; border: 1px solid var(--line); box-shadow: 0 40px 80px -40px rgba(20, 20, 60, 0.5); transition: transform 300ms; }
+.intro-shot:hover :deep(img), .frame:hover :deep(img) { transform: translateY(-4px); }
+.frame { width: 100%; }
 
 .jump { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 40px auto 24px; }
 .jump a { padding: 7px 16px; border-radius: 999px; border: 1px solid var(--line); font-size: 14px; font-weight: 500; color: var(--ink); background: var(--card); }
