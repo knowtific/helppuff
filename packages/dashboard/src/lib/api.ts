@@ -303,6 +303,8 @@ export type Limits = {
   pollsPerIpPerMinute: number;
   endsPerIpPerMinute: number;
   retellLookupsPerMinute: number;
+  apiRequestsPerKeyPerMinute: number;
+  apiKeysPerSite: number;
 };
 export type SecuritySettings = {
   limits: Limits;

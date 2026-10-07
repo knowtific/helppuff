@@ -49,7 +49,7 @@ async function latestRelease(kv: KvStore | undefined): Promise<string | null> {
   }
 }
 
-versionRoutes.get('/admin/api/version', async (c) => {
+versionRoutes.get('/version', async (c) => {
   await currentAdmin(c);
   const ctx = c.get('helppuff');
   const current = deployedVersion(ctx.env);

@@ -20,8 +20,10 @@ export function createApp(config: HelpPuffConfig): Hono<HonoEnv> {
     c.set('helppuff', buildRequestCtx(c, config));
 
     // CORS reflection only decides what the browser may read. Authorization is
-    // enforced per site inside each route.
-    const headers = corsHeaders(c.req.header('Origin'), origins);
+    // enforced per site inside each route. The public API sends none: its keys
+    // belong on servers, never in a browser.
+    const publicApi = c.req.path.startsWith('/api/');
+    const headers: Record<string, string> = publicApi ? { 'X-Request-Id': `req_${crypto.randomUUID()}` } : corsHeaders(c.req.header('Origin'), origins);
 
     if (c.req.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers });
@@ -40,7 +42,11 @@ export function createApp(config: HelpPuffConfig): Hono<HonoEnv> {
   app.route('/', configRoutes);
   app.route('/', sessionRoutes);
   app.route('/', messageRoutes);
-  app.route('/', adminRoutes);
+  // One API, two doors: the dashboard (and the CLI, with the admin key) at
+  // /admin/api, and the public, versioned API at /api/v1 (API keys only; see
+  // api/auth.ts). Same handlers, so the two can never drift apart.
+  app.route('/admin/api', adminRoutes);
+  app.route('/api/v1', adminRoutes);
   app.route('/', retellRoutes);
 
   app.notFound(() => {
@@ -59,7 +65,7 @@ export function createApp(config: HelpPuffConfig): Hono<HonoEnv> {
       path: c.req.path,
     });
 
-    const headers = new Headers(corsHeaders(c.req.header('Origin'), origins));
+    const headers = new Headers(c.req.path.startsWith('/api/') ? { 'X-Request-Id': `req_${crypto.randomUUID()}` } : corsHeaders(c.req.header('Origin'), origins));
     headers.set('Content-Type', 'application/json');
     headers.set('Cache-Control', 'no-store');
     if (error.retryAfter !== undefined) headers.set('Retry-After', String(error.retryAfter));

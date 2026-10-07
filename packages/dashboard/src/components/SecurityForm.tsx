@@ -28,6 +28,8 @@ const MORE: { key: LimitKey; label: string; hint: string; min?: number; max: num
   { key: 'pollsPerIpPerMinute', label: 'Checks for replies a minute, per visitor', hint: 'Backends that answer later, like Retell.', max: 600 },
   { key: 'endsPerIpPerMinute', label: 'Chats closed a minute, per visitor', hint: 'Each close can send a webhook.', max: 600 },
   { key: 'retellLookupsPerMinute', label: 'Retell knowledge lookups a minute', hint: 'For the whole site.', max: 6000 },
+  { key: 'apiRequestsPerKeyPerMinute', label: 'API requests a minute, per new key', hint: 'The default for keys made from now on; each key can have its own.', max: 6000 },
+  { key: 'apiKeysPerSite', label: 'Active API keys', hint: 'Revoke one to make room.', max: 500 },
 ];
 
 function NumberField({ label, hint, value, min = 1, max, onChange }: { label: string; hint: string; value: number; min?: number; max: number; onChange: (value: number) => void }) {

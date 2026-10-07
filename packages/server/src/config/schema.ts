@@ -39,6 +39,8 @@ export const limitsSchema = z.object({
   pollsPerIpPerMinute: z.number().int().min(1).max(600).default(120).describe('Checks for new messages one visitor (IP) may make a minute (backends that reply later, like Retell).'),
   endsPerIpPerMinute: z.number().int().min(1).max(600).default(10).describe('Chats one visitor (IP) may close a minute.'),
   retellLookupsPerMinute: z.number().int().min(1).max(6000).default(120).describe('Knowledge-base lookups a Retell agent may make a minute, for the whole site.'),
+  apiRequestsPerKeyPerMinute: z.number().int().min(1).max(6000).default(120).describe('Requests a new API key may make a minute (each key can have its own). Chat requests also count against the daily cap.'),
+  apiKeysPerSite: z.number().int().min(1).max(500).default(50).describe('Active API keys a site may have.'),
 });
 export type Limits = z.infer<typeof limitsSchema>;
 

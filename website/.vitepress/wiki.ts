@@ -17,7 +17,10 @@ import { fileURLToPath } from 'node:url';
  * - `[[Text|Page#anchor]]` links become ordinary links under `/docs/`;
  * - `_Sidebar.md` becomes the sidebar;
  * - VitePress compiles Markdown as a Vue template, so a `<placeholder>` or
- *   `{{` in prose (fine on GitHub) is escaped. Code is left alone.
+ *   `{{` in prose (fine on GitHub) is escaped. Code is left alone;
+ * - code blocks between `<!-- tabs -->` and `<!-- /tabs -->` (invisible on
+ *   GitHub, where they show one after the other) become a code group: tabs
+ *   titled by each block's `[title]` (the API reference's curl / TypeScript).
  */
 
 export const WIKI_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../wiki');
@@ -68,7 +71,7 @@ export const renderPage = (page: string): string => translate(readFileSync(join(
  * escaping, which skips fenced and inline code.
  */
 export function translate(markdown: string): string {
-  const source = wikiLinks(markdown);
+  const source = wikiLinks(markdown).replace(/^<!-- tabs -->$/gm, '::: code-group').replace(/^<!-- \/tabs -->$/gm, ':::');
   const pieces: string[] = [];
   const code = /^```[^\n]*\n[\s\S]*?^```[^\n]*$|`[^`\n]+`/gm;
   let last = 0;

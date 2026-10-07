@@ -67,6 +67,8 @@ COMMANDS
     prompt history       Every published prompt version: who, from where, when
     users list|add|remove|reset Who can sign in to the dashboard
     webhooks             Send chats, messages, leads and callbacks to other tools (signed JSON)
+    keys list|create|revoke  API keys for the public API (/api/v1): scoped, one site each, shown once
+    api <METHOD> <path>  Call any public API endpoint with this project's admin key (--data '{…}')
     callbacks            Visitors waiting to be called back: list them, mark them done
     dashboard            A one-time sign-in link to the dashboard (or the setup link, before setup)
     validate             Check helppuff.json and prompt.md without deploying
@@ -314,6 +316,18 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     summary:
       'Endpoints that receive what happens, as signed JSON: conversations, messages, leads, callback requests and their updates, summaries, budget alerts, learning (`helppuff webhooks events` lists every type). The same as Settings → Webhooks in the dashboard; stored on the Worker. Each has a signing secret: X-HelpPuff-Signature is sha256= + hex HMAC-SHA256 of "<X-HelpPuff-Timestamp>.<body>". https only; up to 10 per site.',
     examples: ['helppuff webhooks add https://hooks.zapier.com/hooks/catch/123/abc --events lead.captured,callback.requested --json', 'helppuff webhooks test wh_1a2b3c', 'helppuff webhooks list --json'],
+  },
+  keys: {
+    usage: 'helppuff keys list | create <name> [--preset chat|crm|read|full | --scopes a,b] [--expires <days>] [--allow-ips a,b] [--rate <n>] [--save NAME] | revoke <id>',
+    summary:
+      'API keys for the public API at <worker>/api/v1, the same as Settings → API keys in the dashboard. A key works on one site, with the scopes you give it (presets: chat, crm, read, full), an optional expiry, IP allowlist and requests a minute. The full key is shown once (or, with --save NAME, written to .env instead of printed); only a keyed hash is stored. Revoked keys are refused everywhere within 30 seconds. See the wiki\'s API page.',
+    examples: ['helppuff keys create "Website backend" --preset chat --expires 365', 'helppuff keys create "CRM sync" --scopes leads:read,leads:write --save HELPPUFF_CRM_KEY --json', 'helppuff keys revoke k7m3p9q2r4s8'],
+  },
+  api: {
+    usage: "helppuff api <GET|POST|PUT|PATCH|DELETE> <path> [--data '{…}' | --data @file.json]",
+    summary:
+      'Call any endpoint of the public API (/api/v1) with this project\'s admin key, and print the JSON answer. For agents and scripts: everything the dashboard can do, without a command for each. The wiki\'s API reference lists every endpoint.',
+    examples: ['helppuff api GET /leads', "helppuff api POST /conversations --data '{\"message\":\"Do you work weekends?\"}' --json", 'helppuff api PATCH /leads/lead_123 --data @status.json'],
   },
   callbacks: {
     usage: 'helppuff callbacks list [--status open|done|dismissed|all] | done <id> [--note …] | dismiss <id> [--note …] | reopen <id>',

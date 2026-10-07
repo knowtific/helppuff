@@ -179,6 +179,8 @@ export function recordStart(
     sessionId: string;
     /** The salted IP hash the rate limits use (never the IP): per-visitor daily limits count from it. */
     visitor?: string;
+    /** Who holds the conversation: the widget, or the public API. */
+    channel?: 'widget' | 'api';
     lead: Record<string, string>;
     context: VisitorContext;
     firstMessage?: string | undefined;
@@ -193,8 +195,8 @@ export function recordStart(
       db
         .prepare(
           `INSERT OR IGNORE INTO conversations
-           (id, site_id, started_at, last_at, page_url, page_title, referrer, utm, locale, country, first_message, message_count, visitor)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (id, site_id, started_at, last_at, page_url, page_title, referrer, utm, locale, country, first_message, message_count, visitor, channel)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           input.sessionId,
@@ -210,6 +212,7 @@ export function recordStart(
           input.firstMessage?.slice(0, 500) ?? null,
           (input.firstMessage ? 1 : 0) + input.messages.length,
           input.visitor ?? null,
+          input.channel ?? 'widget',
         ),
     ];
     if (input.firstMessage) statements.push(visitorMessage(input.sessionId, input.firstMessage, now - 1, db), countMessage(db, input.siteId, now));

@@ -9,6 +9,11 @@ describe('generated documentation', () => {
     const wiki = join(__dirname, '..', '..', '..', 'wiki');
     expect(readFileSync(join(wiki, 'CLI-Reference.md'), 'utf8')).toBe(cliReferencePage());
     expect(readFileSync(join(wiki, 'Configuration-Reference.md'), 'utf8')).toBe(configReferencePage());
+    const { apiReferencePages } = await import('@helppuff/server');
+    const pages = apiReferencePages();
+    for (const [page, content] of Object.entries(pages)) expect(readFileSync(join(wiki, `${page}.md`), 'utf8'), page).toBe(content);
+    // No page left over from an area that is gone.
+    expect(readdirSync(wiki).filter((f) => /^API-Reference/.test(f)).sort()).toEqual(Object.keys(pages).map((p) => `${p}.md`).sort());
   });
 
   it('documents every command and exit code', async () => {

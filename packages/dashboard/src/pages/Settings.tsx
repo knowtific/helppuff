@@ -8,6 +8,7 @@ import { SettingsForm } from '../components/SettingsForm';
 import { InstructionsForm } from '../components/InstructionsForm';
 import { FactsForm } from '../components/FactsForm';
 import { Webhooks } from '../components/Webhooks';
+import { ApiKeys } from '../components/ApiKeys';
 import { Updates } from '../components/Updates';
 
 export function CopyBlock({ text, label }: { text: string; label: string }) {
@@ -41,6 +42,7 @@ const DESCRIPTIONS: Record<SettingsSection, string> = {
   business: 'Read from your website. The assistant always has these; your changes are never overwritten.',
   advanced: 'The model, how often your site is re-read, rate limits, blocked IPs and sign-in protection.',
   webhooks: 'Send chats, messages, leads and callbacks to other tools as they happen.',
+  api: 'Use HelpPuff from your own servers, as a backend: keys, the base URL and examples.',
   team: 'Who can sign in, and what to do if you’re locked out.',
   updates: 'The version running, and how to upgrade it.',
 };
@@ -53,6 +55,7 @@ const HELP: Record<SettingsSection, string> = {
   business: 'Knowledge-Base#business-details',
   advanced: 'AI-Models',
   webhooks: 'Webhooks',
+  api: 'API',
   team: 'Dashboard#team--security',
   updates: 'Upgrading',
 };
@@ -94,6 +97,7 @@ export function Settings({ me, section }: { me: Me; section: string | undefined 
           </Card>
         )}
         {current.id === 'webhooks' && <Webhooks />}
+        {current.id === 'api' && <ApiKeys />}
         {current.id === 'team' && <Team />}
         {current.id === 'updates' && <Updates />}
       </div>

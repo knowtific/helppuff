@@ -79,6 +79,8 @@ caps.
 | `limits.pollsPerIpPerMinute` | 120 | Checks for new messages from one visitor a minute (Retell) | In memory | 429 |
 | `limits.endsPerIpPerMinute` | 10 | Chats one visitor closes a minute. A chat's `conversation.ended` webhook fires once, whatever is replayed | In memory; once-only in D1 | 429 |
 | `limits.retellLookupsPerMinute` | 120 | Knowledge-base lookups by a Retell agent a minute, whole site | KV | 429 |
+| `limits.apiRequestsPerKeyPerMinute` | 120 | Requests a minute for a new API key (each key can have its own) | In memory, per key | 429 |
+| `limits.apiKeysPerSite` | 50 | Active API keys per site | D1 | 400 on create |
 | `sessionTtlHours` | 24 | How long a chat can be continued | The signed token's expiry | A new chat |
 | `allowIps` | none | Addresses or CIDR ranges exempt from the per-visitor limits | — | — |
 | `blockIps` | none | Addresses or CIDR ranges refused by the chat (not the dashboard) | — | 403, the widget hides |
@@ -321,6 +323,36 @@ sign-in limit per IP (`security.signIn.attemptsPerIp`).
 - **Ratings** (`/v1/sessions/feedback`) need the conversation's own session
   token, can only touch that conversation's assistant messages, and are
   rate-limited per IP.
+
+## The public API
+
+`/api/v1` serves the same handlers as the dashboard's API, behind its own door
+(`api/auth.ts`); see [[The API|API]] for using it.
+
+- **Only registered routes.** A route is public only when it is in the route
+  registry (`api/registry.ts`), with the scope it needs; anything else answers
+  404, so a new dashboard route is never public by accident. Sign-in, setup
+  and sign-in links are dashboard-only.
+- **Keys, not cookies.** A dashboard session cookie is never accepted there,
+  and the API sends no CORS headers, so a browser cannot call it with a
+  visitor's or an admin's credentials.
+- **Keys are hashed.** `hp_live_<id>_<secret>`: only HMAC-SHA-256 of the
+  secret is stored, keyed from HELPPUFF_SECRET (not in D1), compared in
+  constant time. A copy of D1 opens nothing. Shown once.
+- **Least privilege.** One site per key; scopes per resource; optional expiry
+  and IP allowlist; a key cannot create a key with scopes it lacks. Revoked or
+  expired keys are refused within 30 seconds (the per-isolate cache).
+- **Rate per key**, counted in memory, including refused requests, so probing
+  scopes is limited too. The site's per-conversation and daily caps apply to
+  chat over the API as to the widget.
+- **No key in URLs.** `?api_key=` and friends are refused. Bodies are bounded
+  (1 MB, uploads 10 MB) before they are read.
+- **Audit.** Every successful change through the API or the dashboard is in
+  `audit_log` (who: an email, `key:<id>` or the admin key; the route; the
+  record; when; a salted IP hash), kept 90 days, never with the request body.
+- **Chat over the API** runs the widget's pipeline (`core/chat.ts`): text
+  cleaning, prompt-injection guards, form binding and reply checks apply. The
+  key replaces Origin and Turnstile as the proof.
 
 ## Prompt injection
 

@@ -45,7 +45,9 @@ Every failure, at every status code, uses one envelope:
 | `bad_request` | 400 | The request did not match the schema, or a lead field failed validation |
 | `unauthorized` | 401 | Missing, malformed or tampered session token |
 | `session_expired` | 401 | A well-formed token that has aged out |
-| `forbidden_origin` | 403 | `Origin` missing or not on the site's allowlist |
+| `forbidden_origin` | 403 | `Origin` missing or not on the site's allowlist, or the visitor's IP is blocked |
+| `forbidden` | 403 | The public API: the key lacks the scope, belongs to another site, or is used from an address it does not allow |
+| `conflict` | 409 | The public API: it already exists (a lead with that email, an account) |
 | `captcha_failed` | 403 | Turnstile rejected the token |
 | `not_found` | 404 | Unknown site id or unknown route |
 | `rate_limited` | 429 | A per-IP or per-minute limit was hit; see `retryAfter` |

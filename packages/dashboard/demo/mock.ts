@@ -56,6 +56,8 @@ let settings: Settings = {
       pollsPerIpPerMinute: 120,
       endsPerIpPerMinute: 10,
       retellLookupsPerMinute: 120,
+      apiRequestsPerKeyPerMinute: 120,
+      apiKeysPerSite: 50,
     },
     signIn: { attemptsPerIp: 10, attemptsPerAccount: 5, windowMinutes: 15, captcha: true },
     allowIps: [],
@@ -64,6 +66,19 @@ let settings: Settings = {
   },
 };
 let settingsAt = NOW - 6 * DAY;
+const DEMO_KEY = {
+  id: 'k7m3p9q2r4s8',
+  name: 'Website backend',
+  prefix: 'hp_live_k7m3p9q2r4s8',
+  scopes: ['chat', 'leads:read'],
+  allowIps: [],
+  ratePerMinute: 120,
+  createdBy: OWNER,
+  createdAt: NOW - 12 * DAY,
+  expiresAt: NOW + 353 * DAY,
+  lastUsedAt: NOW - 2 * 3600_000,
+  revokedAt: null,
+};
 
 const promptVersions: (PromptVersion & { text: string })[] = [
   { version: 1, hash: 'a1', source: 'cli', author: OWNER, note: 'First deploy', restoredFrom: null, createdAt: NOW - 40 * DAY, chars: 120, text: 'Harbour Plumbing is a family-run plumbing business in Sydney.' },
@@ -208,6 +223,27 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
   if (path === '/me') return json({ admin: { email: OWNER, owner: true }, sites: [SITE], summaries: true });
   if (['/login', '/logout', '/login-link'].includes(path)) return json({ ok: true });
   if (path === '/login/options') return json({ captcha: null });
+  if (path === '/keys') {
+    if (method === 'POST') {
+      const made = { ...DEMO_KEY, id: 'n4w8k2y6t3q9', prefix: 'hp_live_n4w8k2y6t3q9', name: String(body['name'] ?? 'New key'), createdAt: Date.now() };
+      return json({ ...made, key: 'hp_live_n4w8k2y6t3q9_demo-keys-are-not-real-0000000000000000000' }, 201);
+    }
+    return json({
+      keys: [DEMO_KEY],
+      scopes: [
+        { scope: 'chat', description: 'Talk to the assistant as a visitor.' },
+        { scope: 'leads:read', description: 'Read leads.' },
+        { scope: 'leads:write', description: 'Create, update and delete leads.' },
+      ],
+      presets: [
+        { id: 'chat', label: 'Chat only', scopes: ['chat'] },
+        { id: 'crm', label: 'CRM', scopes: ['leads:read', 'leads:write'] },
+        { id: 'read', label: 'Read-only', scopes: ['leads:read'] },
+        { id: 'full', label: 'Full access', scopes: ['chat', 'leads:read', 'leads:write'] },
+      ],
+    });
+  }
+  if (path.startsWith('/keys/') && method === 'DELETE') return json({ ...DEMO_KEY, revokedAt: Date.now(), revoked: true });
   if (path === '/version') {
     return json({ current: __HELPPUFF_VERSION__, latest: __HELPPUFF_VERSION__, upgradeAvailable: false, schema: { applied: 9, expected: 9 }, command: 'npx @knowtific/helppuff upgrade', releaseNotes: '' });
   }

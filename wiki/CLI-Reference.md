@@ -354,6 +354,34 @@ helppuff webhooks test wh_1a2b3c
 helppuff webhooks list --json
 ```
 
+### `helppuff keys`
+
+```
+helppuff keys list | create <name> [--preset chat|crm|read|full | --scopes a,b] [--expires <days>] [--allow-ips a,b] [--rate <n>] [--save NAME] | revoke <id>
+```
+
+API keys for the public API at <worker>/api/v1, the same as Settings → API keys in the dashboard. A key works on one site, with the scopes you give it (presets: chat, crm, read, full), an optional expiry, IP allowlist and requests a minute. The full key is shown once (or, with --save NAME, written to .env instead of printed); only a keyed hash is stored. Revoked keys are refused everywhere within 30 seconds. See the wiki's API page.
+
+```bash
+helppuff keys create "Website backend" --preset chat --expires 365
+helppuff keys create "CRM sync" --scopes leads:read,leads:write --save HELPPUFF_CRM_KEY --json
+helppuff keys revoke k7m3p9q2r4s8
+```
+
+### `helppuff api`
+
+```
+helppuff api <GET|POST|PUT|PATCH|DELETE> <path> [--data '{…}' | --data @file.json]
+```
+
+Call any endpoint of the public API (/api/v1) with this project's admin key, and print the JSON answer. For agents and scripts: everything the dashboard can do, without a command for each. The wiki's API reference lists every endpoint.
+
+```bash
+helppuff api GET /leads
+helppuff api POST /conversations --data '{"message":"Do you work weekends?"}' --json
+helppuff api PATCH /leads/lead_123 --data @status.json
+```
+
 ### `helppuff callbacks`
 
 ```

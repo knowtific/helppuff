@@ -262,7 +262,7 @@ export async function settingsHash(settings: Settings): Promise<string> {
 
 export const settingsRoutes = new Hono<HonoEnv>();
 
-settingsRoutes.get('/admin/api/settings', async (c) => {
+settingsRoutes.get('/settings', async (c) => {
   await currentAdmin(c);
   const ctx = c.get('helppuff');
   const siteId = siteParam(c, c.req.query('site'));
@@ -284,7 +284,7 @@ async function readStored(env: Record<string, unknown>, siteId: string): Promise
   }
 }
 
-settingsRoutes.put('/admin/api/settings', async (c) => {
+settingsRoutes.put('/settings', async (c) => {
   assertSameOrigin(c);
   const admin = await currentAdmin(c);
   const ctx = c.get('helppuff');

@@ -8,6 +8,24 @@ never needs you to change anything. Upgrade with
 
 ## [Unreleased]
 
+### Added: the public API
+
+- Everything HelpPuff does, over HTTPS at `<worker>/api/v1`, so it can be used
+  as a backend only: chat with the assistant from your own server (JSON or
+  streamed), leads (now also create, get one, delete and erase), callbacks,
+  conversations (now also delete), knowledge, prompt, settings, webhooks,
+  analytics, team (add and remove accounts, sign-in links), API keys and an
+  audit log. The same handlers as the dashboard's own API: one implementation.
+- API keys: scoped, one site each, optional expiry and IP allowlist, a rate
+  per key, stored only as a keyed hash and shown once. Settings → API keys in
+  the dashboard, `helppuff keys create|list|revoke`, and `helppuff api` to
+  call any endpoint.
+- Docs: the wiki's API page (quickstart in curl, JavaScript and Python), and
+  the API reference with a curl command, request, response and errors for
+  every endpoint, generated from the same registry that guards the routes;
+  OpenAPI 3.1 at `/api/v1/openapi.json`.
+- D1 migration 9 (`public api`).
+
 Security hardening. Adds D1 migration 8 (`abuse limits`), applied by
 `helppuff upgrade`.
 

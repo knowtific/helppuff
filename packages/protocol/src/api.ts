@@ -5,6 +5,9 @@ export const errorCodes = [
   'bad_request',
   'unauthorized',
   'forbidden_origin',
+  // The public API: a key without the scope, site or address for this request; a duplicate.
+  'forbidden',
+  'conflict',
   'not_found',
   'rate_limited',
   'quota_exceeded',
@@ -32,6 +35,8 @@ export const HTTP_STATUS_FOR_ERROR: Record<ErrorCode, number> = {
   bad_request: 400,
   unauthorized: 401,
   forbidden_origin: 403,
+  forbidden: 403,
+  conflict: 409,
   not_found: 404,
   rate_limited: 429,
   quota_exceeded: 429,

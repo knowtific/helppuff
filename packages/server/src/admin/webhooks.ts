@@ -61,7 +61,7 @@ async function hookOf(c: Context<HonoEnv>, siteId: string): Promise<WebhookRow> 
   return row;
 }
 
-webhookRoutes.get('/admin/api/webhooks', async (c) => {
+webhookRoutes.get('/webhooks', async (c) => {
   await currentAdmin(c);
   const siteId = siteParam(c, c.req.query('site'));
   await ensureSchema(db(c));
@@ -69,7 +69,7 @@ webhookRoutes.get('/admin/api/webhooks', async (c) => {
   return c.json({ webhooks: rows.map(view), events: Object.entries(WEBHOOK_EVENTS).map(([type, description]) => ({ type, description })) });
 });
 
-webhookRoutes.post('/admin/api/webhooks', async (c) => {
+webhookRoutes.post('/webhooks', async (c) => {
   assertSameOrigin(c);
   await currentAdmin(c);
   const body = await jsonBody(c);
@@ -92,7 +92,7 @@ webhookRoutes.post('/admin/api/webhooks', async (c) => {
   return c.json(view(row), 201);
 });
 
-webhookRoutes.patch('/admin/api/webhooks/:id', async (c) => {
+webhookRoutes.patch('/webhooks/:id', async (c) => {
   assertSameOrigin(c);
   await currentAdmin(c);
   const body = await jsonBody(c);
@@ -113,7 +113,7 @@ webhookRoutes.patch('/admin/api/webhooks/:id', async (c) => {
   return c.json(view({ ...row, ...next }));
 });
 
-webhookRoutes.delete('/admin/api/webhooks/:id', async (c) => {
+webhookRoutes.delete('/webhooks/:id', async (c) => {
   assertSameOrigin(c);
   await currentAdmin(c);
   const siteId = siteParam(c, c.req.query('site'));
@@ -127,7 +127,7 @@ webhookRoutes.delete('/admin/api/webhooks/:id', async (c) => {
 });
 
 /** Send a `test.ping` now and say what came back: the quickest way to check an endpoint. */
-webhookRoutes.post('/admin/api/webhooks/:id/test', async (c) => {
+webhookRoutes.post('/webhooks/:id/test', async (c) => {
   assertSameOrigin(c);
   await currentAdmin(c);
   const body = await jsonBody(c);
@@ -140,7 +140,7 @@ webhookRoutes.post('/admin/api/webhooks/:id/test', async (c) => {
   return c.json({ ...result, eventId: event.id });
 });
 
-webhookRoutes.get('/admin/api/webhooks/:id/deliveries', async (c) => {
+webhookRoutes.get('/webhooks/:id/deliveries', async (c) => {
   await currentAdmin(c);
   const siteId = siteParam(c, c.req.query('site'));
   const row = await hookOf(c, siteId);

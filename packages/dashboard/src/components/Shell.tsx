@@ -49,7 +49,7 @@ const ALL_NAV: {
 ];
 
 /** Settings, one page per topic; the sidebar opens them as a sub-menu. */
-export type SettingsSection = 'chat' | 'appearance' | 'leads' | 'instructions' | 'business' | 'advanced' | 'webhooks' | 'team' | 'updates';
+export type SettingsSection = 'chat' | 'appearance' | 'leads' | 'instructions' | 'business' | 'advanced' | 'webhooks' | 'api' | 'team' | 'updates';
 
 export function settingsSections(site: Site | undefined): { id: SettingsSection; label: string }[] {
   return [
@@ -60,6 +60,7 @@ export function settingsSections(site: Site | undefined): { id: SettingsSection;
     ...(site?.knowledge ? [{ id: 'business' as const, label: 'Business details' }] : []),
     ...(site?.knowledge || site?.connector === 'workers-ai' ? [{ id: 'advanced' as const, label: 'Advanced' }] : []),
     { id: 'webhooks' as const, label: 'Webhooks' },
+    { id: 'api' as const, label: 'API keys' },
     { id: 'team' as const, label: 'Team & security' },
     { id: 'updates' as const, label: 'Updates' },
   ];

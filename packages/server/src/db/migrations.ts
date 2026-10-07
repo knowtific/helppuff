@@ -362,6 +362,55 @@ export const MIGRATIONS: readonly Migration[] = [
       'CREATE INDEX IF NOT EXISTS conversations_visitor ON conversations (site_id, visitor, started_at)',
     ],
   },
+  {
+    id: 9,
+    name: 'public api',
+    // API keys for `/api/v1` (only an HMAC of the secret is kept, keyed from
+    // HELPPUFF_SECRET, so the table alone opens nothing); the audit log of
+    // changes made through the API and the dashboard; and the state of
+    // conversations held over the API (the widget keeps it in its token).
+    statements: [
+      `CREATE TABLE IF NOT EXISTS api_keys (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        secret_hash TEXT NOT NULL,
+        site_id TEXT NOT NULL,
+        scopes TEXT NOT NULL,
+        allow_ips TEXT,
+        rate_per_minute INTEGER NOT NULL,
+        created_by TEXT,
+        created_at INTEGER NOT NULL,
+        expires_at INTEGER,
+        last_used_at INTEGER,
+        revoked_at INTEGER,
+        revoked_by TEXT
+      )`,
+      `CREATE TABLE IF NOT EXISTS audit_log (
+        id TEXT PRIMARY KEY,
+        at INTEGER NOT NULL,
+        actor TEXT NOT NULL,
+        action TEXT NOT NULL,
+        target TEXT,
+        site_id TEXT,
+        status INTEGER,
+        ip_hash TEXT
+      )`,
+      'CREATE INDEX IF NOT EXISTS audit_log_at ON audit_log (at DESC)',
+      `CREATE TABLE IF NOT EXISTS api_sessions (
+        id TEXT PRIMARY KEY,
+        site_id TEXT NOT NULL,
+        key_id TEXT,
+        state TEXT,
+        forms TEXT,
+        external_id TEXT,
+        metadata TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`,
+      'CREATE INDEX IF NOT EXISTS api_sessions_external ON api_sessions (site_id, external_id)',
+      'ALTER TABLE conversations ADD COLUMN channel TEXT',
+    ],
+  },
 ];
 
 export const LATEST_MIGRATION = MIGRATIONS[MIGRATIONS.length - 1]!.id;

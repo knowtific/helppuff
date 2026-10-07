@@ -51,7 +51,7 @@ const strings = (value: unknown, max = 1000): string[] | undefined =>
 
 const workerUrl = (c: Context<HonoEnv>) => new URL(c.req.url).origin;
 
-knowledgeRoutes.post('/admin/api/knowledge/discover', async (c) => {
+knowledgeRoutes.post('/knowledge/discover', async (c) => {
   assertSameOrigin(c);
   await currentAdmin(c);
   const body = await jsonBody(c);
@@ -77,7 +77,7 @@ knowledgeRoutes.post('/admin/api/knowledge/discover', async (c) => {
   });
 });
 
-knowledgeRoutes.get('/admin/api/knowledge/pages', async (c) => {
+knowledgeRoutes.get('/knowledge/pages', async (c) => {
   await currentAdmin(c);
   const { siteId, env } = await siteOf(c, c.req.query('site'));
   const status = c.req.query('status');
@@ -92,7 +92,7 @@ knowledgeRoutes.get('/admin/api/knowledge/pages', async (c) => {
   return c.json({ site: siteId, pages: rows.results });
 });
 
-knowledgeRoutes.get('/admin/api/knowledge/pages/:id/chunks', async (c) => {
+knowledgeRoutes.get('/knowledge/pages/:id/chunks', async (c) => {
   await currentAdmin(c);
   const { siteId, env } = await siteOf(c, c.req.query('site'));
   const rows = await env.db
@@ -102,7 +102,7 @@ knowledgeRoutes.get('/admin/api/knowledge/pages/:id/chunks', async (c) => {
   return c.json({ chunks: rows.results });
 });
 
-knowledgeRoutes.post('/admin/api/knowledge/crawl', async (c) => {
+knowledgeRoutes.post('/knowledge/crawl', async (c) => {
   assertSameOrigin(c);
   const admin = await currentAdmin(c);
   const body = await jsonBody(c);
@@ -125,7 +125,7 @@ knowledgeRoutes.post('/admin/api/knowledge/crawl', async (c) => {
   return c.json({ site: siteId, ...started }, 202);
 });
 
-knowledgeRoutes.post('/admin/api/knowledge/runs/:id/cancel', async (c) => {
+knowledgeRoutes.post('/knowledge/runs/:id/cancel', async (c) => {
   assertSameOrigin(c);
   await currentAdmin(c);
   const body = await jsonBody(c);
@@ -158,7 +158,7 @@ function budgetOf(site: { connector: { options?: unknown } }): number {
   return typeof options.budget?.dailyNeurons === 'number' ? options.budget.dailyNeurons : 9000;
 }
 
-knowledgeRoutes.get('/admin/api/knowledge/status', async (c) => {
+knowledgeRoutes.get('/knowledge/status', async (c) => {
   await currentAdmin(c);
   const { siteId, site, env, now } = await siteOf(c, c.req.query('site'));
   const [status, usage] = await Promise.all([crawlStatus(env, siteId), usageToday(env, siteId, now, budgetOf(site))]);
@@ -173,7 +173,7 @@ knowledgeRoutes.get('/admin/api/knowledge/status', async (c) => {
   });
 });
 
-knowledgeRoutes.get('/admin/api/usage', async (c) => {
+knowledgeRoutes.get('/usage', async (c) => {
   await currentAdmin(c);
   const { siteId, site, env, now } = await siteOf(c, c.req.query('site'));
   const days = Math.min(90, Math.max(1, Number(c.req.query('days') ?? 30) || 30));
@@ -185,7 +185,7 @@ knowledgeRoutes.get('/admin/api/usage', async (c) => {
 });
 
 /** What retrieval finds for a question, with scores: `helppuff ask` and the dashboard's test panel show it. */
-knowledgeRoutes.post('/admin/api/knowledge/search', async (c) => {
+knowledgeRoutes.post('/knowledge/search', async (c) => {
   assertSameOrigin(c);
   await currentAdmin(c);
   const body = await jsonBody(c);
@@ -214,7 +214,7 @@ knowledgeRoutes.post('/admin/api/knowledge/search', async (c) => {
 
 // ------------------------------------------------------------ manual knowledge
 
-knowledgeRoutes.get('/admin/api/knowledge/manual', async (c) => {
+knowledgeRoutes.get('/knowledge/manual', async (c) => {
   await currentAdmin(c);
   const { siteId, env } = await siteOf(c, c.req.query('site'));
   const rows = await env.db
@@ -225,7 +225,7 @@ knowledgeRoutes.get('/admin/api/knowledge/manual', async (c) => {
 });
 
 /** Add or replace a hand-written entry (a Q&A, a policy, a price list). Indexed at once. */
-knowledgeRoutes.post('/admin/api/knowledge/manual', async (c) => {
+knowledgeRoutes.post('/knowledge/manual', async (c) => {
   assertSameOrigin(c);
   await currentAdmin(c);
   const body = await jsonBody(c);
@@ -255,7 +255,7 @@ knowledgeRoutes.post('/admin/api/knowledge/manual', async (c) => {
   return c.json({ id, chunks: indexed.chunks });
 });
 
-knowledgeRoutes.delete('/admin/api/knowledge/manual/:id', async (c) => {
+knowledgeRoutes.delete('/knowledge/manual/:id', async (c) => {
   assertSameOrigin(c);
   await currentAdmin(c);
   const { siteId, env } = await siteOf(c, c.req.query('site'));
@@ -274,7 +274,7 @@ knowledgeRoutes.delete('/admin/api/knowledge/manual/:id', async (c) => {
 /** A file still queued after this long never reached its job (a Worker mid-deploy, say): start it again. */
 const STALLED_MS = 120_000;
 
-knowledgeRoutes.get('/admin/api/knowledge/files', async (c) => {
+knowledgeRoutes.get('/knowledge/files', async (c) => {
   await currentAdmin(c);
   const { siteId, site, env, now } = await siteOf(c, c.req.query('site'));
   const stalled = (
@@ -306,7 +306,7 @@ knowledgeRoutes.get('/admin/api/knowledge/files', async (c) => {
  * read, cleaned and learned in the background (the crawl's Workflow); the
  * list above shows its progress.
  */
-knowledgeRoutes.post('/admin/api/knowledge/files', async (c) => {
+knowledgeRoutes.post('/knowledge/files', async (c) => {
   assertSameOrigin(c);
   await currentAdmin(c);
   const { siteId, site, env, now } = await siteOf(c, c.req.query('site'));
@@ -339,7 +339,7 @@ knowledgeRoutes.post('/admin/api/knowledge/files', async (c) => {
   return c.json({ id, name, kind, size: bytes.byteLength, status: 'queued' }, 202);
 });
 
-knowledgeRoutes.delete('/admin/api/knowledge/files/:id', async (c) => {
+knowledgeRoutes.delete('/knowledge/files/:id', async (c) => {
   assertSameOrigin(c);
   await currentAdmin(c);
   const { siteId, env } = await siteOf(c, c.req.query('site'));
@@ -352,7 +352,7 @@ knowledgeRoutes.delete('/admin/api/knowledge/files/:id', async (c) => {
 
 // ------------------------------------------------------------ site facts
 
-knowledgeRoutes.get('/admin/api/knowledge/facts', async (c) => {
+knowledgeRoutes.get('/knowledge/facts', async (c) => {
   await currentAdmin(c);
   const { siteId, env } = await siteOf(c, c.req.query('site'));
   const facts = await readFacts(env.db, siteId);
@@ -361,7 +361,7 @@ knowledgeRoutes.get('/admin/api/knowledge/facts', async (c) => {
 
 /** The owner confirms or corrects facts; theirs are never overwritten by a crawl. An empty value removes one. */
 /** Read the home and contact pages now and fill in the business details (onboarding's first call). */
-knowledgeRoutes.post('/admin/api/knowledge/facts/detect', async (c) => {
+knowledgeRoutes.post('/knowledge/facts/detect', async (c) => {
   assertSameOrigin(c);
   await currentAdmin(c);
   const body = await jsonBody(c);
@@ -380,7 +380,7 @@ knowledgeRoutes.post('/admin/api/knowledge/facts/detect', async (c) => {
   return c.json({ found: detected.found, facts: facts.map((f) => ({ key: f.key, value: f.value, source: f.source_url === 'owner' ? 'owner' : 'site' })) });
 });
 
-knowledgeRoutes.put('/admin/api/knowledge/facts', async (c) => {
+knowledgeRoutes.put('/knowledge/facts', async (c) => {
   assertSameOrigin(c);
   await currentAdmin(c);
   const body = await jsonBody(c);
@@ -422,7 +422,7 @@ knowledgeRoutes.put('/admin/api/knowledge/facts', async (c) => {
  * the loader with this site's id. Best effort: a page that adds it with a
  * tag manager will not show it in its HTML.
  */
-knowledgeRoutes.get('/admin/api/install-check', async (c) => {
+knowledgeRoutes.get('/install-check', async (c) => {
   await currentAdmin(c);
   const ctx = c.get('helppuff');
   const siteId = siteParam(c, c.req.query('site'));
@@ -448,7 +448,7 @@ knowledgeRoutes.get('/admin/api/install-check', async (c) => {
  * site's own model. About ten neurons. Falls back to plain defaults when the
  * model is unavailable or the knowledge base is still empty.
  */
-knowledgeRoutes.post('/admin/api/knowledge/suggest-questions', async (c) => {
+knowledgeRoutes.post('/knowledge/suggest-questions', async (c) => {
   assertSameOrigin(c);
   await currentAdmin(c);
   const body = await jsonBody(c);
@@ -507,7 +507,7 @@ knowledgeRoutes.post('/admin/api/knowledge/suggest-questions', async (c) => {
  * two sizes, and the chat model's time to first token. A few neurons; what
  * `helppuff doctor --speed` reads to pick models by data, not by guess.
  */
-knowledgeRoutes.post('/admin/api/diagnostics/models', async (c) => {
+knowledgeRoutes.post('/diagnostics/models', async (c) => {
   assertSameOrigin(c);
   await currentAdmin(c);
   const body = await jsonBody(c);

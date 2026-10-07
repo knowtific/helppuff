@@ -19,7 +19,7 @@
     "build:website": "pnpm build:playground && pnpm --filter @helppuff/dashboard build:demo && pnpm --filter @helppuff/website build",
     "dev:website": "pnpm --filter @helppuff/website dev",
     "helppuff": "node packages/cli/dist/cli.js",
-    "sync:docs": "pnpm build:cli && node packages/cli/dist/cli.js help wiki-cli > wiki/CLI-Reference.md && node packages/cli/dist/cli.js help wiki-config > wiki/Configuration-Reference.md",
+    "sync:docs": "pnpm build:cli && node packages/cli/dist/cli.js help wiki-cli > wiki/CLI-Reference.md && node packages/cli/dist/cli.js help wiki-config > wiki/Configuration-Reference.md && node packages/cli/dist/cli.js help wiki-api wiki",
     "test": "pnpm ensure-config && vitest run",
     "test:watch": "pnpm ensure-config && vitest",
     "e2e": "pnpm ensure-config && playwright test",

@@ -100,7 +100,7 @@ export async function assertSignInCaptcha(c: Context<HonoEnv>, policy: SignInPol
 export const signInRoutes = new Hono<HonoEnv>();
 
 /** What the sign-in page needs before anyone is signed in: the Turnstile site key, if any. */
-signInRoutes.get('/admin/api/login/options', async (c) => {
+signInRoutes.get('/login/options', async (c) => {
   const policy = await signInPolicy(c);
   return c.json({ captcha: policy.captcha ? { provider: 'turnstile', siteKey: policy.captcha.siteKey } : null });
 });

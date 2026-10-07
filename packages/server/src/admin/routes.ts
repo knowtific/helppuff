@@ -1,4 +1,8 @@
 import { Hono, type Context } from 'hono';
+import { cleanText } from '@helppuff/protocol';
+import { chatRoutes, deleteConversations } from './chat.js';
+import { accessRoutes } from './access.js';
+import { keyScopes } from '../api/keys.js';
 import { HelpPuffError } from '../core/errors.js';
 import { getConnector } from '../core/registry.js';
 import { guidanceFor } from '../core/guidance.js';
@@ -8,7 +12,9 @@ import { resolveSecrets } from '../config/load.js';
 import { requireSecret, type HonoEnv } from '../core/request.js';
 import { cookieValue, issueSession, readSession, SESSION_COOKIE, sessionCookie, verifyPassword } from './auth.js';
 import { assertAccountOpen, assertSignInCaptcha, recordFailure, signInPolicy, signInRoutes, throttleIp } from './signin.js';
-import { assertSameOrigin, currentAdmin, db, isSecure, siteParam } from './guard.js';
+import { assertSameOrigin, assertSiteAccess, currentAdmin, db, isPublicApi, isSecure, jsonBody, siteParam } from './guard.js';
+import { API_BASE, audit, publicApiGate } from '../api/auth.js';
+import { openApiDocument } from '../api/openapi.js';
 import { knowledgeRoutes } from './knowledge.js';
 import { resolveSite } from '../config/site.js';
 import { knowledgeEnv, ownsKnowledge } from '../knowledge/env.js';
@@ -37,16 +43,25 @@ export const adminRoutes = new Hono<HonoEnv>();
 const DAY = 86_400_000;
 export const LEAD_STATUSES = ['new', 'contacted', 'qualified', 'won', 'lost'] as const;
 
-adminRoutes.use('/admin/api/*', async (c, next) => {
+adminRoutes.use('*', async (c, next) => {
   c.header('Cache-Control', 'no-store');
   c.header('X-Frame-Options', 'DENY');
   c.header('X-Content-Type-Options', 'nosniff');
   c.header('Referrer-Policy', 'same-origin');
   if (dbFrom(c.get('helppuff').env)) await ensureSchema(dbFrom(c.get('helppuff').env)!);
-  await next();
+  // The public API: registered routes only, API keys only (api/auth.ts).
+  if (isPublicApi(c)) await publicApiGate(c, next);
+  else await next();
+  audit(c);
 });
 
-adminRoutes.post('/admin/api/login', async (c) => {
+/** The API's description (OpenAPI 3.1), from the same registry that guards it. Public, like any API reference. */
+adminRoutes.get('/openapi.json', (c) => {
+  c.header('Cache-Control', 'public, max-age=300');
+  return c.json(openApiDocument(`${new URL(c.req.url).origin}${API_BASE}`));
+});
+
+adminRoutes.post('/login', async (c) => {
   assertSameOrigin(c);
   const ctx = c.get('helppuff');
   const secret = requireSecret(ctx);
@@ -87,7 +102,7 @@ adminRoutes.post('/admin/api/login', async (c) => {
 });
 
 /** Ends this session everywhere: its id is recorded until it would have expired, so a copied cookie stops working too. */
-adminRoutes.post('/admin/api/logout', async (c) => {
+adminRoutes.post('/logout', async (c) => {
   assertSameOrigin(c);
   const ctx = c.get('helppuff');
   const now = ctx.platform.now();
@@ -103,13 +118,15 @@ adminRoutes.post('/admin/api/logout', async (c) => {
   return c.json({ ok: true });
 });
 
-adminRoutes.get('/admin/api/me', async (c) => {
+adminRoutes.get('/me', async (c) => {
   const admin = await currentAdmin(c);
   const config = c.get('helppuff').config;
   const origin = new URL(c.req.url).origin;
   const ctx = c.get('helppuff');
+  const key = c.get('apiKey');
   const sites = await Promise.all(
-    Object.keys(config.sites).map(async (id) => {
+    // A key sees its own site only.
+    Object.keys(config.sites).filter((id) => !key || id === key.site_id).map(async (id) => {
       // The live config: the dashboard may have renamed or recoloured it since the deploy.
       const site = await resolveSite(ctx, id);
       return {
@@ -132,7 +149,12 @@ adminRoutes.get('/admin/api/me', async (c) => {
       };
     }),
   );
-  return c.json({ admin, sites, summaries: Boolean(ctx.env['AI']) });
+  return c.json({
+    admin,
+    ...(key ? { key: { id: key.id, name: key.name, scopes: keyScopes(key), site: key.site_id, expiresAt: key.expires_at } } : {}),
+    sites,
+    summaries: Boolean(ctx.env['AI']),
+  });
 });
 
 /** Public hostnames (no localhost or bare IPs), the dashboard's last; at most 10, Turnstile's limit. */
@@ -150,11 +172,12 @@ export function turnstileHostnames(origins: readonly string[], dashboard: string
 }
 
 function siteFilter(c: Context<HonoEnv>, column = 'site_id'): { sql: string; params: unknown[] } {
-  const site = c.req.query('site');
+  // An API key sees its own site only.
+  const site = c.get('apiKey')?.site_id ?? c.req.query('site');
   return site ? { sql: ` AND ${column} = ?`, params: [site] } : { sql: '', params: [] };
 }
 
-adminRoutes.get('/admin/api/overview', async (c) => {
+adminRoutes.get('/overview', async (c) => {
   await currentAdmin(c);
   const d = db(c);
   const now = c.get('helppuff').platform.now();
@@ -254,7 +277,7 @@ adminRoutes.get('/admin/api/overview', async (c) => {
   });
 });
 
-adminRoutes.get('/admin/api/conversations', async (c) => {
+adminRoutes.get('/conversations', async (c) => {
   await currentAdmin(c);
   // D1 refuses LIKE patterns over 50 bytes: `%q%` must fit.
   const q = (c.req.query('q') ?? '').trim().slice(0, 48);
@@ -270,6 +293,11 @@ adminRoutes.get('/admin/api/conversations', async (c) => {
         OR c.id IN (SELECT conversation_id FROM messages WHERE text LIKE ?))`,
     );
     params.push(...Array(6).fill(`%${q}%`));
+  }
+  const externalId = c.req.query('externalId');
+  if (externalId) {
+    where.push('c.id IN (SELECT id FROM api_sessions WHERE external_id = ?)');
+    params.push(externalId.slice(0, 128));
   }
   if (filter === 'leads') where.push('c.lead_id IS NOT NULL');
   if (filter === 'unsummarized') where.push('c.summary IS NULL');
@@ -306,20 +334,24 @@ async function loadConversation(d: D1Like, id: string) {
     conversation['lead_id'] ? d.prepare('SELECT * FROM leads WHERE id = ?').bind(conversation['lead_id']).first() : null,
     d.prepare('SELECT * FROM callbacks WHERE conversation_id = ? ORDER BY requested_at DESC').bind(id).all<Parameters<typeof callbackView>[0]>(),
   ]);
+  // The salted IP hash the per-visitor limits count by is not for anyone to read.
+  const { visitor: _visitor, ...shown } = conversation;
   return {
-    conversation,
+    conversation: shown,
     lead,
     callbacks: callbacks.results.map(callbackView),
     messages: messages.results.map((m) => ({ ...m, payload: m.payload ? (JSON.parse(m.payload) as unknown) : null })),
   };
 }
 
-adminRoutes.get('/admin/api/conversations/:id', async (c) => {
+adminRoutes.get('/conversations/:id', async (c) => {
   await currentAdmin(c);
-  return c.json(await loadConversation(db(c), c.req.param('id')));
+  const found = await loadConversation(db(c), c.req.param('id'));
+  assertSiteAccess(c, found.conversation['site_id'], 'conversation');
+  return c.json(found);
 });
 
-adminRoutes.post('/admin/api/conversations/:id/summary', async (c) => {
+adminRoutes.post('/conversations/:id/summary', async (c) => {
   assertSameOrigin(c);
   await currentAdmin(c);
   const ctx = c.get('helppuff');
@@ -329,6 +361,7 @@ adminRoutes.post('/admin/api/conversations/:id/summary', async (c) => {
   }
   const id = c.req.param('id');
   const { conversation } = await loadConversation(db(c), id);
+  assertSiteAccess(c, conversation['site_id'], 'conversation');
   const model = await summaryModel(ctx, String(conversation['site_id']));
   let result;
   try {
@@ -341,7 +374,7 @@ adminRoutes.post('/admin/api/conversations/:id/summary', async (c) => {
   return c.json({ ...result.summary, lead: result.contact });
 });
 
-adminRoutes.get('/admin/api/leads', async (c) => {
+adminRoutes.get('/leads', async (c) => {
   await currentAdmin(c);
   // D1 refuses LIKE patterns over 50 bytes: `%q%` must fit.
   const q = (c.req.query('q') ?? '').trim().slice(0, 48);
@@ -386,7 +419,7 @@ function leadView(row: Record<string, unknown>) {
   return { name: row['name'] ?? null, email: row['email'] ?? null, phone: row['phone'] ?? null, status: row['status'], notes: row['notes'] ?? null, source: row['source'], fields };
 }
 
-adminRoutes.patch('/admin/api/leads/:id', async (c) => {
+adminRoutes.patch('/leads/:id', async (c) => {
   assertSameOrigin(c);
   await currentAdmin(c);
   const body = (await c.req.json().catch(() => ({}))) as { status?: unknown; notes?: unknown; name?: unknown };
@@ -406,6 +439,9 @@ adminRoutes.patch('/admin/api/leads/:id', async (c) => {
     params.push(body.name.slice(0, 200));
   }
   if (!sets.length) throw new HelpPuffError('bad_request', { message: 'Nothing to update.' });
+  const existing = await db(c).prepare('SELECT site_id FROM leads WHERE id = ?').bind(c.req.param('id')).first<{ site_id: string }>();
+  if (!existing) throw new HelpPuffError('not_found', { message: 'No such lead.', detail: 'admin_lead_missing' });
+  assertSiteAccess(c, existing.site_id, 'lead');
   sets.push('updated_at = ?');
   params.push(c.get('helppuff').platform.now());
   await db(c)
@@ -420,6 +456,89 @@ adminRoutes.patch('/admin/api/leads/:id', async (c) => {
   return c.json(lead);
 });
 
+const LEAD_EMAIL = /^[^@\s]+@[^@\s.]+\.[^@\s]{2,}$/;
+const leadText = (value: unknown, max: number) => (typeof value === 'string' && value.trim() ? cleanText(value, 'line').slice(0, max) : null);
+
+/** Add a contact from elsewhere (your CRM, a form, an import). One per email per site: a second gets 409 with the first one's id. */
+adminRoutes.post('/leads', async (c) => {
+  assertSameOrigin(c);
+  await currentAdmin(c);
+  const body = await jsonBody(c);
+  const siteId = siteParam(c, body['site']);
+  const name = leadText(body['name'], 200);
+  const email = leadText(body['email'], 200)?.toLowerCase() ?? null;
+  const phone = leadText(body['phone'], 40);
+  if (!name && !email && !phone) throw new HelpPuffError('bad_request', { message: 'Give at least a name, an email or a phone.', detail: 'lead_empty' });
+  if (email && !LEAD_EMAIL.test(email)) throw new HelpPuffError('bad_request', { message: 'Check email: not an email address.', detail: 'lead_bad_email' });
+  const status = body['status'] === undefined ? 'new' : body['status'];
+  if (!(LEAD_STATUSES as readonly unknown[]).includes(status)) throw new HelpPuffError('bad_request', { message: 'Unknown status.', detail: 'lead_bad_status' });
+  const rawFields = body['fields'] && typeof body['fields'] === 'object' && !Array.isArray(body['fields']) ? (body['fields'] as Record<string, unknown>) : {};
+  const fields = Object.fromEntries(
+    Object.entries(rawFields)
+      .slice(0, 20)
+      .filter(([key, value]) => /^[\w-]{1,64}$/.test(key) && typeof value === 'string' && value.trim())
+      .map(([key, value]) => [key, cleanText(value as string, 'input').slice(0, 2000)]),
+  );
+  const d = db(c);
+  if (email) {
+    const taken = await d.prepare('SELECT id FROM leads WHERE site_id = ? AND email = ?').bind(siteId, email).first<{ id: string }>();
+    if (taken) throw new HelpPuffError('conflict', { message: `A lead with this email exists: ${taken.id}. Update it with PATCH /leads/${taken.id}.`, detail: 'lead_email_taken' });
+  }
+  const now = c.get('helppuff').platform.now();
+  const id = `lead_${crypto.randomUUID()}`;
+  const notes = typeof body['notes'] === 'string' ? body['notes'].slice(0, 5000) : null;
+  await d
+    .prepare(
+      `INSERT INTO leads (id, site_id, conversation_id, name, email, phone, fields, source, status, notes, created_at, updated_at)
+       VALUES (?, ?, NULL, ?, ?, ?, ?, 'api', ?, ?, ?, ?)`,
+    )
+    .bind(id, siteId, name, email, phone, Object.keys(fields).length ? JSON.stringify(fields) : null, status, notes, now, now)
+    .run();
+  const lead = (await d.prepare('SELECT * FROM leads WHERE id = ?').bind(id).first<Record<string, unknown>>())!;
+  emit(c.get('helppuff'), siteId, 'lead.captured', { conversationId: null, source: 'api', name, email, phone, fields });
+  return c.json(lead, 201);
+});
+
+/** One lead, with the conversations linked to it. */
+adminRoutes.get('/leads/:id', async (c) => {
+  await currentAdmin(c);
+  const d = db(c);
+  const lead = await d.prepare('SELECT * FROM leads WHERE id = ?').bind(c.req.param('id')).first<Record<string, unknown>>();
+  if (!lead) throw new HelpPuffError('not_found', { message: 'No such lead.', detail: 'admin_lead_missing' });
+  assertSiteAccess(c, lead['site_id'], 'lead');
+  const conversations = await d
+    .prepare(
+      `SELECT id, started_at AS startedAt, last_at AS lastAt, page_url AS pageUrl, first_message AS firstMessage, message_count AS messageCount, summary, channel
+       FROM conversations WHERE lead_id = ? ORDER BY last_at DESC LIMIT 100`,
+    )
+    .bind(lead['id'])
+    .all();
+  return c.json({ ...lead, conversations: conversations.results });
+});
+
+/**
+ * Delete a lead. `?erase=conversations` also deletes every conversation linked
+ * to it, with their messages and callback requests: a person's "forget me".
+ */
+adminRoutes.delete('/leads/:id', async (c) => {
+  assertSameOrigin(c);
+  await currentAdmin(c);
+  const d = db(c);
+  const id = c.req.param('id');
+  const lead = await d.prepare('SELECT id, site_id FROM leads WHERE id = ?').bind(id).first<{ id: string; site_id: string }>();
+  if (!lead) throw new HelpPuffError('not_found', { message: 'No such lead.', detail: 'admin_lead_missing' });
+  assertSiteAccess(c, lead.site_id, 'lead');
+  const erase = c.req.query('erase') === 'conversations';
+  const linked = erase ? (await d.prepare('SELECT id FROM conversations WHERE lead_id = ?').bind(id).all<{ id: string }>()).results.map((r) => r.id) : [];
+  await deleteConversations(d, linked);
+  await d.batch([
+    d.prepare('UPDATE conversations SET lead_id = NULL WHERE lead_id = ?').bind(id),
+    d.prepare('UPDATE callbacks SET lead_id = NULL WHERE lead_id = ?').bind(id),
+    d.prepare('DELETE FROM leads WHERE id = ?').bind(id),
+  ]);
+  return c.json({ id, deleted: true, conversationsDeleted: linked.length });
+});
+
 const csvCell = (value: unknown) => {
   const text = value === null || value === undefined ? '' : String(value);
   // A leading =, +, -, @, tab or carriage return would run as a formula in a spreadsheet.
@@ -427,7 +546,7 @@ const csvCell = (value: unknown) => {
   return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 };
 
-adminRoutes.get('/admin/api/leads.csv', async (c) => {
+adminRoutes.get('/leads.csv', async (c) => {
   await currentAdmin(c);
   const f = siteFilter(c);
   const rows = await db(c)
@@ -449,7 +568,7 @@ adminRoutes.get('/admin/api/leads.csv', async (c) => {
   });
 });
 
-adminRoutes.get('/admin/api/admins', async (c) => {
+adminRoutes.get('/admins', async (c) => {
   const me = await currentAdmin(c);
   const owner = String(c.get('helppuff').env['ADMIN_EMAIL'] ?? '').toLowerCase();
   const rows = await db(c).prepare('SELECT email, name, created_at AS createdAt, last_login_at AS lastLoginAt FROM admins ORDER BY created_at').all();
@@ -496,7 +615,7 @@ async function builtInView(c: Context<HonoEnv>, siteId: string, connector: { typ
   }
 }
 
-adminRoutes.get('/admin/api/prompt', async (c) => {
+adminRoutes.get('/prompt', async (c) => {
   await currentAdmin(c);
   const site = siteParam(c, c.req.query('site'));
   const d = db(c);
@@ -518,7 +637,7 @@ adminRoutes.get('/admin/api/prompt', async (c) => {
   });
 });
 
-adminRoutes.get('/admin/api/prompt/versions/:version', async (c) => {
+adminRoutes.get('/prompt/versions/:version', async (c) => {
   await currentAdmin(c);
   const site = siteParam(c, c.req.query('site'));
   const row = await db(c)
@@ -529,7 +648,7 @@ adminRoutes.get('/admin/api/prompt/versions/:version', async (c) => {
   return c.json(row);
 });
 
-adminRoutes.post('/admin/api/prompt', async (c) => {
+adminRoutes.post('/prompt', async (c) => {
   assertSameOrigin(c);
   const admin = await currentAdmin(c);
   const body = (await c.req.json().catch(() => ({}))) as { site?: unknown; text?: unknown; note?: unknown; baseVersion?: unknown };
@@ -547,7 +666,7 @@ adminRoutes.post('/admin/api/prompt', async (c) => {
   return published(c, result);
 });
 
-adminRoutes.post('/admin/api/prompt/restore', async (c) => {
+adminRoutes.post('/prompt/restore', async (c) => {
   assertSameOrigin(c);
   const admin = await currentAdmin(c);
   const body = (await c.req.json().catch(() => ({}))) as { site?: unknown; version?: unknown; baseVersion?: unknown };
@@ -578,3 +697,5 @@ adminRoutes.route('/', signInRoutes);
 adminRoutes.route('/', webhookRoutes);
 adminRoutes.route('/', callbackRoutes);
 adminRoutes.route('/', versionRoutes);
+adminRoutes.route('/', chatRoutes);
+adminRoutes.route('/', accessRoutes);

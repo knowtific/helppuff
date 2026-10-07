@@ -1,33 +1,19 @@
 import { Hono } from 'hono';
-import {
-  TOKEN_HEADER,
-  cleanText,
-  feedbackRequestSchema,
-  stripChatTokens,
-  sendRequestSchema,
-  type Message,
-  type PollResponse,
-  type SendRequest,
-  type SendResponse,
-  type StreamedSendDone,
-} from '@helppuff/protocol';
-import { isCallbackForm } from '@helppuff/connector-types';
+import { TOKEN_HEADER, feedbackRequestSchema, sendRequestSchema, type PollResponse, type SendResponse, type StreamedSendDone } from '@helppuff/protocol';
 import { resolveSite } from '../config/site.js';
 import { HelpPuffError } from '../core/errors.js';
 import { assertAllowedOrigin } from '../core/origin.js';
 import { requireSecret, type RequestCtx, type HonoEnv } from '../core/request.js';
 import { connectorContext, prepareConnector, runConnector, type PreparedConnector } from '../core/run.js';
-import { streamResponse, textRelay, wantsStream } from '../core/stream.js';
 import { guardReplies, sanitizeConnectorMessages } from '../core/sanitize.js';
 import { issueToken, verifyToken, type SessionTokenPayload } from '../core/token.js';
-import { hitDaily, hitLimiter, hitMemory, hitTotal, hitWindow, ipLimiter, rateLimited, quotaExceeded, recordedCaps, sessionMessageKey } from '../core/ratelimit.js';
+import { hitMemory, rateLimited } from '../core/ratelimit.js';
 import type { SiteConfig } from '../config/schema.js';
 import { readJsonBody } from './sessions.js';
-import { formLead, recordFeedback, recordLead, recordTurn } from '../admin/record.js';
+import { recordFeedback } from '../admin/record.js';
 import { dbFrom } from '../db/d1.js';
-import { dispatchLead } from '../core/sinks.js';
 import { emit } from '../webhooks/deliver.js';
-import { formWasOffered, isFormSubmission, offeredForms } from '../core/forms.js';
+import { endChat, sendChat } from '../core/chat.js';
 import { visitorStanding } from '../core/visitor.js';
 
 export const messageRoutes = new Hono<HonoEnv>();
@@ -53,184 +39,46 @@ async function authenticate(ctx: RequestCtx, authorization: string | undefined):
   return { payload, site, prepared: prepareConnector(ctx, site), secret };
 }
 
-async function refreshToken(ctx: RequestCtx, session: Session, state: unknown, count: number, messages: Message[]): Promise<string> {
+async function refreshToken(ctx: RequestCtx, session: Session, state: unknown, count: number, forms: string[]): Promise<string> {
   const { token } = await issueToken(session.secret, {
     siteId: session.payload.siteId,
     sessionId: session.payload.sessionId,
     state,
     count,
-    forms: offeredForms(session.payload.forms, messages),
+    forms,
     // Keep the original expiry — a session cannot extend itself indefinitely.
     ttlMs: Math.max(session.payload.exp - ctx.platform.now(), 1000),
   });
   return token;
 }
 
+/** The widget sends a message: the token's session, the pipeline shared with the public API (`core/chat.ts`). */
 messageRoutes.post('/v1/sessions/messages', async (c) => {
   const ctx = c.get('helppuff');
   const session = await ctx.timing.span('auth', () => authenticate(ctx, c.req.header('Authorization')));
   const { site, payload } = session;
-
-  // 3. Body shape, cleaned (`cleanText`), and length cap.
   const parsed = sendRequestSchema.safeParse(await readJsonBody(c.req.raw));
   if (!parsed.success) throw new HelpPuffError('bad_request', { detail: 'send_body_invalid' });
-  const input = cleanSend(parsed.data);
 
-  const length = input.kind === 'text' ? input.text.length : input.value.length;
-  if (length === 0 || (input.kind === 'action' && !input.label)) throw new HelpPuffError('bad_request', { message: 'That message is empty.', detail: 'message_empty' });
-  if (length > site.security.limits.maxMessageLength) {
-    throw new HelpPuffError('bad_request', {
-      message: 'That message is a little too long.',
-      detail: 'message_too_long',
-    });
-  }
-  // A form is answered only if this chat was shown it (see core/forms.ts).
-  if (isFormSubmission(input) && !formWasOffered(input.actionId, payload.forms, site.widget.forms)) {
-    ctx.platform.log('form.not_offered', { siteId: payload.siteId });
-    throw new HelpPuffError('bad_request', { message: 'This form has expired. Please refresh the page and try again.', detail: 'form_not_offered' });
-  }
-
-  // 4. Limits, cheapest first. A blocked IP stops here.
-  const limits = site.security.limits;
-  const standing = await visitorStanding(ctx, site.security);
-  const ipKey = await ctx.ipKey();
-
-  /*
-   * The three limits are read together, and nothing here writes before the
-   * response (see core/ratelimit.ts): per visitor by the Rate Limiting
-   * binding, per conversation and per day from the database's record of the
-   * turns, else KV counters written with `waitUntil`. The per-session cap is
-   * counted server-side, not from the token — a client chooses which token to
-   * send, so a token-held count can be rewound.
-   */
-  const ttlSeconds = Math.max(60, Math.ceil((payload.exp - ctx.platform.now()) / 1000));
-  const defer = ctx.platform.waitUntil;
-  const db = dbFrom(ctx.env);
-  const limiter = ipLimiter(ctx.env, limits.messagesPerIpPerMinute);
-  const ipBucket = `${payload.siteId}:${ipKey}`;
-  const checkLimits = async (): Promise<number> => {
-    const exempt = standing === 'exempt';
-    const pass = Promise.resolve({ allowed: true, count: 0 });
-    const [perIp, [perIpDay, perSession, daily]] = await ctx.timing.span('limits', () =>
-      Promise.all([
-        exempt
-          ? pass
-          : limiter
-            ? hitLimiter(limiter, ipBucket)
-            : hitWindow(ctx.platform.kv, 'msg', ipBucket, limits.messagesPerIpPerMinute, 60, undefined, defer),
-        // With a database, one read of what it records (the visitor's messages today come from their chats' salted IP hash).
-        db
-          ? recordedCaps(
-              db,
-              payload.siteId,
-              payload.sessionId,
-              { perSession: limits.messagesPerSession, perDay: limits.messagesPerSitePerDay, perIpDay: limits.messagesPerIpPerDay },
-              ctx.platform.now(),
-              exempt ? null : ipKey,
-            ).then((caps) => [caps.ipDay, caps.session, caps.daily] as const)
-          : Promise.all([
-              exempt ? pass : hitWindow(ctx.platform.kv, 'msgd', ipBucket, limits.messagesPerIpPerDay, 86_400, undefined, defer),
-              hitTotal(ctx.platform.kv, sessionMessageKey(payload.sessionId), limits.messagesPerSession, ttlSeconds, defer),
-              hitDaily(ctx.platform.kv, payload.siteId, limits.messagesPerSitePerDay, undefined, defer),
-            ]),
-      ]),
-    );
-    // Scoped by site, as with sessions.
-    if (!perIp.allowed) {
-      ctx.platform.log('limit.messages_per_ip', { siteId: payload.siteId });
-      throw rateLimited(perIp, 'messages_per_ip_per_minute');
-    }
-    if (!perIpDay.allowed) {
-      ctx.platform.log('limit.messages_per_ip_day', { siteId: payload.siteId });
-      throw rateLimited(perIpDay, 'messages_per_ip_per_day');
-    }
-    if (!perSession.allowed) {
-      ctx.platform.log('limit.messages_per_session', { siteId: payload.siteId });
-      throw quotaExceeded('messages_per_session', 'This conversation has reached its limit. Start a new one to keep going.');
-    }
-    if (!daily.allowed) {
-      ctx.platform.log('limit.site_daily', { siteId: payload.siteId });
-      throw quotaExceeded('messages_per_site_per_day', 'Chat is unavailable right now.');
-    }
-    return perSession.count;
-  };
-
-  // A lead the conversation produced: kept for the dashboard, sent to the lead destinations.
-  const reportLead = (lead: Record<string, string>, source: 'form' | 'ai' = 'ai') => {
-    recordLead(ctx, { siteId: payload.siteId, sessionId: payload.sessionId, lead, source });
-    dispatchLead(ctx, site, payload.siteId, { sessionId: payload.sessionId, lead, context: { pageUrl: ctx.origin ?? 'unknown' } });
-  };
-
-  /*
-   * A gated connector starts at once and waits for the limits only before its
-   * expensive call (the model), so the counter reads overlap its retrieval. A
-   * blocked request still gets its 429: the connector stops at the gate, and
-   * nothing is recorded. Other connectors run after the limits, as before.
-   */
-  const streaming = wantsStream(c.req.header('Accept'), session.prepared);
-  const relay = textRelay();
-  const verdict = checkLimits();
-  const gate = verdict.then(() => undefined);
-  gate.catch(() => {});
-  const gated = session.prepared.connector.gated;
-
-  // Steps 5-7, shared by the JSON and the streamed response.
-  const finish = async () => {
-    const cctx = connectorContext(ctx, session.prepared, payload.siteId, payload.sessionId, streaming ? relay.onText : undefined, (lead) => reportLead(lead));
-    if (gated) cctx.gate = gate;
-    // 5. Connector.
-    const result = await ctx.timing.span('connector', () =>
-      runConnector(ctx, 'send', () => session.prepared.connector.send(cctx, payload.state, input)),
-    );
-    const count = await verdict;
-
-    // 6. Sanitize.
-    const messages = guardReplies(sanitizeConnectorMessages(result.messages, ctx.platform), session.prepared.guidance, ctx.platform);
-
-    // 7. Refresh the token whenever state or the message count changed.
-    const state = result.state === undefined ? payload.state : result.state;
-    const token = await refreshToken(ctx, session, state, count, messages);
-
-    ctx.platform.log('message.sent', { siteId: payload.siteId, sessionId: payload.sessionId, count });
-    recordTurn(ctx, { siteId: payload.siteId, sessionId: payload.sessionId, request: input, messages });
-    return { messages, token };
-  };
-
-  let work: Promise<{ messages: Message[]; token: string }>;
-  if (gated) {
-    work = finish();
-    work.catch(() => {});
-    await verdict;
-  } else {
-    await verdict;
-    work = finish();
-  }
-  const submitted = formLead(input, limits);
-  // The callback form is itself the request: recorded once, here, whatever the model says next.
-  if (submitted) reportLead(input.kind === 'action' && isCallbackForm(input.actionId) ? { ...submitted, request: 'callback' } : submitted, 'form');
-
-  if (streaming) {
-    // The headers are gone before the new state exists, so the token rides in `done`.
-    return streamResponse(ctx, c.req.path, async (onText) => {
-      relay.attach(onText);
-      const { messages, token } = await work;
-      const done: StreamedSendDone = { messages, token };
-      return done;
-    });
-  }
-
-  const { messages, token } = await work;
-  c.header(TOKEN_HEADER, token);
-  c.header('Server-Timing', ctx.timing.header());
-  const body: SendResponse = { messages };
-  return c.json(body);
+  return sendChat<SendResponse | StreamedSendDone>(c, {
+    session: {
+      siteId: payload.siteId,
+      sessionId: payload.sessionId,
+      site,
+      prepared: session.prepared,
+      state: payload.state,
+      forms: payload.forms,
+      ttlSeconds: Math.max(60, Math.ceil((payload.exp - ctx.platform.now()) / 1000)),
+    },
+    input: parsed.data,
+    channel: { kind: 'widget', standing: await visitorStanding(ctx, site.security), visitor: await ctx.ipKey(), pageUrl: ctx.origin ?? 'unknown' },
+    respond: async (turn, streaming) => {
+      const token = await refreshToken(ctx, session, turn.state, turn.count, turn.forms);
+      // A streamed response's headers are gone before the new state exists, so the token rides in `done`.
+      return streaming ? { body: { messages: turn.messages, token } } : { body: { messages: turn.messages }, headers: { [TOKEN_HEADER]: token } };
+    },
+  });
 });
-
-/** A visitor's message, cleaned: typed text as `input`, an action's label as one line, its value as given (form answers are JSON). */
-function cleanSend(input: SendRequest): SendRequest {
-  if (input.kind === 'text') return { ...input, text: stripChatTokens(cleanText(input.text, 'input')) };
-  return { ...input, label: cleanText(input.label, 'line'), value: cleanText(input.value, 'output') };
-}
 
 messageRoutes.get('/v1/sessions/messages', async (c) => {
   const ctx = c.get('helppuff');
@@ -262,40 +110,12 @@ messageRoutes.get('/v1/sessions/messages', async (c) => {
 messageRoutes.post('/v1/sessions/end', async (c) => {
   const ctx = c.get('helppuff');
   const session = await authenticate(ctx, c.req.header('Authorization'));
-  const end = session.prepared.connector.end;
   const { siteId, sessionId } = session.payload;
   if ((await visitorStanding(ctx, session.site.security)) === 'limited') {
     const perIp = hitMemory('end', `${siteId}:${await ctx.ipKey()}`, session.site.security.limits.endsPerIpPerMinute, 60, ctx.platform.now());
     if (!perIp.allowed) throw rateLimited(perIp, 'ends_per_ip');
   }
-
-  if (end) {
-    const cctx = connectorContext(ctx, session.prepared, siteId, sessionId);
-    ctx.platform.waitUntil(
-      end(cctx, session.payload.state).catch(() => {
-        ctx.platform.log('connector.end_failed');
-      }),
-    );
-  }
-
-  ctx.platform.log('session.ended', { siteId, sessionId });
-  // Once per conversation, decided by the database (webhooks live there too): a token replayed here fans out nothing.
-  const db = dbFrom(ctx.env);
-  if (db) {
-    const now = ctx.platform.now();
-    ctx.platform.waitUntil(
-      (async () => {
-        const result = (await db
-          .prepare(
-            `INSERT INTO conversations (id, site_id, started_at, last_at, message_count, ended_at) VALUES (?, ?, ?, ?, 0, ?)
-             ON CONFLICT (id) DO UPDATE SET ended_at = excluded.ended_at WHERE conversations.ended_at IS NULL`,
-          )
-          .bind(sessionId, siteId, now, now, now)
-          .run()) as { meta?: { changes?: number }; changes?: number } | undefined;
-        if ((result?.meta?.changes ?? result?.changes ?? 0) > 0) emit(ctx, siteId, 'conversation.ended', { conversationId: sessionId });
-      })().catch(() => ctx.platform.log('record.failed')),
-    );
-  }
+  endChat(ctx, { siteId, sessionId, state: session.payload.state, prepared: session.prepared });
   return c.body(null, 204);
 });
 

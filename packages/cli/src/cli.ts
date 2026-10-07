@@ -1,9 +1,10 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { parseArgs, str } from './args.js';
 import { CliError, EXIT } from './errors.js';
 import { COMMAND_HELP, MAIN_HELP, VERSION, cliReferencePage, commandHelp } from './help.js';
 import { configReferencePage } from './engine/reference.js';
+import { apiReferencePages } from '@helppuff/server';
 import { Output } from './output.js';
 import { deployCommand, devCommand, initCommand } from './commands/setup.js';
 import { askCommand, crawlCommand, discoverCommand, knowledgeCommand } from './commands/knowledge.js';
@@ -22,6 +23,7 @@ import {
 import type { Ctx } from './commands/context.js';
 import { dashboardCommand, usersCommand } from './commands/users.js';
 import { webhooksCommand } from './commands/webhooks.js';
+import { apiCommand, keysCommand } from './commands/keys.js';
 import { callbacksCommand } from './commands/callbacks.js';
 import { upgradeCommand } from './commands/upgrade.js';
 import { promptCommand } from './commands/prompt.js';
@@ -48,6 +50,8 @@ const COMMANDS: Record<string, (ctx: Ctx) => Promise<number>> = {
   embed: embedCommand,
   users: usersCommand,
   webhooks: webhooksCommand,
+  keys: keysCommand,
+  api: apiCommand,
   callbacks: callbacksCommand,
   upgrade: upgradeCommand,
   dashboard: dashboardCommand,
@@ -80,6 +84,13 @@ export async function main(argv: string[]): Promise<number> {
       }
       if (topic === 'wiki-config') {
         process.stdout.write(configReferencePage());
+        return EXIT.ok;
+      }
+      if (topic === 'wiki-api') {
+        // Several pages: written into the wiki folder given, replacing the old ones.
+        const dir = resolve(positionals[1] ?? 'wiki');
+        for (const file of readdirSync(dir)) if (/^API-Reference(-.+)?\.md$/.test(file)) rmSync(join(dir, file));
+        for (const [page, content] of Object.entries(apiReferencePages())) writeFileSync(join(dir, `${page}.md`), content);
         return EXIT.ok;
       }
       const help = topic ? commandHelp(topic) : null;

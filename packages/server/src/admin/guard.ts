@@ -14,7 +14,11 @@ import { cookieValue, passwordFingerprint, readSession, SESSION_COOKIE } from '.
  *    owner.
  */
 
-export type Admin = { email: string; owner: boolean; via: 'session' | 'api-key' };
+/** `api-key`: the deployment's ADMIN_API_KEY (the CLI, full access). `key`: a scoped key from `/api/v1/keys`. */
+export type Admin = { email: string; owner: boolean; via: 'session' | 'api-key' | 'key' };
+
+/** The public API (`/api/v1`): API keys only, never a dashboard cookie. */
+export const isPublicApi = (c: Context<HonoEnv>) => c.req.path.startsWith('/api/');
 
 export function db(c: Context<HonoEnv>): D1Like {
   const found = dbFrom(c.get('helppuff').env);
@@ -59,7 +63,16 @@ export async function viaApiKey(c: Context<HonoEnv>): Promise<boolean> {
 }
 
 export async function currentAdmin(c: Context<HonoEnv>): Promise<Admin> {
-  if (await viaApiKey(c)) return { email: 'api-key', owner: true, via: 'api-key' };
+  const key = c.get('apiKey');
+  if (key) {
+    c.set('actor', `key:${key.id}`);
+    return { email: `key:${key.id}`, owner: false, via: 'key' };
+  }
+  if (await viaApiKey(c)) {
+    c.set('actor', 'admin-key');
+    return { email: 'api-key', owner: true, via: 'api-key' };
+  }
+  if (isPublicApi(c)) throw new HelpPuffError('unauthorized', { message: 'Send an API key: Authorization: Bearer hp_live_…', detail: 'api_no_key' });
   const ctx = c.get('helppuff');
   const secret = requireSecret(ctx);
   const session = await readSession(secret, cookieValue(c.req.header('Cookie'), SESSION_COOKIE), ctx.platform.now());
@@ -77,6 +90,7 @@ export async function currentAdmin(c: Context<HonoEnv>): Promise<Admin> {
   if (signedOut || session.fingerprint !== (await passwordFingerprint(secret, hash))) {
     throw new HelpPuffError('unauthorized', { message: 'Please sign in.', detail: signedOut ? 'admin_signed_out' : 'admin_password_changed' });
   }
+  c.set('actor', session.email);
   if (isOwner) return { email: session.email, owner: true, via: 'session' };
   // Without an owner in Worker config, the first account (made at setup) is the owner.
   const first = owner ? null : await d.prepare('SELECT email FROM admins ORDER BY created_at LIMIT 1').first<{ email: string }>();
@@ -91,9 +105,18 @@ export async function passwordHashOf(c: Context<HonoEnv>, email: string): Promis
   return row?.password_hash ?? null;
 }
 
-/** The site asked for, or the only one — a CLI deployment has exactly one. */
+/**
+ * The site asked for, or the only one — a CLI deployment has exactly one.
+ * An API key belongs to one site: that site, whatever was asked.
+ */
 export function siteParam(c: Context<HonoEnv>, value: unknown): string {
   const sites = Object.keys(c.get('helppuff').config.sites);
+  const key = c.get('apiKey');
+  if (key) {
+    if (typeof value === 'string' && value && value !== key.site_id) throw new HelpPuffError('forbidden', { message: `This key is for site "${key.site_id}".`, detail: 'api_key_site' });
+    if (!sites.includes(key.site_id)) throw new HelpPuffError('not_found', { message: 'No such site.', detail: 'admin_unknown_site' });
+    return key.site_id;
+  }
   const site = typeof value === 'string' && value ? value : sites[0];
   if (!site || !sites.includes(site)) throw new HelpPuffError('not_found', { message: 'No such site.', detail: 'admin_unknown_site' });
   return site;
@@ -102,4 +125,10 @@ export function siteParam(c: Context<HonoEnv>, value: unknown): string {
 export async function jsonBody(c: Context<HonoEnv>): Promise<Record<string, unknown>> {
   const body = (await c.req.json().catch(() => null)) as unknown;
   return body && typeof body === 'object' && !Array.isArray(body) ? (body as Record<string, unknown>) : {};
+}
+
+/** A record of another site is, to a key, a record that does not exist. */
+export function assertSiteAccess(c: Context<HonoEnv>, siteId: unknown, what = 'record'): void {
+  const key = c.get('apiKey');
+  if (key && siteId !== key.site_id) throw new HelpPuffError('not_found', { message: `No such ${what}.`, detail: 'api_key_other_site' });
 }

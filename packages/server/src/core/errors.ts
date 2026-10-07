@@ -5,6 +5,8 @@ const DEFAULT_MESSAGES: Record<ErrorCode, string> = {
   bad_request: 'Something in that request was not quite right.',
   unauthorized: 'This conversation is no longer available.',
   forbidden_origin: 'This chat is not available on this site.',
+  forbidden: 'This key is not allowed to do that.',
+  conflict: 'That already exists.',
   not_found: 'This chat is not available.',
   rate_limited: 'Too many messages. Try again shortly.',
   quota_exceeded: 'Chat is unavailable right now.',

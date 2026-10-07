@@ -53,7 +53,7 @@ const COLUMNS = `cb.id, cb.conversation_id, COALESCE(cv.lead_id, cb.lead_id) AS 
 
 export const callbackRoutes = new Hono<HonoEnv>();
 
-callbackRoutes.get('/admin/api/callbacks', async (c) => {
+callbackRoutes.get('/callbacks', async (c) => {
   await currentAdmin(c);
   const siteId = siteParam(c, c.req.query('site'));
   const d = db(c);
@@ -79,7 +79,7 @@ callbackRoutes.get('/admin/api/callbacks', async (c) => {
   });
 });
 
-callbackRoutes.patch('/admin/api/callbacks/:id', async (c) => {
+callbackRoutes.patch('/callbacks/:id', async (c) => {
   assertSameOrigin(c);
   const admin = await currentAdmin(c);
   const body = await jsonBody(c);

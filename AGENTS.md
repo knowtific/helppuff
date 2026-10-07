@@ -19,8 +19,11 @@ as few questions as possible.
   search (`website/`, `.github/workflows/website.yml`). Write wiki Markdown
   (`[[Text|Page]]` links); `website/.vitepress/wiki.ts` translates it. `wiki/CLI-Reference.md` and
   `wiki/Configuration-Reference.md` are **generated** by `pnpm sync:docs`
-  from `cli/src/help.ts` and the schemas' `.describe()` text: edit those, not
-  the pages. A test fails when they are stale.
+  from `cli/src/help.ts` and the schemas' `.describe()` text, and the
+  `wiki/API-Reference*.md` pages (one per area, curl + TypeScript tabs) from
+  `server/src/api/registry.ts`: edit those, not the pages. A test fails when
+  they are stale. Code blocks between `<!-- tabs -->` and `<!-- /tabs -->`
+  become tabs on the website (`wiki.ts`).
 
 ## Monorepo map (pnpm workspaces, TS strict, ESM)
 
@@ -28,9 +31,10 @@ as few questions as possible.
 | --- | --- | --- |
 | `packages/protocol` | `@helppuff/protocol` | Zod schemas + types for the wire contract. **Single source of truth** — never redeclare message types elsewhere. `messages.ts`, `actions.ts`, `api.ts`, `config.ts` (public widget config), `sse.ts` |
 | `packages/server` | `@helppuff/server` | Hono app on Workers. `src/index.ts` (entry, bundles `helppuff.config.ts`) → `app.ts` (`createApp`) → `routes/` + `admin/`. `src/lib.ts` is the public entry the CLI bundles |
-| `packages/server/src/core` | | `registry.ts` (explicit connector/sink registration), `token.ts` (HMAC session tokens), `origin.ts` (CORS allowlist), `ratelimit.ts`, `turnstile.ts`, `stream.ts` (SSE), `sanitize.ts`, `run.ts`, `request.ts` (per-request ctx, the only allowed `console`), `errors.ts` (`HelpPuffError` → JSON envelope) |
+| `packages/server/src/core` | | `registry.ts` (explicit connector/sink registration), `token.ts` (HMAC session tokens), `origin.ts` (CORS allowlist), `ratelimit.ts`, `turnstile.ts`, `stream.ts` (SSE), `sanitize.ts`, `run.ts`, `request.ts` (per-request ctx, the only allowed `console`), `errors.ts` (`HelpPuffError` → JSON envelope), `chat.ts` (the one chat pipeline: widget and API), `visitor.ts` / `ip.ts` (allow/block lists), `forms.ts` (forms bound to the chat) |
 | `packages/server/src/config` | | `schema.ts` (server config), `load.ts` (`defineConfig`, secret refs), `site.ts` (KV `config:<siteId>` overrides) |
-| `packages/server/src/admin` | | Dashboard API under `/admin/api/*`: `guard.ts` (cookie session or `Bearer ADMIN_API_KEY`), `auth.ts`, `record.ts` (conversations, leads keyed by email, ratings), `routes.ts`, `knowledge.ts` (pages, files, facts, search), `settings.ts` (the flat settings object ↔ site config), `setup.ts` (one-time setup/sign-in links), `prompts.ts`, `webhooks.ts`, `callbacks.ts` (callback requests as tasks: list, done/dismiss), `overlaps.ts` (prompt lines a setting or rule already covers), `version.ts` (running vs latest release) |
+| `packages/server/src/api` | | The public API (`/api/v1`): `registry.ts` (every route: scope, docs, examples; drives the door, OpenAPI and the wiki reference), `auth.ts` (the door: keys, scopes, rate, audit), `keys.ts` (hashed keys), `scopes.ts`, `openapi.ts` (OpenAPI + the `wiki/API-Reference*.md` pages; `test/api-docs.test.ts` typechecks every TypeScript example) |
+| `packages/server/src/admin` | | One router, mounted twice: `/admin/api/*` (dashboard, CLI) and `/api/v1/*` (public; registered routes only). A new route goes in `api/registry.ts` too, or keys cannot reach it: `guard.ts` (cookie session or `Bearer ADMIN_API_KEY`), `auth.ts`, `record.ts` (conversations, leads keyed by email, ratings), `routes.ts`, `knowledge.ts` (pages, files, facts, search), `settings.ts` (the flat settings object ↔ site config), `setup.ts` (one-time setup/sign-in links), `prompts.ts`, `webhooks.ts`, `callbacks.ts` (callback requests as tasks: list, done/dismiss), `overlaps.ts` (prompt lines a setting or rule already covers), `version.ts` (running vs latest release), `chat.ts` (chat over the API), `access.ts` (team, API keys, audit log) |
 | `packages/server/src/webhooks` | | `deliver.ts` (signed delivery, retry, delivery log, `emit`/`emitTo`), `events.ts` (conversation → events). Endpoints live in D1 `webhooks`, managed by `admin/webhooks.ts`; event names and envelope in `protocol/src/webhooks.ts` |
 | `packages/server/src/conversations` | | `summary.ts` (AI summary + labels, shared by the dashboard button and the job), `complete.ts` (`runConversationJob`: sleeps until 5 min after the last message, then summarises and sends `conversation.completed`) |
 | `packages/server/src/db` | | `migrations.ts` (numbered, append-only D1 schema; applied by deploy and per isolate), `d1.ts` (binding helpers) |
@@ -197,7 +201,12 @@ pnpm check          # lint + typecheck + test + build + e2e (what CI runs)
   `widget/src/styles/`.
 - **Dashboard API change**: `server/src/admin/routes.ts` (or a sibling module
   mounted there), schema in `server/src/db/migrations.ts`, client in
-  `dashboard/src/lib/api.ts`, test in `server/test/admin.test.ts`.
+  `dashboard/src/lib/api.ts`, test in `server/test/admin.test.ts`. To make it
+  public too, add it to `server/src/api/registry.ts` (scope, example request
+  and response) and a flow in `server/test/api-endpoints.test.ts`: the scope
+  matrix there covers every registered route, and `expectDocumented` fails
+  when a real response stops matching its documented example. Then
+  `pnpm sync:docs`.
 - **New webhook event**: add it to `WEBHOOK_EVENTS` in
   `protocol/src/webhooks.ts`, emit it with `emit()` (`server/src/webhooks/`),
   document it in `wiki/Webhooks.md`.

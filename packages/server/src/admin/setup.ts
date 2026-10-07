@@ -19,7 +19,7 @@ import { signInPolicy, throttleIp } from './signin.js';
 
 export const setupRoutes = new Hono<HonoEnv>();
 
-const TTL = { setup: 24 * 3600_000, login: 15 * 60_000 } as const;
+export const TTL = { setup: 24 * 3600_000, login: 15 * 60_000 } as const;
 type Kind = keyof typeof TTL;
 
 async function sha256(text: string): Promise<string> {
@@ -63,12 +63,11 @@ async function throttle(c: Context<HonoEnv>): Promise<void> {
 }
 
 /** Mint a link. API key only: this is what `helppuff deploy` and `helppuff dashboard` call. */
-setupRoutes.post('/admin/api/links', async (c) => {
+setupRoutes.post('/links', async (c) => {
   if (!(await viaApiKey(c))) throw new HelpPuffError('unauthorized', { message: 'Use the admin API key.', detail: 'admin_links_api_key_only' });
   const body = await jsonBody(c);
   const kind: Kind = body['kind'] === 'login' ? 'login' : 'setup';
   const ctx = c.get('helppuff');
-  const now = ctx.platform.now();
   let email: string | null = null;
   if (kind === 'setup' && (await hasAdmin(c))) {
     throw new HelpPuffError('bad_request', { message: 'Setup is already complete; mint a login link instead.', detail: 'admin_setup_done' });
@@ -82,19 +81,26 @@ setupRoutes.post('/admin/api/links', async (c) => {
     const known = email === owner || Boolean(await db(c).prepare('SELECT 1 AS x FROM admins WHERE email = ?').bind(email).first());
     if (!known) throw new HelpPuffError('not_found', { message: `No account for ${email}.`, detail: 'admin_unknown_email' });
   }
+  return c.json({ kind, email, ...(await mintLink(c, kind, email, TTL[kind])) }, 201);
+});
+
+/**
+ * A one-time link: only its SHA-256 is stored. In the URL's fragment, which a
+ * browser never sends to a server, so it is never in a log or a Referer.
+ */
+export async function mintLink(c: Context<HonoEnv>, kind: Kind, email: string | null, ttlMs: number): Promise<{ url: string; expiresAt: number }> {
+  const now = c.get('helppuff').platform.now();
   const token = newToken();
   await db(c)
     .prepare('INSERT INTO admin_tokens (token_hash, kind, email, created_at, expires_at) VALUES (?, ?, ?, ?, ?)')
-    .bind(await sha256(token), kind, email, now, now + TTL[kind])
+    .bind(await sha256(token), kind, email, now, now + ttlMs)
     .run();
   const origin = new URL(c.req.url).origin;
-  // In the fragment: never sent to a server, so never in a log or a Referer.
-  const url = kind === 'setup' ? `${origin}/admin/#/setup/${token}` : `${origin}/admin/#/signin/${token}`;
-  return c.json({ kind, url, email, expiresAt: now + TTL[kind] }, 201);
-});
+  return { url: kind === 'setup' ? `${origin}/admin/#/setup/${token}` : `${origin}/admin/#/signin/${token}`, expiresAt: now + ttlMs };
+}
 
 /** Whether a link is good, before the page asks for anything. */
-setupRoutes.get('/admin/api/setup', async (c) => {
+setupRoutes.get('/setup', async (c) => {
   await throttle(c);
   const kind: Kind = c.req.query('kind') === 'login' ? 'login' : 'setup';
   const row = await liveToken(c, c.req.query('token'), kind);
@@ -102,7 +108,7 @@ setupRoutes.get('/admin/api/setup', async (c) => {
 });
 
 /** Claim a fresh deployment: create the first account and sign in. */
-setupRoutes.post('/admin/api/setup', async (c) => {
+setupRoutes.post('/setup', async (c) => {
   assertSameOrigin(c);
   await throttle(c);
   const body = await jsonBody(c);
@@ -125,7 +131,7 @@ setupRoutes.post('/admin/api/setup', async (c) => {
 });
 
 /** Sign in with a one-time login link. */
-setupRoutes.post('/admin/api/login-link', async (c) => {
+setupRoutes.post('/login-link', async (c) => {
   assertSameOrigin(c);
   await throttle(c);
   const body = await jsonBody(c);
@@ -140,7 +146,7 @@ setupRoutes.post('/admin/api/login-link', async (c) => {
 });
 
 /** Rotate nothing here, but let a signed-in owner see when setup was done. */
-setupRoutes.get('/admin/api/setup/state', async (c) => {
+setupRoutes.get('/setup/state', async (c) => {
   await currentAdmin(c);
   return c.json({ claimed: await hasAdmin(c), apiKey: String(c.get('helppuff').env['ADMIN_API_KEY'] ?? '').length >= 32 });
 });

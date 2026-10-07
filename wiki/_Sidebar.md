@@ -15,6 +15,25 @@
 - [[Leads and callbacks|Leads]]
 - [[Webhooks]]
 
+**API**
+- [[The API (guide)|API]]
+
+**API reference**
+- [[Overview|API-Reference]]
+- [[Account|API-Reference-Account]]
+- [[Chat|API-Reference-Chat]]
+- [[Conversations|API-Reference-Conversations]]
+- [[Leads|API-Reference-Leads]]
+- [[Callbacks|API-Reference-Callbacks]]
+- [[Knowledge|API-Reference-Knowledge]]
+- [[Prompt|API-Reference-Prompt]]
+- [[Settings|API-Reference-Settings]]
+- [[Webhooks|API-Reference-Webhooks]]
+- [[Analytics|API-Reference-Analytics]]
+- [[Team|API-Reference-Team]]
+- [[API keys|API-Reference-API-Keys]]
+- [[Audit|API-Reference-Audit]]
+
 **Providers**
 - [[Overview|Providers]]
 - [[Workers AI (default)|Provider-Workers-AI]]

@@ -213,6 +213,8 @@ Per-visitor and per-site limits. The daily cap is the cost backstop.
 | `security.limits.pollsPerIpPerMinute` | integer | `120` | Checks for new messages one visitor (IP) may make a minute (backends that reply later, like Retell). · 1–600 |
 | `security.limits.endsPerIpPerMinute` | integer | `10` | Chats one visitor (IP) may close a minute. · 1–600 |
 | `security.limits.retellLookupsPerMinute` | integer | `120` | Knowledge-base lookups a Retell agent may make a minute, for the whole site. · 1–6000 |
+| `security.limits.apiRequestsPerKeyPerMinute` | integer | `120` | Requests a new API key may make a minute (each key can have its own). Chat requests also count against the daily cap. · 1–6000 |
+| `security.limits.apiKeysPerSite` | integer | `50` | Active API keys a site may have. · 1–500 |
 
 ## `leads`
 

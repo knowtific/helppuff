@@ -30,3 +30,7 @@ export {
 export { settingsSchema, settingsPatchSchema, readSettings, applySettings, settingsHash, upgradeSettings, type Settings, type SettingsPatch } from './admin/settings.js';
 export { knowledgeConfigSchema, DEFAULT_CRAWL_EXCLUDE, type KnowledgeConfig } from './config/schema.js';
 export { promptOverlaps, type Overlap } from './admin/overlaps.js';
+export { ENDPOINTS, PUBLIC_ENDPOINTS, TAGS, findEndpoint, type Endpoint } from './api/registry.js';
+export { SCOPES, SCOPE_PRESETS, ALL_SCOPES, type Scope } from './api/scopes.js';
+export { openApiDocument, apiReferencePages, referencePage } from './api/openapi.js';
+export { KEY_PREFIX } from './api/keys.js';
