@@ -366,7 +366,7 @@ Guided questions asked in the widget (no AI), sent as one message at the end. Ty
 | `widget.flows[].steps[].required` | boolean |  | The step cannot be skipped. |
 | `widget.flows[].submit` **(required)** | object |  | What happens with the answers. |
 | `widget.flows[].submit.as` **(required)** | `"message"` |  | Sent as one visitor message. |
-| `widget.flows[].submit.template` **(required)** | string |  | The message, with `{field}` for each answer, e.g. "Quote for {service} in {suburb}". · 1–1000 chars |
+| `widget.flows[].submit.template` **(required)** | string |  | The message, with `{{field}}` for each answer, e.g. "Quote for {{service}} in {{suburb}}". · 1–1000 chars |
 
 ### `widget.forms`
 

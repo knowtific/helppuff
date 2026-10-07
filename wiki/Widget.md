@@ -4,6 +4,9 @@ The chat bubble on your site. One `<script>` tag, about 6 KB gzipped to start
 (the rest loads only when needed), inside a shadow root so your page's CSS
 cannot break it and it cannot break your page.
 
+**Try it first:** the [playground](https://knowtific.github.io/helppuff/) runs the real widget with every
+option below in a panel beside it, and exports the config you build.
+
 ## Embedding
 
 ```html

@@ -337,6 +337,12 @@ importers:
         specifier: ^10.27.0
         version: 10.29.8
     devDependencies:
+      '@helppuff/connector-echo':
+        specifier: workspace:*
+        version: link:../connectors/echo
+      '@helppuff/connector-types':
+        specifier: workspace:*
+        version: link:../connectors/_types
       '@helppuff/protocol':
         specifier: workspace:*
         version: link:../protocol

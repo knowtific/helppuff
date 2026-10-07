@@ -37,7 +37,7 @@ as few questions as possible.
 | `packages/connectors/_types` | `@helppuff/connector-types` | `Connector` interface + `defineConnector`, helpers, rich messages, prompt, history, shared `ai-search.ts` |
 | `packages/connectors/*` | `@helppuff/connector-<name>` | `workers-ai` (default: Workers AI + `@helppuff/rag`, tools, budget), `echo` (dev/test, no key), `cloudflare` (AI Search), `openai`, `gemini`, `anthropic` (via AI Search), `http` (own API), `retell` |
 | `packages/sinks/*` | `@helppuff/sink-*` | Lead destinations (`webhook`) |
-| `packages/widget` | `@helppuff/widget` | Preact widget in a shadow root. `src/loader.ts` (tiny loader, no Preact, owns fail-safe) → lazy `src/app/` (store, api, persist, strings, validate) + `components/` + `flows/` + `lib/` (markdown, safe, turnstile…) + `styles/` (CSS in TS template literals). `demo/` = playground, gallery, hostile-host fixtures |
+| `packages/widget` | `@helppuff/widget` | Preact widget in a shadow root. `src/loader.ts` (tiny loader, no Preact, owns fail-safe) → lazy `src/app/` (store, api, persist, strings, validate) + `components/` + `flows/` + `lib/` (markdown, safe, turnstile…) + `styles/` (CSS in TS template literals). `demo/` = playground (local Worker), options playground (`playground.html` + `preview.html`, an in-page API on the echo connector; published to GitHub Pages by `pnpm build:playground` / `.github/workflows/playground.yml`), gallery, hostile-host fixtures |
 | `packages/dashboard` | `@helppuff/dashboard` | React + Tailwind v4 dashboard served at `/admin/`: Home (test chat), Conversations, Leads, Knowledge, Analytics, Settings (sub-pages, incl. Webhooks and Updates). Look: shadcn / Notion / Twenty, minimal |
 | `packages/cli` | `@knowtific/helppuff` | The published CLI. `src/cli.ts` (command table), `commands/` (incl. `upgrade.ts`, `webhooks.ts`), `engine/` (init, deploy, compile, admin-api, knowledge, cloudflare, wrangler, doctor, `version.ts`, `reference.ts` (wiki config page)…), `help.ts` (the wiki's CLI page is generated from it by `pnpm sync:docs`) |
 | `instructions.md` | | The cross-agent install, deploy, test and upgrade workflow linked from the README and wiki. No plugin, skill or MCP setup is required. |
@@ -128,6 +128,7 @@ pnpm typecheck      # every package
 pnpm lint           # eslint, type-aware
 pnpm build          # widget bundles + size budgets (fails if over)
 pnpm build:cli      # CLI bundle: widget + dashboard + server runtime
+pnpm build:playground  # the static options playground GitHub Pages publishes
 pnpm e2e            # playwright (needs `npx playwright install chromium` once)
 pnpm check          # lint + typecheck + test + build + e2e (what CI runs)
 ```

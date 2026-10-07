@@ -17,6 +17,7 @@ Then open:
 | URL | |
 | --- | --- |
 | http://localhost:5173 | **Playground**: the real widget on a page, buttons for every `window.HelpPuff` call, an event log, one-click fail-safe checks |
+| http://localhost:5173/playground.html | **Options playground**: every widget option beside a live preview, with JSON editing, a reference generated from the schema and an export. Needs no Worker (an in-page API answers with the echo backend), which is why it is also the public demo: `pnpm build:playground` builds it, and `.github/workflows/playground.yml` publishes it to [GitHub Pages](https://knowtific.github.io/helppuff/) |
 | http://localhost:5173/gallery.html | **Gallery**: every surface of the widget rendered with the real components, with a live theme and colour picker |
 | http://localhost:5173/fixtures/ | **Hostile host pages**: aggressive CSS, patched prototypes, double include, SPA routing |
 

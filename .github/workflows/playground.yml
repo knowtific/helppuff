@@ -1,0 +1,58 @@
+name: Playground
+
+# Publishes the widget playground (every option, live, no server) to GitHub
+# Pages: https://knowtific.github.io/helppuff/. One-time setup: in the
+# repository's Settings → Pages, set Source to "GitHub Actions".
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/widget/**'
+      - 'packages/protocol/**'
+      - 'packages/connectors/echo/**'
+      - 'packages/connectors/_types/**'
+      - '.github/workflows/playground.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The production widget bundle (size budgets enforced) plus the demo pages.
+      - run: pnpm build:playground
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: packages/widget/dist-playground
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

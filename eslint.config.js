@@ -13,6 +13,7 @@ export default tseslint.config(
     ignores: [
       '**/dist/**',
       '**/dist-demo/**',
+      '**/dist-playground/**',
       '**/node_modules/**',
       '**/.wrangler/**',
       'test-results/**',

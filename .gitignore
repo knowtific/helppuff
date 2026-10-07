@@ -16,6 +16,7 @@ dist/
 helppuff.config.ts
 .DS_Store
 dist-demo/
+dist-playground/
 test-results/
 playwright-report/
 

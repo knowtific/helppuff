@@ -8,15 +8,18 @@
     "build": "node scripts/build.mjs",
     "dev": "vite",
     "typecheck": "tsc --noEmit",
-    "size": "node scripts/build.mjs"
+    "size": "node scripts/build.mjs",
+    "build:playground": "node scripts/build-playground.mjs"
   },
   "dependencies": {
     "preact": "^10.27.0"
   },
   "devDependencies": {
+    "@helppuff/connector-echo": "workspace:*",
+    "@helppuff/connector-types": "workspace:*",
     "@helppuff/protocol": "workspace:*",
-    "vite": "^7.1.0",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vite": "^7.1.0"
   },
   "sideEffects": false
 }

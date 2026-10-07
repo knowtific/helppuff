@@ -27,6 +27,17 @@ The agent can complete the setup, configure the assistant, add the embed code,
 deploy it and test the result. You only step in when authorization or a real
 business decision is required.
 
+## Try it in your browser
+
+**[Open the playground →](https://knowtific.github.io/helppuff/)**
+
+The real widget on a sample page, beside a panel of every option it has:
+brand, colours and theme, the launcher, the teaser bubble, the home screen
+and its shortcuts, the lead form, the chat screen, styling and the footer.
+Change anything and the preview updates. Chat with it, try rich replies
+(`/card`, `/carousel`, `/form`…) and copy the finished `widget` config into
+your `helppuff.json`. Nothing to install, and no server or account needed.
+
 ## Why HelpPuff?
 
 Most hosted chatbots start with a monthly subscription, put important features
@@ -193,6 +204,7 @@ The wiki's source is the [`wiki/`](wiki) folder in this repository.
 ```bash
 pnpm install
 pnpm dev        # Worker :8787 + widget playground :5173; no API key needed
+                # options playground: http://localhost:5173/playground.html
 pnpm check      # lint, typecheck, tests, build and end-to-end tests
 ```
 

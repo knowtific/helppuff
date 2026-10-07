@@ -82,7 +82,7 @@ export const flowSchema = z.object({
   submit: z
     .object({
       as: z.literal('message').describe('Sent as one visitor message.'),
-      template: z.string().min(1).max(1000).describe('The message, with `{field}` for each answer, e.g. "Quote for {service} in {suburb}".'),
+      template: z.string().min(1).max(1000).describe('The message, with `{{field}}` for each answer, e.g. "Quote for {{service}} in {{suburb}}".'),
     })
     .describe('What happens with the answers.'),
 });

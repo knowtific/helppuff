@@ -215,7 +215,7 @@ function Gallery() {
               <button key={c} style={{ background: c }} onClick={() => setAccent(c)} aria-label={c} />
             ))}
           </div>
-          <a href="/">← Live playground</a>
+          <a href="./">← Playground</a>
         </div>
       </header>
 
@@ -376,7 +376,7 @@ function Gallery() {
             <span>100dvh, safe-area insets, 16px inputs</span>
           </figcaption>
           <div class="stage" data-theme={theme}>
-            <iframe src="/gallery.html?frame=mobile" title="Mobile" style={{ width: '390px', height: '600px', border: 0 }} />
+            <iframe src="gallery.html?frame=mobile" title="Mobile" style={{ width: '390px', height: '600px', border: 0 }} />
           </div>
         </figure>
       </div>

@@ -15,6 +15,7 @@
     "dev:widget": "pnpm --filter @helppuff/widget dev",
     "build": "pnpm ensure-config && pnpm --filter @helppuff/widget build",
     "build:cli": "pnpm --filter @knowtific/helppuff build",
+    "build:playground": "pnpm --filter @helppuff/widget build:playground",
     "helppuff": "node packages/cli/dist/cli.js",
     "sync:docs": "pnpm build:cli && node packages/cli/dist/cli.js help wiki-cli > wiki/CLI-Reference.md && node packages/cli/dist/cli.js help wiki-config > wiki/Configuration-Reference.md",
     "test": "pnpm ensure-config && vitest run",

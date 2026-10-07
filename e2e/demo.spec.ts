@@ -60,6 +60,76 @@ test.describe('the playground', () => {
   });
 });
 
+/**
+ * The options playground, which is also the hosted demo on GitHub Pages: the
+ * real widget in a frame, answered by an in-page API, so it must work with no
+ * Worker at all.
+ */
+test.describe('the options playground', () => {
+  const preview = (page: Page) => page.frameLocator('iframe[title="Widget preview"]');
+  /** On a phone the preview sits below the options; bring all of it on screen. */
+  const showPreview = (page: Page) =>
+    page.locator('iframe[title="Widget preview"]').evaluate((frame) => frame.scrollIntoView({ block: 'end' }));
+
+  test.beforeEach(async ({ page }) => {
+    // Prove it: nothing may reach the local Worker.
+    await page.route('http://localhost:8787/**', (route) => route.abort());
+  });
+
+  test('loads with no missing assets and mounts the widget without a server', async ({ page }) => {
+    const { notFound, errors } = watch(page);
+    await page.goto('/playground.html', { waitUntil: 'networkidle' });
+    await expect(page.getByRole('heading', { name: 'HelpPuff playground' })).toBeVisible();
+    await expect(preview(page).locator('helppuff-widget .hp-orb')).toBeVisible();
+    expect(notFound.filter((line) => !line.includes('localhost:8787'))).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+
+  test('an option change rebuilds the preview', async ({ page }) => {
+    await page.goto('/playground.html');
+    await page.getByRole('textbox', { name: 'Label', exact: true }).fill('Talk to us');
+    await expect(preview(page).locator('helppuff-widget').getByText('Talk to us')).toBeVisible();
+  });
+
+  test('chats through the in-page API', async ({ page }) => {
+    await page.goto('/playground.html');
+    await page.getByLabel('Start from').selectOption('minimal');
+    const frame = preview(page);
+    // Wait for the preview built from the preset.
+    await expect(frame.locator('helppuff-widget .hp-orb')).toHaveAttribute('aria-label', 'Chat with Acme');
+    await showPreview(page);
+    await frame.locator('helppuff-widget .hp-orb').click();
+    await frame.locator('helppuff-widget .hp-btn').first().click();
+    await frame.locator('helppuff-widget .hp-composer textarea').fill('hello there');
+    await frame.locator('helppuff-widget .hp-send').click();
+    await expect(frame.locator('helppuff-widget .hp-agent').last()).toContainText('You said: hello there');
+  });
+
+  test('flags an invalid config instead of applying it', async ({ page }) => {
+    await page.goto('/playground.html');
+    await page.getByRole('tab', { name: 'JSON' }).click();
+    await page.getByLabel('Widget config JSON').fill('{ "brand": { "accent": "red" } }');
+    await expect(page.getByRole('alert').first()).toContainText('widget.brand.accent');
+  });
+
+  test('a shared link restores the setup', async ({ page }) => {
+    await page.goto('/playground.html');
+    await page.getByLabel('Business name').fill('Northwind');
+    await expect(page).toHaveURL(/#c=/);
+    const link = page.url();
+    await page.goto('about:blank');
+    await page.goto(link);
+    await expect(page.getByLabel('Business name')).toHaveValue('Northwind');
+  });
+
+  test('every option is in the reference', async ({ page }) => {
+    await page.goto('/playground.html');
+    await page.getByRole('tab', { name: 'Reference' }).click();
+    await page.getByLabel('Filter options').fill('teaser.afterScroll');
+    await expect(page.locator('.ref-row')).toHaveCount(1);
+  });
+});
+
 test.describe('the component gallery', () => {
   test('loads with no missing assets and no uncaught errors', async ({ page }) => {
     const { notFound, errors } = watch(page);

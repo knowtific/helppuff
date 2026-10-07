@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Your website — HelpPuff preview</title>
+    <style>
+      :root { color-scheme: light; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        color: #1c1c22;
+        background: #f4f4f1;
+      }
+      header {
+        display: flex; align-items: center; justify-content: space-between; gap: 16px;
+        padding: 18px 28px; background: #fff; border-bottom: 1px solid #e6e6e0;
+      }
+      .logo { font-weight: 700; letter-spacing: -0.02em; }
+      nav { display: flex; gap: 18px; font-size: 14px; color: #63636b; }
+      .hero { padding: 72px 28px 56px; max-width: 760px; }
+      .hero h1 { font-size: clamp(30px, 6vw, 46px); line-height: 1.1; letter-spacing: -0.03em; margin: 0 0 14px; }
+      .hero p { color: #55555d; font-size: 18px; margin: 0 0 24px; }
+      .cta { display: inline-block; padding: 12px 20px; border-radius: 10px; background: #1c1c22; color: #fff; text-decoration: none; font-weight: 600; }
+      .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); padding: 0 28px 40px; }
+      .tile { background: #fff; border: 1px solid #e6e6e0; border-radius: 14px; padding: 20px; }
+      .tile h3 { margin: 0 0 6px; font-size: 16px; }
+      .tile p { margin: 0; color: #63636b; font-size: 14px; }
+      .bar { height: 10px; border-radius: 5px; background: #e9e9e3; margin: 0 0 10px; }
+      section.copy { padding: 8px 28px 200px; max-width: 760px; }
+      @media (max-width: 560px) { nav { display: none; } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <span class="logo">Your website</span>
+      <nav><span>Services</span><span>Pricing</span><span>About</span><span>Contact</span></nav>
+    </header>
+    <div class="hero">
+      <h1>This is a stand-in for your site.</h1>
+      <p>The chat in the corner is the real HelpPuff widget, configured by the panel beside this preview.</p>
+      <a class="cta" href="#more">Learn more</a>
+    </div>
+    <div class="grid">
+      <div class="tile"><h3>Fast answers</h3><p>Visitors get replies from your own content.</p></div>
+      <div class="tile"><h3>Leads captured</h3><p>Name, phone and email land in your dashboard.</p></div>
+      <div class="tile"><h3>Your Cloudflare</h3><p>Everything runs in your own account.</p></div>
+    </div>
+    <section class="copy" id="more">
+      <div class="bar" style="width: 92%"></div>
+      <div class="bar" style="width: 84%"></div>
+      <div class="bar" style="width: 88%"></div>
+      <div class="bar" style="width: 60%"></div>
+      <br />
+      <div class="bar" style="width: 90%"></div>
+      <div class="bar" style="width: 76%"></div>
+      <div class="bar" style="width: 82%"></div>
+    </section>
+    <script type="module" src="/demo/preview.ts"></script>
+  </body>
+</html>
