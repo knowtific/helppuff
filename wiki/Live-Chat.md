@@ -36,7 +36,8 @@ live chat hub (a Cloudflare Durable Object, on the Free plan).
 4. If nobody takes it within **Wait before offering a callback** (default
    120 seconds), they get the callback form, and can keep waiting.
 5. When the team hands back to the assistant, or closes the chat, they are
-   told; if they write again, the assistant answers.
+   told; if they write again, the assistant answers. The team can step back
+   in at any time (see [Answering](#answering)).
 
 The workers-ai backend hands over by itself when a visitor asks for a person
 (its `request_person` tool). Every other backend gets the same through the
@@ -46,21 +47,22 @@ button.
 
 New live chats appear at the top of **Conversations** with a **Waiting**
 indicator, and the menu shows how many are waiting. Everyone available is
-notified; whoever answers first, or presses **Take chat**, has it. Anyone can
-**Take over** a chat from a colleague, and an admin can give it to someone
-(the **Assigned to** menu).
+notified; whoever answers first, or presses **Take chat**, has it.
 
-In the chat:
+You can step into **any** conversation, not only one a visitor handed over:
 
 | Button | What it does |
 | --- | --- |
-| **Take chat** / **Take over** | It's yours: the visitor sees you joined |
-| Reply box | Enter sends, Shift+Enter is a new line. Replying takes the chat if nobody has |
-| **Back to assistant** | The assistant answers the next message |
+| **Take over** | On a chat the assistant is answering, or a colleague's: it's yours, live. The visitor sees "Sam joined the chat" at once if their chat is open, or when they come back |
+| **Reopen with me** | On a closed chat: reopens it, live, with you |
+| Reply box | On every chat. Enter sends, Shift+Enter is a new line. Sending to a chat the assistant has, or a closed one, takes it over first |
+| **Back to assistant** | The assistant answers the next message. Take it over again at any time |
+| **Reopen for assistant** | On a closed chat: the assistant has it again |
 | **Close** | Closes it; the visitor is told |
 
-Members (not admins) can take chats and answer; giving a chat to someone else
-is for admins.
+Every status can be changed back, so a wrong click is one click to undo.
+Members (not admins) can take over and answer; giving a chat to someone else
+(the **Assigned to** menu) is for admins.
 
 ## Statuses
 
@@ -78,12 +80,33 @@ again.
 
 ## Notifications
 
+The dashboard gets your attention the way support tools do, and only for
+what concerns you:
+
+- **A new chat waiting**: everyone who is available.
+- **A visitor's message**: in a chat that is yours, or nobody's yet.
+- **A chat given to you** by someone else.
+
+Never for your own doing, a colleague's chat, or the conversation you are
+looking at. How you are told depends on where you are:
+
+| You are… | You get |
+| --- | --- |
+| In another tab, another app, or the window is minimised | A desktop notification (click it to open the chat), the sound, the tab's title counting and alternating with the message ("💬 Ada: my tap is leaking"), and a red count on the tab's icon |
+| In the dashboard, on another page or chat | A small pop-up with **Open**, and the sound |
+| Looking at that chat | Nothing: you can see it |
+
+New-chat notifications stay on screen until dismissed. Messages from one chat
+replace each other, so one chat is one notification. The count in the title
+and on the icon is the live chats waiting for the team, plus what arrived
+while you were away; it clears when you look.
+
 Each person sets their own, in Settings → **Notifications**:
 
 | Setting | Default |
 | --- | --- |
 | Browser notification: a new live chat is waiting | on |
-| Browser notification: a new message in a live chat (tab in the background) | on |
+| Browser notification: a new message in a live chat | on |
 | Sound: a new live chat / a new message | on / on |
 | Repeat the sound every 15 seconds until someone takes it | off |
 | Sound (chime, bell, pop) and volume | chime, 70% |
@@ -92,10 +115,12 @@ Each person sets their own, in Settings → **Notifications**:
 **Allow notifications** asks the browser once. If it was blocked: Chrome →
 the icon left of the address → Site settings → Notifications → Allow, then
 reload. Browsers only play sound after you have clicked on the page once;
-**Test sound** and **Test notification** check both.
+**Test sound** and **Test notification** check both. Also check that your
+operating system lets the browser show notifications (Windows: Settings →
+System → Notifications; macOS: System Settings → Notifications).
 
-Notifications need an open dashboard tab (in the background is fine). For
-alerts with the dashboard closed, link [[Telegram]].
+Notifications need a dashboard tab open (in the background is fine). For
+alerts with the browser closed, link [[Telegram]].
 
 ## Settings
 
@@ -113,10 +138,12 @@ Limits (Settings → Advanced → More limits; see [[Security|Security#every-lim
 ## How it works, and what it costs
 
 The visitor's messages still go through the same route as every message
-(limits, cleaning, recording); the reply comes back over a WebSocket to a
-Cloudflare Durable Object, one per site, which uses the Hibernation API: an
-open but idle connection costs nothing. Where a host page blocks WebSockets,
-the widget polls instead. Every message is written to D1 like any other, so
+(limits, cleaning, recording); the team's replies come back over a WebSocket
+to a Cloudflare Durable Object, one per site. With live chat on, an open chat
+stays connected, so the team can take it over at any time; the hub uses the
+Hibernation API, so an idle connection costs nothing (one request when it
+opens, on each page). Where a host page blocks WebSockets, the widget polls
+instead, only while a person has the chat. Every message is written to D1 like any other, so
 summaries, webhooks and the transcript include the team's part (labelled as
 the team's).
 

@@ -5,6 +5,7 @@ import './index.css';
 import { Shell } from './components/Shell';
 import { api, isMember, onUnauthorized, type Me } from './lib/api';
 import { useRoute } from './lib/utils';
+import { setBaseTitle } from './lib/attention';
 import { Conversations } from './pages/Conversations';
 import { Leads } from './pages/Leads';
 import { Contact } from './pages/Contact';
@@ -27,8 +28,14 @@ function App() {
   }, []);
   useEffect(load, [load]);
   useEffect(() => onUnauthorized(() => setMe('signed-out')), []);
+  // Settings that change what the dashboard shows (live chat on or off) ask for a fresh `me`.
   useEffect(() => {
-    if (me && me !== 'signed-out' && me.sites[0]) document.title = `${me.sites[0].name} · Dashboard`;
+    window.addEventListener('hp-me-changed', load);
+    return () => window.removeEventListener('hp-me-changed', load);
+  }, [load]);
+  useEffect(() => {
+    // Through lib/attention, which adds the count of what waits.
+    if (me && me !== 'signed-out' && me.sites[0]) setBaseTitle(`${me.sites[0].name} · Dashboard`);
   }, [me]);
 
   if (me === null) {
@@ -44,7 +51,8 @@ function App() {
   if (me === 'signed-out') return <Login onDone={load} />;
 
   // Members see the inbox: pages for admins send them to it.
-  const adminOnly = ['home', 'analytics', 'prompt', 'knowledge', 'onboarding', 'setup'];
+  // A member has settings only with live chat on (their notifications).
+  const adminOnly = ['home', 'analytics', 'prompt', 'knowledge', 'onboarding', 'setup', ...(me.sites[0]?.live ? [] : ['settings'])];
   if (isMember(me) && adminOnly.includes(route.page)) {
     window.location.hash = '#/conversations';
     return null;

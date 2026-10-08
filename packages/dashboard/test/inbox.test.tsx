@@ -5,6 +5,7 @@ import { NotificationSettings } from '../src/components/LiveChat';
 import { Conversations } from '../src/pages/Conversations';
 import type { ConversationRow, Note } from '../src/lib/api';
 import { button, byText, click, fakeApi, flush, me, mount, select, type, unmount } from './helpers';
+import { setBaseTitle } from '../src/lib/attention';
 
 /**
  * The dashboard's inbox as the team uses it: what a member sees, the
@@ -75,7 +76,7 @@ describe('the shell', () => {
 
   it('shows an admin everything, and the live chats waiting on the menu and the tab title', async () => {
     fakeApi(base);
-    document.title = 'Acme · Dashboard';
+    setBaseTitle('Acme · Dashboard');
     const view = await mount(
       <Shell me={me('owner')} route={{ page: 'settings' }} onLogout={() => {}}>
       <div />
@@ -90,6 +91,28 @@ describe('the shell', () => {
     expect(NoSocket.made).toBe(1);
     // The Available switch.
     expect(view.querySelector('[role="switch"][aria-label="Available for live chats"]')?.getAttribute('aria-checked')).toBe('true');
+    await unmount();
+  });
+
+  it('shows nothing of live chat by default (live chat off): no switch, no Notifications, no Settings for members', async () => {
+    fakeApi(base);
+    const admin = await mount(
+      <Shell me={me('owner', false)} route={{ page: 'settings' }} onLogout={() => {}}>
+        <div />
+      </Shell>,
+    );
+    expect(admin.querySelector('[role="switch"]')).toBeNull();
+    const sections = [...admin.querySelectorAll('#settings-menu a')].map((a) => a.textContent);
+    expect(sections).toContain('Live chat');
+    expect(sections).not.toContain('Notifications');
+    await unmount();
+    const member = await mount(
+      <Shell me={me('member', false)} route={{ page: 'conversations' }} onLogout={() => {}}>
+        <div />
+      </Shell>,
+    );
+    const nav = [...member.querySelectorAll('nav[aria-label="Main"]')[0]!.querySelectorAll(':scope > a, :scope > div > button')].map((el) => el.textContent?.trim());
+    expect(nav).toEqual(['Conversations', 'Contacts', 'Callbacks']);
     await unmount();
   });
 
@@ -133,6 +156,16 @@ describe('the conversation list', () => {
     expect(again.querySelector('[role="radio"][aria-checked="true"]')?.textContent).toBe('Live agent');
     expect(lastList()).toContain('status=live');
     expect(lastList()).toContain('label=Urgent');
+    await unmount();
+  });
+
+  it('has no "who is answering" filter by default, and ignores a stored one', async () => {
+    localStorage.setItem('hp-conversations-status', 'live');
+    const calls = fakeApi({ 'GET /labels': { labels: [], colors: [] }, 'GET /admins': { me: '', owner: '', admins: [] }, 'GET /conversations': { items: [], next: null } });
+    const view = await mount(<Conversations me={me('owner', false)} />);
+    expect(view.querySelector('[role="radiogroup"][aria-label="Who is answering"]')).toBeNull();
+    expect(calls.filter((c) => c.path.startsWith('/conversations?')).at(-1)?.path).toContain('status=all');
+    expect(view.querySelector('option[value="waiting"]')).toBeNull();
     await unmount();
   });
 

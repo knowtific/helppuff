@@ -87,8 +87,9 @@ messageRoutes.get('/v1/sessions/messages', async (c) => {
   const poll = session.prepared.connector.poll;
   // A live chat whose socket cannot connect (a strict host page, a proxy) polls for the team's replies instead.
   const db = dbFrom(ctx.env);
+  // With live chat on, the record is the channel: any chat (the team can take one over), not only a handed-over one.
   const live = db && liveAvailable(ctx.env, session.site, session.payload.siteId) ? await readLiveState(db, session.payload.sessionId) : null;
-  const liveChat = Boolean(live?.handover_at);
+  const liveChat = Boolean(live && (live.handover_at || !poll));
 
   if (!poll && !liveChat) {
     throw new HelpPuffError('bad_request', { detail: 'poll_not_supported' });

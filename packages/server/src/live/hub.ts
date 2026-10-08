@@ -64,12 +64,14 @@ const DEFAULT_SETTINGS: HubSettings = { waitSeconds: 120, closeAfterMinutes: 60 
 /** What the Worker publishes. Every message in one was recorded in D1 first. */
 export type HubEvent =
   | { type: 'handover'; siteId: string; conversationId: string; conversation: Record<string, unknown>; settings: HubSettings; messages?: Message[] }
-  /** The visitor wrote (recorded): to the team. */
-  | { type: 'visitor'; conversationId: string; message: Message }
+  /** The visitor wrote (recorded): to the team, with whose chat it is and who the visitor is (for each person's alerts). */
+  | { type: 'visitor'; conversationId: string; message: Message; assignedTo?: string | null; who?: string | null }
   /** The team wrote (recorded): to the visitor and the team. */
   | { type: 'agent'; conversationId: string; message: Message; by: string }
-  | { type: 'assigned'; conversationId: string; to: string | null; name: string | null; messages?: Message[] }
-  /** Back to the assistant, or closed: the visitor's socket is told and closed. */
+  | { type: 'assigned'; conversationId: string; to: string | null; name: string | null; by?: string; messages?: Message[] }
+  /** A person took the chat from the assistant, or reopened it: tracked from now, nobody waiting. */
+  | { type: 'takeover'; siteId: string; conversationId: string; to: string; name: string | null; messages?: Message[]; settings: HubSettings }
+  /** Back to the assistant, or closed: the visitor is told, and stays connected (the team may take it over again). */
   | { type: 'ended'; conversationId: string; status: 'left' | 'closed'; messages?: Message[] }
   /** Anything else about a conversation the dashboards should reload (labels, attributes, notes). */
   | { type: 'changed'; conversationId: string };
@@ -190,7 +192,7 @@ export class HubCore {
       }
       case 'visitor': {
         await this.touch(key, now, {});
-        this.toAgents({ t: 'message', conversationId: event.conversationId, message: event.message });
+        this.toAgents({ t: 'message', conversationId: event.conversationId, message: event.message, assignedTo: event.assignedTo ?? null, who: event.who ?? null });
         break;
       }
       case 'agent': {
@@ -204,20 +206,22 @@ export class HubCore {
         await this.touch(key, now, { deadline: null, assignedTo: event.to });
         if (event.to) this.toVisitor(event.conversationId, { t: 'status', status: 'joined', ...(event.name ? { agentName: event.name } : {}) });
         for (const message of event.messages ?? []) this.toVisitor(event.conversationId, { t: 'msg', message });
-        this.toAgents({ t: 'assigned', conversationId: event.conversationId, to: event.to, name: event.name });
+        this.toAgents({ t: 'assigned', conversationId: event.conversationId, to: event.to, name: event.name, by: event.by ?? event.to });
+        break;
+      }
+      case 'takeover': {
+        await this.deps.storage.put('settings', event.settings);
+        await this.deps.storage.put('site', event.siteId);
+        await this.deps.storage.put(key, { conversationId: event.conversationId, deadline: null, lastAt: now, assignedTo: event.to } satisfies Tracked);
+        for (const message of event.messages ?? []) this.toVisitor(event.conversationId, { t: 'msg', message });
+        this.toVisitor(event.conversationId, { t: 'status', status: 'joined', ...(event.name ? { agentName: event.name } : {}) });
+        this.toAgents({ t: 'assigned', conversationId: event.conversationId, to: event.to, name: event.name, by: event.to });
         break;
       }
       case 'ended': {
         await this.deps.storage.delete(key);
         for (const message of event.messages ?? []) this.toVisitor(event.conversationId, { t: 'msg', message });
         this.toVisitor(event.conversationId, { t: 'status', status: event.status });
-        for (const socket of this.deps.sockets(visitorTag(event.conversationId))) {
-          try {
-            socket.close(1000, event.status);
-          } catch {
-            // Already closing.
-          }
-        }
         this.toAgents({ t: 'ended', conversationId: event.conversationId, status: event.status });
         break;
       }

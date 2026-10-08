@@ -82,6 +82,7 @@ A person on the team answers instead of the assistant: reply, take, give, close 
 
 - [[Live chat now|API-Reference-Live-Chat#live-chat-now]]: `GET /live/status`
 - [[Reply in a live chat|API-Reference-Live-Chat#reply-in-a-live-chat]]: `POST /conversations/:id/reply`
+- [[Take a conversation over|API-Reference-Live-Chat#take-a-conversation-over]]: `POST /conversations/:id/takeover`
 - [[Take or give a conversation|API-Reference-Live-Chat#take-or-give-a-conversation]]: `POST /conversations/:id/assign`
 - [[Close a conversation|API-Reference-Live-Chat#close-a-conversation]]: `POST /conversations/:id/close`
 - [[Hand back to the assistant|API-Reference-Live-Chat#hand-back-to-the-assistant]]: `POST /conversations/:id/handback`

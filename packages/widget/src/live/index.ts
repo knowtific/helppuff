@@ -1,9 +1,9 @@
 import type { HandoverStatus, Message } from '@helppuff/protocol';
 
 /**
- * Live chat's client: its own small chunk (`live-*.js`), loaded only when a
- * visitor is handed to a person (or comes back to a chat that was). Sites
- * without live chat never download it.
+ * Live chat's client: its own small chunk (`live-*.js`), loaded while a chat
+ * is open on a site with live chat, so a person can take it over at any time.
+ * Sites without live chat never download it.
  *
  * It receives what the team sends — over a WebSocket to the site's hub, with
  * the session token as a subprotocol, never in the URL — and falls back to
@@ -32,6 +32,12 @@ export type LiveOptions = {
   token: () => string | null;
   /** The newest message's time: what a reconnect or a poll asks for after. */
   lastTs: () => number;
+  /**
+   * Whether a person has the chat now. The socket stays open either way (the
+   * team can take a chat over at any time; idle, it costs nothing), but the
+   * polling fallback runs only while this is true.
+   */
+  active?: () => boolean;
   hooks: LiveHooks;
   /** For tests. */
   WebSocket?: typeof WebSocket;
@@ -81,13 +87,13 @@ export function connectLive(options: LiveOptions): LiveConnection {
         credentials: 'omit',
         mode: 'cors',
       });
-      if (!response.ok) return response.status < 500;
+      // Refused (not live, an expired token): nothing to wait for. Busy or down: try again later.
+      if (!response.ok) return response.status === 429 || response.status >= 500;
       const body = (await response.json()) as { messages?: unknown[] };
       for (const raw of body.messages ?? []) {
         deliver(raw);
         const status = (raw as { type?: string; status?: HandoverStatus }).type === 'handover' ? (raw as { status: HandoverStatus }).status : null;
         if (status) hooks.onStatus(status);
-        if (status === 'left' || status === 'closed') return false;
       }
       return true;
     } catch {
@@ -95,8 +101,14 @@ export function connectLive(options: LiveOptions): LiveConnection {
     }
   };
 
+  const active = options.active ?? (() => true);
   const poll = () => {
     if (stopped) return;
+    // With the assistant: no requests, just look again later (a takeover then needs the visitor's next message).
+    if (!active()) {
+      polling = setTimeout(poll, 15_000);
+      return;
+    }
     void catchUp().then((go) => {
       if (!go) return stop();
       // Quicker while the visitor is looking.
@@ -135,12 +147,10 @@ export function connectLive(options: LiveOptions): LiveConnection {
       else if (frame.t === 'typing') hooks.onTyping(Boolean(frame.on));
       else if (frame.t === 'status' && frame.status) hooks.onStatus(frame.status, frame.agentName);
     };
-    socket.onclose = (event) => {
+    socket.onclose = () => {
       clearInterval(ping);
       if (ws === socket) ws = null;
       if (stopped) return;
-      // The server ended the live part (back to the assistant, closed): nothing to reconnect to.
-      if (event.code === 1000 && (event.reason === 'left' || event.reason === 'closed')) return stop();
       failures++;
       // Never connected after a few tries: sockets are blocked here, so poll instead.
       if (!opened && failures >= 3) return poll();

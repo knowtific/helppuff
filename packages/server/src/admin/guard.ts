@@ -35,7 +35,7 @@ const MEMBER_ROUTES: [method: string | '*', path: RegExp][] = [
   ['POST', /^\/logout$/],
   ['GET', /^\/admins$/],
   ['GET', /^\/conversations$/],
-  ['*', /^\/conversations\/[^/]+(\/(reply|notes|close|assign|handback|summary))?$/],
+  ['*', /^\/conversations\/[^/]+(\/(reply|notes|close|assign|handback|takeover|summary))?$/],
   ['GET', /^\/leads(\.csv)?$/],
   ['POST', /^\/leads$/],
   ['*', /^\/leads\/[^/]+(\/notes)?$/],

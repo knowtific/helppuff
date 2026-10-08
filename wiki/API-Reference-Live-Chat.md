@@ -6,6 +6,7 @@ A person on the team answers instead of the assistant: reply, take, give, close 
 
 - [[Live chat now|API-Reference-Live-Chat#live-chat-now]]: `GET /live/status`
 - [[Reply in a live chat|API-Reference-Live-Chat#reply-in-a-live-chat]]: `POST /conversations/:id/reply`
+- [[Take a conversation over|API-Reference-Live-Chat#take-a-conversation-over]]: `POST /conversations/:id/takeover`
 - [[Take or give a conversation|API-Reference-Live-Chat#take-or-give-a-conversation]]: `POST /conversations/:id/assign`
 - [[Close a conversation|API-Reference-Live-Chat#close-a-conversation]]: `POST /conversations/:id/close`
 - [[Hand back to the assistant|API-Reference-Live-Chat#hand-back-to-the-assistant]]: `POST /conversations/:id/handback`
@@ -94,7 +95,7 @@ type LiveChatNowResponse = {
 
 `POST /conversations/:id/reply` · scope `conversations:write`
 
-A person on the team answers the visitor (shown with their first name, `live.showAgentName`). Only a live chat (handed over to the team) can be answered; replying takes it if nobody has. Sends `message.sent` with `author`.
+A person on the team answers the visitor (shown with their first name, `live.showAgentName`). Any conversation: replying to one the assistant has, or a closed one, takes it over first (it becomes live). Needs live chat on. Sends `message.sent` with `author`.
 
 | Parameter | In | Required | Description |
 | --- | --- | --- | --- |
@@ -172,7 +173,64 @@ type ReplyInLiveChatResponse = {
 
 | Status | Code | When |
 | --- | --- | --- |
-| 409 | `conflict` | The chat is not live: the assistant has it, or it closed. |
+| 400 | `bad_request` | Live chat is off, or the message is empty. |
+
+## Take a conversation over
+
+`POST /conversations/:id/takeover` · scope `conversations:write`
+
+A signed-in person takes the chat, whatever it is doing: from the assistant, from a colleague, or closed (this reopens it). It becomes live and theirs; the visitor sees who joined, at once if their chat is open. For a key, reply instead (`POST /conversations/:id/reply` takes it over too). Sends `conversation.assigned`.
+
+| Parameter | In | Required | Description |
+| --- | --- | --- | --- |
+| `id` | path | yes | The record's id. |
+
+**Request**
+
+<!-- tabs -->
+```bash [curl]
+curl -X POST "$HELPPUFF_URL/api/v1/conversations/ID/takeover" \
+  -H "Authorization: Bearer $HELPPUFF_API_KEY"
+```
+```ts [TypeScript]
+const id = '…';
+const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/conversations/${id}/takeover`, {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${process.env.HELPPUFF_API_KEY}`,
+  },
+});
+if (!response.ok) throw new Error(((await response.json()) as ApiError).error.message);
+const data = (await response.json()) as TakeConversationOverResponse;
+```
+<!-- /tabs -->
+
+**Response** `200`
+
+<!-- tabs -->
+```json [Example]
+{
+  "conversationId": "1b0f6a52-3c1e-4c55-9f0e-2d1c7a9e5b10",
+  "status": "live",
+  "assignedTo": "sam@acme.example",
+  "assignedName": "Sam"
+}
+```
+```ts [Type]
+type TakeConversationOverResponse = {
+  conversationId: string;
+  status: string;
+  assignedTo: string;
+  assignedName: string | null;
+};
+```
+<!-- /tabs -->
+
+**Errors**
+
+| Status | Code | When |
+| --- | --- | --- |
+| 400 | `bad_request` | Live chat is off, or called with an API key (use reply). |
 
 ## Take or give a conversation
 
@@ -293,7 +351,7 @@ type CloseConversationResponse = {
 
 `POST /conversations/:id/handback` · scope `conversations:write`
 
-Ends the live part: the assistant answers the visitor's next message. Sends `handover.ended`.
+Ends the live part, or reopens a closed conversation for the assistant: it answers the visitor's next message. The team can take it over again at any time. Sends `handover.ended`.
 
 | Parameter | In | Required | Description |
 | --- | --- | --- | --- |

@@ -46,6 +46,8 @@ export function LiveChatSettings() {
       await api('/settings', { method: 'PUT', json: { settings: { live: value } } });
       setState('saved');
       reload();
+      // The shell (the Available switch, Notifications, filters) follows at once.
+      window.dispatchEvent(new Event('hp-me-changed'));
     } catch (thrown) {
       setSaveError((thrown as Error).message);
       setState('idle');
@@ -57,13 +59,23 @@ export function LiveChatSettings() {
       <Card>
         <form onSubmit={(e) => void save(e)} className="space-y-4 p-4">
           {older && <p className="text-xs text-muted-foreground">This Worker is older than live chat. Run helppuff upgrade first.</p>}
-          <Toggle
-            checked={value.enabled}
-            onChange={(enabled) => setValue({ ...value, enabled })}
-            label="Let visitors talk to a person"
-            hint="The assistant offers it when a visitor asks for someone, and a “Talk to a person” button appears. When nobody is available, they get the callback form instead."
-            disabled={older}
-          />
+          <fieldset className="space-y-2" disabled={older}>
+            <legend className="mb-1 text-[13px] font-medium">When a visitor asks for a person</legend>
+            {(
+              [
+                [false, 'Take their details for a callback', 'The default. The assistant collects a name and a phone number or email, and the team calls back (Callbacks).'],
+                [true, 'Connect them to someone on the team, live', 'The assistant hands the chat over and a “Talk to a person” button appears in the widget. Your team answers here or in Telegram. When nobody is available, visitors get the callback form instead.'],
+              ] as const
+            ).map(([enabled, label, hint]) => (
+              <label key={label} className={cn('flex cursor-pointer items-start gap-2.5 rounded-md border p-3 text-[13px]', value.enabled === enabled && 'border-primary/50 bg-primary/5')}>
+                <input type="radio" name="escalation" className="mt-0.5 size-4 accent-[var(--primary)]" checked={value.enabled === enabled} onChange={() => setValue({ ...value, enabled })} />
+                <span>
+                  <span className="block font-medium">{label}</span>
+                  <span className="block text-xs text-muted-foreground">{hint}</span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
           {nobody && (
             <p role="note" className="rounded-md border border-[#d97706]/40 bg-[#d97706]/5 px-3 py-2 text-xs">
               Nobody can take chats yet: switch yourself to Available (bottom of the menu), or connect Telegram below. Until then, visitors get the callback form.
@@ -74,6 +86,7 @@ export function LiveChatSettings() {
               This deployment has no live chat hub yet. Run helppuff upgrade (or helppuff deploy) once.
             </p>
           )}
+          {value.enabled && (
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block space-y-1.5">
               <span className="text-xs font-medium">Wait before offering a callback (seconds)</span>
@@ -86,8 +99,13 @@ export function LiveChatSettings() {
               <span className="block text-[11px] text-muted-foreground">Every conversation. If the visitor writes again, the assistant answers.</span>
             </label>
           </div>
-          <Toggle checked={value.showAgentName} onChange={(showAgentName) => setValue({ ...value, showAgentName })} label="Show visitors your first name" hint="“Sam joined the chat”. Off: “Someone from the team joined”." />
-          <Toggle checked={value.aiWhileWaiting} onChange={(aiWhileWaiting) => setValue({ ...value, aiWhileWaiting })} label="Let the assistant keep answering until someone takes the chat" />
+          )}
+          {value.enabled && (
+            <>
+              <Toggle checked={value.showAgentName} onChange={(showAgentName) => setValue({ ...value, showAgentName })} label="Show visitors your first name" hint="“Sam joined the chat”. Off: “Someone from the team joined”." />
+              <Toggle checked={value.aiWhileWaiting} onChange={(aiWhileWaiting) => setValue({ ...value, aiWhileWaiting })} label="Let the assistant keep answering until someone takes the chat" />
+            </>
+          )}
           {saveError && (
             <p role="alert" className="text-xs text-danger">
               {saveError}
@@ -105,7 +123,7 @@ export function LiveChatSettings() {
           </div>
         </form>
       </Card>
-      <TelegramCard />
+      {value.enabled && <TelegramCard />}
     </div>
   );
 }

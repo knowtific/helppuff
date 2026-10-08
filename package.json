@@ -13,6 +13,7 @@
     "dev": "pnpm ensure-config && concurrently -n worker,widget -c cyan,magenta \"pnpm dev:server\" \"pnpm dev:widget\"",
     "dev:server": "pnpm --filter @helppuff/server dev",
     "dev:widget": "pnpm --filter @helppuff/widget dev",
+    "dev:live": "pnpm ensure-config && node scripts/dev-live.mjs",
     "build": "pnpm ensure-config && pnpm --filter @helppuff/widget build",
     "build:cli": "pnpm --filter @knowtific/helppuff build",
     "build:playground": "pnpm --filter @helppuff/widget build:playground",

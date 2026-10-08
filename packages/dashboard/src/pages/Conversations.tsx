@@ -1,4 +1,4 @@
-import { ArrowLeft, Bot, ExternalLink, Headset, Loader2, Lock, Mail, MessagesSquare, Phone, PhoneCall, Search, Send, Sparkles, ThumbsDown, ThumbsUp, UserRound } from 'lucide-react';
+import { ArrowLeft, Bot, ExternalLink, Headset, Loader2, Lock, Mail, MessagesSquare, Phone, PhoneCall, RotateCcw, Search, Send, Sparkles, ThumbsDown, ThumbsUp, UserRound } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { PageHeader } from '../components/Shell';
 import { Avatar, Badge, Button, Card, Empty, ErrorNote, Input, Segmented, Select, Skeleton, StatusBadge, Textarea } from '../components/ui';
@@ -191,7 +191,7 @@ function SummaryCard({ id, stored, enabled, onDone }: { id: string; stored: Summ
 }
 
 /** The reply box of a live chat: Enter sends, Shift+Enter is a new line. */
-function Composer({ id, onSent }: { id: string; onSent: () => void }) {
+function Composer({ id, onSent, note }: { id: string; onSent: () => void; note: string | null }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -220,6 +220,7 @@ function Composer({ id, onSent }: { id: string; onSent: () => void }) {
         void send();
       }}
     >
+      {note && <p className="mb-2 text-xs text-muted-foreground">{note}</p>}
       <div className="flex items-end gap-2">
         <Textarea
           rows={2}
@@ -281,6 +282,7 @@ function Detail({ id, me, team, onChanged }: { id: string; me: Me; team: Team | 
   const status = c.status ?? 'bot';
   const member = isMember(me);
   const mine = c.assigned_to === me.admin.email;
+  const live = Boolean(me.sites[0]?.live);
   const act = async (name: string, path: string, json?: unknown) => {
     setBusy(name);
     setActionError(null);
@@ -323,15 +325,31 @@ function Detail({ id, me, team, onChanged }: { id: string; me: Me; team: Team | 
             {c['country'] ? ` · ${flag(String(c['country']))} ${String(c['country'])}` : ''}
           </p>
         </div>
+        {/* Every status can move to every other: a mistake is one click to undo. */}
         <div className="flex flex-wrap items-center gap-1.5">
-          {status === 'live' && !mine && (
-            <Button size="sm" onClick={() => void act('take', 'assign', { to: 'me' })} disabled={busy !== null}>
+          {live && status === 'live' && !mine && (
+            <Button size="sm" onClick={() => void act('take', 'takeover')} disabled={busy !== null}>
               <Headset /> {c.assigned_to ? 'Take over' : 'Take chat'}
+            </Button>
+          )}
+          {live && status === 'bot' && (
+            <Button size="sm" onClick={() => void act('take', 'takeover')} disabled={busy !== null}>
+              <Headset /> Take over
+            </Button>
+          )}
+          {live && status === 'closed' && (
+            <Button size="sm" onClick={() => void act('take', 'takeover')} disabled={busy !== null}>
+              <Headset /> Reopen with me
             </Button>
           )}
           {status === 'live' && (
             <Button size="sm" variant="outline" onClick={() => void act('handback', 'handback')} disabled={busy !== null}>
               <Bot /> Back to assistant
+            </Button>
+          )}
+          {status === 'closed' && (
+            <Button size="sm" variant="outline" onClick={() => void act('handback', 'handback')} disabled={busy !== null}>
+              <RotateCcw /> Reopen for assistant
             </Button>
           )}
           {status !== 'closed' && (
@@ -358,9 +376,12 @@ function Detail({ id, me, team, onChanged }: { id: string; me: Me; team: Team | 
               {visitorTyping && <p className="text-xs text-muted-foreground">The visitor is typing…</p>}
             </div>
           </div>
-          {status === 'live' && <Composer id={id} onSent={reload} />}
-          {status === 'bot' && me.sites[0]?.live && (
-            <p className="border-t px-4 py-2.5 text-xs text-muted-foreground">The assistant is answering. When the visitor asks for a person, you can reply here.</p>
+          {live && (
+            <Composer
+              id={id}
+              onSent={reload}
+              note={status === 'bot' ? 'The assistant is answering. Sending takes the chat over.' : status === 'closed' ? 'This chat is closed. Sending reopens it with you.' : null}
+            />
           )}
         </div>
         <aside className="scroll-thin hidden min-h-0 space-y-5 overflow-auto border-l p-4 text-[13px] lg:block">
@@ -452,14 +473,16 @@ export function Conversations({ id, me }: { id?: string | undefined; me: Me }) {
   const { labels } = useLabels();
   const q = useDebounced(query);
   const [pages, setPages] = useState<number[]>([]);
-  const params = `filter=${filter}&status=${status}${label ? `&label=${encodeURIComponent(label)}` : ''}&q=${encodeURIComponent(q)}`;
+  // Who answers is live chat's question: with it off (the default), every chat is the assistant's.
+  const live = Boolean(me.sites[0]?.live);
+  const shownStatus: StatusFilter = live ? status : 'all';
+  const params = `filter=${filter}&status=${shownStatus}${label ? `&label=${encodeURIComponent(label)}` : ''}&q=${encodeURIComponent(q)}`;
   const { data, error, loading, reload } = useData(() => api<{ items: ConversationRow[]; next: number | null }>(`/conversations?${params}`), [params]);
   const team = useData(() => api<Team>('/admins').catch(() => null), []).data;
   const [more, setMore] = useState<ConversationRow[]>([]);
   const [next, setNext] = useState<number | null>(null);
   const items = [...(data?.items ?? []), ...more];
   const cursor = more.length ? next : (data?.next ?? null);
-  const live = Boolean(me.sites[0]?.live);
 
   // New chats, messages and who took what: the list follows, a moment later.
   const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -484,7 +507,7 @@ export function Conversations({ id, me }: { id?: string | undefined; me: Me }) {
     setNext(page.next);
     setPages((p) => [...p, cursor]);
   };
-  const filtered = status !== 'all' || filter !== 'all' || Boolean(label) || Boolean(q);
+  const filtered = shownStatus !== 'all' || filter !== 'all' || Boolean(label) || Boolean(q);
 
   return (
     <div className="flex h-full flex-col">
@@ -507,6 +530,7 @@ export function Conversations({ id, me }: { id?: string | undefined; me: Me }) {
                 aria-label="Search conversations"
               />
             </div>
+            {live && (
             <Segmented
               label="Who is answering"
               value={status}
@@ -520,6 +544,7 @@ export function Conversations({ id, me }: { id?: string | undefined; me: Me }) {
                 { value: 'live', label: 'Live agent' },
               ]}
             />
+            )}
             <div className="flex gap-2">
               <Select
                 value={filter}

@@ -2,7 +2,7 @@ import { Hono, type Context } from 'hono';
 import { resolveSite } from '../config/site.js';
 import { HelpPuffError } from '../core/errors.js';
 import { requireSecret, type HonoEnv } from '../core/request.js';
-import { assignConversation, closeConversation, handBack, hubOf, HUB_ORIGIN, LiveError, liveDeps, presence, sendAgentMessage, type Author, type LiveDeps } from '../live/service.js';
+import { assignConversation, closeConversation, handBack, hubOf, HUB_ORIGIN, LiveError, liveDeps, presence, sendAgentMessage, takeOver, type Author, type LiveDeps } from '../live/service.js';
 import { botApi, connectTelegram, disconnectTelegram, readTelegram, saveTelegram, telegramReady, telegramStatus } from '../live/telegram.js';
 import { assertAdmin, assertSameOrigin, assertSiteAccess, currentAdmin, db, jsonBody, siteParam, type Admin } from './guard.js';
 import { actorOf, readPrefs } from './inbox.js';
@@ -50,6 +50,7 @@ liveRoutes.post('/conversations/:id/reply', async (c) => {
   const admin = await currentAdmin(c);
   const id = c.req.param('id');
   const site = await resolveSite(c.get('helppuff'), await conversationSite(c, id));
+  if (!site.live.enabled) throw new HelpPuffError('bad_request', { message: 'Live chat is off: turn it on in Settings → Live chat.', detail: 'live_off' });
   const body = await jsonBody(c);
   try {
     const message = await sendAgentMessage(deps(c), site.live, { conversationId: id, text: typeof body['text'] === 'string' ? body['text'] : '', author: authorOf(admin) });
@@ -105,14 +106,33 @@ liveRoutes.post('/conversations/:id/close', async (c) => {
   }
 });
 
-/** Hand a live chat back to the assistant. */
+/** Hand a live chat back to the assistant, or reopen a closed one for it. */
 liveRoutes.post('/conversations/:id/handback', async (c) => {
   assertSameOrigin(c);
   const admin = await currentAdmin(c);
   const id = c.req.param('id');
-  await conversationSite(c, id);
+  const site = await resolveSite(c.get('helppuff'), await conversationSite(c, id));
   try {
-    return c.json(await handBack(deps(c), { conversationId: id, by: actorOf(admin) }));
+    return c.json(await handBack(deps(c), site.live, { conversationId: id, by: actorOf(admin) }));
+  } catch (thrown) {
+    rethrow(thrown);
+  }
+});
+
+/**
+ * Take a chat over, whatever it is doing: from the assistant, from a
+ * colleague, or closed (this reopens it). It becomes live and yours. The
+ * visitor sees who joined.
+ */
+liveRoutes.post('/conversations/:id/takeover', async (c) => {
+  assertSameOrigin(c);
+  const admin = await currentAdmin(c);
+  if (admin.via !== 'session') throw new HelpPuffError('bad_request', { message: 'A key cannot take a chat: use a dashboard account, or reply with POST /conversations/:id/reply.', detail: 'live_takeover_key' });
+  const id = c.req.param('id');
+  const site = await resolveSite(c.get('helppuff'), await conversationSite(c, id));
+  if (!site.live.enabled) throw new HelpPuffError('bad_request', { message: 'Live chat is off: turn it on in Settings → Live chat.', detail: 'live_off' });
+  try {
+    return c.json(await takeOver(deps(c), site.live, { conversationId: id, author: authorOf(admin) }));
   } catch (thrown) {
     rethrow(thrown);
   }

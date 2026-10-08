@@ -207,12 +207,78 @@ describe('live chat', () => {
     const polled = (await (await w.h.fetch('/v1/sessions/messages?after=0', { headers: { Authorization: `Bearer ${token}` } })).json()) as { messages: { text?: string }[] };
     expect(polled.messages.map((m) => m.text)).toContain('Hi, Olivia here.');
 
-    // Back to the assistant: the visitor's socket closes, the next message gets an answer.
+    // Back to the assistant: the visitor is told and stays connected; the next message gets an answer.
     expect((await w.owner.send('POST', `/conversations/${id}/handback`)).status).toBe(200);
     await w.settle();
-    expect(visitor.closed).toBe(true);
+    expect(visitor.sent).toContainEqual({ t: 'status', status: 'left' });
+    expect(visitor.closed).toBe(false);
     const answered = (await (await say(w.h, token, { kind: 'text', text: 'Thanks!' })).json()) as { messages: unknown[] };
     expect(answered.messages.length).toBeGreaterThan(0);
+  });
+
+  it('lets a person take over a chat the assistant has, at once, and hand it back and take it again', async () => {
+    const w = await world(live);
+    const { token, id } = await chat(w.h);
+    await w.settle();
+    // An open chat is connected even before anyone asks for a person.
+    const visitor = w.hub.connect(HubCore.visitor(id, 'ip'));
+    const taken = await w.owner.send('POST', `/conversations/${id}/takeover`);
+    expect(await taken.json()).toMatchObject({ status: 'live', assignedTo: OWNER, assignedName: 'Owner' });
+    await w.settle();
+    expect(visitor.sent).toContainEqual({ t: 'status', status: 'joined', agentName: 'Owner' });
+    expect(visitor.sent).toContainEqual(expect.objectContaining({ t: 'msg', message: expect.objectContaining({ type: 'handover', status: 'joined', text: 'Owner joined the chat.' }) }));
+    // The visitor writes: it goes to the team, not the assistant.
+    expect(((await (await say(w.h, token, { kind: 'text', text: 'Oh hi' })).json()) as { messages: unknown[] }).messages).toEqual([]);
+    // Taking it again changes nothing.
+    await w.owner.send('POST', `/conversations/${id}/takeover`);
+    await w.settle();
+    expect(visitor.sent.filter((f) => (f as { t: string; status?: string }).status === 'joined')).toHaveLength(1);
+    // A mistake: back to the assistant, then taken again.
+    await w.owner.send('POST', `/conversations/${id}/handback`);
+    await w.settle();
+    expect((await (await w.owner.get(`/conversations/${id}`)).json()) as { conversation: unknown }).toMatchObject({ conversation: { status: 'bot' } });
+    await w.owner.send('POST', `/conversations/${id}/takeover`);
+    await w.settle();
+    expect((await (await w.owner.get(`/conversations/${id}`)).json()) as { conversation: unknown }).toMatchObject({ conversation: { status: 'live', assigned_to: OWNER } });
+  });
+
+  it('reopens a closed chat, with a person or with the assistant', async () => {
+    const w = await world(live);
+    const { token, id } = await chat(w.h);
+    await w.settle();
+    await w.owner.send('POST', `/conversations/${id}/close`);
+    expect((await (await w.owner.get(`/conversations/${id}`)).json()) as { conversation: unknown }).toMatchObject({ conversation: { status: 'closed' } });
+
+    // Reopened for the assistant.
+    expect((await w.owner.send('POST', `/conversations/${id}/handback`)).status).toBe(200);
+    expect((await (await w.owner.get(`/conversations/${id}`)).json()) as { conversation: unknown }).toMatchObject({ conversation: { status: 'bot', closed_at: null } });
+    expect((await w.owner.send('POST', `/conversations/${id}/handback`)).status).toBe(409);
+
+    // Closed again (even just by going quiet), then reopened with a person by replying.
+    w.db.raw.prepare('UPDATE conversations SET last_at = ? WHERE id = ?').run(Date.now() - 61 * 60_000, id);
+    const reply = await w.owner.send('POST', `/conversations/${id}/reply`, { text: 'Hi, following up on your question.' });
+    expect(reply.status).toBe(201);
+    await w.settle();
+    const detail = (await (await w.owner.get(`/conversations/${id}`)).json()) as { conversation: Record<string, unknown>; messages: { type: string; text: string | null }[] };
+    expect(detail.conversation).toMatchObject({ status: 'live', assigned_to: OWNER, closed_at: null });
+    expect(detail.messages.map((m) => m.text)).toEqual(expect.arrayContaining(['Owner joined the chat.', 'Hi, following up on your question.']));
+    // A visitor who was away gets it when they come back (the poll, or the socket's catch-up).
+    const polled = (await (await w.h.fetch('/v1/sessions/messages?after=0', { headers: { Authorization: `Bearer ${token}` } })).json()) as { messages: { text?: string }[] };
+    expect(polled.messages.map((m) => m.text)).toContain('Hi, following up on your question.');
+  });
+
+  it('lets a member take over, but needs live chat on', async () => {
+    const off = await world();
+    const quiet = await chat(off.h);
+    await off.settle();
+    expect((await off.owner.send('POST', `/conversations/${quiet.id}/takeover`)).status).toBe(400);
+    expect((await off.owner.send('POST', `/conversations/${quiet.id}/reply`, { text: 'hi' })).status).toBe(400);
+
+    const w = await world(live);
+    const { id } = await chat(w.h);
+    await w.settle();
+    const mo = await w.member();
+    expect(await (await mo.send('POST', `/conversations/${id}/takeover`)).json()).toMatchObject({ status: 'live', assignedTo: 'mo@acme.com' });
   });
 
   it('accepts the callback form offered when nobody took the chat in time', async () => {

@@ -1,7 +1,8 @@
 import { ArrowUpCircle, BookOpen, ChartColumn, ChevronDown, CircleHelp, House, LogOut, MessagesSquare, Moon, PhoneCall, Settings, Sun, Users } from 'lucide-react';
 import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import { api, isMember, type CallbackList, type LiveStatus, type Me, type Prefs, type Site } from '../lib/api';
-import { setAvailable, unlockAudio, useLiveConnection, useLiveEvents } from '../lib/live';
+import { onToast, setAvailable, unlockAudio, useLiveConnection, useLiveEvents, type Toast } from '../lib/live';
+import { setAccent, setWaiting } from '../lib/attention';
 import { cn, href, useTheme, type Route } from '../lib/utils';
 import { Avatar, Button } from './ui';
 import { useVersion } from './Updates';
@@ -56,8 +57,10 @@ const ALL_NAV: {
 export type SettingsSection = 'chat' | 'appearance' | 'leads' | 'instructions' | 'business' | 'advanced' | 'live' | 'labels' | 'notifications' | 'webhooks' | 'api' | 'team' | 'updates';
 
 export function settingsSections(site: Site | undefined, me?: Me): { id: SettingsSection; label: string }[] {
+  // Notifications are live chat's: with it off (the default) there is no such page.
+  const live = Boolean(site?.live);
   // Members change only their own notifications.
-  if (me && isMember(me)) return [{ id: 'notifications' as const, label: 'Notifications' }];
+  if (me && isMember(me)) return live ? [{ id: 'notifications' as const, label: 'Notifications' }] : [];
   return [
     { id: 'chat' as const, label: 'Chat' },
     { id: 'appearance' as const, label: 'Appearance' },
@@ -66,7 +69,7 @@ export function settingsSections(site: Site | undefined, me?: Me): { id: Setting
     ...(site?.knowledge ? [{ id: 'business' as const, label: 'Business details' }] : []),
     { id: 'live' as const, label: 'Live chat' },
     { id: 'labels' as const, label: 'Labels' },
-    { id: 'notifications' as const, label: 'Notifications' },
+    ...(live ? [{ id: 'notifications' as const, label: 'Notifications' }] : []),
     ...(site?.knowledge || site?.connector === 'workers-ai' ? [{ id: 'advanced' as const, label: 'Advanced' }] : []),
     { id: 'webhooks' as const, label: 'Webhooks' },
     { id: 'api' as const, label: 'API keys' },
@@ -106,16 +109,53 @@ function useLive(me: Me) {
     return () => window.removeEventListener('hp-prefs', onPrefs);
   }, []);
   const waiting = status ? status.unassigned + status.mine : 0;
-  useEffect(() => {
-    const base = document.title.replace(/^\(\d+\) /, '');
-    document.title = waiting > 0 ? `(${waiting}) ${base}` : base;
-  }, [waiting]);
+  // The tab's title and icon count what waits (lib/attention.ts).
+  useEffect(() => setAccent(me.sites[0]?.accent ?? ''), [me]);
+  useEffect(() => setWaiting(waiting), [waiting]);
   const toggle = async () => {
     unlockAudio();
     if (!prefs) return;
     setPrefs(await setAvailable(!prefs.available));
   };
   return { enabled, connected, prefs, waiting, toggle };
+}
+
+/** Pop-ups for what concerns you while you are elsewhere in the dashboard: a few seconds each, with Open. */
+function Toasts() {
+  const [items, setItems] = useState<Toast[]>([]);
+  useEffect(
+    () =>
+      onToast((toast) => {
+        setItems((current) => [...current.filter((t) => t.conversationId !== toast.conversationId), toast].slice(-3));
+        setTimeout(() => setItems((current) => current.filter((t) => t.id !== toast.id)), toast.kind === 'new-chat' ? 15_000 : 7000);
+      }),
+    [],
+  );
+  if (!items.length) return null;
+  return (
+    <div className="fixed right-4 bottom-4 z-50 flex w-80 flex-col gap-2" role="status" aria-live="polite">
+      {items.map((toast) => (
+        <div key={toast.id} className="rounded-lg border bg-card p-3 text-[13px] shadow-lg">
+          <p className="font-medium">{toast.title}</p>
+          {toast.body && <p className="mt-0.5 line-clamp-2 text-muted-foreground">{toast.body}</p>}
+          <div className="mt-2 flex justify-end gap-1.5">
+            <Button variant="ghost" size="sm" onClick={() => setItems((current) => current.filter((t) => t.id !== toast.id))}>
+              Dismiss
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                window.location.hash = `#/conversations/${toast.conversationId}`;
+                setItems((current) => current.filter((t) => t.id !== toast.id));
+              }}
+            >
+              Open
+            </Button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function Availability({ live }: { live: ReturnType<typeof useLive> }) {
@@ -134,9 +174,10 @@ function Availability({ live }: { live: ReturnType<typeof useLive> }) {
         aria-checked={on}
         aria-label="Available for live chats"
         onClick={() => void live.toggle()}
-        className={cn('relative h-5 w-9 shrink-0 rounded-full transition-colors', on ? 'bg-primary' : 'bg-muted')}
+        className={cn('relative h-5 w-9 shrink-0 rounded-full border border-transparent transition-colors', on ? 'bg-primary' : 'bg-muted-foreground/30')}
       >
-        <span className={cn('absolute top-0.5 size-4 rounded-full bg-background shadow transition-transform', on ? 'translate-x-[18px]' : 'translate-x-0.5')} />
+        {/* Anchored to the left edge: a button centres its content, so an unanchored knob starts mid-track. */}
+        <span className={cn('absolute top-px left-px size-4 rounded-full bg-background shadow-sm transition-transform motion-reduce:transition-none', on ? 'translate-x-4' : 'translate-x-0')} />
       </button>
     </div>
   );
@@ -146,7 +187,8 @@ export function Shell({ me, route, onLogout, children }: { me: Me; route: Route;
   const [dark, toggleTheme] = useTheme();
   const site = me.sites[0];
   const member = isMember(me);
-  const NAV = ALL_NAV.filter((item) => (!item.knowledge || site?.knowledge) && (!item.admin || !member));
+  // A member with live chat off has no settings at all: no Settings entry.
+  const NAV = ALL_NAV.filter((item) => (!item.knowledge || site?.knowledge) && (!item.admin || !member) && (item.page !== 'settings' || !member || site?.live));
   const inSettings = route.page === 'settings' || route.page === 'prompt';
   const sections = settingsSections(site, me);
   const live = useLive(me);
@@ -302,6 +344,7 @@ export function Shell({ me, route, onLogout, children }: { me: Me; route: Route;
           ))}
         </nav>
         <main className="min-h-0 flex-1 overflow-auto scroll-thin">{children}</main>
+        {live.enabled && <Toasts />}
       </div>
     </div>
   );

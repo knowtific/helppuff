@@ -16,7 +16,7 @@ import type { Runtime } from '../src/loader.js';
  */
 
 const agentText = (text: string, extra: Partial<Message> = {}): Message => ({ id: `a${Math.random()}`, ts: Date.now(), role: 'agent', type: 'text', text, ...extra }) as Message;
-const handover = (status: 'waiting' | 'joined' | 'left', text: string, agentName?: string): Message =>
+const handover = (status: 'waiting' | 'joined' | 'left' | 'missed', text: string, agentName?: string): Message =>
   ({ id: `ho${Math.random()}`, ts: Date.now(), role: 'system', type: 'handover', status, text, ...(agentName ? { agentName } : {}) }) as Message;
 
 /** Sockets the live chunk opens, recorded instead of connecting. */
@@ -96,18 +96,18 @@ describe('live chat in the widget', () => {
   it('asks for a person, shows the wait, then who joined and what they wrote', async () => {
     const { handle, send } = setup(true, async () => ({ messages: [handover('waiting', 'Connecting you with someone from the team.')] }));
     await startChat(handle);
-    // No socket yet: the chat is with the assistant.
-    expect(FakeSocket.made).toEqual([]);
+    // Connected as soon as there is a chat (the team can take it over), with the token as a subprotocol.
+    await waitFor(() => expect(FakeSocket.made).toHaveLength(1));
+    const socket = FakeSocket.made[0]!;
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Talk to a person' }));
     });
     expect(send).toHaveBeenCalledWith('tok-1', expect.objectContaining({ kind: 'action', actionId: 'handover' }), undefined);
     await waitFor(() => expect(inThread().getByText('Connecting you with someone from the team.')).toBeTruthy());
-    // Live now: the button goes, and the live chunk connects with the token as a subprotocol.
+    // Waiting for a person now: the button goes, and the same connection carries on.
     expect(screen.queryByRole('button', { name: 'Talk to a person' })).toBeNull();
-    await waitFor(() => expect(FakeSocket.made).toHaveLength(1));
-    const socket = FakeSocket.made[0]!;
+    expect(FakeSocket.made).toHaveLength(1);
     expect(socket.url).toBe('wss://api.test/v1/live/socket');
     expect(socket.protocols).toEqual(['helppuff.v1', 't.tok-1']);
 
@@ -126,7 +126,36 @@ describe('live chat in the widget', () => {
     expect(document.querySelector('.hp-header-status')?.textContent).toContain('Sam');
   });
 
-  it('closes the live connection when the team hands back to the assistant', async () => {
+  it('stays with the assistant when nobody was free (a "missed" with no wait before it)', async () => {
+    const { handle } = setup(true, async () => ({
+      messages: [handover('missed', 'Nobody from the team is free right now.'), { id: 'callback_live', ts: Date.now(), role: 'agent', type: 'form', fields: [{ name: 'phone', label: 'Phone', type: 'tel' }] } as Message],
+    }));
+    await startChat(handle);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Talk to a person' }));
+    });
+    await waitFor(() => expect(inThread().getByText('Nobody from the team is free right now.')).toBeTruthy());
+    // Still the one quiet connection, nothing polling, and they can ask again later.
+    expect(screen.getByRole('button', { name: 'Talk to a person' })).toBeTruthy();
+  });
+
+  it('stays connected after a wait runs out ("missed" after "waiting"): the visitor may keep waiting', async () => {
+    const { handle } = setup(true, async () => ({ messages: [handover('waiting', 'Connecting you…')] }));
+    await startChat(handle);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Talk to a person' }));
+    });
+    await waitFor(() => expect(FakeSocket.made).toHaveLength(1));
+    const socket = FakeSocket.made[0]!;
+    await act(async () => {
+      socket.onmessage?.({ data: JSON.stringify({ t: 'msg', message: handover('missed', 'Nobody is free just now.') }) });
+    });
+    await waitFor(() => expect(inThread().getByText('Nobody is free just now.')).toBeTruthy());
+    expect(socket.readyState).not.toBe(3);
+    expect(FakeSocket.made).toHaveLength(1);
+  });
+
+  it('stays connected when the team hands back to the assistant, so it can take over again', async () => {
     const { handle } = setup(true, async () => ({ messages: [handover('waiting', 'Connecting you…')] }));
     await startChat(handle);
     await act(async () => {
@@ -138,8 +167,14 @@ describe('live chat in the widget', () => {
       socket.onmessage?.({ data: JSON.stringify({ t: 'msg', message: handover('left', 'You’re back with the assistant.') }) });
     });
     await waitFor(() => expect(inThread().getByText('You’re back with the assistant.')).toBeTruthy());
-    await waitFor(() => expect(socket.readyState).toBe(3));
+    expect(socket.readyState).not.toBe(3);
     // The button is back: the visitor can ask again.
     expect(screen.getByRole('button', { name: 'Talk to a person' })).toBeTruthy();
+    // The team takes it over again: it arrives on the same connection.
+    await act(async () => {
+      socket.onmessage?.({ data: JSON.stringify({ t: 'msg', message: handover('joined', 'Sam joined the chat.', 'Sam') }) });
+    });
+    await waitFor(() => expect(inThread().getByText('Sam joined the chat.')).toBeTruthy());
+    expect(screen.queryByRole('button', { name: 'Talk to a person' })).toBeNull();
   });
 });

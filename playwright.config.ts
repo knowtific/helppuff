@@ -36,9 +36,11 @@ export default defineConfig({
       stdout: 'ignore',
     },
     {
-      // Live chat's Worker: a local D1, the live hub and the dashboard (e2e/live).
+      // Live chat's Worker: a local D1, the live hub and the dashboard (e2e/live), on
+      // its own port so it never meets a developer's `pnpm dev:live` (8788).
       command: 'node e2e/live/serve.mjs',
-      url: 'http://localhost:8788/healthz',
+      env: { HELPPUFF_LIVE_PORT: '8796' },
+      url: 'http://localhost:8796/healthz',
       reuseExistingServer: !process.env.CI,
       timeout: 180_000,
       stdout: 'ignore',

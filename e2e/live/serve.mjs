@@ -1,20 +1,52 @@
-// Starts the live-chat e2e Worker (see wrangler.toml): a fresh database, the
-// dashboard built under /admin/, then `wrangler dev` on :8788.
+// Starts the live-chat Worker (see wrangler.toml): a fresh database; the
+// widget, a preview page and the dashboard as its assets, as a deployment
+// has them; then `wrangler dev` on :8788.
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, rmSync } from 'node:fs';
+import { cpSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, '..', '..');
-rmSync(join(here, '.state'), { recursive: true, force: true });
-rmSync(join(here, '.assets'), { recursive: true, force: true });
-mkdirSync(join(here, '.assets'), { recursive: true });
+const port = process.env['HELPPUFF_LIVE_PORT'] ?? '8788';
+// One set per port, so a second instance never wipes the first one's.
+const assets = join(here, '.assets', port);
+const state = join(here, '.state', port);
+rmSync(state, { recursive: true, force: true });
+rmSync(assets, { recursive: true, force: true });
+mkdirSync(assets, { recursive: true });
 
-const built = spawnSync('pnpm', ['--filter', '@helppuff/dashboard', 'exec', 'vite', 'build', '--outDir', join(here, '.assets', 'admin'), '--emptyOutDir'], { cwd: repo, stdio: 'inherit' });
-if (built.status !== 0) process.exit(built.status ?? 1);
+const run = (args) => {
+  const done = spawnSync('pnpm', args, { cwd: repo, stdio: ['ignore', 'ignore', 'inherit'] });
+  if (done.status !== 0) process.exit(done.status ?? 1);
+};
+run(['--filter', '@helppuff/widget', 'build']);
+cpSync(join(repo, 'packages', 'widget', 'dist'), assets, { recursive: true });
+run(['--filter', '@helppuff/dashboard', 'exec', 'vite', 'build', '--outDir', join(assets, 'admin'), '--emptyOutDir']);
 
-const worker = spawn('pnpm', ['--filter', '@helppuff/server', 'exec', 'wrangler', 'dev', '--config', join(here, 'wrangler.toml'), '--port', '8788', '--local', '--persist-to', join(here, '.state')], {
+const page = (title, body) => `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title>
+<style>:root { color-scheme: light dark; } body { margin: 0; min-height: 100vh; background: Canvas; color: CanvasText; font: 16px/1.5 system-ui, sans-serif; }</style>
+</head>
+<body>
+${body}
+</body>
+</html>
+`;
+// What a visitor sees: a page with the widget (the API is this same origin).
+writeFileSync(
+  join(assets, 'index.html'),
+  page(
+    'Live chat · visitor',
+    `<main style="padding: 12vh 2rem; max-width: 34rem"><h1>A site with live chat</h1><p>Start a chat, then press the person icon at the top of the widget to talk to the team.</p></main>
+<script src="/loader.js" data-site="demo" data-open async></script>`,
+  ),
+);
+// The dashboard's Home: just the widget, open.
+writeFileSync(join(assets, 'chat.html'), page('Chat', '<script src="/loader.js" data-site="demo" data-open data-fill async></script>'));
+
+const worker = spawn('pnpm', ['--filter', '@helppuff/server', 'exec', 'wrangler', 'dev', '--config', join(here, 'wrangler.toml'), '--port', port, '--local', '--persist-to', state, '--assets', assets], {
   cwd: repo,
   stdio: 'inherit',
 });

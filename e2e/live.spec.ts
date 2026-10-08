@@ -3,11 +3,11 @@ import { agentMessages, composer, openWidget, send, startConversation, thread } 
 
 /**
  * Live chat end to end: a visitor's widget (on the fixture page) and the
- * team's dashboard (served by the live-chat Worker on :8788, e2e/live), two
+ * team's dashboard (served by the live-chat Worker on :8796, e2e/live), two
  * real browsers, one real Worker with D1 and the live hub.
  */
 
-const WORKER = 'http://localhost:8788';
+const WORKER = 'http://localhost:8796';
 const ADMIN_KEY = 'e2e-only-admin-key-not-for-any-deployment-012345';
 const OWNER = { email: 'owner@e2e.test', password: 'owner-password-123' };
 const MEMBER = { email: 'mo@e2e.test', password: 'member-password-123' };
@@ -45,7 +45,7 @@ async function signIn(browser: Browser, who: { email: string; password: string }
 
 async function visitor(browser: Browser): Promise<Page> {
   const page = await (await browser.newContext()).newPage();
-  await page.goto('http://localhost:5173/fixtures/live.html');
+  await page.goto(`http://localhost:5173/fixtures/live.html?api=${WORKER}`);
   await openWidget(page);
   await startConversation(page);
   return page;
@@ -101,6 +101,59 @@ test('a visitor is handed to the team, answered, and handed back to the assistan
   await expect(thread(page)).toContainText('You said');
   await expect(personButton(page)).toBeVisible();
 
+  await page.context().close();
+  await team.context().close();
+});
+
+test('the team takes over a chat the assistant has, hands it back by mistake, and takes it again', async ({ browser }) => {
+  const page = await visitor(browser);
+  await send(page, 'Do you do weekends?');
+  await expect(agentMessages(page).last()).toContainText('You said');
+
+  const team = await signIn(browser, OWNER);
+  await team.goto('/admin/#/conversations');
+  await team.getByRole('radio', { name: 'AI bot' }).click();
+  await team.locator('a[href^="#/conversations/"]', { hasText: 'Do you do weekends?' }).first().click();
+  await team.getByRole('button', { name: 'Take over' }).click();
+  // The visitor never asked: the person joins anyway, at once.
+  await expect(thread(page)).toContainText('Olivia joined the chat');
+  const reply = team.getByLabel('Reply to the visitor');
+  await reply.fill('Yes, Saturdays 8 to 12. Want a booking?');
+  await reply.press('Enter');
+  await expect(thread(page)).toContainText('Yes, Saturdays 8 to 12.');
+
+  // A mistake: back to the assistant… and taken again.
+  await team.getByRole('button', { name: 'Back to assistant' }).click();
+  await expect(thread(page)).toContainText('back with the assistant');
+  await team.getByRole('button', { name: 'Take over' }).click();
+  await expect(thread(page).getByText('Olivia joined the chat')).toHaveCount(2);
+  await send(page, 'Yes please');
+  await expect(team.getByText('Yes please')).toBeVisible();
+  await page.context().close();
+  await team.context().close();
+});
+
+test('a closed chat is reopened from the dashboard, with a person or with the assistant', async ({ browser }) => {
+  const page = await visitor(browser);
+  await send(page, 'Is it too late to book today?');
+  await expect(agentMessages(page).last()).toContainText('You said');
+  const team = await signIn(browser, OWNER);
+  await team.goto('/admin/#/conversations');
+  await team.locator('a[href^="#/conversations/"]', { hasText: 'Is it too late to book today?' }).first().click();
+  await team.getByRole('button', { name: 'Close' }).click();
+  await expect(team.getByRole('button', { name: 'Reopen with me' })).toBeVisible();
+
+  // Reopened for the assistant, then closed again and reopened with a person by writing.
+  await team.getByRole('button', { name: 'Reopen for assistant' }).click();
+  await expect(team.getByRole('button', { name: 'Take over' })).toBeVisible();
+  await team.getByRole('button', { name: 'Close' }).click();
+  await expect(team.getByText('This chat is closed. Sending reopens it with you.')).toBeVisible();
+  const reply = team.getByLabel('Reply to the visitor');
+  await reply.fill('We can still fit you in at 5pm.');
+  await reply.press('Enter');
+  await expect(thread(page)).toContainText('Olivia joined the chat');
+  await expect(thread(page)).toContainText('We can still fit you in at 5pm.');
+  await expect(team.getByRole('button', { name: 'Back to assistant' })).toBeVisible();
   await page.context().close();
   await team.context().close();
 });
@@ -183,12 +236,38 @@ test("the team labels a conversation, notes it, and keeps a contact's details", 
   await team.context().close();
 });
 
-test('the composer is only there while a person has the chat', async ({ browser }) => {
+test('every chat has the reply box, saying what sending will do', async ({ browser }) => {
+  const page = await visitor(browser);
+  await send(page, 'Just browsing');
+  await expect(agentMessages(page).last()).toContainText('You said');
   const team = await signIn(browser, OWNER);
   await team.goto('/admin/#/conversations');
   await team.getByRole('radio', { name: 'AI bot' }).click();
-  await team.locator('a[href^="#/conversations/"]').first().click();
-  await expect(team.getByLabel('Reply to the visitor')).toHaveCount(0);
-  await expect(composer(team)).toHaveCount(0);
+  await team.locator('a[href^="#/conversations/"]', { hasText: 'Just browsing' }).first().click();
+  await expect(team.getByText('The assistant is answering. Sending takes the chat over.')).toBeVisible();
+  await expect(team.getByLabel('Reply to the visitor')).toBeVisible();
+  await page.context().close();
+  await team.context().close();
+});
+
+test('with live chat off (the default), nothing of it shows: no button, no switch, callbacks only', async ({ browser }) => {
+  const team = await signIn(browser, OWNER);
+  await team.goto('/admin/#/settings/live');
+  await team.getByRole('radio', { name: /Take their details for a callback/ }).check();
+  await team.getByRole('button', { name: 'Save' }).click();
+  await expect(team.getByText('Saved.')).toBeVisible();
+  // The dashboard follows at once: no Available switch, no Notifications page.
+  await expect(team.getByRole('switch', { name: 'Available for live chats' })).toHaveCount(0);
+  await expect(team.locator('#settings-menu').getByRole('link', { name: 'Notifications' })).toHaveCount(0);
+
+  const page = await visitor(browser);
+  await expect(composer(page)).toBeVisible();
+  await expect(personButton(page)).toHaveCount(0);
+
+  // Back on, for anything after this.
+  await team.getByRole('radio', { name: /Connect them to someone on the team/ }).check();
+  await team.getByRole('button', { name: 'Save' }).click();
+  await expect(team.getByRole('switch', { name: 'Available for live chats' })).toBeVisible();
+  await page.context().close();
   await team.context().close();
 });

@@ -343,6 +343,15 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
       c.assignedName = to === OWNER ? 'Dan' : to ? 'Priya' : null;
       return json({ conversationId: c.id, assignedTo: c.assignedTo, assignedName: c.assignedName });
     }
+    if (sub === 'takeover' && method === 'POST') {
+      c.status = 'live';
+      c.assignedTo = OWNER;
+      c.assignedName = 'Dan';
+      c.waitingSince = null;
+      c.lastAt = Date.now();
+      c.messages.push({ id: `${c.id}_take${Date.now()}`, role: 'system', type: 'handover', text: 'Dan joined the chat.', payload: { status: 'joined' }, ts: Date.now(), author: null });
+      return json({ conversationId: c.id, status: 'live', assignedTo: OWNER, assignedName: 'Dan' });
+    }
     if ((sub === 'close' || sub === 'handback') && method === 'POST') {
       c.status = sub === 'close' ? 'closed' : 'bot';
       c.waitingSince = null;

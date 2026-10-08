@@ -1,10 +1,11 @@
-# The Worker the live-chat e2e suite runs against (`e2e/live.spec.ts`), on
-# :8788, next to `pnpm dev`'s on :8787: the same code, plus what live chat
-# needs and `pnpm dev` does not have — a local D1, the live hub, and the
-# dashboard at /admin/ (built into .assets by serve.mjs). Local only: every
-# value here is a test value, and the state is wiped at each start.
+# The live-chat Worker (`pnpm dev:live`, and `e2e/live.spec.ts`), on :8788,
+# next to `pnpm dev`'s on :8787: the same code, plus what live chat needs and
+# `pnpm dev` does not have — a local D1, the live hub, and, like a real
+# deployment, the widget, a preview page at / and the dashboard at /admin/
+# (built into .assets by serve.mjs). Its config is config.ts. Local only:
+# every value here is a test value, and the state is wiped at each start.
 name = "helppuff-e2e-live"
-main = "../../packages/server/src/index.ts"
+main = "index.ts"
 compatibility_date = "2026-03-27"
 compatibility_flags = ["nodejs_compat"]
 kv_namespaces = [{ binding = "HELPPUFF_KV", id = "e2e-live", preview_id = "e2e-live" }]
@@ -17,6 +18,7 @@ HELPPUFF_LOG = "0"
 HELPPUFF_SECRET = "e2e-only-secret-not-for-any-deployment-0123456789"
 ADMIN_API_KEY = "e2e-only-admin-key-not-for-any-deployment-012345"
 
+# The directory is given by serve.mjs (`--assets .assets/<port>`).
 [assets]
-directory = ".assets"
+directory = ".assets/8788"
 not_found_handling = "none"

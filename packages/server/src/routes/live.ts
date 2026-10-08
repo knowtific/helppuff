@@ -8,7 +8,7 @@ import { verifyToken } from '../core/token.js';
 import { dbFrom } from '../db/d1.js';
 import { agentSocket } from '../admin/live.js';
 import { safeEqual } from '../admin/guard.js';
-import { assignConversation, closeConversation, handBack, hubOf, HUB_ORIGIN, isLive, LiveError, liveDeps, readLiveState, sendAgentMessage } from '../live/service.js';
+import { closeConversation, handBack, hubOf, HUB_ORIGIN, LiveError, liveDeps, readLiveState, sendAgentMessage, takeOver } from '../live/service.js';
 import { botApi, postToThread, readTelegram, readUpdate, saveTelegram, TELEGRAM_HELP, TELEGRAM_SECRET_HEADER, type TelegramUpdate } from '../live/telegram.js';
 
 /**
@@ -24,7 +24,8 @@ export const liveSocketRoutes = new Hono<HonoEnv>();
 /**
  * The visitor's socket. The session token rides as a subprotocol
  * (`helppuff.v1, t.<token>`), never in the URL; the Origin must be one of the
- * site's. Only a chat that is live (handed to a person) may connect.
+ * site's. Open while the chat is (on a site with live chat), so a person can
+ * take it over at any time; idle, a hibernating socket costs nothing.
  */
 liveSocketRoutes.get('/v1/live/socket', async (c) => {
   const ctx = c.get('helppuff');
@@ -38,7 +39,8 @@ liveSocketRoutes.get('/v1/live/socket', async (c) => {
   const db = dbFrom(ctx.env);
   const hub = hubOf(ctx.env, payload.siteId);
   if (!site.live.enabled || !db || !hub) throw new HelpPuffError('not_found', { detail: 'live_off' });
-  if (!isLive(await readLiveState(db, payload.sessionId), site.live, ctx.platform.now())) throw new HelpPuffError('conflict', { message: 'This chat is not live.', detail: 'live_not_live' });
+  // Any recorded chat may connect, not only a live one: the team can take a chat over at any time.
+  if (!(await readLiveState(db, payload.sessionId))) throw new HelpPuffError('not_found', { message: 'No such chat.', detail: 'live_no_chat' });
   return hub.fetch(`${HUB_ORIGIN}/socket`, {
     headers: {
       Upgrade: 'websocket',
@@ -111,9 +113,9 @@ async function handleUpdate(c: Context<HonoEnv>, siteId: string, update: Telegra
     case 'command': {
       const { conversationId, from } = incoming;
       try {
-        if (incoming.command === 'take') await assignConversation(deps, site.live, { conversationId, to: from, by: from.id });
+        if (incoming.command === 'take') await takeOver(deps, site.live, { conversationId, author: from });
         else if (incoming.command === 'close') await closeConversation(deps, { conversationId, by: from.id, reason: 'team' });
-        else if (incoming.command === 'ai') await handBack(deps, { conversationId, by: from.id });
+        else if (incoming.command === 'ai') await handBack(deps, site.live, { conversationId, by: from.id });
         else if (incoming.command === 'info') {
           const row = await deps.db
             .prepare('SELECT c.page_url AS page, c.country, l.name, l.email, l.phone FROM conversations c LEFT JOIN leads l ON l.id = c.lead_id WHERE c.id = ?')

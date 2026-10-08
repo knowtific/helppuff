@@ -75,25 +75,44 @@ describe('the live client', () => {
     conn.close();
   });
 
-  it('polls instead when sockets never connect, and stops when the team hands back', async () => {
+  it('polls when sockets never connect, but only while a person has the chat', async () => {
     vi.useFakeTimers();
-    const responses = [
-      { messages: [{ id: 'h2', ts: 10, role: 'agent', type: 'text', text: 'Still there?', meta: { human: true } }] },
-      { messages: [{ id: 'ho', ts: 11, role: 'system', type: 'handover', status: 'left', text: 'You’re back with the assistant.' }] },
-    ];
-    const fetch = vi.fn(async () => new Response(JSON.stringify(responses.shift() ?? { messages: [] }), { status: 200 }));
+    let active = false;
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ messages: [{ id: 'h2', ts: 10, role: 'agent', type: 'text', text: 'Still there?', meta: { human: true } }] }), { status: 200 }));
     const { got, hooks: h } = hooks();
+    connectLive({ apiBase: 'https://chat.example.com', token: () => 'tok', lastTs: () => 0, active: () => active, hooks: h, WebSocket: FakeSocket as never, fetch });
+    for (let i = 0; i < 3; i++) {
+      FakeSocket.made.at(-1)!.onclose?.({ code: 1006, reason: '' });
+      await vi.runOnlyPendingTimersAsync();
+    }
+    // With the assistant: no requests at all.
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fetch).not.toHaveBeenCalled();
+    // A person has it: it polls, and delivers what they wrote.
+    active = true;
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(fetch).toHaveBeenCalled();
+    expect(got.messages.map((m) => (m as { id: string }).id)).toContain('h2');
+  });
+
+  it('stops polling when the server refuses (the chat is not live), but keeps trying when it is busy', async () => {
+    vi.useFakeTimers();
+    let status = 429;
+    const fetch = vi.fn(async () => new Response('{}', { status }));
+    const { hooks: h } = hooks();
     connectLive({ apiBase: 'https://chat.example.com', token: () => 'tok', lastTs: () => 0, hooks: h, WebSocket: FakeSocket as never, fetch });
     for (let i = 0; i < 3; i++) {
       FakeSocket.made.at(-1)!.onclose?.({ code: 1006, reason: '' });
       await vi.runOnlyPendingTimersAsync();
     }
-    await vi.advanceTimersByTimeAsync(5000);
-    expect(got.messages.map((m) => (m as { id: string }).id)).toEqual(['h2', 'ho']);
-    expect(got.statuses).toEqual(['left']);
-    const calls = fetch.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(9000);
+    const busy = fetch.mock.calls.length;
+    expect(busy).toBeGreaterThan(1);
+    status = 400;
+    await vi.advanceTimersByTimeAsync(9000);
+    const refused = fetch.mock.calls.length;
     await vi.advanceTimersByTimeAsync(60_000);
-    expect(fetch.mock.calls.length).toBe(calls);
+    expect(fetch.mock.calls.length).toBe(refused);
   });
 });
 

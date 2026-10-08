@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, type Prefs } from './api';
+import { concerns, looking, nudge, type Concern } from './attention';
 
 /**
  * The team's live connection: one WebSocket per dashboard tab, to the site's
@@ -11,8 +12,8 @@ import { api, type Prefs } from './api';
 
 export type LiveEvent =
   | { t: 'handover'; conversationId: string; conversation: { leadName?: string | null; leadEmail?: string | null; firstMessage?: string | null; pageUrl?: string | null } }
-  | { t: 'message'; conversationId: string; message: { role: string; text?: string }; by?: string }
-  | { t: 'assigned'; conversationId: string; to: string | null; name: string | null }
+  | { t: 'message'; conversationId: string; message: { role: string; text?: string }; by?: string; assignedTo?: string | null; who?: string | null }
+  | { t: 'assigned'; conversationId: string; to: string | null; name: string | null; by?: string }
   | { t: 'ended'; conversationId: string; status: 'left' | 'closed' }
   | { t: 'missed'; conversationId: string }
   | { t: 'changed'; conversationId: string }
@@ -107,18 +108,38 @@ export async function askNotifications(): Promise<NotificationPermission | 'unsu
   return Notification.requestPermission();
 }
 
-function notify(title: string, body: string, conversationId: string): void {
+/**
+ * A desktop notification. New chats stay until dismissed (they need someone);
+ * messages replace the last one for that chat, so one chat is one
+ * notification, not a stack. Clicking brings the dashboard forward on the chat.
+ */
+function notify(concern: Concern): void {
   if (notificationState() !== 'granted') return;
   try {
-    const n = new Notification(title, { body: body.slice(0, 160), tag: `hp-${conversationId}` });
+    const n = new Notification(concern.title, {
+      body: concern.body.slice(0, 160),
+      tag: `hp-${concern.kind === 'new-chat' ? 'new' : 'msg'}-${concern.conversationId}`,
+      requireInteraction: concern.kind === 'new-chat',
+      // Replacing one for the same chat still sounds and shows it again.
+      ...({ renotify: concern.kind !== 'new-chat' } as NotificationOptions),
+    });
     n.onclick = () => {
       window.focus();
-      window.location.hash = `#/conversations/${conversationId}`;
+      window.location.hash = `#/conversations/${concern.conversationId}`;
       n.close();
     };
   } catch {
     // Some browsers allow notifications only from a service worker.
   }
+}
+
+/** In the dashboard, but somewhere else in it: a small pop-up (the shell shows it). */
+export type Toast = Concern & { id: number };
+const toastListeners = new Set<(toast: Toast) => void>();
+let toasts = 0;
+export function onToast(listener: (toast: Toast) => void): () => void {
+  toastListeners.add(listener);
+  return () => toastListeners.delete(listener);
 }
 
 export function testNotification(): void {
@@ -154,30 +175,36 @@ export function useLiveConnection(enabled: boolean, prefs: Prefs | null, me: str
       waiting.delete(id);
     };
 
+    /**
+     * Whether and how to tell this person (`concerns`): a notification when they are
+     * not looking at the dashboard, a pop-up when they are but elsewhere in it, the
+     * title and the tab's icon either way, and the sound their settings ask for.
+     */
     const alert = (event: LiveEvent) => {
       const p = prefsRef.current;
+      if (event.t === 'assigned' || event.t === 'ended') stopRepeat(event.conversationId);
       if (!p) return;
-      if (event.t === 'handover') {
-        const who = event.conversation.leadName ?? event.conversation.leadEmail ?? 'A visitor';
-        if (p.notifyNewChat) notify(`${who} wants to talk to someone`, event.conversation.firstMessage ?? 'A new live chat is waiting.', event.conversationId);
-        if (p.soundNewChat) {
-          playSound(p.sound, p.volume);
-          if (p.repeatUntilTaken) {
-            let times = 0;
-            waiting.set(
-              event.conversationId,
-              setInterval(() => {
-                if (++times > 10) return stopRepeat(event.conversationId);
-                playSound(p.sound, p.volume);
-              }, 15_000),
-            );
-          }
-        }
-      } else if (event.t === 'message' && event.message.role === 'user') {
-        if (p.notifyNewMessage && document.hidden) notify('New message', event.message.text ?? '', event.conversationId);
-        if (p.soundNewMessage) playSound(p.sound, p.volume * 0.7);
-      } else if (event.t === 'assigned' || event.t === 'ended') {
-        stopRepeat(event.conversationId);
+      const concern = concerns(event, me, p.available);
+      if (!concern) return;
+      const wantsNotice = concern.kind === 'message' ? p.notifyNewMessage : p.notifyNewChat;
+      const wantsSound = concern.kind === 'message' ? p.soundNewMessage : p.soundNewChat;
+      if (looking()) {
+        toastListeners.forEach((listener) => listener({ ...concern, id: ++toasts }));
+      } else {
+        nudge(`${concern.title}${concern.kind === 'message' ? `: ${concern.body}` : ''}`);
+        if (wantsNotice) notify(concern);
+      }
+      if (!wantsSound) return;
+      playSound(p.sound, concern.kind === 'message' ? p.volume * 0.7 : p.volume);
+      if (concern.kind === 'new-chat' && p.repeatUntilTaken) {
+        let times = 0;
+        waiting.set(
+          concern.conversationId,
+          setInterval(() => {
+            if (++times > 10) return stopRepeat(concern.conversationId);
+            playSound(p.sound, p.volume);
+          }, 15_000),
+        );
       }
     };
 

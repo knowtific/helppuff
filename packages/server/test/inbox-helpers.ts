@@ -60,6 +60,11 @@ export function memoryHub() {
           await core.publish(event);
           return new Response(null, { status: 204 });
         }
+        // A socket the Worker let through (a test cannot make a real 101): who it is, as the hub was told.
+        if (path === '/socket') {
+          const headers = new Headers(init?.headers);
+          return Response.json({ accepted: headers.get('X-Live-Kind'), conversation: headers.get('X-Live-Conversation') });
+        }
         return new Response('nope', { status: 404 });
       },
     }),

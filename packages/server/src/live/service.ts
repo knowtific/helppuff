@@ -305,13 +305,22 @@ async function threadIntro(db: D1Like, conversationId: string, card: Record<stri
 
 // --------------------------------------------------------- the visitor writes
 
-/** A visitor's message in a live chat (recorded by `recordTurn`): to the team's dashboards and Telegram. */
+/**
+ * A visitor's message in a live chat (recorded by `recordTurn`): to the team's
+ * dashboards, with whose chat it is and who wrote it (each dashboard decides
+ * whether to alert its person), and to Telegram.
+ */
 export function relayVisitorMessage(deps: LiveDeps, siteId: string, conversationId: string, text: string): void {
   const now = deps.now();
   const message: Message = { id: messageId('u'), ts: now, role: 'user', type: 'text', text: text.slice(0, 8000) || '…' };
   deps.waitUntil(
     (async () => {
-      await publish(deps, siteId, { type: 'visitor', conversationId, message });
+      const row = await deps.db
+        .prepare('SELECT c.assigned_to AS assignedTo, l.name, l.email FROM conversations c LEFT JOIN leads l ON l.id = c.lead_id WHERE c.id = ?')
+        .bind(conversationId)
+        .first<{ assignedTo: string | null; name: string | null; email: string | null }>()
+        .catch(() => null);
+      await publish(deps, siteId, { type: 'visitor', conversationId, message, assignedTo: row?.assignedTo ?? null, who: row?.name ?? row?.email ?? null });
       const telegram = await telegramOf(deps, siteId);
       if (telegramReady(telegram)) await postToThread({ db: deps.db, fetch: deps.fetch, now }, telegram, siteId, conversationId, `👤 ${text}`);
     })().catch(() => deps.log('live.relay_failed')),
@@ -339,21 +348,26 @@ export class LiveError extends Error {
 }
 
 /**
- * A person on the team answers. The chat must be live (handed over); a reply
- * takes it if nobody has. Written, then sent to the visitor, the other
- * dashboards and (unless it came from there) Telegram.
+ * A person on the team answers. A reply takes the chat if nobody has it, and
+ * takes it over if the assistant has it or it closed (`takeOver`). Written,
+ * then sent to the visitor, the other dashboards and (unless it came from
+ * there) Telegram.
  */
 export async function sendAgentMessage(
   deps: LiveDeps,
   live: LiveConfig,
   input: { conversationId: string; text: string; author: Author; from?: 'dashboard' | 'telegram' },
 ): Promise<Message> {
-  const row = await liveRow(deps.db, input.conversationId);
-  if (!row) throw new LiveError('not_found', 'No such conversation.');
-  const now = deps.now();
-  if (!isLive(row, live, now)) throw new LiveError('not_live', 'This chat is not live: the visitor is with the assistant, or it closed.');
   const text = cleanText(input.text, 'input').trim().slice(0, 4000);
   if (!text) throw new LiveError('empty', 'Write a message first.');
+  let row = await liveRow(deps.db, input.conversationId);
+  if (!row) throw new LiveError('not_found', 'No such conversation.');
+  // Writing to a chat the assistant has (or a closed one) takes it over first.
+  if (!isLive(row, live, deps.now())) {
+    await takeOver(deps, live, { conversationId: input.conversationId, author: input.author });
+    row = (await liveRow(deps.db, input.conversationId))!;
+  }
+  const now = deps.now();
   const name = shownName(live, input.author.name);
   const message: Message = { id: messageId('h'), ts: now, role: 'agent', type: 'text', text, meta: { human: true, ...(name ? { agentName: name } : {}) } };
   const taking = !row.assigned_to;
@@ -371,7 +385,7 @@ export async function sendAgentMessage(
   deps.waitUntil(
     (async () => {
       if (taking) {
-        await publish(deps, row.site_id, { type: 'assigned', conversationId: input.conversationId, to: input.author.id, name, messages: joined });
+        await publish(deps, row.site_id, { type: 'assigned', conversationId: input.conversationId, to: input.author.id, name, by: input.author.id, messages: joined });
         await emit(deps, row.site_id, 'conversation.assigned', { conversationId: input.conversationId, assignedTo: input.author.id, name: input.author.name, by: input.author.id });
       }
       await publish(deps, row.site_id, { type: 'agent', conversationId: input.conversationId, message, by: input.author.id });
@@ -401,7 +415,7 @@ export async function assignConversation(deps: LiveDeps, live: LiveConfig, input
   if (changed) {
     deps.waitUntil(
       (async () => {
-        await publish(deps, row.site_id, { type: 'assigned', conversationId: input.conversationId, to: input.to?.id ?? null, name, messages: announce });
+        await publish(deps, row.site_id, { type: 'assigned', conversationId: input.conversationId, to: input.to?.id ?? null, name, by: input.by, messages: announce });
         await emit(deps, row.site_id, 'conversation.assigned', { conversationId: input.conversationId, assignedTo: input.to?.id ?? null, name: input.to?.name ?? null, by: input.by });
         const telegram = await telegramOf(deps, row.site_id);
         if (telegramReady(telegram) && input.by !== input.to?.id) {
@@ -442,16 +456,20 @@ export async function closeConversation(deps: LiveDeps, input: { siteId?: string
   return { conversationId: input.conversationId, status: 'closed' as const, closedAt: now };
 }
 
-/** Back to the assistant: it answers the visitor's next message. */
-export async function handBack(deps: LiveDeps, input: { conversationId: string; by: string }) {
+/**
+ * Back to the assistant: it answers the visitor's next message. From a live
+ * chat, or a closed one (reopened for the assistant).
+ */
+export async function handBack(deps: LiveDeps, live: LiveConfig, input: { conversationId: string; by: string }) {
   const row = await liveRow(deps.db, input.conversationId);
   if (!row) throw new LiveError('not_found', 'No such conversation.');
-  if (row.status !== 'live') throw new LiveError('not_live', 'The assistant already has this chat.');
   const now = deps.now();
+  const closed = row.status === 'closed' || row.last_at < now - live.closeAfterMinutes * 60_000;
+  if (row.status !== 'live' && !closed) throw new LiveError('not_live', 'The assistant already has this chat.');
   const notice = [handoverMessage('left', COPY.left, null, now)];
   await deps.db.batch([
     ...messageStatements(deps.db, input.conversationId, notice, now),
-    deps.db.prepare("UPDATE conversations SET status = 'bot', waiting_since = NULL, last_at = ? WHERE id = ?").bind(now, input.conversationId),
+    deps.db.prepare("UPDATE conversations SET status = 'bot', waiting_since = NULL, closed_at = NULL, last_at = ? WHERE id = ?").bind(now, input.conversationId),
   ]);
   deps.waitUntil(
     (async () => {
@@ -462,6 +480,40 @@ export async function handBack(deps: LiveDeps, input: { conversationId: string; 
     })().catch(() => deps.log('live.handback_publish_failed')),
   );
   return { conversationId: input.conversationId, status: 'bot' as const };
+}
+
+/**
+ * A person takes a chat, whatever it was doing: the assistant had it, someone
+ * else had it, or it closed (this reopens it). It becomes live and theirs;
+ * the visitor sees who joined, at once if their chat is open, or when they
+ * come back. Taking a chat you already have changes nothing.
+ */
+export async function takeOver(deps: LiveDeps, live: LiveConfig, input: { conversationId: string; author: Author }) {
+  const row = await liveRow(deps.db, input.conversationId);
+  if (!row) throw new LiveError('not_found', 'No such conversation.');
+  const now = deps.now();
+  const result = { conversationId: input.conversationId, status: 'live' as const, assignedTo: input.author.id, assignedName: input.author.name };
+  if (isLive(row, live, now) && row.assigned_to === input.author.id) return result;
+  const name = shownName(live, input.author.name);
+  const joined = [handoverMessage('joined', COPY.joined(name), name, now)];
+  await deps.db.batch([
+    ...messageStatements(deps.db, input.conversationId, joined, now),
+    deps.db
+      .prepare(
+        `UPDATE conversations SET status = 'live', handover_at = COALESCE(handover_at, ?), waiting_since = NULL, closed_at = NULL, completed_at = NULL,
+           assigned_to = ?, assigned_name = ?, last_at = ? WHERE id = ?`,
+      )
+      .bind(now, input.author.id, input.author.name, now, input.conversationId),
+  ]);
+  deps.waitUntil(
+    (async () => {
+      await publish(deps, row.site_id, { type: 'takeover', siteId: row.site_id, conversationId: input.conversationId, to: input.author.id, name, messages: joined, settings: hubSettings(live) });
+      await emit(deps, row.site_id, 'conversation.assigned', { conversationId: input.conversationId, assignedTo: input.author.id, name: input.author.name, by: input.author.id, takeover: true });
+      const telegram = await telegramOf(deps, row.site_id);
+      if (telegramReady(telegram)) await postToThread({ db: deps.db, fetch: deps.fetch, now }, telegram, row.site_id, input.conversationId, `➡️ ${input.author.name ?? input.author.id} took this chat.`);
+    })().catch(() => deps.log('live.takeover_publish_failed')),
+  );
+  return result;
 }
 
 /** Nobody took a chat in time: the visitor gets the callback form (and may keep waiting). Returns what they see. */

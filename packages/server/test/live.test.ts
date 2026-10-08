@@ -147,13 +147,13 @@ describe("the hub's alarm", () => {
     // Still live: someone can still take it.
     expect((w.db.raw.prepare('SELECT status FROM conversations WHERE id = ?').get(id) as { status: string }).status).toBe('live');
 
-    // Quiet past closeAfterMinutes (and the database agrees): closed, the visitor told and disconnected.
+    // Quiet past closeAfterMinutes (and the database agrees): closed and the visitor told (still connected: the team can reopen it).
     w.db.raw.prepare('UPDATE conversations SET last_at = ? WHERE id = ?').run(Date.now() - 31 * 60_000, id);
     w.hub.tick(31 * 60_000);
     await runDue(w.hub.core, deps, 'demo');
     expect((w.db.raw.prepare('SELECT status FROM conversations WHERE id = ?').get(id) as { status: string }).status).toBe('closed');
     expect(visitor.sent).toContainEqual({ t: 'status', status: 'closed' });
-    expect(visitor.closed).toBe(true);
+    expect(visitor.closed).toBe(false);
   });
 });
 
@@ -200,13 +200,15 @@ describe('hand-over limits', () => {
 describe("the sockets' doors", () => {
   const upgrade = { Upgrade: 'websocket' };
 
-  it("refuses a visitor socket without a token, from another origin, or for a chat that is not live", async () => {
+  it('refuses a visitor socket without a token or from another origin, and lets any recorded chat connect', async () => {
     const w = await world(live);
-    const { token } = await chat(w.h);
+    const { token, id } = await chat(w.h);
     const open = (headers: Record<string, string>) => w.h.fetch('/v1/live/socket', { headers: { ...upgrade, ...headers } });
     expect((await open({ 'Sec-WebSocket-Protocol': 'helppuff.v1' })).status).toBe(401);
     expect((await open({ 'Sec-WebSocket-Protocol': `helppuff.v1, t.${token}`, Origin: 'https://evil.test' })).status).toBe(403);
-    expect((await open({ 'Sec-WebSocket-Protocol': `helppuff.v1, t.${token}` })).status).toBe(409);
+    // A chat the assistant is answering connects (the team can take it over at any time).
+    await w.settle();
+    expect(await (await open({ 'Sec-WebSocket-Protocol': `helppuff.v1, t.${token}` })).json()).toEqual({ accepted: 'visitor', conversation: id });
     expect((await open({ 'Sec-WebSocket-Protocol': 'helppuff.v1, t.forged.token' })).status).toBe(401);
   });
 
