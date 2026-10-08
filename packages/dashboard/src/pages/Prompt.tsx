@@ -1,16 +1,24 @@
 import { ArrowLeft, History, Lock, RotateCcw } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '../components/Shell';
-import { Badge, Button, Card, CardHeader, Empty, ErrorNote, Input, Segmented, Select, Skeleton, Textarea } from '../components/ui';
-import { api, ApiError, type Me, type PromptVersion, type PromptView, type PublishResult } from '../lib/api';
+import { PromptEditor, promptSuggestions, RunSection, SectionNumber, ToolDialog, ToolLibrary, unknownRefs, type Section } from '../components/Tools';
+import { Badge, Button, Card, CardHeader, Empty, ErrorNote, Input, Segmented, Select, Skeleton } from '../components/ui';
+import { api, ApiError, type Me, type PromptVersion, type PromptView, type PublishResult, type ToolsList, type ToolView } from '../lib/api';
+import { promptToolRefs } from '@helppuff/protocol/tools';
 import { diffLines } from '../lib/diff';
 import { cn, fmtDateTime, fmtRelative, useData } from '../lib/utils';
 
 /**
- * The assistant's system prompt, versioned. Publishing makes a new version
- * live; restoring publishes an old text as a new version, so nothing in the
- * history is ever lost. `helppuff deploy` publishes into the same history, and
- * refuses to overwrite a version made here that prompt.md has not pulled.
+ * The assistant's system prompt, versioned, and the site's tools around it,
+ * top to bottom as a chat runs: (1) tools called before the chat, (2) the
+ * prompt, where `{{tool}}` lets the assistant call one and `{{tool.key}}`
+ * reads what it returned, (3) tools called after it. The tool library is on
+ * the right.
+ *
+ * Publishing makes a new prompt version live; restoring publishes an old
+ * text as a new version, so nothing in the history is ever lost.
+ * `helppuff deploy` publishes into the same history, and refuses to overwrite
+ * a version made here that prompt.md has not pulled. Tools save at once.
  */
 
 const normalize = (text: string) => text.replace(/\r\n?/g, '\n').trim();
@@ -25,6 +33,13 @@ type Notice = { tone: 'ok' | 'warn'; text: string } | null;
 export function Prompt({ me }: { me: Me }) {
   const [site, setSite] = useState(me.sites[0]?.id ?? '');
   const { data, error, reload } = useData(() => api<PromptView>(`/prompt?site=${encodeURIComponent(site)}`), [site]);
+  const tools = useData(() => api<ToolsList>(`/tools?site=${encodeURIComponent(site)}`), [site]);
+  const [dialog, setDialog] = useState<{ tool: ToolView | null; section?: Section | 'prompt' } | null>(null);
+  const suggestions = useMemo(() => promptSuggestions(tools.data ?? null), [tools.data]);
+  const setFlag = async (tool: ToolView, section: Section, on: boolean) => {
+    await api<ToolView>(`/tools/${tool.id}`, { method: 'PATCH', json: { site, [section]: on } });
+    tools.reload();
+  };
   const [draft, setDraft] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
@@ -120,175 +135,242 @@ export function Prompt({ me }: { me: Me }) {
 
         {!data && !error && <Skeleton className="h-[32rem]" />}
 
-        {data && !data.editable && (
-          <Card>
-            <Empty icon={<Lock />} title="This prompt is managed elsewhere">
-              {data.reason}
-            </Empty>
-          </Card>
-        )}
-
-        {data?.editable && (
-          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
-            {selected === null ? (
-              <Card>
-                <CardHeader
-                  title={
-                    <span className="flex items-center gap-2">
-                      Live prompt {data.version > 0 && <Badge>v{data.version}</Badge>}
-                      {dirty && <Badge dot="var(--series-2)">Unpublished edit</Badge>}
-                    </span>
-                  }
-                  description={
-                    data.meta
-                      ? `Published ${fmtRelative(data.meta.at)}${data.meta.by ? ` by ${data.meta.by}` : ''} · ${sourceLabel(
-                          data.versions.find((v) => v.version === data.version) ?? { source: data.meta.source, restoredFrom: null },
-                        )}`
-                      : 'Not versioned yet — your first publish starts the history.'
-                  }
-                />
-                <div className="space-y-3 px-4 pb-4">
-                  {(() => {
-                    // Lines of the live prompt that settings or built-in rules already cover, still in the text being edited.
-                    const lines = new Set(text.split('\n').map((l) => l.trim()));
-                    const repeats = data.overlaps.filter((o) => lines.has(o.text));
-                    if (!repeats.length) return null;
-                    return (
-                      <div className="rounded-md border bg-subtle px-3 py-2.5 text-xs" role="note">
-                        <p className="font-medium">
-                          {repeats.length === 1 ? 'One line repeats' : `${repeats.length} lines repeat`} what HelpPuff already adds from your settings and rules
-                        </p>
-                        <ul className="mt-1.5 space-y-1 text-muted-foreground">
-                          {repeats.map((o) => (
-                            <li key={o.line}>
-                              <span className="text-foreground">“{o.text.length > 90 ? `${o.text.slice(0, 90)}…` : o.text}”</span> — {o.why}
-                            </li>
-                          ))}
-                        </ul>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="mt-2"
-                          onClick={() => {
-                            const drop = new Set(repeats.map((o) => o.text));
-                            setDraft(
-                              text
-                                .split('\n')
-                                .filter((l) => !drop.has(l.trim()))
-                                .join('\n')
-                                .replace(/\n{3,}/g, '\n\n')
-                                .trim(),
-                            );
-                          }}
-                        >
-                          Remove these lines
-                        </Button>
-                        <span className="ml-2 text-muted-foreground">Then review and publish; nothing changes until you do.</span>
-                      </div>
-                    );
-                  })()}
-                  <Textarea
-                    value={text}
-                    onChange={(e) => setDraft(e.target.value)}
-                    aria-label="System prompt"
-                    className="min-h-[28rem] resize-y font-mono text-[12.5px] leading-relaxed"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Only what is specific to your business: goal, tone and length are settings, and HelpPuff adds its rules itself. Facts belong in the
-                    knowledge base. You can use <code className="rounded bg-muted px-1">{'{{business.phone}}'}</code>,{' '}
-                    <code className="rounded bg-muted px-1">{'{{lead.name}}'}</code> and{' '}
-                    <code className="rounded bg-muted px-1">{'{{context.pageUrl}}'}</code>.
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Input
-                      value={note}
-                      onChange={(e) => setNote(e.target.value)}
-                      maxLength={200}
-                      placeholder="What changed? (optional)"
-                      aria-label="Change note"
-                      className="max-w-sm flex-1"
-                    />
-                    <span className={cn('ml-auto text-xs tabular-nums', over ? 'text-danger' : 'text-muted-foreground')}>
-                      {normalize(text).length.toLocaleString()} / {data.limit.toLocaleString()}
-                    </span>
-                    {dirty && (
-                      <Button variant="ghost" onClick={() => setDraft(null)} disabled={busy}>
-                        Discard
-                      </Button>
-                    )}
-                    <Button onClick={() => void publish()} disabled={!dirty || over || busy}>
-                      {busy ? 'Publishing…' : 'Publish'}
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            ) : (
-              <VersionView
-                site={site}
-                version={selected}
-                live={data}
-                busy={busy}
-                onBack={() => setSelected(null)}
-                onRestore={(v) => void restore(v)}
-              />
-            )}
-
-            {data.builtIn && (
-              <Card>
-                <details className="group">
-                  <summary className="cursor-pointer list-none px-4 py-3 text-[13px] font-medium marker:hidden">
-                    HelpPuff also adds these rules to every answer
-                    <span className="block text-xs font-normal text-muted-foreground">
-                      Read-only. They come from your settings; there is no need to repeat them above, and instructions that contradict them confuse the assistant.
-                    </span>
-                  </summary>
-                  <pre className="max-h-96 overflow-auto whitespace-pre-wrap border-t px-4 py-3 font-mono text-xs leading-relaxed text-muted-foreground scroll-thin">{data.builtIn}</pre>
-                </details>
-              </Card>
-            )}
-
-            <Card>
-              <CardHeader title="History" description={data.versions.length ? `${data.versions.length} version${data.versions.length === 1 ? '' : 's'}` : undefined} />
-              {data.versions.length === 0 ? (
-                <p className="px-4 pb-4 text-[13px] text-muted-foreground">
-                  No versions yet. The next publish — here or with <code className="rounded bg-muted px-1">helppuff deploy</code> — starts the history.
-                </p>
-              ) : (
-                <ul className="max-h-[36rem] overflow-auto border-t scroll-thin">
-                  {data.versions.map((v) => (
-                    <li key={v.version}>
-                      <button
-                        // The live version is what the editor shows.
-                        onClick={() => setSelected(v.version === data.version ? null : v.version)}
-                        aria-current={(selected ?? data.version) === v.version ? 'true' : undefined}
-                        className={cn(
-                          'flex w-full items-start gap-2.5 border-b px-4 py-2.5 text-left transition-colors last:border-b-0 hover:bg-muted/60',
-                          (selected ?? data.version) === v.version && 'bg-muted',
-                        )}
-                      >
-                        <span className="w-8 shrink-0 pt-px text-xs font-medium tabular-nums">v{v.version}</span>
-                        <span className="min-w-0 flex-1">
-                          <span className="flex items-center gap-1.5 text-[13px]">
-                            {sourceLabel(v)}
-                            {v.version === data.version && <Badge dot="#16a34a">Live</Badge>}
-                          </span>
-                          <span className="block truncate text-xs text-muted-foreground" title={v.note ?? undefined}>
-                            {v.note ?? v.author ?? '—'}
-                          </span>
-                        </span>
-                        <span className="shrink-0 pt-px text-xs text-muted-foreground" title={fmtDateTime(v.createdAt)}>
-                          {fmtRelative(v.createdAt)}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+        {data && (
+          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+            <div className="min-w-0 space-y-4">
+              {tools.error && <ErrorNote error={tools.error} onRetry={tools.reload} />}
+              {tools.data?.assistant && (
+                <RunSection section="before" list={tools.data} onOpen={(tool) => setDialog({ tool })} onNew={() => setDialog({ tool: null, section: 'before' })} onChange={(tool, on) => setFlag(tool, 'before', on)} />
               )}
-            </Card>
+              {!data.editable ? (
+                <Card>
+                  <Empty icon={<Lock />} title="This prompt is managed elsewhere">
+                    {data.reason}
+                  </Empty>
+                </Card>
+              ) : selected === null ? (
+                <Card>
+                  <CardHeader
+                    title={
+                      <span className="flex items-center gap-2">
+                        {tools.data?.assistant && <SectionNumber n={2} />}
+                        Prompt {data.version > 0 && <Badge>v{data.version}</Badge>}
+                        {dirty && <Badge dot="var(--series-2)">Unpublished edit</Badge>}
+                      </span>
+                    }
+                    description={
+                      data.meta
+                        ? `Published ${fmtRelative(data.meta.at)}${data.meta.by ? ` by ${data.meta.by}` : ''} · ${sourceLabel(
+                            data.versions.find((v) => v.version === data.version) ?? { source: data.meta.source, restoredFrom: null },
+                          )}`
+                        : 'Not versioned yet — your first publish starts the history.'
+                    }
+                  />
+                  <div className="space-y-3 px-4 pb-4">
+                    {(() => {
+                      // Lines of the live prompt that settings or built-in rules already cover, still in the text being edited.
+                      const lines = new Set(text.split('\n').map((l) => l.trim()));
+                      const repeats = data.overlaps.filter((o) => lines.has(o.text));
+                      if (!repeats.length) return null;
+                      return (
+                        <div className="rounded-md border bg-subtle px-3 py-2.5 text-xs" role="note">
+                          <p className="font-medium">
+                            {repeats.length === 1 ? 'One line repeats' : `${repeats.length} lines repeat`} what HelpPuff already adds from your settings and rules
+                          </p>
+                          <ul className="mt-1.5 space-y-1 text-muted-foreground">
+                            {repeats.map((o) => (
+                              <li key={o.line}>
+                                <span className="text-foreground">“{o.text.length > 90 ? `${o.text.slice(0, 90)}…` : o.text}”</span> — {o.why}
+                              </li>
+                            ))}
+                          </ul>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="mt-2"
+                            onClick={() => {
+                              const drop = new Set(repeats.map((o) => o.text));
+                              setDraft(
+                                text
+                                  .split('\n')
+                                  .filter((l) => !drop.has(l.trim()))
+                                  .join('\n')
+                                  .replace(/\n{3,}/g, '\n\n')
+                                  .trim(),
+                              );
+                            }}
+                          >
+                            Remove these lines
+                          </Button>
+                          <span className="ml-2 text-muted-foreground">Then review and publish; nothing changes until you do.</span>
+                        </div>
+                      );
+                    })()}
+                    <PromptEditor
+                      value={text}
+                      onChange={setDraft}
+                      suggestions={suggestions}
+                      label="System prompt"
+                      className="min-h-[24rem] resize-y font-mono text-[12.5px] leading-relaxed"
+                    />
+                    <PromptTools text={text} list={tools.data ?? null} onOpen={(tool) => setDialog({ tool })} onNew={() => setDialog({ tool: null, section: 'prompt' })} />
+                    <p className="text-xs text-muted-foreground">
+                      Only what is specific to your business: goal, tone and length are settings, and HelpPuff adds its rules itself. Facts belong in the
+                      knowledge base. Type <code className="rounded bg-muted px-1">{'{{'}</code> for what you can use:{' '}
+                      {tools.data?.assistant ? (
+                        <>
+                          <code className="rounded bg-muted px-1">{'{{order_status}}'}</code> lets the assistant call that tool,{' '}
+                          <code className="rounded bg-muted px-1">{'{{crm_lookup.tier}}'}</code> puts in what it returned,{' '}
+                        </>
+                      ) : null}
+                      <code className="rounded bg-muted px-1">{'{{business.phone}}'}</code>, <code className="rounded bg-muted px-1">{'{{lead.name}}'}</code>…
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Input
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        maxLength={200}
+                        placeholder="What changed? (optional)"
+                        aria-label="Change note"
+                        className="max-w-sm flex-1"
+                      />
+                      <span className={cn('ml-auto text-xs tabular-nums', over ? 'text-danger' : 'text-muted-foreground')}>
+                        {normalize(text).length.toLocaleString()} / {data.limit.toLocaleString()}
+                      </span>
+                      {dirty && (
+                        <Button variant="ghost" onClick={() => setDraft(null)} disabled={busy}>
+                          Discard
+                        </Button>
+                      )}
+                      <Button onClick={() => void publish()} disabled={!dirty || over || busy}>
+                        {busy ? 'Publishing…' : 'Publish'}
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              ) : (
+                <VersionView
+                  site={site}
+                  version={selected}
+                  live={data}
+                  busy={busy}
+                  onBack={() => setSelected(null)}
+                  onRestore={(v) => void restore(v)}
+                />
+              )}
+              {tools.data && (
+                <RunSection section="after" list={tools.data} onOpen={(tool) => setDialog({ tool })} onNew={() => setDialog({ tool: null, section: 'after' })} onChange={(tool, on) => setFlag(tool, 'after', on)} />
+              )}
+            </div>
+
+            <div className="space-y-4">
+              {tools.data ? (
+                <ToolLibrary list={tools.data} prompt={text} onOpen={(tool) => setDialog({ tool })} onNew={() => setDialog({ tool: null })} />
+              ) : (
+                !tools.error && <Skeleton className="h-40" />
+              )}
+
+              {data.builtIn && (
+                <Card>
+                  <details className="group">
+                    <summary className="cursor-pointer list-none px-4 py-3 text-[13px] font-medium marker:hidden">
+                      HelpPuff also adds these rules to every answer
+                      <span className="block text-xs font-normal text-muted-foreground">
+                        Read-only. They come from your settings; there is no need to repeat them above, and instructions that contradict them confuse the assistant.
+                      </span>
+                    </summary>
+                    <pre className="max-h-96 overflow-auto whitespace-pre-wrap border-t px-4 py-3 font-mono text-xs leading-relaxed text-muted-foreground scroll-thin">{data.builtIn}</pre>
+                  </details>
+                </Card>
+              )}
+
+              <Card>
+                <CardHeader title="History" description={data.versions.length ? `${data.versions.length} version${data.versions.length === 1 ? '' : 's'}` : undefined} />
+                {data.versions.length === 0 ? (
+                  <p className="px-4 pb-4 text-[13px] text-muted-foreground">
+                    No versions yet. The next publish — here or with <code className="rounded bg-muted px-1">helppuff deploy</code> — starts the history.
+                  </p>
+                ) : (
+                  <ul className="max-h-[36rem] overflow-auto border-t scroll-thin">
+                    {data.versions.map((v) => (
+                      <li key={v.version}>
+                        <button
+                          // The live version is what the editor shows.
+                          onClick={() => setSelected(v.version === data.version ? null : v.version)}
+                          aria-current={(selected ?? data.version) === v.version ? 'true' : undefined}
+                          className={cn(
+                            'flex w-full items-start gap-2.5 border-b px-4 py-2.5 text-left transition-colors last:border-b-0 hover:bg-muted/60',
+                            (selected ?? data.version) === v.version && 'bg-muted',
+                          )}
+                        >
+                          <span className="w-8 shrink-0 pt-px text-xs font-medium tabular-nums">v{v.version}</span>
+                          <span className="min-w-0 flex-1">
+                            <span className="flex items-center gap-1.5 text-[13px]">
+                              {sourceLabel(v)}
+                              {v.version === data.version && <Badge dot="#16a34a">Live</Badge>}
+                            </span>
+                            <span className="block truncate text-xs text-muted-foreground" title={v.note ?? undefined}>
+                              {v.note ?? v.author ?? '—'}
+                            </span>
+                          </span>
+                          <span className="shrink-0 pt-px text-xs text-muted-foreground" title={fmtDateTime(v.createdAt)}>
+                            {fmtRelative(v.createdAt)}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Card>
+            </div>
           </div>
         )}
       </div>
+      {dialog && tools.data && (
+        <ToolDialog
+          site={site}
+          tool={dialog.tool}
+          {...(dialog.section ? { section: dialog.section } : {})}
+          list={tools.data}
+          onClose={() => setDialog(null)}
+          onSaved={(saved) => {
+            setDialog(null);
+            tools.reload();
+            // A new tool made from the prompt section goes into the prompt at the end, ready to publish.
+            if (saved && !dialog.tool && dialog.section === 'prompt' && !promptToolRefs(text).some((r) => r.name === saved.name)) {
+              setDraft(`${text.replace(/\s+$/, '')}${text.trim() ? '\n' : ''}${saved.kind === 'extract' ? `Save it with {{${saved.name}}}.` : `Use {{${saved.name}}} when needed.`}`);
+            }
+          }}
+        />
+      )}
     </>
+  );
+}
+
+/** The tools this prompt names, and names that are not a tool (typos). */
+function PromptTools({ text, list, onOpen, onNew }: { text: string; list: ToolsList | null; onOpen: (tool: ToolView) => void; onNew: () => void }) {
+  if (!list?.assistant) return null;
+  const named = new Set(promptToolRefs(text).map((r) => r.name));
+  const used = list.tools.filter((t) => named.has(t.name));
+  const unknown = unknownRefs(text, list);
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 text-xs">
+      <span className="text-muted-foreground">Tools in this prompt:</span>
+      {used.length === 0 && <span className="text-muted-foreground">none</span>}
+      {used.map((t) => (
+        <button key={t.id} type="button" onClick={() => onOpen(t)} className={cn('rounded border px-1.5 py-0.5 font-mono hover:bg-muted', !t.enabled && 'text-muted-foreground line-through')}>
+          {t.name}
+        </button>
+      ))}
+      <button type="button" onClick={onNew} className="rounded border border-dashed px-1.5 py-0.5 text-muted-foreground hover:text-foreground">
+        + New tool
+      </button>
+      {unknown.length > 0 && (
+        <span className="w-full text-danger" role="note">
+          Not a tool or a known value: {unknown.map((u) => `{{${u}}}`).join(', ')}. Check the spelling, or add the tool.
+        </span>
+      )}
+    </div>
   );
 }
 

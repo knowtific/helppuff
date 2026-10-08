@@ -6,6 +6,8 @@ import { aiSettingsFor } from '../knowledge/env.js';
 import { emitTo, type WebhookRetryParams } from '../webhooks/deliver.js';
 import { summarizeConversation, type AiRunner } from './summary.js';
 import { parseJsonObject } from '../admin/inbox.js';
+import { afterToolIds, runAfterTool } from '../tools/chat.js';
+import { parseData } from '../tools/run.js';
 
 /**
  * The end of a conversation, as a background job (the Worker's Workflow).
@@ -17,8 +19,9 @@ import { parseJsonObject } from '../admin/inbox.js';
  *
  *   1. summarises and labels it (intent, sentiment, lead quality, outcome,
  *      topics, unanswered questions), saved for the dashboard;
- *   2. sends `conversation.completed` to the site's webhooks, with the
- *      summary, the lead and the transcript.
+ *   2. calls the site's after-chat tools (the Prompt page) with all of it;
+ *   3. sends `conversation.completed` to the site's webhooks, with the
+ *      summary, the lead, the transcript and the tools' data.
  *
  * Sleeping instances cost nothing on the Free plan (they do not count towards
  * the concurrency limit). Each step is retried on its own; a summary that
@@ -51,6 +54,8 @@ export type ConversationJobDeps = {
   log?: (event: string, data?: object) => void;
   /** Hand a failed webhook delivery to the Workflow for later tries. */
   retry?: ((params: WebhookRetryParams) => Promise<void>) | undefined;
+  /** HELPPUFF_SECRET: opens the after-chat tools' secret headers. Without it they do not run. */
+  secret?: string | undefined;
 };
 
 /** The model summaries use: HELPPUFF_SUMMARY_MODEL, else the site's own chat model. */
@@ -131,6 +136,18 @@ export async function runConversationJob(step: StepLike, deps: ConversationJobDe
     deps.log?.('conversation.summary_failed');
   }
 
+  // The site's after-chat tools, one step each (retried on a 5xx or a timeout), before the event, so it carries what they returned.
+  if (deps.secret) {
+    const tools = await step.do('tools', () => afterToolIds(deps.db, params.siteId, now())).catch(() => [] as string[]);
+    for (const toolId of tools) {
+      try {
+        await step.do(`tool:${toolId}`, async () => runAfterTool({ db: deps.db, fetch: deps.fetch, secret: deps.secret, now, log: deps.log }, params.siteId, toolId, await completedEvent(deps.db, params.conversationId)));
+      } catch {
+        deps.log?.('conversation.tool_failed');
+      }
+    }
+  }
+
   const sent = await step.do('complete', async () => {
     // Claimed first, so a retried step (or a second instance) never sends it twice.
     const claim = (await deps.db
@@ -194,6 +211,8 @@ async function completedEvent(db: D1Like, id: string): Promise<Record<string, un
     /** The site's own labels on it (Settings → Labels), by the team or the AI. */
     tags: tags.results.map((t) => t.name),
     attributes: parseJsonObject(row?.['attributes']),
+    /** What the site's tools returned or saved, by tool name. */
+    data: parseData(row?.['data']),
     assignedTo: row?.['assigned_to'] ?? null,
     lead: lead
       ? { name: lead['name'] ?? null, email: lead['email'] ?? null, phone: lead['phone'] ?? null, company: lead['company'] ?? null, status: lead['status'], source: lead['source'], fields, attributes: parseJsonObject(lead['attributes']) }

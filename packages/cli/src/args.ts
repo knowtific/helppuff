@@ -32,9 +32,14 @@ const BOOLEAN = new Set([
   'timing',
   'check',
   'allow-downgrade',
+  'extract',
+  'before',
+  'after',
 ]);
 /** Flags that may repeat, collected into a list. */
 const LIST = new Set(['docs']);
+/** Flags that may repeat, each value kept whole (a header or a description may have commas). */
+const REPEAT = new Set(['header', 'param', 'field', 'arg', 'prechat']);
 
 /**
  * Small and strict: `--flag value`, `--flag=value`, `--no-flag`, `-y`.
@@ -69,7 +74,9 @@ export function parseArgs(argv: string[]): Parsed {
         value = next;
         i++;
       }
-      if (LIST.has(name) && typeof value === 'string') {
+      if (REPEAT.has(name) && typeof value === 'string') {
+        flags[name] = [...(Array.isArray(flags[name]) ? (flags[name] as string[]) : []), value];
+      } else if (LIST.has(name) && typeof value === 'string') {
         const list = Array.isArray(flags[name]) ? (flags[name] as string[]) : [];
         flags[name] = [...list, ...value.split(',').map((v) => v.trim()).filter(Boolean)];
       } else {

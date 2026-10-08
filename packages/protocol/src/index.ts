@@ -12,3 +12,4 @@ export * from './config.js';
 export * from './webhooks.js';
 export * from './live.js';
 export * from './jobs.js';
+export * from './tools.js';

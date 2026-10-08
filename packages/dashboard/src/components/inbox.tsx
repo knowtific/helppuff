@@ -357,6 +357,42 @@ export function NotesPanel({ notes, me, isAdmin, addPath, onChange }: { notes: N
 }
 
 /** A small section heading for the side panels. */
+/**
+ * What the site's tools returned or saved in a conversation (the Prompt
+ * page's tools), by tool name: read-only, a line per key, objects folded.
+ */
+export function ToolData({ value }: { value: Record<string, unknown> }) {
+  const entries = Object.entries(value);
+  if (!entries.length) return <p className="text-xs text-muted-foreground">No tool has run in this conversation.</p>;
+  const line = (v: unknown) => (v === null || v === undefined ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v));
+  return (
+    <div className="space-y-1.5">
+      {entries.map(([name, data]) => {
+        const failed = Boolean(data && typeof data === 'object' && !Array.isArray(data) && 'error' in data);
+        const rows = data && typeof data === 'object' && !Array.isArray(data) ? Object.entries(data as Record<string, unknown>) : [['value', data] as const];
+        return (
+          <details key={name} className="group rounded-md border text-xs" open={entries.length <= 3}>
+            <summary className="flex cursor-pointer list-none items-center gap-1.5 px-2 py-1.5 font-mono marker:hidden">
+              <span className="truncate">{name}</span>
+              {failed && <span className="ml-auto text-danger">failed</span>}
+            </summary>
+            <dl className="divide-y border-t">
+              {rows.map(([k, v]) => (
+                <div key={k} className="flex items-start gap-2 px-2 py-1">
+                  <dt className="w-24 shrink-0 truncate text-muted-foreground" title={k}>
+                    {k}
+                  </dt>
+                  <dd className="min-w-0 flex-1 break-words font-mono text-[11px]">{line(v)}</dd>
+                </div>
+              ))}
+            </dl>
+          </details>
+        );
+      })}
+    </div>
+  );
+}
+
 export function SideSection({ title, children, className }: { title: string; children: ReactNode; className?: string }) {
   return (
     <section className={cn('space-y-2', className)}>

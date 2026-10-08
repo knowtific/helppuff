@@ -22,6 +22,7 @@ import { COPY, isLive, LIVE_CALLBACK_FORM, liveDeps, noHandover, readLiveState, 
 import type { TurnStatus } from '../admin/record.js';
 import { completeJobForm, jobsHandle, submitQuote } from '../jobs/chat.js';
 import { quoteActionId } from '../jobs/widget.js';
+import { conversationFacts, enabledTools, runBeforeTools, toolsHandle } from '../tools/chat.js';
 
 /**
  * A conversation with the assistant, whoever holds it: the widget (a browser
@@ -185,6 +186,8 @@ export async function startChat<T>(
   const sessionId = newSessionId();
   const streaming = wantsStream(c.req.header('Accept'), prepared);
   const relay = textRelay();
+  // The site's own tools (Prompt page): read now, while the limits are checked.
+  const toolsRead = enabledTools(ctx, site, siteId).catch(() => []);
 
   const finish = async (): Promise<ChatTurn> => {
     const cctx = connectorContext(ctx, prepared, siteId, sessionId, streaming ? relay.onText : undefined, (found) => {
@@ -192,6 +195,19 @@ export async function startChat<T>(
       dispatchLead(ctx, site, siteId, { sessionId, lead: found, context: input.context });
     });
     if (prepared.connector.gated) cctx.gate = gate;
+    // Before the chat: the tools marked so run with the form's answers, once the limits passed;
+    // the first answer has what they returned.
+    const tools = await toolsRead;
+    let data: Record<string, unknown> = {};
+    if (tools.length) {
+      const page = { url: input.context.pageUrl ?? null, title: input.context.pageTitle ?? null };
+      if (tools.some((t) => t.before)) {
+        await gate;
+        data = await ctx.timing.span('tools', () => runBeforeTools(ctx, { siteId, sessionId, tools, prechat: lead, page }));
+      }
+      const handle = toolsHandle(ctx, { siteId, sessionId, prepared, tools, facts: { data, prechat: lead, page } });
+      if (handle) cctx.tools = handle;
+    }
     const started = await ctx.timing.span('connector', () => runConnector(ctx, 'start', () => prepared.connector.start(cctx, { ...input, lead })));
     // Nothing is recorded for a request the limits refused.
     await verdict;
@@ -210,6 +226,7 @@ export async function startChat<T>(
       firstMessage: input.firstMessage,
       messages,
       country: c.req.header('CF-IPCountry') ?? null,
+      data,
     });
     // Lead destinations, after the response is decided and never blocking it.
     dispatchLead(ctx, site, siteId, { sessionId, lead, context: input.context, ...(input.firstMessage ? { firstMessage: input.firstMessage } : {}) });
@@ -239,6 +256,13 @@ export async function sendChat<T>(c: Context<HonoEnv>, options: { session: ChatS
   // over the live socket (nobody took the chat in time) is for a conversation that was handed over.
   // The quote questions' answers (a `job` flow) are checked against the site's quote questions below.
   const quoteAnswers = input.kind === 'action' && input.actionId === quoteActionId;
+  // The site's own tools and what this conversation has from them (one read, started now).
+  const toolsRead = (async () => {
+    const tools = await enabledTools(ctx, site, siteId);
+    const records = dbFrom(ctx.env);
+    return tools.length && records ? { tools, facts: await conversationFacts(records, sessionId) } : null;
+  })();
+  toolsRead.catch(() => {});
   if (isFormSubmission(input) && !quoteAnswers && !formWasOffered(input.actionId, session.forms, site.widget.forms)) {
     const handedOver = input.actionId === LIVE_CALLBACK_FORM && Boolean((await liveRead)?.handover_at);
     if (!handedOver) {
@@ -379,6 +403,9 @@ export async function sendChat<T>(c: Context<HonoEnv>, options: { session: ChatS
     if (!liveNow) {
       const jobs = await jobsHandle(ctx, siteId, sessionId, jobForms).catch(() => undefined);
       if (jobs) cctx.jobs = jobs;
+      const own = await toolsRead.catch(() => null);
+      const handle = own ? toolsHandle(ctx, { siteId, sessionId, prepared, tools: own.tools, facts: own.facts }) : undefined;
+      if (handle) cctx.tools = handle;
     }
     const result = await ctx.timing.span('connector', () => runConnector(ctx, 'send', () => prepared.connector.send(cctx, session.state, input)));
     const count = await verdict;

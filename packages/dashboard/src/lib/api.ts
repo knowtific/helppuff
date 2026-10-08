@@ -163,6 +163,8 @@ export type ConversationDetail = {
     assigned_name?: string | null;
     waiting_since?: number | null;
     attributes?: Record<string, string>;
+    /** What the site's tools returned or saved, by tool name. */
+    data?: Record<string, unknown>;
   };
   lead: Lead | null;
   callbacks: Callback[];
@@ -273,6 +275,40 @@ export type PromptView = {
   overlaps: { line: number; text: string; why: string }[];
 };
 export type PublishResult = { status: 'published' | 'unchanged'; version: number };
+
+// ---------------------------------------------------------------------- tools
+
+export type ToolParamView = { name: string; description: string; required: boolean };
+export type ToolHeaderView = { name: string; value: string; secret: boolean; /** A value is stored (secret values are never sent back). */ set?: boolean };
+export type ToolView = {
+  id: string;
+  name: string;
+  kind: 'http' | 'extract';
+  description: string;
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  url?: string;
+  headers?: ToolHeaderView[];
+  body?: string;
+  parameters?: ToolParamView[];
+  fields?: ToolParamView[];
+  pick?: string[];
+  timeoutMs?: number;
+  /** What it returns or saves, for `{{name.key}}`. */
+  keys: string[];
+  before: boolean;
+  after: boolean;
+  enabled: boolean;
+  lastStatus: number | null;
+  lastError: string | null;
+  lastAt: number | null;
+};
+export type ToolsList = {
+  tools: ToolView[];
+  assistant: boolean;
+  prechat: { name: string; label: string }[];
+  limits: { tools: number; timeoutMs: { default: number; min: number; max: number } };
+};
+export type ToolTestResult = { ok: boolean; status: number | null; ms: number; error: string | null; response: unknown; value: unknown; keys: string[]; missing?: string[] };
 
 // ------------------------------------------------------------------ knowledge
 

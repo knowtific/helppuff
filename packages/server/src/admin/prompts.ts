@@ -75,7 +75,12 @@ export function promptField(connector: ConnectorConfig): {
   let option: string | null;
   try {
     const erased = getConnector(connector.type);
-    option = erased.promptOption(erased.parseOptions(connector.options ?? {}));
+    try {
+      option = erased.promptOption(erased.parseOptions(connector.options ?? {}));
+    } catch {
+      // Options valid only once their `{ env }` refs are filled in (a base URL from a secret): which option holds the prompt does not depend on those.
+      option = erased.promptOption((connector.options ?? {}) as never);
+    }
   } catch {
     option = null;
   }

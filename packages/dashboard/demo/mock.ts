@@ -1,5 +1,5 @@
 import { WEBHOOK_EVENTS } from '@helppuff/protocol';
-import type { Callback, CallbackStatus, KnowledgePage, Label, Lead, LeadStatus, Note, Overview, Prefs, PromptVersion, Settings, StoredMessage, Summary } from '../src/lib/api';
+import type { Callback, CallbackStatus, KnowledgePage, Label, Lead, LeadStatus, Note, Overview, Prefs, PromptVersion, Settings, StoredMessage, Summary, ToolView } from '../src/lib/api';
 import { FACTS, LABELS, PAGES, PROMPT_TEXT, SITE, callbacks, conversations, leads, notes } from './data';
 import { jobsRoute } from './jobs';
 
@@ -110,6 +110,49 @@ const manual = [
 const files = [
   { id: 'f1', name: 'price-list-2026.pdf', kind: 'pdf' as const, size: 184_220, status: 'indexed' as const, error: null, chunks: 12, truncated: 0, createdAt: NOW - 15 * DAY, updatedAt: NOW - 15 * DAY },
   { id: 'f2', name: 'hot-water-guide.docx', kind: 'docx' as const, size: 96_100, status: 'indexed' as const, error: null, chunks: 7, truncated: 0, createdAt: NOW - 30 * DAY, updatedAt: NOW - 30 * DAY },
+];
+
+const toolBase = { enabled: true, lastError: null, lastAt: NOW - 2 * 3600_000, lastStatus: 200, before: false, after: false, timeoutMs: 5000, pick: [], parameters: [], headers: [], body: '' };
+const tools: ToolView[] = [
+  {
+    ...toolBase,
+    id: 'tool_customer',
+    name: 'customer_lookup',
+    kind: 'http',
+    description: 'The customer in our job system, by email: how many jobs we have done for them.',
+    method: 'POST',
+    url: 'https://api.jobsystem.example/v2/customers/search',
+    headers: [{ name: 'Authorization', value: '', secret: true, set: true }],
+    body: '{ "email": "{{prechat.email}}" }',
+    pick: ['jobs', 'since'],
+    keys: ['jobs', 'since', 'name'],
+    before: true,
+  },
+  {
+    ...toolBase,
+    id: 'tool_status',
+    name: 'job_status',
+    kind: 'http',
+    description: 'A booked job’s status, date and plumber, by its job number (like HP-2041).',
+    method: 'GET',
+    url: 'https://api.jobsystem.example/v2/jobs/{{args.job_number}}',
+    headers: [{ name: 'Authorization', value: '', secret: true, set: true }],
+    parameters: [{ name: 'job_number', description: 'Like HP-2041.', required: true }],
+    keys: ['status', 'date', 'plumber'],
+  },
+  { ...toolBase, id: 'tool_number', name: 'job_number', kind: 'extract', description: 'Save the job number once the customer gives it.', fields: [{ name: 'job_number', description: 'Like HP-2041.', required: true }], keys: ['job_number'], lastAt: null, lastStatus: null },
+  {
+    ...toolBase,
+    id: 'tool_crm',
+    name: 'crm_sync',
+    kind: 'http',
+    description: 'Send each finished conversation to our CRM.',
+    method: 'POST',
+    url: 'https://crm.example/api/helppuff',
+    headers: [{ name: 'X-Api-Key', value: '', secret: true, set: true }],
+    keys: [],
+    after: true,
+  },
 ];
 
 type Hook = {
@@ -419,6 +462,7 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
         assigned_name: c.assignedName ?? null,
         waiting_since: c.waitingSince ?? null,
         attributes: c.attributes ?? {},
+        data: c.data ?? {},
       },
       lead: lead ? { ...lead, created_at: lead.createdAt } : null,
       callbacks: callbacks.filter((cb) => cb.conversationId === c.id),
@@ -583,6 +627,27 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
       case 'suggest-questions':
         return json({ questions: ['How much is a blocked drain?', 'Do you do emergency callouts?', 'Do you install heat-pump hot water?', 'What areas do you cover?'] });
     }
+  }
+
+  if (head === 'tools') {
+    if (id === 'test') {
+      const draft = (body['tool'] ?? {}) as Partial<ToolView>;
+      const found = tools.find((t) => t.id === body['id']) ?? draft;
+      const response = found.name === 'job_status' ? { status: 'Booked', date: 'Tomorrow, 8am', plumber: 'Dan', notes: 'Gate code 4471' } : found.name === 'customer_lookup' ? { jobs: 3, since: '2021', name: 'Ada Lovelace' } : { ok: true };
+      return json({ ok: true, status: 200, ms: 164, error: null, response, value: response, keys: Object.keys(response) });
+    }
+    if (!id) {
+      if (method === 'POST') {
+        const tool = { ...toolBase, keys: [], lastAt: null, lastStatus: null, ...(body as Partial<ToolView>), id: `tool_${tools.length + 1}` } as ToolView;
+        tools.push(tool);
+        return json(tool);
+      }
+      return json({ tools, assistant: true, prechat: [{ name: 'name', label: 'Name' }, { name: 'email', label: 'Email' }, { name: 'phone', label: 'Phone' }], limits: { tools: 30, timeoutMs: { default: 5000, min: 1000, max: 10000 } } });
+    }
+    const at = tools.findIndex((t) => t.id === id);
+    if (method === 'DELETE' && at >= 0) tools.splice(at, 1);
+    if (method === 'PATCH' && at >= 0) Object.assign(tools[at]!, body, { headers: tools[at]!.headers });
+    return json(tools[at] ?? { deleted: true });
   }
 
   if (head === 'webhooks') {

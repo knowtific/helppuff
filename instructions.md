@@ -284,8 +284,8 @@ else keeps its default. Two kinds of setting:
   them), then `config set <path> <value> --json`, then `deploy --json`.
   Values are JSON when they look like JSON (`true`, `120`, `'["a","b"]'`).
   `schema --json` lists every path with its meaning.
-- **On the Worker** (jobs, labels, live chat, Telegram, webhooks, the team,
-  API keys): their own commands, live at once, no deploy. Anything without a
+- **On the Worker** (jobs, labels, live chat, Telegram, webhooks, tools, the
+  team, API keys): their own commands, live at once, no deploy. Anything without a
   command goes through `api <METHOD> <path> --data '{…}' --json`, the public
   API with the project's admin key (the wiki's API reference lists every
   route).
@@ -318,6 +318,10 @@ else keeps its default. Two kinds of setting:
 | Jobs: the assistant should not create them | `api PUT /jobs/pipeline --data '{"assistantJobs":false}'` |
 | Jobs: other stages or fields | `api GET /jobs/pipeline`; from its `pipeline`, edit the whole `stages` list or `fields` list (keep each `id`; leave out fields with `"archived": true`), save it as `{"stages":[…]}` or `{"fields":[…]}` and `api PUT /jobs/pipeline --data @pipeline.json`. Keep one open, one won and one lost stage; a removed field keeps its values on old jobs |
 | Send events to another tool | `webhooks add <https url> --events lead.captured,job.created` |
+| The assistant should check their API (an order, a booking, stock) | `tools add order_status --curl '<their curl, with {{args.order_number}} where the assistant fills a value in and ${ENV_NAME} for a key>' --description '<when to use it>' --param order_number='<what it is>'`; it answers `needs_input` for a missing key (the user runs `secret set`). Then `tools test order_status --arg order_number=<sample>`, add `{{order_status}}` to the sentence of `prompt.md` that says when to use it, and `deploy` |
+| Look the visitor up when the chat starts | `tools add crm_lookup --url <https url> --method POST --body '{"email":"{{prechat.email}}"}' --header 'Authorization: Bearer ${CRM_KEY}' --before --description '…'`; use what it returns in `prompt.md` as `{{crm_lookup.<key>}}` (`tools test` lists the keys) |
+| Save something the visitor says (an order number) | `tools add order_number --extract --field order_number='<what it is>' --description 'Save the order number once they give it'`, and `{{order_number}}` in `prompt.md`. It is saved as a conversation attribute |
+| Send each finished chat to their CRM | `tools add crm_sync --url <https url> --method POST --after --description '…'` (no body: the whole conversation as JSON), or a webhook on `conversation.completed` |
 | Use HelpPuff from their own server | `keys create "<name>" --preset chat` (or `--scopes …`); the key is shown once: give it to the user, never store it in the repository |
 | Remove everything from Cloudflare | Only on an explicit request: `destroy --yes` |
 
@@ -328,7 +332,7 @@ user run `secret set`.
 
 Every command above takes `--json` and runs as `npx -y @knowtific/helppuff …`.
 Confirm the change with the matching read (`config get <path>`,
-`jobs pipeline`, `live status`, `users list`, `webhooks list`) and tell the
+`jobs pipeline`, `live status`, `users list`, `webhooks list`, `tools list`) and tell the
 user what changed.
 
 ## Non-negotiable rules

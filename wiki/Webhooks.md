@@ -20,7 +20,7 @@ leads only; see [[Leads]].
 
 | Event | When | `data` |
 | --- | --- | --- |
-| `conversation.started` | A visitor opened a chat | `conversationId`, `page` `{url,title,referrer,utm}`, `locale`, `country`, `form` (pre-chat form fields or null), `firstMessage` |
+| `conversation.started` | A visitor opened a chat | `conversationId`, `page` `{url,title,referrer,utm}`, `locale`, `country`, `form` (pre-chat form fields or null), `firstMessage`, `data` (what [[tools|Tools]] returned before the chat, or null) |
 | `message.received` | A visitor sent a message (including the pre-chat form's message) | `conversationId`, `kind` (`text` or `action`), `text`, `action` `{id,value}` for a button or form |
 | `message.sent` | The assistant replied, or a person on the team did (live chat) | `conversationId`, `text` (the reply as plain text), `messages` (the rich messages as the widget showed them), `author` `{kind: "human", id, name}` for a person's reply |
 | `lead.captured` | Contact details arrived: the form, typed in the chat, or found by the assistant | `conversationId`, `source` (`form`, `chat`, `ai`), `name`, `email`, `phone`, `fields` (custom form fields), `message` |
@@ -28,7 +28,7 @@ leads only; see [[Leads]].
 | `callback.updated` | A callback request was marked done or dismissed, reopened, or its note changed (dashboard or `helppuff callbacks`) | `callback` (`id`, `conversationId`, `status`, `note`, `name`, `phone`, `email`, `reason`, `closedBy`…), `previousStatus` |
 | `lead.updated` | A lead's status, details, notes or attributes changed | `leadId`, `conversationId`, `changed`, `lead` |
 | `feedback.received` | A visitor rated a reply | `conversationId`, `messageId`, `rating` (`up`, `down`, `cleared`) |
-| `conversation.completed` | A conversation went quiet: **5 minutes after its last message** (a live chat: when it closes). Sent once (again if the visitor comes back later) | `conversationId`, `startedAt`, `lastMessageAt`, `messageCount`, `page`, `country`, `summary`, `labels` `{intent, sentiment, leadQuality, outcome, topics}`, `tags` (the site's own labels on it), `attributes`, `assignedTo`, `unanswered` (questions it could not answer), `followUp`, `lead`, `transcript` `[{role, text, at}]` (`role`: `visitor`, `assistant` or `team`) |
+| `conversation.completed` | A conversation went quiet: **5 minutes after its last message** (a live chat: when it closes). Sent once (again if the visitor comes back later) | `conversationId`, `startedAt`, `lastMessageAt`, `messageCount`, `page`, `country`, `summary`, `labels` `{intent, sentiment, leadQuality, outcome, topics}`, `tags` (the site's own labels on it), `attributes`, `assignedTo`, `unanswered` (questions it could not answer), `followUp`, `lead`, `data` (what the site's [[tools|Tools]] returned or saved, by tool name), `transcript` `[{role, text, at}]` (`role`: `visitor`, `assistant` or `team`) |
 | `handover.requested` | A visitor asked for a person ([[Live chat|Live-Chat]]): the team was notified | `conversationId`, `reason`, `page` |
 | `handover.missed` | Nobody took a live chat within `live.waitSeconds`: the visitor was offered the callback form | `conversationId` |
 | `handover.ended` | A person handed the chat back to the assistant | `conversationId`, `by`, `outcome` |

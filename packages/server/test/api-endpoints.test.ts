@@ -78,7 +78,7 @@ async function world(site: Site = {}) {
 }
 
 /** Maps whose keys are data (counts by status, custom fields…), not part of the shape. */
-const MAPS = new Set(['pages', 'counts', 'facts', 'metadata', 'fields', 'ms', 'embedding', 'utm', 'limits', 'contact', 'attributes']);
+const MAPS = new Set(['pages', 'counts', 'facts', 'metadata', 'fields', 'ms', 'embedding', 'utm', 'limits', 'contact', 'attributes', 'data', 'response', 'value']);
 
 /** Top-level fields of `actual` against the documented example (and of the first item of each list). */
 function shapeOf(value: unknown, depth = 0, key = ''): unknown {
@@ -307,6 +307,35 @@ describe('every area, end to end through /api/v1', () => {
     expect(off.json['enabled']).toBe(false);
     expectDocumented('PATCH', `/webhooks/${id}`, off.json);
     expectDocumented('DELETE', `/webhooks/${id}`, (await w.call('DELETE', `/webhooks/${id}`, key)).json);
+  });
+
+  it('tools: adds, lists, tests (remembering the keys), changes and removes; secrets never come back', async () => {
+    const w = await world();
+    const key = await w.key(['prompt:write']);
+    const body = findEndpoint('POST', '/tools')!.body as Json;
+    const added = await w.call('POST', '/tools', key, body);
+    expect(added.status).toBe(201);
+    expect(added.json['headers']).toEqual([{ name: 'Authorization', value: '', secret: true, set: true }]);
+    expect(JSON.stringify(w.db.raw.prepare('SELECT headers FROM tools').get())).not.toContain('sk_live');
+    expectDocumented('POST', '/tools', added.json);
+    const id = added.json['id'] as string;
+    const fetched = vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ status: 'shipped', delivery: { date: '2026-10-12', carrier: 'AusPost' } }));
+    const tested = await w.call('POST', '/tools/test', key, { id, sample: { args: { order_number: 'A-1042' } } });
+    expect(tested.json).toMatchObject({ ok: true, status: 200, value: { status: 'shipped', delivery: { date: '2026-10-12' } } });
+    const [url, init] = fetched.mock.calls[0]!;
+    expect(url).toBe('https://api.acme.example/orders/A-1042');
+    expect(new Headers(init!.headers).get('authorization')).toBe('Bearer sk_live_4f3e2d1c');
+    expectDocumented('POST', '/tools/test', tested.json);
+    const listed = await w.call('GET', '/tools', key);
+    expect(listed.json['tools'][0]['keys']).toContain('delivery.carrier');
+    expectDocumented('GET', '/tools', listed.json);
+    const changed = await w.call('PATCH', `/tools/${id}`, key, { before: true, headers: [{ name: 'Authorization', value: '', secret: true }] });
+    expect(changed.json['before']).toBe(true);
+    expectDocumented('PATCH', `/tools/${id}`, changed.json);
+    await w.call('POST', '/tools/test', key, { id, sample: { args: { order_number: 'A-1' } } });
+    expect(new Headers(fetched.mock.calls[1]![1]!.headers).get('authorization')).toBe('Bearer sk_live_4f3e2d1c');
+    expect((await w.call('POST', '/tools', key, { ...body })).json).toMatchObject({ error: { message: 'There is already a tool called order_status.' } });
+    expectDocumented('DELETE', `/tools/${id}`, (await w.call('DELETE', `/tools/${id}`, key)).json);
   });
 
   it('analytics: overview and version', async () => {

@@ -165,7 +165,7 @@ const NOTES = [
   null,
 ];
 
-export type DemoConversation = ConversationRow & { messages: StoredMessage[]; leadId: string | null; summaryJson: string | null; referrer: string | null; locale: string };
+export type DemoConversation = ConversationRow & { messages: StoredMessage[]; leadId: string | null; summaryJson: string | null; referrer: string | null; locale: string; data?: Record<string, unknown> };
 
 export const conversations: DemoConversation[] = [];
 export const leads: Lead[] = [];
@@ -327,7 +327,8 @@ export const callbacks: Callback[] = [];
       { id: `${answering.id}_u2`, role: 'user', type: 'text', text: 'Perfect, thank you!', payload: null, ts: NOW - 6 * 60_000, author: null },
     );
     answering.messageCount = answering.messages.length;
-    answering.attributes = { job: 'HP-2041' };
+    answering.attributes = { job_number: 'HP-2041' };
+    answering.data = { customer_lookup: { jobs: 3, since: '2021' }, job_number: { job_number: 'HP-2041' }, job_status: { status: 'Booked', date: 'Tomorrow, 8am', plumber: 'Dan' } };
   }
   for (const lead of leads.slice(0, 6)) lead.attributes = { suburb: JSON.parse(lead.fields ?? '{}').suburb ?? 'Balmain', ...(lead.status === 'won' ? { lifetimeValue: '$640' } : {}) };
   const first = leads[0];
@@ -341,7 +342,9 @@ export const PROMPT_TEXT = `Harbour Plumbing is a family-run plumbing business i
 
 - Quote the standard callout ($180 + GST, first 30 minutes) when asked about prices.
 - For gas work, offer a call from Dan, our licensed gas fitter.
-- We do not do roofing or guttering: suggest a roofer.`;
+- We do not do roofing or guttering: suggest a roofer.
+- Returning customers ({{customer_lookup.jobs}} past jobs) get priority booking.
+- When someone asks about a booked job, ask for the job number, save it with {{job_number}}, then check it with {{job_status}}.`;
 
 export const PAGES = [
   ['/', 'Harbour Plumbing: plumbers in the inner west', 'home', 6],

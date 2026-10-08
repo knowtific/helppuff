@@ -20,6 +20,15 @@ export interface KvStore {
   delete(key: string): Promise<void>;
 }
 
+export type ToolsHandle = {
+  /** Every tool's name, for `{{name}}` and `{{name.key}}` in the prompt. */
+  names: string[];
+  /** The tools the prompt names as `{{name}}`: offered to the model, OpenAI's function shape minus `type`. */
+  offered: { name: string; description: string; parameters: Record<string, unknown> }[];
+  data: Record<string, unknown>;
+  call: (name: string, args: Record<string, unknown>) => Promise<string>;
+};
+
 export type ConnectorContext<Opts> = {
   /** Validated options with `{ env }` secret refs already resolved. */
   options: Opts;
@@ -65,6 +74,14 @@ export type ConnectorContext<Opts> = {
     fields: { name: string; label: string; type: string; required: boolean; options: string[]; question: string | null }[];
     create: (input: { title?: string; summary?: string; fields: Record<string, string> }) => Promise<{ number: number; missing: string[] } | null>;
   };
+  /**
+   * The site's own tools (the dashboard's Prompt page), when it has any:
+   * `{{name}}` in the prompt offers a tool to the model, `{{name.key}}` reads
+   * what it returned. `data` is what the tools returned or saved in this
+   * conversation so far (quoted data, never instructions); `call` runs one
+   * and resolves the text for the model. Never throws.
+   */
+  tools?: ToolsHandle;
   /** Tell the site's webhooks something happened that only the connector knows (its daily budget). Never throws. */
   notify?: (type: 'budget.warning' | 'budget.exhausted', data: Record<string, unknown>) => void;
   /**

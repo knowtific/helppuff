@@ -389,6 +389,23 @@ helppuff webhooks test wh_1a2b3c
 helppuff webhooks list --json
 ```
 
+### `helppuff tools`
+
+```
+helppuff tools list | show <name> | add <name> (--curl '…' | --url <https://…> [--method POST] [--header "Name: value"] [--body …] | --extract --field name="what it is") --description "…" [--param name="what it is"] [--pick a,b] [--before] [--after] [--timeout ms] | set <name> [the same flags, --no-before, --no-after] | test <name> [--arg name=value] [--prechat field=value] | enable <name> | disable <name> | remove <name>
+```
+
+The site's own tools, the same as on the dashboard's Prompt page (stored on the Worker). An http tool calls your API: `{{args.x}}` in its URL, headers or body is filled in by the assistant, `{{prechat.email}}` from the pre-chat form, `{{data.other_tool.key}}` from another tool. `--before` runs it when a chat starts, `--after` when the conversation ends (with the transcript, summary, contact and all the data; an empty body sends all of it as JSON). An extract tool (`--extract`) saves what the visitor says, like an order number, as conversation attributes. Name a tool in the prompt as {{name}} to let the assistant use it, and {{name.key}} to put in what it returned. What tools return is kept on the conversation, shown in the dashboard and sent to webhooks. Credential headers (Authorization, X-Api-Key…) are stored encrypted and never read back; write `${NAME}` in a header to take the value from .env (a missing one answers needs_input). Up to 30 per site; https only.
+
+```bash
+helppuff tools add order_status --curl 'curl https://api.acme.com/orders/{{args.order_number}} -H "Authorization: Bearer ${ACME_API_KEY}"' --description 'Look up an order by its number' --param order_number='Like A-1042' --json
+helppuff tools add crm_lookup --url https://crm.acme.com/lookup --method POST --body '{"email":"{{prechat.email}}"}' --header 'X-Api-Key: ${CRM_KEY}' --before --description 'The customer in our CRM'
+helppuff tools add order_number --extract --field order_number='Like A-1042' --description 'Save the order number once the visitor gives it'
+helppuff tools test order_status --arg order_number=A-1042 --json
+```
+
+Then reference the tool in prompt.md ({{order_status}}) and `helppuff deploy`, or edit the prompt in the dashboard. Tools apply to HelpPuff's assistant (any model); with a whole backend (Retell, your own API) only after-chat tools run.
+
 ### `helppuff keys`
 
 ```

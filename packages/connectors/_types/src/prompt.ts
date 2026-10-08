@@ -50,6 +50,8 @@ export type PromptScope = {
   site?: { id: string } | undefined;
   /** The business details (`{{business.phone}}`), where the backend has them: always current, never copied into the prompt. */
   business?: Record<string, string> | undefined;
+  /** The site's tools: `{{name}}` names one, `{{name.key}}` reads what it returned (quoted). */
+  tools?: { names: readonly string[]; data: Record<string, unknown> } | undefined;
 };
 
 /**
@@ -75,11 +77,32 @@ export async function resolvePrompt(
   scope: PromptScope,
 ): Promise<string | undefined> {
   const template = source === undefined ? null : await readSource(ctx, source);
-  const owner = template === null ? '' : renderTemplate(template, scope as Record<string, unknown>, scopeValue).trim();
+  const owner = template === null ? '' : renderTemplate(scope.tools ? renderToolRefs(template, scope.tools) : template, scope as Record<string, unknown>, scopeValue).trim();
   if (!ctx.guidance) return owner || undefined;
   // The owner's words sit between HelpPuff's settings and its rules, so the rules have the last word.
   const render = (text: string) => renderTemplate(text, scope as Record<string, unknown>, scopeValue).trim();
   return [render(ctx.guidance.before), owner ? `## Instructions from the business\n${owner}` : '', render(ctx.guidance.after)].filter(Boolean).join('\n\n');
+}
+
+/**
+ * The site's tools in a prompt: `{{order_status}}` becomes the tool's name
+ * (the model is offered a function by that name), `{{crm_lookup.tier}}` what
+ * that tool returned, quoted, or "(not known yet)". Other placeholders are
+ * left for `renderTemplate`.
+ */
+export function renderToolRefs(text: string, tools: { names: readonly string[]; data: Record<string, unknown> }): string {
+  const names = new Set(tools.names);
+  return text.replace(/\{\{\s*([a-z][a-z0-9_]*)((?:\.[\w-]+)*)\s*\}\}/g, (all, name: string, rest: string) => {
+    if (!names.has(name)) return all;
+    if (!rest) return `\`${name}\``;
+    const value = rest
+      .slice(1)
+      .split('.')
+      .reduce<unknown>((acc, key) => (acc && typeof acc === 'object' && Object.prototype.hasOwnProperty.call(acc, key) ? (acc as Record<string, unknown>)[key] : undefined), tools.data[name]);
+    if (value === undefined || value === null || value === '') return '(not known yet)';
+    // Braces in a response are not placeholders: renderTemplate runs after this.
+    return quotedValue(typeof value === 'object' ? JSON.stringify(value) : value, 1000).replace(/\{\{/g, '{ {');
+  });
 }
 
 /**
