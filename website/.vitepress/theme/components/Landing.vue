@@ -99,7 +99,9 @@ const COMPARE: { row: string; hosted: Cell; diy: Cell; us: Cell }[] = [
   { row: 'Where conversations and leads live', hosted: 'Their platform', diy: 'Wherever you build it', us: 'Your Cloudflare account' },
   { row: 'Learns your website and files', hosted: 'Often a paid tier', diy: 'You build retrieval', us: true },
   { row: 'Lead capture and CRM dashboard', hosted: 'Higher plans', diy: 'You build it', us: true },
-  { row: 'Switch AI provider', hosted: false, diy: true, us: 'One setting' },
+  { row: 'Live chat with your team', hosted: 'Higher plans', diy: 'You build it', us: true },
+  { row: 'Quotes and jobs board', hosted: 'A separate tool', diy: 'You build it', us: true },
+  { row: 'Choose the AI model and knowledge base', hosted: false, diy: true, us: 'Any, one command each' },
   { row: 'Servers to patch', hosted: false, diy: 'Yes', us: false },
   { row: 'Set up by your coding agent', hosted: false, diy: false, us: true },
   { row: 'Open source', hosted: false, diy: true, us: 'MIT' },
@@ -109,19 +111,24 @@ const FEATURES = [
   { icon: 'book', title: 'Learns your website and files', text: 'Crawls the pages you choose and reads PDF, Word, Markdown and text files. Hybrid semantic and keyword search finds the right passage.', link: 'Knowledge-Base' },
   { icon: 'message', title: 'Rich conversations', text: 'Streaming replies, suggested questions, option chips, cards, carousels, links and forms, right inside the chat.', link: 'Widget' },
   { icon: 'form', title: 'Pre-chat and inline forms', text: 'Ask for a name, phone, email or anything custom before the chat, with the fields and wording you choose.', link: 'Leads' },
-  { icon: 'users', title: 'Built-in CRM', text: 'One lead per person across repeat conversations, pipeline stages, notes, custom answers and CSV export.', link: 'Dashboard#leads' },
+  { icon: 'users', title: 'Built-in CRM', text: 'One contact per person across repeat chats: company, address, custom attributes, private notes, labels and CSV export.', link: 'Leads' },
+  { icon: 'headset', title: 'Live chat with your team', text: 'Hand any chat to a person, answered from the dashboard or Telegram, with alerts and sounds. Nobody free? The callback form.', link: 'Live-Chat' },
+  { icon: 'briefcase', title: 'Quotes and jobs', text: 'Requests from the chat or a “Get a quote” button land on a board with your own stages, set up from your website by the AI.', link: 'Jobs' },
   { icon: 'sparkles', title: 'Conversation intelligence', text: 'Automatic summaries with intent, sentiment, lead quality, outcome, topics, next steps and unanswered questions.', link: 'Dashboard#conversations' },
   { icon: 'phone', title: 'Callback requests', text: '“Please call me” becomes a task your team can complete, dismiss or reopen.', link: 'Leads#callbacks' },
   { icon: 'chart', title: 'Analytics and ratings', text: 'Conversation and lead trends, conversion, top pages, countries and thumbs-up feedback.', link: 'Dashboard#analytics' },
   { icon: 'webhook', title: 'Signed webhooks', text: 'Send leads, callbacks, summaries and ratings to Zapier, Make, n8n, your CRM or your API, with retries.', link: 'Webhooks' },
   { icon: 'shield', title: 'Safety and cost controls', text: 'Origin allowlists, signed sessions, daily budgets, rate limits, optional Turnstile and graceful fallbacks.', link: 'Security' },
   { icon: 'zap', title: 'Fast and isolated', text: 'A shadow-root widget your CSS cannot break and that cannot break your page. Accessible and mobile-first.', link: 'Widget' },
-  { icon: 'plug', title: 'Any AI backend', text: 'Workers AI by default; OpenAI, Gemini, Claude, Cloudflare AI Search, Retell or your own API with one setting.', link: 'Providers' },
+  { icon: 'plug', title: 'Any model', text: 'Workers AI free by default, or OpenAI, Gemini, Claude, DeepSeek, OpenRouter, any OpenAI-compatible API, or your own code.', link: 'Models-and-Providers' },
+  { icon: 'database', title: 'Any knowledge base', text: 'Your site and files by default, or Cloudflare AI Search, an OpenAI vector store, your own search API or your own code.', link: 'Providers' },
   { icon: 'refresh', title: 'Safe upgrades', text: 'Additive database migrations, compatibility checks, restore points and downgrade protection.', link: 'Upgrading' },
 ];
 
 const DASH_TABS = [
   { id: 'conversation', label: 'Conversations', caption: 'Every chat summarised and labelled: intent, sentiment, lead quality, next step, and the questions it could not answer.' },
+  { id: 'live', label: 'Live chat', caption: 'A visitor asked for a person: see who is waiting and for how long, take the chat, reply, or hand it back to the assistant.' },
+  { id: 'jobs', label: 'Jobs', caption: 'Quote requests and work on a board with your own stages: drag to move, spot what has gone stale, and every update in its history.' },
   { id: 'leads', label: 'Leads', caption: 'One lead per person, moved through your pipeline from new to won, with notes and CSV export.' },
   { id: 'callbacks', label: 'Callbacks', caption: '“Please call me” becomes a task: tap to call, mark it done with a note, or dismiss it.' },
   { id: 'analytics', label: 'Analytics', caption: 'Conversations, leads and conversion against the previous period, top pages, countries and the latest questions.' },
@@ -130,7 +137,7 @@ const DASH_TABS = [
 const dashTab = ref(DASH_TABS[0]!.id);
 const dashCaption = computed(() => DASH_TABS.find((t) => t.id === dashTab.value)?.caption ?? '');
 /** The demo's route for a tab: the screenshot names a single conversation, the dashboard calls the page `conversations`. */
-const dashRoute = computed(() => (dashTab.value === 'conversation' ? 'conversations' : dashTab.value));
+const dashRoute = computed(() => (dashTab.value === 'conversation' || dashTab.value === 'live' ? 'conversations' : dashTab.value));
 
 const STACK = [
   { name: 'Workers', role: 'Chat API, widget and dashboard from one deployment' },
@@ -138,19 +145,26 @@ const STACK = [
   { name: 'D1', role: 'Conversations, leads, CRM, analytics and knowledge text' },
   { name: 'Vectorize', role: 'Finds passages by meaning' },
   { name: 'KV', role: 'Live configuration and prompt updates' },
-  { name: 'Workflows', role: 'Crawls, file learning, summaries and retries' },
-  { name: 'Cron Triggers', role: 'Re-learns your website on a schedule' },
+  { name: 'Workflows + Cron', role: 'Crawls, file learning, summaries, retries, and re-learning on a schedule' },
+  { name: 'Durable Objects', role: 'Live chat between visitors and your team' },
   { name: 'Rate Limiting', role: 'Protects the public chat endpoint' },
 ];
 
-const PROVIDERS = [
+const MODELS = [
   { name: 'Workers AI', note: 'default, no key', page: 'Provider-Workers-AI' },
-  { name: 'OpenAI', page: 'Provider-OpenAI' },
-  { name: 'Gemini', page: 'Provider-Gemini' },
-  { name: 'Claude', page: 'Provider-Anthropic' },
+  { name: 'OpenAI', page: 'Models-and-Providers' },
+  { name: 'Gemini', page: 'Models-and-Providers' },
+  { name: 'Claude', page: 'Models-and-Providers' },
+  { name: 'DeepSeek, OpenRouter, Groq…', page: 'Models-and-Providers' },
+  { name: 'Cloudflare and Vercel AI Gateway', page: 'Models-and-Providers' },
+  { name: 'Your own code', page: 'Custom-Model' },
+];
+const KNOWLEDGE = [
+  { name: 'Your site and files', note: 'default', page: 'Knowledge-Base' },
   { name: 'Cloudflare AI Search', page: 'Provider-Cloudflare-AI-Search' },
-  { name: 'Retell', page: 'Provider-Retell' },
-  { name: 'Your own API', page: 'Provider-Your-Own-API' },
+  { name: 'OpenAI vector store', page: 'Providers' },
+  { name: 'Your search API', page: 'Custom-Knowledge-Base' },
+  { name: 'Your own code', page: 'Custom-Knowledge-Base' },
 ];
 
 /** Lucide-style outline icons, 24px grid. */
@@ -166,6 +180,9 @@ const ICONS: Record<string, string> = {
   shield: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10ZM9 12l2 2 4-4',
   zap: 'M13 2 3 14h9l-1 8 10-12h-9Z',
   plug: 'M12 22v-5M9 8V2M15 8V2M18 8v5a6 6 0 0 1-12 0V8Z',
+  database: 'M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3ZM4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',
+  headset: 'M3 14v-2a9 9 0 0 1 18 0v2M21 16a2 2 0 0 1-2 2h-1v-6h1a2 2 0 0 1 2 2ZM3 16a2 2 0 0 0 2 2h1v-6H5a2 2 0 0 0-2 2ZM18 18v.5a3 3 0 0 1-3 3h-3',
+  briefcase: 'M3 7h18v13H3zM8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18',
   refresh: 'M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5',
   lock: 'M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4',
   cloud: 'M17.5 19H9a7 7 0 1 1 6.7-9h1.8a4.5 4.5 0 1 1 0 9Z',
@@ -192,8 +209,8 @@ const ICONS: Record<string, string> = {
             <span class="grad">Owned by you.</span>
           </h1>
           <p class="lede">
-            HelpPuff learns your website, answers visitors, captures leads and gives your team a CRM,
-            all inside <strong>your own Cloudflare account</strong>. No subscription, no server to patch,
+            HelpPuff learns your website, answers visitors, captures leads, hands chats to your team and
+            turns requests into jobs, all inside <strong>your own Cloudflare account</strong>. No subscription, no server to patch,
             no chatbot vendor holding your customers.
           </p>
           <div class="ctas">
@@ -268,8 +285,8 @@ const ICONS: Record<string, string> = {
         </header>
         <div class="gallery">
           <figure>
-            <Zoom :src="shot('home-teal')" alt="A home screen with four shortcuts in a serif font and teal accent" lazy width="464" height="816" caption="A home screen that sells: shortcuts for the questions you get most, calls and links." :demo="WIDGET_DEMO" />
-            <figcaption><b>A home screen that sells</b>Shortcuts for the questions you get most, calls and links.</figcaption>
+            <Zoom :src="shot('home-teal')" alt="A home screen with four shortcuts in a serif font and teal accent" lazy width="464" height="816" caption="A home screen that sells: questions, calls and useful pages, suggested from your website and edited in the dashboard." :demo="WIDGET_DEMO" />
+            <figcaption><b>A home screen that sells</b>Questions, calls and useful pages, suggested from your website and yours to edit.</figcaption>
           </figure>
           <figure>
             <Zoom :src="shot('lead-form')" alt="A pre-chat form asking for name, email and occasion, with a privacy note" lazy width="464" height="816" caption="Leads before the first message: your fields, your wording, a privacy note." :demo="WIDGET_DEMO" />
@@ -387,6 +404,7 @@ const ICONS: Record<string, string> = {
           <ul class="ticks">
             <li><svg viewBox="0 0 24 24"><path :d="ICONS.check" /></svg> Shared instructions for every agent: no plugin, skill or MCP server</li>
             <li><svg viewBox="0 0 24 24"><path :d="ICONS.check" /></svg> Everything the dashboard does is in the CLI and admin API</li>
+            <li><svg viewBox="0 0 24 24"><path :d="ICONS.check" /></svg> Any model or knowledge base with one command, even your own code</li>
             <li><svg viewBox="0 0 24 24"><path :d="ICONS.check" /></svg> You step in only for sign-in or a real business decision</li>
           </ul>
           <button class="btn primary" type="button" @click="copy(AGENT_PROMPT, 'agent')">
@@ -455,13 +473,24 @@ const ICONS: Record<string, string> = {
       </div>
       <div class="panel">
         <span class="f-icon big"><svg viewBox="0 0 24 24"><path :d="ICONS.plug" /></svg></span>
-        <h3>Works with the AI you choose</h3>
-        <p>Keep the widget, dashboard, leads and webhooks. Change only the model behind them.</p>
+        <h3>Any model. Any knowledge base.</h3>
+        <p>
+          Keep the widget, dashboard, leads, tools and guardrails. Choose who writes the answers and what they come from,
+          separately, with one command each.
+        </p>
+        <p class="chips-label">Who writes the answers</p>
         <div class="chips">
-          <a v-for="p in PROVIDERS" :key="p.name" :href="docs(p.page)" class="chip">
+          <a v-for="p in MODELS" :key="p.name" :href="docs(p.page)" class="chip">
             {{ p.name }}<small v-if="p.note">{{ p.note }}</small>
           </a>
         </div>
+        <p class="chips-label">What they come from</p>
+        <div class="chips">
+          <a v-for="p in KNOWLEDGE" :key="p.name" :href="docs(p.page)" class="chip">
+            {{ p.name }}<small v-if="p.note">{{ p.note }}</small>
+          </a>
+        </div>
+        <a class="whole" :href="docs('Providers')">Or a whole agent: Retell, or your own API →</a>
       </div>
     </section>
 
@@ -675,6 +704,8 @@ figcaption b { display: block; font-size: 16px; color: var(--ink); margin-bottom
 .chip { display: inline-flex; align-items: baseline; gap: 6px; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); font-size: 14px; font-weight: 500; color: var(--ink); transition: border-color 160ms; }
 .chip:hover { border-color: var(--hp-indigo); }
 .chip small { font-size: 11px; color: var(--vp-c-brand-1); font-weight: 600; }
+.panel .chips-label { margin: 18px 0 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+.panel .whole { display: inline-block; margin-top: 18px; font-size: 14px; }
 
 /* Final */
 .final { position: relative; overflow: hidden; margin-top: 120px; padding: 80px 32px; border-radius: 32px; text-align: center; background: var(--hp-gradient); color: #fff; }

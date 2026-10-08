@@ -13,7 +13,7 @@ import { compile, DEV_PORT, devOrigin, embedSnippet } from '../engine/compile.js
 import { cloudflareSession } from '../engine/credentials.js';
 import { doctor } from '../engine/doctor.js';
 import { loadEnv, redact, writeEnvVar } from '../engine/env.js';
-import { findProject, GENERATED_DIR, loadProject, updateProject, workerNameFor, type LoadedProject } from '../engine/project.js';
+import { findProject, GENERATED_DIR, loadProject, updateProject, workerNameFor, type LoadedProject, usesHelpPuffKnowledge, modelOf, retrievalOf } from '../engine/project.js';
 import { projectJsonSchema, writeSchemaFile } from '../engine/schema.js';
 import type { Ctx } from './context.js';
 
@@ -83,7 +83,7 @@ export async function statusCommand(ctx: Ctx): Promise<number> {
   const url = project.cloudflare.url;
   // The live knowledge base and today's budget, when the Worker can be asked.
   const knowledge =
-    url && project.backend.type === 'workers-ai' && loadEnv(loaded.dir)['ADMIN_API_KEY']
+    url && usesHelpPuffKnowledge(project) && loadEnv(loaded.dir)['ADMIN_API_KEY']
       ? await adminApi(loaded)
           .get<KnowledgeStatus>('/admin/api/knowledge/status')
           .catch((thrown: unknown) => ({ error: (thrown as Error).message }))
@@ -92,6 +92,7 @@ export async function statusCommand(ctx: Ctx): Promise<number> {
     site: project.site,
     name: project.name,
     backend: project.backend,
+    ...(modelOf(project) ? { model: modelOf(project), retrieval: retrievalOf(project) } : {}),
     website: project.website ?? null,
     origins: project.origins,
     deployed: Boolean(url),
@@ -107,9 +108,12 @@ export async function statusCommand(ctx: Ctx): Promise<number> {
   };
   ctx.out.result(status, () => {
     const backend = project.backend as Record<string, unknown>;
+    const model = modelOf(project) as Record<string, unknown> | null;
     const lines = [
       `${c.bold(project.name)} ${c.dim(`(${project.site})`)}`,
-      `  backend   ${backend['type']}${backend['model'] ? ` · ${String(backend['model'])}` : ''}`,
+      model
+        ? `  model     ${String(model['provider'])}${model['preset'] ? ` (${String(model['preset'])})` : ''}${model['model'] ? ` · ${String(model['model'])}` : ''}\n  knowledge ${retrievalOf(project)!.type}`
+        : `  backend   ${backend['type']}${backend['model'] ? ` · ${String(backend['model'])}` : ''}`,
       `  website   ${project.website ?? c.dim('none')}`,
       url ? `  preview   ${c.cyan(`${url}/`)}` : `  deployed  ${c.yellow('not yet')} — run ${c.cyan('helppuff deploy')}`,
       ...(url ? [`  embed     ${embedSnippet(url, project.site)}`] : []),
@@ -280,12 +284,32 @@ export function pullSettings(loaded: LoadedProject, live: Settings): LoadedProje
     }
     Object.assign(obj(widget, 'leadForm'), { enabled: applied.widget.leadForm.enabled, fields: applied.widget.leadForm.fields });
 
-    const backend = obj(raw, 'backend');
-    if (live.assistant && backend['type'] === 'workers-ai') {
+    // The assistant's language, time zone and reranker (the model itself changes only with the CLI, so it already matches).
+    if (live.assistant) {
       const options = (applied.connector.options ?? {}) as Record<string, unknown>;
-      for (const key of ['model', 'locale', 'timezone', 'retrieval']) {
-        if (options[key] === undefined) delete backend[key];
-        else backend[key] = options[key];
+      const legacy = raw['backend'] && typeof raw['backend'] === 'object' && (raw['backend'] as Record<string, unknown>)['type'] === 'workers-ai';
+      if (legacy) {
+        const backend = obj(raw, 'backend');
+        for (const key of ['model', 'locale', 'timezone', 'retrieval']) {
+          if (options[key] === undefined) delete backend[key];
+          else backend[key] = options[key];
+        }
+      } else if (!raw['backend']) {
+        const model = obj(raw, 'model');
+        if (!model['provider']) model['provider'] = 'workers-ai';
+        for (const key of ['locale', 'timezone']) {
+          if (options[key] === undefined) delete model[key];
+          else model[key] = options[key];
+        }
+        const knowledge = obj(raw, 'knowledge');
+        const retrieval = options['retrieval'] as Record<string, unknown> | undefined;
+        const current = knowledge['retrieval'] as Record<string, unknown> | undefined;
+        if (!current || current['type'] === 'helppuff') {
+          const { type: _type, ...tuned } = current ?? {};
+          const next = { ...tuned, ...(retrieval ?? {}) };
+          if (retrieval?.['rerankerModel'] === undefined) delete next['rerankerModel'];
+          if (current || Object.keys(next).length) knowledge['retrieval'] = { type: 'helppuff', ...next };
+        }
       }
     }
     // Limits and lists from the Advanced page; only what differs from the defaults, so helppuff.json stays short.

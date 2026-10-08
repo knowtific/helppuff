@@ -1,6 +1,8 @@
 # Provider: OpenAI
 
-`"backend": { "type": "openai" }`
+`"model": { "provider": "openai" }`, with any knowledge (`knowledge.retrieval`; HelpPuff's own by default). See [[Models and providers|Models-and-Providers]].
+
+This page describes the whole `"backend": { "type": "openai" }`, still used for what does not split: a stored prompt (`promptId`), a vector store HelpPuff fills for you, or another base URL. A vector store you fill yourself works with any model: `"knowledge": { "retrieval": { "type": "openai-vector-store", "vectorStoreId": "vs_…" } }`.
 
 Answers with OpenAI's [Responses API](https://platform.openai.com/docs/api-reference/responses).
 Knowledge comes from an OpenAI vector store (File Search), or from HelpPuff's

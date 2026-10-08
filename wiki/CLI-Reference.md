@@ -447,6 +447,52 @@ helppuff jobs move 1042 Lost --reason "Went with another quote"
 helppuff jobs setup --json
 ```
 
+### `helppuff model`
+
+```
+helppuff model | model set <workers-ai|openai-compatible|openai|gemini|anthropic|custom> [--model …] [--preset …] [--base-url …] [--key-env NAME] [--module ./llm.ts] [--secrets A,B] [--gateway …] [--gateway-id …] [--account-id …] [--yes] | model test ["question"]
+```
+
+Who writes the answers, chosen separately from the knowledge base (`helppuff rag`). Workers AI is the default (no key, on the Free plan). `openai-compatible` is any /chat/completions API with tools; presets fill the address and the key's name: deepinfra, openrouter, deepseek, groq, together, mistral, fireworks, vercel-ai-gateway, cloudflare-ai-gateway. `openai`, `gemini` and `anthropic` are those providers; `custom` is your own TypeScript file (`helppuff scaffold model`). HelpPuff's assistant (prompt, tools, citations, guardrails) stays the same whoever writes. A missing key answers needs_input: the user stores it with `helppuff secret set NAME`. Changed only here (never in the dashboard), then `helppuff deploy`; `model test` asks the deployed Worker.
+
+```bash
+helppuff model --json
+helppuff model set openai-compatible --preset deepinfra --model deepseek-ai/DeepSeek-V3.1 --json
+helppuff model set openai-compatible --preset openrouter --model anthropic/claude-sonnet-5 --json
+helppuff model set anthropic --model claude-opus-5 --json
+helppuff model set custom --module ./llm.ts --secrets MY_MODEL_KEY --json
+helppuff model test "Do you do emergency callouts?" --json
+```
+
+### `helppuff rag`
+
+```
+helppuff rag | rag set <helppuff|none|ai-search|openai-vector-store|http|custom> [--url …] [--token-env NAME] [--module ./rag.ts] [--secrets A,B] [--vector-store vs_…] [--key-env NAME] [--instance …] [--endpoint …] | rag test ["question"]
+```
+
+What answers come from, chosen separately from the model. `helppuff` (the default): your site and files, learned by the Worker. `none`: the prompt and the business details only. `ai-search`: Cloudflare AI Search. `openai-vector-store`: a store you fill in OpenAI. `http`: your own search endpoint (`{ query, question, siteId, limit }` → `{ passages }`). `custom`: your own TypeScript file (`helppuff scaffold rag`); HelpPuff only calls its `search`. Changed only here, then `helppuff deploy`; `rag test` shows the passages the deployed Worker finds.
+
+```bash
+helppuff rag --json
+helppuff rag set http --url https://search.example.com/query --token-env SEARCH_TOKEN --json
+helppuff rag set custom --module ./rag.ts --secrets MY_SEARCH_KEY --json
+helppuff rag set none --json
+helppuff rag test "price of a blocked drain" --json
+```
+
+### `helppuff scaffold`
+
+```
+helppuff scaffold model|rag [--file ./llm.ts] [--use] [--force]
+```
+
+Write a starter TypeScript file for your own model (`defineModel`-shaped: one `chat` function) or knowledge base (one `search` function). It imports only types from `@knowtific/helppuff/sdk`, so it deploys without installing anything (install the package for editor types). `--use` also points helppuff.json at it. Then set its secret, deploy, and test.
+
+```bash
+helppuff scaffold model --use --json
+helppuff scaffold rag --file ./search/rag.ts
+```
+
 ### `helppuff dashboard`
 
 ```

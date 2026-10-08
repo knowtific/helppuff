@@ -14,6 +14,7 @@ import { forgetPipeline, publishQuote, quoteWidget } from '../jobs/widget.js';
 import { assertAdmin, assertSameOrigin, assertSiteAccess, currentAdmin, db, jsonBody, siteParam, type Admin } from './guard.js';
 import { actorOf } from './inbox.js';
 import { displayName } from './live.js';
+import { knowledgeOf } from '../core/assistant.js';
 
 /**
  * Jobs: the site's pipeline (stages, fields, quote questions, the template
@@ -406,7 +407,7 @@ export async function maybeSetup(ctx: Pick<RequestCtx, 'env' | 'config' | 'platf
   if (!(await awaitingSetup(d, siteId))) return { status: 'kept' };
   await ensurePipeline(d, siteId, ctx.platform.now());
   const site = await resolveSite(ctx, siteId);
-  if (site.connector.type === 'workers-ai') {
+  if (knowledgeOf(site) === 'helppuff') {
     const learned = await d.prepare('SELECT 1 AS x FROM chunks WHERE site_id = ? LIMIT 1').bind(siteId).first();
     if (!learned) return { status: 'waiting' };
   }

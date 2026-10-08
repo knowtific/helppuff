@@ -1,7 +1,7 @@
 {
   "name": "@knowtific/helppuff",
   "version": "0.3.0",
-  "description": "Set up, deploy and manage an AI chat widget on your own Cloudflare account — built to be driven by people and by AI agents.",
+  "description": "Set up, deploy and manage an AI chat widget on your own Cloudflare account \u2014 built to be driven by people and by AI agents.",
   "author": "Knowtific (MYT PTY LTD)",
   "homepage": "https://www.knowtific.com.au",
   "repository": {
@@ -27,6 +27,13 @@
   "type": "module",
   "bin": {
     "helppuff": "./dist/cli.js"
+  },
+  "exports": {
+    "./sdk": {
+      "types": "./dist/sdk.d.ts",
+      "default": "./dist/sdk.js"
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist"

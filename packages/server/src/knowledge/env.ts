@@ -3,6 +3,7 @@ import { DEFAULT_RETRIEVAL } from '@helppuff/rag';
 import type { SiteConfig } from '../config/schema.js';
 import { HelpPuffError } from '../core/errors.js';
 import { dbFrom } from '../db/d1.js';
+import { knowledgeOf, workersAiModelOf } from '../core/assistant.js';
 
 /**
  * The bindings the knowledge base runs on, as `helppuff deploy` names them:
@@ -73,7 +74,8 @@ export function aiSettingsFor(site: SiteConfig): { embeddingModel: string; chatM
   const options = (site.connector.options ?? {}) as { retrieval?: { embeddingModel?: unknown }; gateway?: unknown; model?: unknown };
   const model = options.retrieval?.embeddingModel;
   // Other backends' models are not Workers AI models; the free default reads facts for them.
-  const chat = site.connector.type === 'workers-ai' && typeof options.model === 'string' ? options.model : DEFAULT_CHAT_MODEL;
+  // Helper calls (facts, summaries, suggestions) run on Workers AI: the site's model when Workers AI writes its answers too.
+  const chat = workersAiModelOf(site) ?? DEFAULT_CHAT_MODEL;
   return {
     embeddingModel: typeof model === 'string' && model ? model : DEFAULT_RETRIEVAL.embeddingModel,
     chatModel: chat,
@@ -87,7 +89,7 @@ export function websiteFor(site: SiteConfig): string | null {
   return site.origins.find((o) => /^https:\/\//.test(o) && !/localhost|127\.0\.0\.1|workers\.dev/.test(o)) ?? null;
 }
 
-/** The site answers from HelpPuff's own knowledge base: workers-ai, or another backend with `retrieval: "helppuff"`. */
+/** The site answers from HelpPuff's own knowledge base: the assistant with `helppuff` knowledge, or a whole backend with `retrieval: "helppuff"`. */
 export function ownsKnowledge(site: SiteConfig): boolean {
-  return site.connector.type === 'workers-ai' || (site.connector.options as { retrieval?: unknown } | undefined)?.retrieval === 'helppuff';
+  return knowledgeOf(site) === 'helppuff' || (site.connector.options as { retrieval?: unknown } | undefined)?.retrieval === 'helppuff';
 }

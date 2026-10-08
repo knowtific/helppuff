@@ -225,7 +225,9 @@ describe('runInit for an agent', () => {
     expect(project).toMatchObject({
       site: 'acme',
       name: 'Acme Plumbing',
-      backend: { type: 'cloudflare', model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast' },
+      // AI Search is the knowledge; Workers AI writes the answers (the old `cloudflare` backend, split).
+      model: { provider: 'workers-ai', model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast' },
+      knowledge: { retrieval: { type: 'ai-search' } },
       widget: { brand: { accent: '#0EA5E9' }, chat: { fallbackContact: { email: 'hello@acme.com.au' } } },
     });
     expect(readFileSync(join(dir, '.env'), 'utf8')).toContain('CLOUDFLARE_API_TOKEN=cf-token');
@@ -275,7 +277,7 @@ describe('runInit for an agent', () => {
       answers: { website: 'acme.com.au', backend: 'cloudflare', cfToken: 't' },
       fetch: world([{ id: 'acme-web', type: 'web-crawler', source: 'acme.com.au' }]).fetch,
     });
-    expect(JSON.parse(readFileSync(join(dir, 'helppuff.json'), 'utf8')).backend.instance).toBe('acme-web');
+    expect(JSON.parse(readFileSync(join(dir, 'helppuff.json'), 'utf8')).knowledge.retrieval).toEqual({ type: 'ai-search', instance: 'acme-web' });
   });
 
   it('stores a provider key in .env, not in helppuff.json', async () => {
@@ -315,7 +317,8 @@ describe('runInit for an agent', () => {
     });
     expect(asked).toEqual(['website']);
     expect(result.status).toBe('created');
-    if (result.status === 'created') expect(result.project.backend).toEqual({ type: 'workers-ai' });
+    // The default: HelpPuff's assistant, Workers AI and its own knowledge base; nothing to write for either.
+    if (result.status === 'created') expect([result.project.backend, result.project.model, result.project.knowledge.retrieval]).toEqual([{ type: 'assistant' }, undefined, undefined]);
     // How it behaves is a setting; prompt.md holds only what is specific to the business.
     if (result.status === 'created') expect(result.project.assistant).toMatchObject({ goal: 'callbacks' });
     const prompt = readFileSync(join(dir, 'prompt.md'), 'utf8');
@@ -381,7 +384,8 @@ describe('runInit for an agent', () => {
     const result = await runInit({ cwd: dir, answers: { website: 'acme.com.au', cfToken: 't' }, yes: true, fetch: world().fetch });
     expect(result.status).toBe('created');
     if (result.status !== 'created') return;
-    expect(result.project.backend).toEqual({ type: 'workers-ai' });
+    expect(result.project.backend).toEqual({ type: 'assistant' });
+    expect(result.project.model).toBeUndefined();
     expect(result.project.dashboard.adminEmail).toBeUndefined();
     expect(result.adminPassword).toBeUndefined();
   });

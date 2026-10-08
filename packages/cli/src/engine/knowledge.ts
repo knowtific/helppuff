@@ -7,7 +7,15 @@ import { readState, writeState, type State } from './state.js';
 import type { CloudflareApi, CrawlerSource } from './cloudflare.js';
 import { PAGE_PREFIX, crawlSite, hasSitemap, looksRendered, pageFileName } from './site.js';
 import { pool, syncGeminiStore, syncOpenAiStore, type UploadDoc } from './providers.js';
-import { aiSearchInstanceFor, hasKnowledge, type LoadedProject, type Project } from './project.js';
+import { aiSearchInstanceFor, hasKnowledge, modelOf, retrievalOf, usesHelpPuffKnowledge, type LoadedProject, type Project } from './project.js';
+
+/** The AI Search public endpoint a project answers from, if it uses one instead of an instance it manages. */
+const aiSearchEndpoint = (project: Project): string | undefined => {
+  const retrieval = retrievalOf(project);
+  if (retrieval?.type === 'ai-search') return retrieval.endpoint;
+  const backend = project.backend;
+  return backend.type === 'cloudflare' || backend.type === 'anthropic' ? backend.endpoint : undefined;
+};
 
 /**
  * The knowledge base: the website's pages plus any files the project lists,
@@ -154,7 +162,7 @@ export async function ensureAiSearchInstance(
   if (!id) return null;
   const existing = await cf.aiSearchInstance(accountId, id);
   if (existing) return { id, created: false, crawlsWebsite: existing.type === 'web-crawler' };
-  const model = project.backend.type === 'cloudflare' ? project.backend.model : undefined;
+  const model = project.backend.type === 'cloudflare' ? project.backend.model : modelOf(project)?.provider === 'workers-ai' ? (modelOf(project) as { model?: string }).model : undefined;
   const crawler = await crawlerFor(cf, project, doFetch);
   progress?.(
     crawler
@@ -208,13 +216,15 @@ export async function syncKnowledge(
   const backend = project.backend;
   const progress = deps.progress;
 
-  // workers-ai: the Worker crawls the site itself, and files go up through the admin API (`uploadFilesToWorker`).
-  if (!hasKnowledge(project) || backend.type === 'workers-ai' || ('retrieval' in backend && backend.retrieval === 'helppuff')) {
+  // HelpPuff's knowledge base: the Worker crawls the site itself, and files go up through the admin API (`uploadFilesToWorker`).
+  // A knowledge base of the site's own (`http`, `custom`, an OpenAI vector store, none) is filled where it lives.
+  const retrieval = retrievalOf(project);
+  if (!hasKnowledge(project) || usesHelpPuffKnowledge(project) || (retrieval && retrieval.type !== 'ai-search')) {
     return { target: 'none', uploaded: 0, removed: 0, pages: 0, files: 0, skipped: [] };
   }
 
-  if (backend.type === 'cloudflare' || backend.type === 'anthropic') {
-    if (backend.endpoint) {
+  if (backend.type === 'cloudflare' || backend.type === 'anthropic' || retrieval?.type === 'ai-search') {
+    if (aiSearchEndpoint(project)) {
       throw new CliError(
         'knowledge_external',
         'This project answers from an AI Search public endpoint, so its content is managed where that instance lives.',
@@ -351,7 +361,8 @@ export async function knowledgeMissing(
 ): Promise<boolean> {
   if (!hasKnowledge(project)) return false;
   const backend = project.backend;
-  if ('retrieval' in backend && backend.retrieval === 'helppuff') return false;
+  if (usesHelpPuffKnowledge(project)) return false;
+  if (retrievalOf(project) && retrievalOf(project)!.type !== 'ai-search') return false;
   if (backend.type === 'openai') return !backend.vectorStoreId;
   if (backend.type === 'gemini') return !backend.fileSearchStore;
   const instance = aiSearchInstanceFor(project);

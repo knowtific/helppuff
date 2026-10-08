@@ -442,6 +442,8 @@ export type SettingsView = {
   captcha?: boolean;
   /** What the widget's home screen shows until it is set up: suggested from the website. */
   suggestedHome?: { questions: string[]; links: HomeLinks | null; at: number } | null;
+  /** Who writes the answers and what they come from: changed only with the CLI. Null for a backend that runs its own. */
+  ai?: { provider: string | null; model: string | null; knowledge: string | null } | null;
   /** What a shortcut can open. */
   forms?: { id: string; title: string }[];
   flows?: { id: string; title: string }[];

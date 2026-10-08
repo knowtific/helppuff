@@ -79,8 +79,36 @@ never needs you to change anything. Upgrade with
 - API: `home` in `GET/PUT /settings`, `POST /home/suggest`; `config pull`
   brings `widget.home` (title, subtitle, links) into helppuff.json.
 
+### Added: choose the model and the knowledge base separately
+
+- **`model`** in helppuff.json: who writes the answers. Workers AI (the
+  default), any OpenAI-compatible API with tools (presets: DeepInfra,
+  OpenRouter, DeepSeek, Groq, Together, Mistral, Fireworks, Vercel AI
+  Gateway, Cloudflare AI Gateway), OpenAI, Gemini, Claude (its Messages
+  API), or your own TypeScript file (`custom`).
+- **`knowledge.retrieval`**: what the answers come from. HelpPuff's own
+  knowledge base (the default), none, Cloudflare AI Search, an OpenAI vector
+  store, your own search over HTTP, or your own TypeScript file.
+- HelpPuff's assistant (prompt, tools, citations, guardrails, budget) is now
+  the same whichever model writes: other models get callbacks, jobs, live
+  chat hand-over and HelpPuff's knowledge base, which before were Workers AI
+  only.
+- `helppuff model set|test`, `helppuff rag set|test` (through the deployed
+  Worker), `helppuff scaffold model|rag`; `@knowtific/helppuff/sdk` for the
+  types (`LanguageModel`, `Retriever`). A missing key answers `needs_input`
+  with the `secret set` command. `doctor` checks the keys and files.
+- API: `POST /assistant/test`; `GET /settings` shows `ai` (provider, model,
+  knowledge).
+- helppuff.json format 2, applied by `helppuff upgrade`: `backend` becomes
+  `model` + `knowledge.retrieval`. Kept as whole backends: Retell, your own
+  API in `helppuff` mode, echo, OpenAI with a stored prompt or a vector store
+  HelpPuff fills, Gemini with File Search.
+
 ### Changed
 
+- The model, the reranker and thinking are shown in Settings → Advanced but
+  changed only with the CLI (and a deploy), so helppuff.json stays the one
+  place they are set.
 - The agent instructions (`instructions.md`) list the command for every
   change a user may ask for: settings in `helppuff.json`, and what lives on
   the Worker (jobs, labels, live chat, team, webhooks, keys).

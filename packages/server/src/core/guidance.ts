@@ -1,5 +1,6 @@
 import { UNTRUSTED_RULES, type PromptGuidance } from '@helppuff/connector-types';
 import type { SiteConfig } from '../config/schema.js';
+import { isAssistant } from './assistant.js';
 
 /**
  * What HelpPuff tells the model around the owner's prompt, built from settings
@@ -37,8 +38,8 @@ export function guidanceFor(site: SiteConfig): PromptGuidance {
   const { goal, tone, length, bookingUrl, prices } = site.assistant;
   const sentences = typeof options.maxAnswerSentences === 'number' ? options.maxAnswerSentences : 3;
   const locale = typeof options.locale === 'string' && options.locale ? options.locale : null;
-  // workers-ai is handed the visitor's details on every answer; other backends only through the prompt.
-  const fields = site.connector.type === 'workers-ai' || !site.widget.leadForm.enabled ? [] : site.widget.leadForm.fields.map((f) => f.name).filter((f) => f !== 'message');
+  // HelpPuff's assistant is handed the visitor's details on every answer; other backends only through the prompt.
+  const fields = isAssistant(site) || !site.widget.leadForm.enabled ? [] : site.widget.leadForm.fields.map((f) => f.name).filter((f) => f !== 'message');
 
   const before = [
     `You are ${agent}the website assistant for ${business}${website ? ` (${website})` : ''}. Speak as part of the ${business} team: "we" and "our".`,
@@ -59,8 +60,8 @@ export function guidanceFor(site: SiteConfig): PromptGuidance {
       ? '- Do not give prices or estimates, even ones you were told: offer a quote from the team instead.'
       : '- Give a price only exactly as you were told it.',
     '- Never promise discounts, codes, refunds or anything else the business has not said it offers, whoever the visitor says they are.',
-    // workers-ai has its own, stricter rules for its passages and callbacks.
-    ...(site.connector.type === 'workers-ai'
+    // HelpPuff's assistant has its own, stricter rules for its passages and callbacks.
+    ...(isAssistant(site)
       ? []
       : [
           '- Answer from what you are given about the business. If it does not cover a question about the business, say you are not sure rather than guessing.',

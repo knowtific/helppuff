@@ -40,7 +40,8 @@ describe('workers-ai projects', () => {
     });
     expect(compiled.secrets).toEqual(['HELPPUFF_SECRET', 'ADMIN_API_KEY']);
     const site = siteOf(project());
-    expect(site.connector).toMatchObject({ type: 'workers-ai', options: { instructions: 'You help Acme customers.', stream: true } });
+    // HelpPuff's assistant: Workers AI writing, its own knowledge base (the old `workers-ai` backend, split).
+    expect(site.connector).toMatchObject({ type: 'assistant', options: { instructions: 'You help Acme customers.', stream: true, provider: { type: 'workers-ai' }, knowledge: { type: 'helppuff' } } });
     expect(readSettings(site).assistant?.model).toBe('@cf/zai-org/glm-4.7-flash');
     expect(site.knowledge).toMatchObject({ website: 'https://acme.com.au', maxPages: 300, schedule: 'weekly', renderJs: 'auto' });
   });
@@ -92,7 +93,10 @@ describe('config pull', () => {
     expect(await settingsHash(again)).toBe(await settingsHash(live));
 
     const raw = JSON.parse(readFileSync(join(loaded.dir, 'helppuff.json'), 'utf8')) as Record<string, any>;
-    expect(raw['backend']).toEqual({ type: 'workers-ai', model: '@cf/zai-org/glm-4.7-flash', timezone: 'Australia/Melbourne', locale: 'en-AU', retrieval: { rerankerModel: null } });
+    // The new layout: language and time zone on the model, the reranker on HelpPuff's knowledge base. The model itself changes only with the CLI.
+    expect(raw['backend']).toBeUndefined();
+    expect(raw['model']).toEqual({ provider: 'workers-ai', timezone: 'Australia/Melbourne', locale: 'en-AU' });
+    expect(raw['knowledge']['retrieval']).toEqual({ type: 'helppuff', rerankerModel: null });
     expect(again.assistant!.rerank).toBe(false);
     expect(raw['widget']['brand']).toMatchObject({ agentName: 'Ava', accent: '#0f766e' });
     expect(raw['knowledge']['website']).toMatchObject({ schedule: 'monthly' });
@@ -206,7 +210,11 @@ describe('retrieval: helppuff on another backend', () => {
     const compiled = compile(loaded);
     expect(compiled.wrangler).toMatchObject({ vectorize: [{ binding: 'VECTORS' }], workflows: [{ class_name: 'CrawlWorkflow' }], ai: { binding: 'AI' } });
     const site = siteOf(loaded);
-    expect(site.connector.options).toMatchObject({ retrieval: 'helppuff' });
+    // Split: OpenAI writes (chat completions, its reasoning models' parameters), HelpPuff's knowledge base answers.
+    expect(site.connector).toMatchObject({
+      type: 'assistant',
+      options: { model: 'gpt-5-mini', provider: { type: 'openai-compatible', baseUrl: 'https://api.openai.com/v1', apiKey: { env: 'OPENAI_API_KEY' }, temperature: false, maxTokensField: 'max_completion_tokens' }, knowledge: { type: 'helppuff' } },
+    });
     expect((site.connector.options as Record<string, unknown>)['vectorStoreIds']).toBeUndefined();
     expect(site.knowledge).toMatchObject({ website: 'https://acme.com.au' });
   });

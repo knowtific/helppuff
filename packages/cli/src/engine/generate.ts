@@ -1,4 +1,4 @@
-import { DEFAULT_BACKEND, PROMPT_FILE, resourceName, type Backend, type ProjectInput } from './project.js';
+import { DEFAULT_BACKEND, PROJECT_FORMAT, PROMPT_FILE, resourceName, splitBackend, type Backend, type ProjectInput } from './project.js';
 import { DEFAULT_LEAD_FORM, PROVIDER_KEYS, defaultModel, guessName, type Answers, type Facts } from './questions.js';
 import { originsFor, normalizeUrl, siteIdFor, type SiteInfo } from './site.js';
 
@@ -27,6 +27,7 @@ export function generateProject(answers: Answers, facts: Facts): Generated {
 
   let backend: Backend | Record<string, unknown>;
   switch (backendType) {
+    case 'assistant':
     case 'workers-ai':
       backend = { type: 'workers-ai', ...(answers.model && answers.model !== defaultModel('workers-ai') ? { model: answers.model } : {}) };
       break;
@@ -81,6 +82,7 @@ export function generateProject(answers: Answers, facts: Facts): Generated {
 
   const project: ProjectInput = {
     $schema: './.helppuff/helppuff.schema.json',
+    format: PROJECT_FORMAT,
     site: siteId,
     name,
     ...(website ? { website } : {}),
@@ -96,6 +98,10 @@ export function generateProject(answers: Answers, facts: Facts): Generated {
     },
     dashboard: answers.dashboard === false ? { enabled: false } : { enabled: true, ...(answers.adminEmail ? { adminEmail: answers.adminEmail } : {}) },
   };
+  // The model and the knowledge, chosen separately (Workers AI with no options needs no `model` at all).
+  splitBackend(project as Record<string, unknown>);
+  const written = project as Record<string, unknown>;
+  if (JSON.stringify(written['model']) === JSON.stringify({ provider: 'workers-ai' })) delete written['model'];
 
   const agentName = (answers.agentName || 'Assistant').slice(0, 60);
   const widget = project.widget as { brand: { agentName: string }; chat: Record<string, unknown>; leadForm: Record<string, unknown> };

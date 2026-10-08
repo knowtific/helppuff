@@ -1,6 +1,6 @@
 # Provider: Cloudflare AI Search
 
-`"backend": { "type": "cloudflare" }`
+`"knowledge": { "retrieval": { "type": "ai-search" } }`, with any model (Workers AI by default). Older projects' `"backend": { "type": "cloudflare" }` is converted by `helppuff upgrade`: AI Search finds the passages, the model writes the answer.
 
 [Cloudflare AI Search](https://developers.cloudflare.com/ai-search/) does the
 retrieval and generation: it indexes your site and files, and answers with a

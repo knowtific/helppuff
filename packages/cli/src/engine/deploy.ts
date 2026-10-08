@@ -48,6 +48,7 @@ import {
   resourceName,
   updateProject,
   usesHelpPuffKnowledge,
+  retrievalOf,
   vectorizeIndexFor,
   workerNameFor,
   type LoadedProject,
@@ -164,7 +165,9 @@ function ensureGeneratedSecret(dir: string, env: Record<string, string>, name: '
 
 export function embeddingModelFor(project: Project): string {
   const backend = project.backend;
-  return backend.type === 'workers-ai' ? (backend.retrieval?.embeddingModel ?? DEFAULT_RETRIEVAL.embeddingModel) : DEFAULT_RETRIEVAL.embeddingModel;
+  if (backend.type === 'workers-ai') return backend.retrieval?.embeddingModel ?? DEFAULT_RETRIEVAL.embeddingModel;
+  const retrieval = retrievalOf(project);
+  return retrieval?.type === 'helppuff' ? (retrieval.embeddingModel ?? DEFAULT_RETRIEVAL.embeddingModel) : DEFAULT_RETRIEVAL.embeddingModel;
 }
 
 export async function deploy(initial: LoadedProject, options: DeployOptions = {}): Promise<DeployResult> {

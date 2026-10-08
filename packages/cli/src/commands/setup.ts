@@ -14,7 +14,7 @@ import { loadEnv } from '../engine/env.js';
 import { LOGGED_IN, runInit, type InitResult } from '../engine/init.js';
 import { wranglerLogin } from '../engine/wrangler-auth.js';
 import { syncKnowledge, type IndexingStatus, type SyncResult } from '../engine/knowledge.js';
-import { aiSearchInstanceFor, hasKnowledge, loadProject, updateProject, usesHelpPuffKnowledge, type LoadedProject, type Project } from '../engine/project.js';
+import { aiSearchInstanceFor, hasKnowledge, loadProject, modelOf, retrievalOf, updateProject, usesHelpPuffKnowledge, type LoadedProject, type Project } from '../engine/project.js';
 import type { Answers, Question } from '../engine/questions.js';
 import { writeSchemaFile } from '../engine/schema.js';
 import { readState, writeState, type State } from '../engine/state.js';
@@ -143,7 +143,8 @@ export async function initCommand(ctx: Ctx): Promise<number> {
     ...(ctx.interactive
       ? {
           background: async (draft, env) => {
-            if (!hasKnowledge(draft.project) || !['cloudflare', 'anthropic', 'openai', 'gemini'].includes(draft.project.backend.type)) {
+            // Built here only for knowledge kept outside the Worker: AI Search, or an OpenAI / Gemini file store.
+            if (!hasKnowledge(draft.project) || (!aiSearchInstanceFor(draft.project) && !['openai', 'gemini'].includes(draft.project.backend.type))) {
               return null;
             }
             p.log.info('Building the knowledge base in the background while we finish up…');
@@ -172,6 +173,7 @@ export async function initCommand(ctx: Ctx): Promise<number> {
     site: project.site,
     name: project.name,
     backend: project.backend.type,
+    ...(modelOf(project) ? { model: modelOf(project)!.provider, knowledge: retrievalOf(project)!.type } : {}),
     files: result.files,
     secretsStored: result.secrets,
     assumed: result.assumed,
@@ -322,7 +324,7 @@ export function unattendedFrom(ctx: Ctx, onboarding: OnboardingMode): boolean {
  */
 function agentOnboarding(ctx: Ctx, project: Project, onboarding: OnboardingMode): OnboardingMode {
   if (usesHelpPuffKnowledge(project)) return onboarding;
-  if (str(ctx.flags, 'onboarding') === 'dashboard') ctx.out.warn(`--onboarding dashboard applies to the workers-ai backend only; ignored for ${project.backend.type}.`);
+  if (str(ctx.flags, 'onboarding') === 'dashboard') ctx.out.warn(`--onboarding dashboard applies to HelpPuff's own knowledge base only; ignored here.`);
   return 'defaults';
 }
 

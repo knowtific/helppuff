@@ -202,9 +202,23 @@ await shot('mobile', {
 }
 
 // The dashboard demo, page by page.
-async function dashboard(name, route, { dark = false, before } = {}) {
+async function dashboard(name, route, { dark = false, live = false, before } = {}) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
   await page.addInitScript((theme) => localStorage.setItem('hp-theme', theme), dark ? 'dark' : 'light');
+  if (live) {
+    // Live chat on, with a stand-in for its socket that connects and stays quiet.
+    await page.addInitScript(() => {
+      localStorage.setItem('hp-demo-live', '1');
+      window.WebSocket = class {
+        readyState = 1;
+        constructor() {
+          setTimeout(() => this.onopen?.(), 0);
+        }
+        send() {}
+        close() {}
+      };
+    });
+  }
   await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: dark ? 'dark' : 'light' });
   await page.goto(`${origin}/dashboard-demo/#/${route}`, { waitUntil: 'networkidle' });
   await before?.(page);
@@ -229,6 +243,23 @@ await dashboard('dash-analytics', 'analytics');
 await dashboard('dash-callbacks', 'callbacks');
 await dashboard('dash-knowledge', 'knowledge');
 await dashboard('dash-prompt', 'prompt');
+await dashboard('dash-jobs', 'jobs', {
+  // The board, without the mouse resting on a card.
+  before: async (page) => {
+    await page.getByText('Hot water in Petersham').waitFor();
+    await page.mouse.move(1430, 890);
+  },
+});
+await dashboard('dash-live', 'conversations', {
+  live: true,
+  // A live chat a person on the team is answering.
+  before: async (page) => {
+    await page.getByRole('radio', { name: 'Live agent' }).click();
+    await page.locator('a[href^="#/conversations/"]').first().click();
+    await page.waitForLoadState('networkidle');
+  },
+});
+await dashboard('dash-home-screen', 'settings/home');
 
 await browser.close();
 server.close();

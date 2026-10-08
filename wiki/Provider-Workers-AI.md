@@ -1,6 +1,6 @@
 # Provider: Workers AI (default)
 
-`"backend": { "type": "workers-ai" }`
+`"model": { "provider": "workers-ai" }` — the default: leave `model` out. See [[Models and providers|Models-and-Providers]] for other models with the same knowledge base.
 
 Answers with Cloudflare Workers AI, from **HelpPuff's own knowledge base**: your
 website and files, learned into Vectorize and D1 on your account by a

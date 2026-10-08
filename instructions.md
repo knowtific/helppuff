@@ -301,8 +301,11 @@ else keeps its default. Two kinds of setting:
 | The greeting, a teaser, the button | `widget.chat.initialMessages`, `widget.teaser`, `widget.launcher.label` / `.shape` / `.position` / `.hideOnPaths` |
 | The chat's first screen: heading, buttons, useful pages | HelpPuff suggests links and questions from the website by itself; leave them unless the user asks. To change: `api POST /home/suggest` for ideas, then `config set widget.home.title "…"`, `widget.home.links '{"title":"Useful pages","items":[{"label":"Prices","url":"https://…/prices"}]}'` (`null`: none) or `widget.home.shortcuts '[…]'` (the whole list, up to 8: `reply`, `url`, `tel`, `email`, `form` or `flow` buttons) |
 | Re-learn the site regularly | `config set knowledge.website.schedule weekly` |
-| Another AI model | `config set backend.model <id>` (the wiki's AI models page compares them) |
-| A daily spending cap | `config set backend.budget.dailyNeurons <n>` and `security.limits.messagesPerSitePerDay <n>` |
+| Another Workers AI model | `model set workers-ai --model <id>` (the wiki's AI models page compares them) |
+| Another provider's model | `model set openai-compatible --preset <deepinfra\|openrouter\|deepseek\|groq\|together\|mistral\|fireworks\|vercel-ai-gateway\|cloudflare-ai-gateway> --model <id>`, or `model set openai\|gemini\|anthropic [--model <id>]`, or `--base-url <url> --key-env <NAME>` for any OpenAI-compatible API. It answers `needs_input` with the `secret set` command for the key: the user runs it |
+| Their own model or knowledge code | `scaffold model --use` / `scaffold rag --use`, edit the file, `secret set` each name in its `secrets`, deploy, then `model test` / `rag test` |
+| Answers from another knowledge base | `rag set none\|ai-search\|openai-vector-store --vector-store vs_…\|http --url <url> [--token-env NAME]\|custom --module ./rag.ts` (`rag set helppuff` for the default) |
+| A daily spending cap | Workers AI: `config set model.budget.dailyNeurons <n>` (raise it only on Workers Paid). Any provider: `config set security.limits.messagesPerSitePerDay <n>` |
 | Protection from bots | Turnstile: the user creates the widget in Cloudflare; then `config set security.captcha '{"provider":"turnstile","siteKey":"<key>","secret":{"env":"TURNSTILE_SECRET"}}'` and the user runs `secret set TURNSTILE_SECRET` |
 | Talk to a person (live chat) | `live on` / `live off`; Telegram: `telegram connect --token <token>` (see above) |
 | Team members | `users add <email> --role admin\|member`, `users role <email> <role>`, `users remove <email>` |
@@ -317,6 +320,11 @@ else keeps its default. Two kinds of setting:
 | Send events to another tool | `webhooks add <https url> --events lead.captured,job.created` |
 | Use HelpPuff from their own server | `keys create "<name>" --preset chat` (or `--scopes …`); the key is shown once: give it to the user, never store it in the repository |
 | Remove everything from Cloudflare | Only on an explicit request: `destroy --yes` |
+
+Models and knowledge bases change only this way (never in the dashboard),
+and only take effect after `deploy`; then check with `model test` / `rag test`.
+Never put a key in `helppuff.json` or a chat: name the variable and have the
+user run `secret set`.
 
 Every command above takes `--json` and runs as `npx -y @knowtific/helppuff …`.
 Confirm the change with the matching read (`config get <path>`,

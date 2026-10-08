@@ -284,43 +284,7 @@ export function SettingsForm({ knowledge, section }: { knowledge: boolean; secti
       {section === 'advanced' && (
         <Section title="Advanced">
           <div className="grid gap-3 sm:grid-cols-2">
-            {draft.assistant && (
-              <Field label="Model" hint="All run on Workers AI in your Cloudflare account.">
-                <Select className="w-full" value={draft.assistant.model} onChange={(e) => setAssistant({ model: e.target.value })}>
-                  {[
-                    ...MODELS,
-                    ...(MODELS.some((m) => m.value === draft.assistant!.model)
-                      ? []
-                      : [
-                          {
-                            value: draft.assistant.model,
-                            label: draft.assistant.model,
-                          },
-                        ]),
-                  ].map((m) => (
-                    <option key={m.value} value={m.value}>
-                      {m.label}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-            )}
-            {draft.assistant && (
-              <Field
-                label="Thinking"
-                hint="How long the model thinks before it answers. Thinking keeps answers safe: without it, assistants in testing leaked their instructions and agreed to false facts. Deeper helps with questions that need several steps; visitors wait longer for the first words."
-              >
-                <Select
-                  className="w-full"
-                  value={draft.assistant.reasoning}
-                  onChange={(e) => setAssistant({ reasoning: e.target.value as NonNullable<Settings['assistant']>['reasoning'] })}
-                >
-                  <option value="low">Low: fastest</option>
-                  <option value="medium">Medium (default)</option>
-                  <option value="high">High: best on multi-step questions, slowest</option>
-                </Select>
-              </Field>
-            )}
+            {draft.assistant && <AiPanel assistant={draft.assistant} ai={view?.ai ?? null} />}
             {knowledge && (
               <Field label="Re-learn the site">
                 <Select
@@ -350,22 +314,6 @@ export function SettingsForm({ knowledge, section }: { knowledge: boolean; secti
                 <Field label="Language and spelling">
                   <Input placeholder="en-AU" value={draft.assistant.locale ?? ''} onChange={(e) => setAssistant({ locale: e.target.value || null })} />
                 </Field>
-                <div className="space-y-1 sm:col-span-2">
-                  <label className="flex items-center gap-2 text-[13px]">
-                    <input
-                      type="checkbox"
-                      className="size-4 accent-[var(--primary)]"
-                      checked={draft.assistant.rerank}
-                      onChange={(e) => setAssistant({ rerank: e.target.checked })}
-                      aria-describedby="rerank-hint"
-                    />
-                    Double-check answers before replying
-                  </label>
-                  <p id="rerank-hint" className="pl-6 text-[11px] text-muted-foreground">
-                    Re-reads what it found on your site and keeps only what answers the question, so it says “not sure” instead of guessing. Off replies about half a second sooner but is more likely
-                    to use the wrong page.
-                  </p>
-                </div>
               </>
             )}
           </div>
@@ -398,3 +346,40 @@ export function SettingsForm({ knowledge, section }: { knowledge: boolean; secti
     </form>
   );
 }
+
+const PROVIDER_NAMES: Record<string, string> = { 'workers-ai': 'Workers AI', 'openai-compatible': 'An OpenAI-compatible API', anthropic: 'Anthropic Claude', custom: 'Your own model' };
+const KNOWLEDGE_NAMES: Record<string, string> = { helppuff: 'Your site and files (HelpPuff’s knowledge base)', none: 'None: the prompt and business details', 'ai-search': 'Cloudflare AI Search', 'openai-vector-store': 'An OpenAI vector store', http: 'Your own search (HTTP)', custom: 'Your own knowledge base' };
+
+/** A Workers AI model by its name in the list above, else its id. */
+const modelName = (id: string) => MODELS.find((m) => m.value === id)?.label ?? id;
+
+/**
+ * Who writes the answers and what they come from: shown, not edited. They
+ * change with the CLI and a deploy (`helppuff model`, `helppuff rag`), so
+ * helppuff.json stays the one place they are set.
+ */
+function AiPanel({ assistant, ai }: { assistant: NonNullable<Settings['assistant']>; ai: SettingsView['ai'] }) {
+  const rows: [string, string][] = [
+    ['Writes the answers', `${PROVIDER_NAMES[ai?.provider ?? 'workers-ai'] ?? ai?.provider ?? ''} · ${modelName(ai?.model ?? assistant.model)}`],
+    ['Answers come from', KNOWLEDGE_NAMES[ai?.knowledge ?? 'helppuff'] ?? ai?.knowledge ?? ''],
+    ['Thinking', assistant.reasoning === 'medium' ? 'Medium (default)' : assistant.reasoning === 'high' ? 'High' : 'Low'],
+    ['Double-check answers', assistant.rerank ? 'On' : 'Off'],
+  ];
+  return (
+    <div className="space-y-2 rounded-md border bg-subtle p-3 sm:col-span-2" role="group" aria-label="Model and knowledge">
+      <dl className="grid gap-x-4 gap-y-1 text-[13px] sm:grid-cols-[auto_1fr]">
+        {rows.map(([label, value]) => (
+          <div key={label} className="contents">
+            <dt className="text-muted-foreground">{label}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="text-[11px] text-muted-foreground">
+        Changed with the CLI, then a deploy: <code className="rounded bg-muted px-1">helppuff model set …</code>, <code className="rounded bg-muted px-1">helppuff rag set …</code> (or
+        your coding agent). See the wiki’s Models and providers page.
+      </p>
+    </div>
+  );
+}
+

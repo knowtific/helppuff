@@ -40,7 +40,7 @@ export function promptOverlaps(text: string, connectorType: string): Overlap[] {
   const found: Overlap[] = [];
   text.split('\n').forEach((line, index) => {
     if (!line.trim()) return;
-    const check = CHECKS.find((c) => (!c.workersAiOnly || connectorType === 'workers-ai') && c.test.test(line));
+    const check = CHECKS.find((c) => (!c.workersAiOnly || connectorType === 'workers-ai' || connectorType === 'assistant') && c.test.test(line));
     if (check) found.push({ line: index + 1, text: line.trim().slice(0, 200), why: check.why });
   });
   return found;
