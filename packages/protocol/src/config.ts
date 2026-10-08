@@ -44,7 +44,7 @@ const pathGlob = z.string().min(1).max(200).describe('A path pattern, e.g. `/ser
 export const iconNames = [
   'chat', 'phone', 'mail', 'calendar', 'quote', 'pin', 'clock', 'wrench', 'heart',
   'info', 'book', 'arrow-right', 'arrow-left', 'close', 'send', 'menu',
-  'sound', 'sound-off', 'check', 'external',
+  'sound', 'sound-off', 'check', 'external', 'person',
 ] as const;
 export type IconName = (typeof iconNames)[number];
 

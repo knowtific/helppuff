@@ -43,6 +43,13 @@ const data = (await response.json()) as SettingsResponse;
   "site": "acme",
   "connector": "workers-ai",
   "settings": {
+    "live": {
+      "enabled": true,
+      "waitSeconds": 120,
+      "closeAfterMinutes": 60,
+      "showAgentName": true,
+      "aiWhileWaiting": false
+    },
     "botName": "Sam",
     "businessName": "Acme Plumbing",
     "welcomeMessage": "Hi, I'm Sam. How can I help?",
@@ -108,6 +115,13 @@ type SettingsResponse = {
   site: string;
   connector: string;
   settings: {
+    live: {
+      enabled: boolean;
+      waitSeconds: number;
+      closeAfterMinutes: number;
+      showAgentName: boolean;
+      aiWhileWaiting: boolean;
+    };
     botName: string;
     businessName: string;
     welcomeMessage: string;
@@ -235,6 +249,13 @@ const data = (await response.json()) as ChangeSettingsResponse;
   "site": "acme",
   "connector": "workers-ai",
   "settings": {
+    "live": {
+      "enabled": true,
+      "waitSeconds": 120,
+      "closeAfterMinutes": 60,
+      "showAgentName": true,
+      "aiWhileWaiting": false
+    },
     "botName": "Sam",
     "businessName": "Acme Plumbing",
     "welcomeMessage": "Hi! Ask me anything about our plumbing services.",
@@ -304,6 +325,13 @@ type ChangeSettingsResponse = {
   site: string;
   connector: string;
   settings: {
+    live: {
+      enabled: boolean;
+      waitSeconds: number;
+      closeAfterMinutes: number;
+      showAgentName: boolean;
+      aiWhileWaiting: boolean;
+    };
     botName: string;
     businessName: string;
     welcomeMessage: string;

@@ -39,7 +39,7 @@ export type Runtime = {
    * fields the launcher needed.
    */
   rawConfig: unknown;
-  capabilities: { poll: boolean; end: boolean; stream: boolean; feedback?: boolean };
+  capabilities: { poll: boolean; end: boolean; stream: boolean; feedback?: boolean; live?: boolean };
   disposer: Disposer;
   version: string;
   /** Tear everything down, silently. */

@@ -6,3 +6,4 @@
 export * from './lib.js';
 export { createWorker } from './worker.js';
 export { CrawlWorkflow } from './workflows/crawl.js';
+export { LiveHub } from './live/object.js';

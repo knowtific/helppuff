@@ -65,7 +65,9 @@ COMMANDS
     prompt [status]      Is prompt.md the live prompt, ahead of it, or behind a dashboard edit?
     prompt pull          Bring the live prompt (or --version N, to restore it) into prompt.md
     prompt history       Every published prompt version: who, from where, when
-    users list|add|remove|reset Who can sign in to the dashboard
+    users list|add|role|remove|reset Who can sign in to the dashboard, as admin or member
+    live on|off|status   Live chat: visitors talk to a person on your team
+    telegram connect|status|test|disconnect  Answer live chats from Telegram
     webhooks             Send chats, messages, leads and callbacks to other tools (signed JSON)
     keys list|create|revoke  API keys for the public API (/api/v1): scoped, one site each, shown once
     api <METHOD> <path>  Call any public API endpoint with this project's admin key (--data '{…}')
@@ -306,10 +308,24 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   doctor: { usage: 'helppuff doctor [--json]', summary: 'Run every check and print a fix for each failure. Exit code 1 if any check fails.' },
   embed: { usage: 'helppuff embed', summary: 'Print the <script> tag to paste into the site.' },
   users: {
-    usage: 'helppuff users list | add <email> | remove <email> | reset <email> [--password <p>]',
+    usage: 'helppuff users list | add <email> [--role admin|member] | role <email> admin|member | remove <email> | reset <email> [--password <p>]',
     summary:
-      'Manage who can sign in to the dashboard. The owner is dashboard.adminEmail; others are stored in the D1 database. A password is generated and shown once when --password is omitted.',
-    examples: ['helppuff users add sam@acme.com', 'helppuff users reset owner@acme.com --json', 'helppuff users list'],
+      'Manage who can sign in to the dashboard. The owner is dashboard.adminEmail; others are stored in the D1 database. Admins (the default) can do everything; members see only conversations, contacts, callbacks and live chat, and their own notifications. A password is generated and shown once when --password is omitted.',
+    examples: ['helppuff users add sam@acme.com --role member', 'helppuff users role sam@acme.com admin', 'helppuff users reset owner@acme.com --json', 'helppuff users list'],
+  },
+  live: {
+    usage: 'helppuff live on [--wait <seconds>] [--close-after <minutes>] [--names|--no-names] | off | status',
+    summary:
+      'Live chat: a visitor who asks for a person is handed to your team, who answer from the dashboard (with a notification and a sound) or Telegram. When nobody is available, or nobody takes the chat in --wait seconds (default 120), the visitor gets the callback form. Conversations close after --close-after minutes without a message (default 60); a visitor who writes again is answered by the assistant. Off by default. Saved live and in helppuff.json (`live`).',
+    examples: ['helppuff live on --json', 'helppuff live on --wait 180 --no-names', 'helppuff live status --json', 'helppuff live off'],
+    notes: 'Someone has to be able to take chats: a dashboard open and set to Available, or Telegram linked (`helppuff telegram connect`).',
+  },
+  telegram: {
+    usage: 'helppuff telegram connect [--token <bot token>] | status | test | disconnect',
+    summary:
+      'Answer live chats from Telegram: each chat is a thread in your team\'s group (Topics on, the bot an admin with "Manage topics") or in your own chat with the bot. connect takes the token @BotFather gives you (from --token, piped, or prompted; stored encrypted on the Worker), then send /link <code> in the chat to answer from. In a thread: write to answer, /take, /close, /ai (back to the assistant), /info.',
+    examples: ['helppuff telegram connect --token 7123456789:AA… --json', 'echo "$BOT_TOKEN" | helppuff telegram connect', 'helppuff telegram status --json', 'helppuff telegram test'],
+    notes: 'Making the bot with @BotFather, and sending /link in the chat, are steps for the person: an agent can run everything else once it has the token.',
   },
   webhooks: {
     usage: 'helppuff webhooks list | add <url> [--events a,b] [--description …] | remove <id> | test <id> | enable <id> | disable <id> | events',

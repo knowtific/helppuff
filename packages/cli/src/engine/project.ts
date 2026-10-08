@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
 import { widgetConfigSchema } from '@helppuff/protocol';
-import { assistantConfigSchema, securitySchema } from '@helppuff/server';
+import { assistantConfigSchema, liveConfigSchema, securitySchema } from '@helppuff/server';
 import { workersAiOptionsSchema } from '@helppuff/connector-workers-ai';
 import { CliError } from '../errors.js';
 
@@ -199,6 +199,9 @@ export const projectSchema = z
       .default({})
       .describe('How the assistant behaves: goal, tone, answer length. HelpPuff writes these around prompt.md on every answer, so prompt.md holds only what is specific to the business.'),
     security: securitySchema.default({}).describe('Rate limits, daily cap, Turnstile. The defaults are safe for a public site.'),
+    live: liveConfigSchema
+      .default({})
+      .describe('Live chat: visitors can talk to a person on your team, who answers from the dashboard or Telegram. Off by default. `helppuff live on` turns it on.'),
     leads: z
       .object({
         webhook: z

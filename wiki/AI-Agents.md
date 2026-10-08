@@ -90,3 +90,7 @@ what would change; `… upgrade --yes --json` does it. See [[Upgrading]].
 - Stay on the free plan unless the user asks otherwise.
 - Before editing `prompt.md`, run `helppuff prompt pull`: the owner may have
   changed it in the dashboard. Before deploying settings, `helppuff config pull`.
+- Live chat only when asked (`helppuff live on`). For Telegram the person
+  makes the bot with @BotFather and sends `/link <code>` in their chat; the
+  agent runs `helppuff telegram connect --token …` with the token they give.
+  See [[Live chat|Live-Chat]] and [[Telegram]].

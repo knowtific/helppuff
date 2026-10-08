@@ -8,6 +8,35 @@ never needs you to change anything. Upgrade with
 
 ## [Unreleased]
 
+### Added: live chat, roles and a fuller CRM
+
+- **Live chat** (off by default; `helppuff live on` or Settings → Live chat):
+  a visitor who asks for a person is handed to the team, who answer from the
+  dashboard (browser notifications and a sound, per person) or from Telegram
+  (`helppuff telegram connect`; a thread per chat). Nobody available, or
+  nobody in `live.waitSeconds`: the callback form, as before. workers-ai hands
+  over itself (`request_person`); every backend gets a "Talk to a person"
+  button. Runs on a Durable Object per site, on the Free plan; the widget's
+  live code is a separate 1 kB file loaded only when a chat is handed over.
+- **Conversation status**: AI bot, Live agent or Closed (by the team, or after
+  `live.closeAfterMinutes` without a message; a visitor who writes again is
+  answered by the assistant). Filter by status, label and "waiting for a
+  reply"; filters are remembered.
+- **Roles**: admin or member. Members see conversations, contacts, callbacks
+  and live chat only. Invite and change roles in Settings → Team, or
+  `helppuff users add --role member` / `helppuff users role`.
+- **Labels** (Settings → Labels), put on by the team or by the AI when a
+  conversation goes quiet; **custom attributes** and **private notes** on
+  conversations and contacts; a **page per contact** with their details,
+  attributes, notes, conversations and history.
+- API: `PATCH /conversations/:id`, notes, labels, live chat (reply, assign,
+  close, hand back, status, Telegram), `PATCH /admins/:email`; contacts gain
+  `company`, `address`, `attributes`. Webhooks: `handover.requested`,
+  `handover.missed`, `handover.ended`, `conversation.assigned`,
+  `conversation.closed`; `message.sent` carries `author` for a person.
+- D1 migration 10 (`inbox and live chat`), and the `LiveHub` Durable Object,
+  added by `helppuff upgrade`.
+
 ### Added: the public API
 
 - Everything HelpPuff does, over HTTPS at `<worker>/api/v1`, so it can be used

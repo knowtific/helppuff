@@ -28,6 +28,11 @@ export const WEBHOOK_EVENTS = {
   'conversation.completed': 'A conversation went quiet (5 minutes after the last message): its summary, labels, lead and transcript.',
   'budget.warning': 'Today\'s AI budget is 80% used: answers are being kept shorter. Once a day.',
   'budget.exhausted': 'Today\'s AI budget is used up: visitors get your contact details and a callback form until 00:00 UTC. Once a day.',
+  'handover.requested': 'A visitor asked for a person (live chat): the team was notified.',
+  'handover.missed': 'Nobody took a live chat in time: the visitor was offered the callback form.',
+  'handover.ended': 'A person handed a live chat back to the assistant.',
+  'conversation.assigned': 'A conversation was taken by, or given to, someone on the team (or unassigned).',
+  'conversation.closed': 'A conversation was closed: by the team, or after it went quiet (`live.closeAfterMinutes`).',
   'knowledge.crawl.finished': 'Learning the website finished.',
   'knowledge.file.processed': 'An uploaded file was learned, or failed.',
 } as const;

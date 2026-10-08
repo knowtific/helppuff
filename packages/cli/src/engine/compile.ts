@@ -45,6 +45,7 @@ export const KV_BINDING = 'HELPPUFF_KV';
 export const DB_BINDING = 'HELPPUFF_DB';
 export const VECTORS_BINDING = 'VECTORS';
 export const WORKFLOW_BINDING = 'CRAWL_WORKFLOW';
+export const LIVE_HUB_BINDING = 'LIVE_HUB';
 export const BROWSER_BINDING = 'BROWSER';
 /** Daily, at a quiet minute; the Worker decides per site whether a re-crawl is due. */
 export const CRAWL_CRON = '23 3 * * *';
@@ -221,7 +222,7 @@ export function compile(
     ? { ...project.security, limits: { ...project.security.limits, messagesPerIpPerMinute: 600, messagesPerIpPerDay: 100_000, sessionsPerIpPerHour: 1000, sessionsPerIpPerDay: 10_000 } }
     : project.security;
   const knowledge = knowledgeFor(project);
-  const stored = { connector, sinks, security, widget, assistant: project.assistant, ...(knowledge ? { knowledge } : {}) };
+  const stored = { connector, sinks, security, widget, assistant: project.assistant, live: project.live, ...(knowledge ? { knowledge } : {}) };
   const site = { origins, ...stored };
   const serverConfig = { sites: { [project.site]: site } };
 
@@ -275,6 +276,10 @@ export function compile(
           ai: { binding: 'AI' },
           // Background jobs: crawls and files (workers-ai), the end of each conversation, webhook retries.
           workflows: [{ name: `${workerName}-crawl`.slice(0, 64), binding: WORKFLOW_BINDING, class_name: 'CrawlWorkflow' }],
+          // Live chat's hub, one per site: deployed always (it costs nothing unused), so the dashboard's switch needs no redeploy.
+          // SQLite-backed, the kind the Workers Free plan has.
+          durable_objects: { bindings: [{ name: LIVE_HUB_BINDING, class_name: 'LiveHub' }] },
+          migrations: [{ tag: 'live-hub-v1', new_sqlite_classes: ['LiveHub'] }],
         }
       : {}),
     ...(ownKnowledge

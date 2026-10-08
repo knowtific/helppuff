@@ -1,6 +1,8 @@
 import { ArrowUpCircle, BookOpen, ChartColumn, ChevronDown, CircleHelp, House, LogOut, MessagesSquare, Moon, PhoneCall, Settings, Sun, Users } from 'lucide-react';
-import { useEffect, useState, type ComponentProps, type ReactNode } from 'react';
-import { api, type CallbackList, type Me, type Site } from '../lib/api';
+import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
+import { api, isMember, type CallbackList, type LiveStatus, type Me, type Prefs, type Site } from '../lib/api';
+import { onToast, setAvailable, unlockAudio, useLiveConnection, useLiveEvents, type Toast } from '../lib/live';
+import { setAccent, setWaiting } from '../lib/attention';
 import { cn, href, useTheme, type Route } from '../lib/utils';
 import { Avatar, Button } from './ui';
 import { useVersion } from './Updates';
@@ -33,31 +35,41 @@ const ALL_NAV: {
   label: string;
   icon: ReactNode;
   knowledge?: boolean;
+  /** Admins only (members see the inbox). */
+  admin?: boolean;
 }[] = [
-  { page: 'home', label: 'Home', icon: <House /> },
+  { page: 'home', label: 'Home', icon: <House />, admin: true },
   { page: 'conversations', label: 'Conversations', icon: <MessagesSquare /> },
-  { page: 'leads', label: 'Leads', icon: <Users /> },
+  { page: 'leads', label: 'Contacts', icon: <Users /> },
   { page: 'callbacks', label: 'Callbacks', icon: <PhoneCall /> },
   {
     page: 'knowledge',
     label: 'Knowledge',
     icon: <BookOpen />,
     knowledge: true,
+    admin: true,
   },
-  { page: 'analytics', label: 'Analytics', icon: <ChartColumn /> },
+  { page: 'analytics', label: 'Analytics', icon: <ChartColumn />, admin: true },
   { page: 'settings', label: 'Settings', icon: <Settings /> },
 ];
 
 /** Settings, one page per topic; the sidebar opens them as a sub-menu. */
-export type SettingsSection = 'chat' | 'appearance' | 'leads' | 'instructions' | 'business' | 'advanced' | 'webhooks' | 'api' | 'team' | 'updates';
+export type SettingsSection = 'chat' | 'appearance' | 'leads' | 'instructions' | 'business' | 'advanced' | 'live' | 'labels' | 'notifications' | 'webhooks' | 'api' | 'team' | 'updates';
 
-export function settingsSections(site: Site | undefined): { id: SettingsSection; label: string }[] {
+export function settingsSections(site: Site | undefined, me?: Me): { id: SettingsSection; label: string }[] {
+  // Notifications are live chat's: with it off (the default) there is no such page.
+  const live = Boolean(site?.live);
+  // Members change only their own notifications.
+  if (me && isMember(me)) return live ? [{ id: 'notifications' as const, label: 'Notifications' }] : [];
   return [
     { id: 'chat' as const, label: 'Chat' },
     { id: 'appearance' as const, label: 'Appearance' },
     { id: 'leads' as const, label: 'Lead form' },
     { id: 'instructions' as const, label: 'Instructions' },
     ...(site?.knowledge ? [{ id: 'business' as const, label: 'Business details' }] : []),
+    { id: 'live' as const, label: 'Live chat' },
+    { id: 'labels' as const, label: 'Labels' },
+    ...(live ? [{ id: 'notifications' as const, label: 'Notifications' }] : []),
     ...(site?.knowledge || site?.connector === 'workers-ai' ? [{ id: 'advanced' as const, label: 'Advanced' }] : []),
     { id: 'webhooks' as const, label: 'Webhooks' },
     { id: 'api' as const, label: 'API keys' },
@@ -66,12 +78,120 @@ export function settingsSections(site: Site | undefined): { id: SettingsSection;
   ];
 }
 
+/**
+ * Live chat in the shell: the connection (one per tab), the person's
+ * Available switch, and the count of live chats waiting for a reply, on the
+ * menu and in the tab's title.
+ */
+function useLive(me: Me) {
+  const enabled = Boolean(me.sites[0]?.live);
+  const [prefs, setPrefs] = useState<Prefs | null>(null);
+  const [status, setStatus] = useState<LiveStatus | null>(null);
+  useEffect(() => {
+    if (!enabled) return;
+    api<Prefs>('/prefs').then(setPrefs, () => {});
+  }, [enabled]);
+  const connected = useLiveConnection(enabled, prefs, me.admin.email);
+  const refresh = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const load = () => {
+    if (enabled) api<LiveStatus>('/live/status').then(setStatus, () => {});
+  };
+  useEffect(load, [enabled, connected]);
+  useLiveEvents((event) => {
+    if (event.t === 'typing') return;
+    if (refresh.current) clearTimeout(refresh.current);
+    refresh.current = setTimeout(load, 300);
+  });
+  // Prefs saved on the Notifications page reach the live connection.
+  useEffect(() => {
+    const onPrefs = (e: Event) => setPrefs((e as CustomEvent<Prefs>).detail);
+    window.addEventListener('hp-prefs', onPrefs);
+    return () => window.removeEventListener('hp-prefs', onPrefs);
+  }, []);
+  const waiting = status ? status.unassigned + status.mine : 0;
+  // The tab's title and icon count what waits (lib/attention.ts).
+  useEffect(() => setAccent(me.sites[0]?.accent ?? ''), [me]);
+  useEffect(() => setWaiting(waiting), [waiting]);
+  const toggle = async () => {
+    unlockAudio();
+    if (!prefs) return;
+    setPrefs(await setAvailable(!prefs.available));
+  };
+  return { enabled, connected, prefs, waiting, toggle };
+}
+
+/** Pop-ups for what concerns you while you are elsewhere in the dashboard: a few seconds each, with Open. */
+function Toasts() {
+  const [items, setItems] = useState<Toast[]>([]);
+  useEffect(
+    () =>
+      onToast((toast) => {
+        setItems((current) => [...current.filter((t) => t.conversationId !== toast.conversationId), toast].slice(-3));
+        setTimeout(() => setItems((current) => current.filter((t) => t.id !== toast.id)), toast.kind === 'new-chat' ? 15_000 : 7000);
+      }),
+    [],
+  );
+  if (!items.length) return null;
+  return (
+    <div className="fixed right-4 bottom-4 z-50 flex w-80 flex-col gap-2" role="status" aria-live="polite">
+      {items.map((toast) => (
+        <div key={toast.id} className="rounded-lg border bg-card p-3 text-[13px] shadow-lg">
+          <p className="font-medium">{toast.title}</p>
+          {toast.body && <p className="mt-0.5 line-clamp-2 text-muted-foreground">{toast.body}</p>}
+          <div className="mt-2 flex justify-end gap-1.5">
+            <Button variant="ghost" size="sm" onClick={() => setItems((current) => current.filter((t) => t.id !== toast.id))}>
+              Dismiss
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                window.location.hash = `#/conversations/${toast.conversationId}`;
+                setItems((current) => current.filter((t) => t.id !== toast.id));
+              }}
+            >
+              Open
+            </Button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Availability({ live }: { live: ReturnType<typeof useLive> }) {
+  if (!live.enabled || !live.prefs) return null;
+  const on = live.prefs.available;
+  return (
+    <div className="mx-2 mb-2 flex items-center gap-2 rounded-md border px-2.5 py-2 text-xs">
+      <span className={cn('size-2 rounded-full', on && live.connected ? 'bg-[#16a34a]' : 'bg-muted-foreground/40')} aria-hidden />
+      <span className="flex-1">
+        <span className="block font-medium">{on ? 'Available' : 'Away'}</span>
+        <span className="text-muted-foreground">{live.connected ? (on ? 'You get new live chats' : 'No live chat alerts') : 'Connecting…'}</span>
+      </span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        aria-label="Available for live chats"
+        onClick={() => void live.toggle()}
+        className={cn('relative h-5 w-9 shrink-0 rounded-full border border-transparent transition-colors', on ? 'bg-primary' : 'bg-muted-foreground/30')}
+      >
+        {/* Anchored to the left edge: a button centres its content, so an unanchored knob starts mid-track. */}
+        <span className={cn('absolute top-px left-px size-4 rounded-full bg-background shadow-sm transition-transform motion-reduce:transition-none', on ? 'translate-x-4' : 'translate-x-0')} />
+      </button>
+    </div>
+  );
+}
+
 export function Shell({ me, route, onLogout, children }: { me: Me; route: Route; onLogout: () => void; children: ReactNode }) {
   const [dark, toggleTheme] = useTheme();
   const site = me.sites[0];
-  const NAV = ALL_NAV.filter((item) => !item.knowledge || site?.knowledge);
+  const member = isMember(me);
+  // A member with live chat off has no settings at all: no Settings entry.
+  const NAV = ALL_NAV.filter((item) => (!item.knowledge || site?.knowledge) && (!item.admin || !member) && (item.page !== 'settings' || !member || site?.live));
   const inSettings = route.page === 'settings' || route.page === 'prompt';
-  const sections = settingsSections(site);
+  const sections = settingsSections(site, me);
+  const live = useLive(me);
   const version = useVersion();
   // Callbacks waiting, on the menu: refreshed whenever the page changes.
   const [waiting, setWaiting] = useState(0);
@@ -151,14 +271,19 @@ export function Shell({ me, route, onLogout, children }: { me: Me; route: Route;
               <a
                 key={item.page}
                 href={href({ page: item.page })}
-                aria-current={route.page === item.page ? 'page' : undefined}
+                aria-current={route.page === item.page || (item.page === 'leads' && route.page === 'contact') ? 'page' : undefined}
                 className={cn(
                   'flex h-8 items-center gap-2.5 rounded-md px-2 text-[13px] transition-colors [&_svg]:size-4',
-                  route.page === item.page ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+                  route.page === item.page || (item.page === 'leads' && route.page === 'contact') ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
                 )}
               >
                 {item.icon}
                 <span className="flex-1">{item.label}</span>
+                {item.page === 'conversations' && live.waiting > 0 && (
+                  <span className="rounded-full bg-[#d97706] px-1.5 text-[11px] font-medium tabular-nums text-white" aria-label={`${live.waiting} live chats waiting`}>
+                    {live.waiting}
+                  </span>
+                )}
                 {item.page === 'callbacks' && waiting > 0 && (
                   <span className="rounded-full bg-primary px-1.5 text-[11px] font-medium tabular-nums text-primary-foreground" aria-label={`${waiting} waiting`}>
                     {waiting}
@@ -168,10 +293,12 @@ export function Shell({ me, route, onLogout, children }: { me: Me; route: Route;
             ),
           )}
         </nav>
-        {version?.upgradeAvailable && (
+        <div className="mt-auto" />
+        <Availability live={live} />
+        {!member && version?.upgradeAvailable && (
           <a
             href={href({ page: 'settings', id: 'updates' })}
-            className="mx-2 mt-auto mb-2 flex items-center gap-2 rounded-md border px-2.5 py-2 text-xs text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+            className="mx-2 mb-2 flex items-center gap-2 rounded-md border px-2.5 py-2 text-xs text-muted-foreground hover:bg-muted/60 hover:text-foreground"
           >
             <ArrowUpCircle className="size-4 shrink-0 text-primary" aria-hidden />
             <span>
@@ -180,7 +307,7 @@ export function Shell({ me, route, onLogout, children }: { me: Me; route: Route;
             </span>
           </a>
         )}
-        <div className={cn('flex items-center gap-2 border-t px-3 py-2.5', !version?.upgradeAvailable && 'mt-auto')}>
+        <div className="flex items-center gap-2 border-t px-3 py-2.5">
           <Avatar name={me.admin.email} className="size-6 text-[10px]" />
           <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" title={me.admin.email}>
             {me.admin.email}
@@ -217,6 +344,7 @@ export function Shell({ me, route, onLogout, children }: { me: Me; route: Route;
           ))}
         </nav>
         <main className="min-h-0 flex-1 overflow-auto scroll-thin">{children}</main>
+        {live.enabled && <Toasts />}
       </div>
     </div>
   );

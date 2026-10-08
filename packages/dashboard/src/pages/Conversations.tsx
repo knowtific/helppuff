@@ -1,9 +1,11 @@
-import { ArrowLeft, ExternalLink, Loader2, Mail, MessagesSquare, Phone, PhoneCall, Search, Sparkles, ThumbsDown, ThumbsUp } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowLeft, Bot, ExternalLink, Headset, Loader2, Lock, Mail, MessagesSquare, Phone, PhoneCall, RotateCcw, Search, Send, Sparkles, ThumbsDown, ThumbsUp, UserRound } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { PageHeader } from '../components/Shell';
-import { Avatar, Badge, Button, Card, Empty, ErrorNote, Input, Segmented, Skeleton, StatusBadge } from '../components/ui';
-import { api, parseSummary, type ConversationDetail, type ConversationRow, type Me, type StoredMessage, type Summary } from '../lib/api';
-import { cn, flag, fmtDateTime, fmtRelative, fmtTime, href, pathOf, useData, useDebounced } from '../lib/utils';
+import { Avatar, Badge, Button, Card, Empty, ErrorNote, Input, Segmented, Select, Skeleton, StatusBadge, Textarea } from '../components/ui';
+import { AttributesEditor, ConversationStatusBadge, LabelChip, LabelPicker, NotesPanel, SideSection, useLabels, WaitingBadge } from '../components/inbox';
+import { api, isMember, parseSummary, type ConversationDetail, type ConversationRow, type Me, type StoredMessage, type Summary, type Team } from '../lib/api';
+import { sendTyping, useLiveEvents } from '../lib/live';
+import { cn, flag, fmtDateTime, fmtRelative, fmtTime, href, pathOf, useData, useDebounced, usePersisted } from '../lib/utils';
 
 const QUALITY_DOT = { hot: '#dc2626', warm: '#f59e0b', cold: '#3b82f6', none: '#a1a1aa' } as const;
 const OUTCOME_LABEL = {
@@ -14,7 +16,10 @@ const OUTCOME_LABEL = {
   abandoned: 'left early',
 } as const;
 
-type Filter = 'all' | 'leads' | 'callbacks' | 'unsummarized';
+const STATUSES = ['all', 'bot', 'live'] as const;
+type StatusFilter = (typeof STATUSES)[number];
+const FILTERS = ['all', 'waiting', 'leads', 'callbacks', 'unsummarized'] as const;
+type Filter = (typeof FILTERS)[number];
 
 function Row({ row, active }: { row: ConversationRow; active: boolean }) {
   const who = row.leadName ?? row.leadEmail ?? row.leadPhone;
@@ -23,7 +28,7 @@ function Row({ row, active }: { row: ConversationRow; active: boolean }) {
     <a
       href={href({ page: 'conversations', id: row.id })}
       aria-current={active ? 'true' : undefined}
-      className={cn('flex gap-3 border-b px-3 py-3 transition-colors', active ? 'bg-muted' : 'hover:bg-subtle')}
+      className={cn('flex gap-3 border-b px-3 py-3 transition-colors', active ? 'bg-muted' : 'hover:bg-subtle', Boolean(row.waitingSince) && 'border-l-2 border-l-[#d97706]')}
     >
       <Avatar name={who} />
       <div className="min-w-0 flex-1">
@@ -33,6 +38,9 @@ function Row({ row, active }: { row: ConversationRow; active: boolean }) {
         </div>
         <p className="mt-0.5 line-clamp-2 text-[13px] text-muted-foreground">{summary?.summary ?? row.firstMessage ?? 'No messages'}</p>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          {row.waitingSince ? <WaitingBadge since={row.waitingSince} compact /> : row.status && row.status !== 'bot' && <ConversationStatusBadge status={row.status} />}
+          {row.status === 'live' && <Badge>{row.assignedName ?? 'Unassigned'}</Badge>}
+          {row.labels?.map((label) => <LabelChip key={label.id} label={label} />)}
           {row.intent && <Badge>{row.intent}</Badge>}
           {summary?.leadQuality === 'hot' && <Badge dot={QUALITY_DOT.hot}>hot lead</Badge>}
           {row.leadStatus && <StatusBadge status={row.leadStatus} />}
@@ -52,16 +60,24 @@ function Bubble({ message }: { message: StoredMessage }) {
   const payload = message.payload ?? {};
   const options = Array.isArray(payload['options']) ? (payload['options'] as { label: string }[]) : null;
   const links = Array.isArray(payload['links']) ? (payload['links'] as { label: string; url: string }[]) : null;
-  if (message.role === 'system' || message.type === 'notice') {
+  const human = Boolean(message.author);
+  const name = (payload['meta'] as { agentName?: string } | undefined)?.agentName;
+  if (message.role === 'system' || message.type === 'notice' || message.type === 'handover') {
     return <p className="py-1 text-center text-xs text-muted-foreground">{message.text}</p>;
   }
   return (
     <div className={cn('flex flex-col gap-1', mine ? 'items-end' : 'items-start')}>
+      {!mine && (
+        <span className="flex items-center gap-1 px-1 text-[10px] text-muted-foreground">
+          {human ? <UserRound className="size-3" aria-hidden /> : <Bot className="size-3" aria-hidden />}
+          {human ? `${name ?? message.author} (team)` : 'Assistant'}
+        </span>
+      )}
       {message.text && message.type !== 'options' && (
         <div
           className={cn(
             'max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-[13px] leading-relaxed',
-            mine ? 'rounded-br-md bg-primary text-primary-foreground' : 'rounded-bl-md bg-muted',
+            mine ? 'rounded-br-md bg-primary text-primary-foreground' : human ? 'rounded-bl-md border border-primary/30 bg-primary/5' : 'rounded-bl-md bg-muted',
           )}
         >
           {message.type === 'card' && <span className="block font-medium">{message.text}</span>}
@@ -174,44 +190,230 @@ function SummaryCard({ id, stored, enabled, onDone }: { id: string; stored: Summ
   );
 }
 
-function Detail({ id, me }: { id: string; me: Me }) {
+/** The reply box of a live chat: Enter sends, Shift+Enter is a new line. */
+function Composer({ id, onSent, note }: { id: string; onSent: () => void; note: string | null }) {
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const typing = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const send = async () => {
+    const value = text.trim();
+    if (!value || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api(`/conversations/${id}/reply`, { method: 'POST', json: { text: value } });
+      setText('');
+      sendTyping(id, false);
+      onSent();
+    } catch (thrown) {
+      setError((thrown as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <form
+      className="border-t bg-background p-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void send();
+      }}
+    >
+      {note && <p className="mb-2 text-xs text-muted-foreground">{note}</p>}
+      <div className="flex items-end gap-2">
+        <Textarea
+          rows={2}
+          value={text}
+          maxLength={4000}
+          placeholder="Reply to the visitor…"
+          aria-label="Reply to the visitor"
+          onChange={(e) => {
+            setText(e.target.value);
+            if (!typing.current) sendTyping(id, true);
+            if (typing.current) clearTimeout(typing.current);
+            typing.current = setTimeout(() => {
+              sendTyping(id, false);
+              typing.current = null;
+            }, 3000);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              void send();
+            }
+          }}
+          className="min-h-[52px] resize-none"
+        />
+        <Button type="submit" disabled={busy || !text.trim()} aria-label="Send">
+          {busy ? <Loader2 className="animate-spin" /> : <Send />}
+        </Button>
+      </div>
+      {error && (
+        <p role="alert" className="mt-1.5 text-xs text-danger">
+          {error}
+        </p>
+      )}
+    </form>
+  );
+}
+
+function Detail({ id, me, team, onChanged }: { id: string; me: Me; team: Team | null; onChanged: () => void }) {
   const { data, error, reload } = useData(() => api<ConversationDetail>(`/conversations/${id}`), [id]);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [visitorTyping, setVisitorTyping] = useState(false);
+  const thread = useRef<HTMLDivElement>(null);
+  useLiveEvents((event) => {
+    if (!('conversationId' in event) || event.conversationId !== id) return;
+    if (event.t === 'typing') setVisitorTyping(event.on);
+    else reload();
+  });
+  useEffect(() => {
+    thread.current?.scrollTo({ top: thread.current.scrollHeight });
+  }, [data?.messages.length]);
+
   if (error) return <div className="p-6"><ErrorNote error={error} onRetry={reload} /></div>;
   if (!data) return <div className="space-y-3 p-6">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-16" />)}</div>;
 
   const c = data.conversation;
   const lead = data.lead;
   const who = lead?.name ?? lead?.email ?? lead?.phone ?? 'Visitor';
+  const status = c.status ?? 'bot';
+  const member = isMember(me);
+  const mine = c.assigned_to === me.admin.email;
+  const live = Boolean(me.sites[0]?.live);
+  const act = async (name: string, path: string, json?: unknown) => {
+    setBusy(name);
+    setActionError(null);
+    try {
+      await api(`/conversations/${id}/${path}`, { method: 'POST', ...(json === undefined ? {} : { json }) });
+      reload();
+      onChanged();
+    } catch (thrown) {
+      setActionError((thrown as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
+  const patch = async (json: Record<string, unknown>) => {
+    await api(`/conversations/${id}`, { method: 'PATCH', json });
+    reload();
+    onChanged();
+  };
+
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-3 border-b px-4 py-3">
+      <div className="flex flex-wrap items-center gap-3 border-b px-4 py-3">
         <a href={href({ page: 'conversations' })} className="text-muted-foreground lg:hidden" aria-label="Back to list">
           <ArrowLeft className="size-4" />
         </a>
         <Avatar name={lead ? who : null} className="size-8" />
         <div className="min-w-0 flex-1">
-          <p className="truncate font-medium">{who}</p>
+          <p className="flex items-center gap-2 truncate font-medium">
+            {lead ? (
+              <a href={href({ page: 'contact', id: lead.id })} className="truncate hover:underline">
+                {who}
+              </a>
+            ) : (
+              who
+            )}
+            <ConversationStatusBadge status={status} />
+          </p>
           <p className="truncate text-xs text-muted-foreground">
             Started {fmtDateTime(Number(c.started_at))} on {pathOf(c['page_url'] as string | null)}
             {c['country'] ? ` · ${flag(String(c['country']))} ${String(c['country'])}` : ''}
           </p>
         </div>
-      </div>
-      <div className="grid min-h-0 flex-1 lg:grid-cols-[1fr_260px]">
-        <div className="scroll-thin min-h-0 space-y-4 overflow-auto p-4">
-          <SummaryCard id={id} stored={parseSummary(c.summary)} enabled={me.summaries} onDone={reload} />
-          <div className="space-y-3">
-            {data.messages.map((m) => (
-              <Bubble key={m.id} message={m} />
-            ))}
-          </div>
+        {/* Every status can move to every other: a mistake is one click to undo. */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {live && status === 'live' && !mine && (
+            <Button size="sm" onClick={() => void act('take', 'takeover')} disabled={busy !== null}>
+              <Headset /> {c.assigned_to ? 'Take over' : 'Take chat'}
+            </Button>
+          )}
+          {live && status === 'bot' && (
+            <Button size="sm" onClick={() => void act('take', 'takeover')} disabled={busy !== null}>
+              <Headset /> Take over
+            </Button>
+          )}
+          {live && status === 'closed' && (
+            <Button size="sm" onClick={() => void act('take', 'takeover')} disabled={busy !== null}>
+              <Headset /> Reopen with me
+            </Button>
+          )}
+          {status === 'live' && (
+            <Button size="sm" variant="outline" onClick={() => void act('handback', 'handback')} disabled={busy !== null}>
+              <Bot /> Back to assistant
+            </Button>
+          )}
+          {status === 'closed' && (
+            <Button size="sm" variant="outline" onClick={() => void act('handback', 'handback')} disabled={busy !== null}>
+              <RotateCcw /> Reopen for assistant
+            </Button>
+          )}
+          {status !== 'closed' && (
+            <Button size="sm" variant="outline" onClick={() => void act('close', 'close')} disabled={busy !== null}>
+              <Lock /> Close
+            </Button>
+          )}
         </div>
-        <aside className="hidden space-y-4 border-l p-4 text-[13px] lg:block">
-          <div>
-            <p className="mb-2 text-xs font-medium text-muted-foreground">Contact</p>
+      </div>
+      {actionError && (
+        <p role="alert" className="border-b bg-danger/5 px-4 py-1.5 text-xs text-danger">
+          {actionError}
+        </p>
+      )}
+      <div className="grid min-h-0 flex-1 lg:grid-cols-[1fr_280px]">
+        <div className="flex min-h-0 flex-col">
+          <div ref={thread} className="scroll-thin min-h-0 flex-1 space-y-4 overflow-auto p-4">
+            {c.waiting_since && <WaitingBadge since={Number(c.waiting_since)} />}
+            <SummaryCard id={id} stored={parseSummary(c.summary)} enabled={me.summaries} onDone={reload} />
+            <div className="space-y-3" aria-live="polite">
+              {data.messages.map((m) => (
+                <Bubble key={m.id} message={m} />
+              ))}
+              {visitorTyping && <p className="text-xs text-muted-foreground">The visitor is typing…</p>}
+            </div>
+          </div>
+          {live && (
+            <Composer
+              id={id}
+              onSent={reload}
+              note={status === 'bot' ? 'The assistant is answering. Sending takes the chat over.' : status === 'closed' ? 'This chat is closed. Sending reopens it with you.' : null}
+            />
+          )}
+        </div>
+        <aside className="scroll-thin hidden min-h-0 space-y-5 overflow-auto border-l p-4 text-[13px] lg:block">
+          {status === 'live' && (
+            <SideSection title="Assigned to">
+              {member || !team ? (
+                <p>{c.assigned_name ?? c.assigned_to ?? 'Nobody yet'}</p>
+              ) : (
+                <Select
+                  value={c.assigned_to ?? ''}
+                  onChange={(e) => void act('assign', 'assign', { to: e.target.value || null })}
+                  aria-label="Assign to"
+                  className="w-full"
+                >
+                  <option value="">Nobody</option>
+                  {!team.admins.some((a) => a.email === team.owner) && team.owner && <option value={team.owner}>{team.owner}</option>}
+                  {team.admins.map((a) => (
+                    <option key={a.email} value={a.email}>
+                      {a.name ? `${a.name} (${a.email})` : a.email}
+                    </option>
+                  ))}
+                  {c.assigned_to && c.assigned_to.startsWith('telegram:') && <option value={c.assigned_to}>{c.assigned_name ?? 'Telegram'} (Telegram)</option>}
+                </Select>
+              )}
+            </SideSection>
+          )}
+          <SideSection title="Contact">
             {lead ? (
               <div className="space-y-1.5">
-                <p className="font-medium">{lead.name ?? '—'}</p>
+                <a href={href({ page: 'contact', id: lead.id })} className="font-medium hover:underline">
+                  {lead.name ?? '—'}
+                </a>
                 {lead.email && (
                   <a href={`mailto:${lead.email}`} className="flex items-center gap-1.5 hover:underline">
                     <Mail className="size-3.5 text-muted-foreground" /> {lead.email}
@@ -225,9 +427,6 @@ function Detail({ id, me }: { id: string; me: Me }) {
                 <div className="pt-1">
                   <StatusBadge status={lead.status} />
                 </div>
-                <a href={href({ page: 'leads' })} className="block pt-1 text-xs text-muted-foreground hover:text-foreground">
-                  Manage in Leads →
-                </a>
                 {data.callbacks.map((cb) => (
                   <div key={cb.id} className="mt-2 rounded-md border px-2.5 py-2">
                     <p className="flex items-center gap-1.5 text-xs font-medium">
@@ -245,7 +444,16 @@ function Detail({ id, me }: { id: string; me: Me }) {
             ) : (
               <p className="text-muted-foreground">No contact details shared.</p>
             )}
-          </div>
+          </SideSection>
+          <SideSection title="Labels">
+            <LabelPicker value={data.labels ?? []} onChange={(ids) => void patch({ labels: ids })} />
+          </SideSection>
+          <SideSection title="Attributes">
+            <AttributesEditor value={c.attributes ?? {}} onSave={(attributes) => patch({ attributes })} />
+          </SideSection>
+          <SideSection title="Notes">
+            <NotesPanel notes={data.notes ?? []} me={me.admin.email} isAdmin={!member} addPath={`/conversations/${id}/notes`} onChange={reload} />
+          </SideSection>
           <div className="space-y-1 border-t pt-4 text-xs text-muted-foreground">
             <p>{data.messages.length} messages</p>
             {Boolean(c['referrer']) && <p className="truncate">From {pathOf(String(c['referrer']))}</p>}
@@ -259,25 +467,47 @@ function Detail({ id, me }: { id: string; me: Me }) {
 
 export function Conversations({ id, me }: { id?: string | undefined; me: Me }) {
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<Filter>('all');
+  const [status, setStatus] = usePersisted<StatusFilter>('hp-conversations-status', 'all', STATUSES);
+  const [filter, setFilter] = usePersisted<Filter>('hp-conversations-filter', 'all', FILTERS);
+  const [label, setLabel] = usePersisted<string>('hp-conversations-label', '');
+  const { labels } = useLabels();
   const q = useDebounced(query);
   const [pages, setPages] = useState<number[]>([]);
-  const { data, error, loading, reload } = useData(
-    () => api<{ items: ConversationRow[]; next: number | null }>(`/conversations?filter=${filter}&q=${encodeURIComponent(q)}`),
-    [q, filter],
-  );
+  // Who answers is live chat's question: with it off (the default), every chat is the assistant's.
+  const live = Boolean(me.sites[0]?.live);
+  const shownStatus: StatusFilter = live ? status : 'all';
+  const params = `filter=${filter}&status=${shownStatus}${label ? `&label=${encodeURIComponent(label)}` : ''}&q=${encodeURIComponent(q)}`;
+  const { data, error, loading, reload } = useData(() => api<{ items: ConversationRow[]; next: number | null }>(`/conversations?${params}`), [params]);
+  const team = useData(() => api<Team>('/admins').catch(() => null), []).data;
   const [more, setMore] = useState<ConversationRow[]>([]);
   const [next, setNext] = useState<number | null>(null);
   const items = [...(data?.items ?? []), ...more];
   const cursor = more.length ? next : (data?.next ?? null);
 
+  // New chats, messages and who took what: the list follows, a moment later.
+  const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useLiveEvents((event) => {
+    if (event.t === 'typing' || event.t === 'presence') return;
+    if (pending.current) clearTimeout(pending.current);
+    pending.current = setTimeout(reload, 400);
+  });
+  // A label that no longer exists is not a filter.
+  useEffect(() => {
+    if (label && labels.length && !labels.some((l) => l.name === label)) setLabel('');
+  }, [labels, label, setLabel]);
+
+  const reset = () => {
+    setMore([]);
+    setPages([]);
+  };
   const loadMore = async () => {
     if (!cursor) return;
-    const page = await api<{ items: ConversationRow[]; next: number | null }>(`/conversations?filter=${filter}&q=${encodeURIComponent(q)}&before=${cursor}`);
+    const page = await api<{ items: ConversationRow[]; next: number | null }>(`/conversations?${params}&before=${cursor}`);
     setMore((rows) => [...rows, ...page.items]);
     setNext(page.next);
     setPages((p) => [...p, cursor]);
   };
+  const filtered = shownStatus !== 'all' || filter !== 'all' || Boolean(label) || Boolean(q);
 
   return (
     <div className="flex h-full flex-col">
@@ -293,36 +523,68 @@ export function Conversations({ id, me }: { id?: string | undefined; me: Me }) {
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);
-                  setMore([]);
-                  setPages([]);
+                  reset();
                 }}
                 placeholder="Search messages, names, emails…"
                 className="pl-8"
                 aria-label="Search conversations"
               />
             </div>
+            {live && (
             <Segmented
-              label="Filter"
-              value={filter}
+              label="Who is answering"
+              value={status}
               onChange={(value) => {
-                setFilter(value);
-                setMore([]);
-                setPages([]);
+                setStatus(value);
+                reset();
               }}
               options={[
                 { value: 'all', label: 'All' },
-                { value: 'leads', label: 'With contact' },
-                { value: 'callbacks', label: 'Callback waiting' },
-                { value: 'unsummarized', label: 'Not summarised' },
+                { value: 'bot', label: 'AI bot' },
+                { value: 'live', label: 'Live agent' },
               ]}
             />
+            )}
+            <div className="flex gap-2">
+              <Select
+                value={filter}
+                onChange={(e) => {
+                  setFilter(e.target.value as Filter);
+                  reset();
+                }}
+                aria-label="Show"
+                className="min-w-0 flex-1"
+              >
+                <option value="all">Everything</option>
+                {live && <option value="waiting">Waiting for a reply</option>}
+                <option value="leads">With contact</option>
+                <option value="callbacks">Callback waiting</option>
+                <option value="unsummarized">Not summarised</option>
+              </Select>
+              <Select
+                value={label}
+                onChange={(e) => {
+                  setLabel(e.target.value);
+                  reset();
+                }}
+                aria-label="Label"
+                className="min-w-0 flex-1"
+              >
+                <option value="">Any label</option>
+                {labels.map((l) => (
+                  <option key={l.id} value={l.name}>
+                    {l.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
           </div>
           <div className="scroll-thin min-h-0 flex-1 overflow-auto">
             {error && <div className="p-3"><ErrorNote error={error} onRetry={reload} /></div>}
             {loading && !data && [0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="m-3 h-16" />)}
             {data && items.length === 0 && (
-              <Empty icon={<MessagesSquare />} title={q ? 'Nothing matches' : 'No conversations yet'}>
-                {q ? 'Try another word.' : 'Chats appear here as soon as a visitor says hello.'}
+              <Empty icon={<MessagesSquare />} title={filtered ? 'Nothing matches' : 'No conversations yet'}>
+                {filtered ? 'Try another word or filter.' : 'Chats appear here as soon as a visitor says hello.'}
               </Empty>
             )}
             {items.map((row) => (
@@ -339,10 +601,10 @@ export function Conversations({ id, me }: { id?: string | undefined; me: Me }) {
         </section>
         <section className={cn('min-w-0 flex-1', !id && 'hidden lg:block')}>
           {id ? (
-            <Detail id={id} me={me} />
+            <Detail id={id} me={me} team={team} onChanged={reload} />
           ) : (
             <Empty icon={<MessagesSquare />} title="Pick a conversation">
-              Read the full transcript, the visitor&apos;s details and an AI summary.
+              Read the full transcript, the visitor&apos;s details and an AI summary{live ? ', or answer a live chat' : ''}.
             </Empty>
           )}
         </section>

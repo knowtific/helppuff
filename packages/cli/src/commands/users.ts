@@ -14,7 +14,8 @@ import type { Ctx } from './context.js';
 /**
  * `helppuff users` — who can sign in to the dashboard.
  *
- *   add <email> [--password p]     a teammate (password generated if omitted)
+ *   add <email> [--password p] [--role admin|member]   a teammate (password generated if omitted)
+ *   role <email> admin|member      what they can do: members see the inbox only
  *   remove <email>
  *   reset <email> [--password p]   a new password, for the owner or a teammate
  *   list
@@ -38,8 +39,8 @@ async function passwordFor(ctx: Ctx): Promise<{ password: string; generated: boo
 }
 
 export async function usersCommand(ctx: Ctx): Promise<number> {
-  assertKnown(ctx.flags, ['password'], 'users');
-  const [sub, rawEmail] = ctx.positionals;
+  assertKnown(ctx.flags, ['password', 'role'], 'users');
+  const [sub, rawEmail, rawRole] = ctx.positionals;
   const email = rawEmail?.trim().toLowerCase();
   const loaded = loadProject(ctx.cwd);
   const owner = loaded.project.dashboard.adminEmail?.toLowerCase();
@@ -69,10 +70,10 @@ export async function usersCommand(ctx: Ctx): Promise<number> {
 
   switch (sub) {
     case 'list': {
-      const rows = await query('SELECT email, created_at, last_login_at FROM admins ORDER BY created_at');
+      const rows = await query("SELECT email, COALESCE(role, 'admin') AS role, created_at, last_login_at FROM admins ORDER BY created_at");
       const users = [
         ...(owner ? [{ email: owner, role: 'owner', lastLoginAt: null }] : []),
-        ...rows.map((r) => ({ email: String(r['email']), role: 'admin', lastLoginAt: r['last_login_at'] ?? null })),
+        ...rows.map((r) => ({ email: String(r['email']), role: String(r['role']), lastLoginAt: r['last_login_at'] ?? null })),
       ];
       ctx.out.result({ users, dashboard: loaded.project.cloudflare.url ? dashboardUrl(loaded.project.cloudflare.url) : null }, () => {
         for (const user of users) process.stdout.write(`${user.email.padEnd(36)} ${c.dim(user.role)}\n`);
@@ -88,16 +89,26 @@ export async function usersCommand(ctx: Ctx): Promise<number> {
       const exists = (await query('SELECT email FROM admins WHERE email = ?', [email])).length > 0;
       if (sub === 'add' && exists) throw new CliError('user_exists', `${email} can already sign in.`, { hint: `helppuff users reset ${email}` });
       if (sub === 'reset' && !exists) throw new CliError('no_user', `${email} is not a dashboard user.`, { hint: `helppuff users add ${email}` });
+      const role = str(ctx.flags, 'role') ?? 'admin';
+      if (role !== 'admin' && role !== 'member') throw new CliError('usage', '--role is admin (everything) or member (conversations, contacts, callbacks, live chat).', { exitCode: 2 });
       const { password, generated } = await passwordFor(ctx);
-      await query(
-        `INSERT INTO admins (email, password_hash, created_at) VALUES (?, ?, ?)
-         ON CONFLICT(email) DO UPDATE SET password_hash = excluded.password_hash`,
-        [email, hashPassword(password), Date.now()],
-      );
-      ctx.out.result({ email, action: sub === 'add' ? 'added' : 'reset', ...(generated ? { password } : {}) }, () => {
-        ctx.out.success(`${email} ${sub === 'add' ? 'can now sign in' : 'has a new password'}.`);
+      if (sub === 'add') {
+        await query('INSERT INTO admins (email, password_hash, role, created_at) VALUES (?, ?, ?, ?)', [email, hashPassword(password), role, Date.now()]);
+      } else {
+        await query('UPDATE admins SET password_hash = ? WHERE email = ?', [hashPassword(password), email]);
+      }
+      ctx.out.result({ email, action: sub === 'add' ? 'added' : 'reset', ...(sub === 'add' ? { role } : {}), ...(generated ? { password } : {}) }, () => {
+        ctx.out.success(`${email} ${sub === 'add' ? `can now sign in, as ${role === 'member' ? 'a member' : 'an admin'}` : 'has a new password'}.`);
         if (generated) ctx.out.info(`  Password: ${c.bold(password)}  ${c.dim('(shown once — share it privately)')}`);
       });
+      return 0;
+    }
+    case 'role': {
+      if (!email || (rawRole !== 'admin' && rawRole !== 'member')) throw new CliError('usage', 'Usage: helppuff users role <email> admin|member', { exitCode: 2 });
+      if (email === owner) throw new CliError('usage', 'The owner always has full access.', { exitCode: 2 });
+      if (!(await query('SELECT email FROM admins WHERE email = ?', [email])).length) throw new CliError('no_user', `${email} is not a dashboard user.`, { hint: `helppuff users add ${email} --role ${rawRole}` });
+      await query('UPDATE admins SET role = ? WHERE email = ?', [rawRole, email]);
+      ctx.out.result({ email, role: rawRole }, () => ctx.out.success(`${email} is now ${rawRole === 'member' ? 'a member (the inbox only)' : 'an admin'}.`));
       return 0;
     }
     case 'remove': {
@@ -108,7 +119,7 @@ export async function usersCommand(ctx: Ctx): Promise<number> {
       return 0;
     }
     default:
-      throw new CliError('usage', 'Usage: helppuff users list | add <email> | remove <email> | reset <email>', { exitCode: 2 });
+      throw new CliError('usage', 'Usage: helppuff users list | add <email> [--role admin|member] | role <email> admin|member | remove <email> | reset <email>', { exitCode: 2 });
   }
 }
 

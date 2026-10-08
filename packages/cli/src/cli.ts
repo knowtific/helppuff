@@ -27,6 +27,7 @@ import { apiCommand, keysCommand } from './commands/keys.js';
 import { callbacksCommand } from './commands/callbacks.js';
 import { upgradeCommand } from './commands/upgrade.js';
 import { promptCommand } from './commands/prompt.js';
+import { liveCommand, telegramCommand } from './commands/live.js';
 
 const COMMANDS: Record<string, (ctx: Ctx) => Promise<number>> = {
   init: initCommand,
@@ -56,6 +57,8 @@ const COMMANDS: Record<string, (ctx: Ctx) => Promise<number>> = {
   upgrade: upgradeCommand,
   dashboard: dashboardCommand,
   prompt: promptCommand,
+  live: liveCommand,
+  telegram: telegramCommand,
 };
 
 export async function main(argv: string[]): Promise<number> {

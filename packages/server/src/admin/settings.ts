@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { iconNames, type WidgetConfig } from '@helppuff/protocol';
 import type { KvStore } from '@helppuff/connector-types';
 import { ANSWER_REASONING, answerReasoning } from '@helppuff/rag';
-import { assistantConfigSchema, securitySchema, storedSiteConfigSchema, type SiteConfig, type StoredSiteConfig } from '../config/schema.js';
+import { assistantConfigSchema, liveConfigSchema, securitySchema, storedSiteConfigSchema, type SiteConfig, type StoredSiteConfig } from '../config/schema.js';
 import { resolveSite, siteConfigKey } from '../config/site.js';
 import { HelpPuffError } from '../core/errors.js';
 import type { HonoEnv } from '../core/request.js';
@@ -117,6 +117,8 @@ export const settingsSchema = z
       .strict(),
     /** Absent from Workers older than the Advanced page. */
     security: securitySettingsSchema.optional(),
+    /** Live chat (the `live` site section). Absent from Workers older than live chat. */
+    live: liveConfigSchema.optional(),
   })
   .strict();
 export type Settings = z.infer<typeof settingsSchema>;
@@ -149,6 +151,7 @@ export const settingsPatchSchema = settingsSchema.partial().extend({
     })
     .strict()
     .optional(),
+  live: liveConfigSchema.partial().optional(),
 });
 export type SettingsPatch = z.infer<typeof settingsPatchSchema>;
 
@@ -183,6 +186,7 @@ export function readSettings(site: SiteConfig): Settings {
     behaviour: site.assistant,
     crawl: { schedule: site.knowledge.schedule, include: site.knowledge.include, exclude: site.knowledge.exclude, renderJs: site.knowledge.renderJs },
     security: securityOf(site),
+    live: site.live,
   };
 }
 
@@ -207,7 +211,7 @@ const compact = (value: Record<string, unknown>) =>
   Object.fromEntries(Object.entries(value).filter(([, v]) => v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)));
 
 /** The site config sections that carry these settings, rewritten. */
-export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<SiteConfig, 'widget' | 'connector' | 'knowledge' | 'assistant' | 'security'> {
+export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<SiteConfig, 'widget' | 'connector' | 'knowledge' | 'assistant' | 'security' | 'live'> {
   const current = readSettings(site);
   const s: Settings = {
     ...current,
@@ -252,7 +256,8 @@ export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<Site
     };
   }
   const knowledge = { ...site.knowledge, ...s.crawl };
-  return { widget, connector, knowledge, assistant: s.behaviour, security: mergeSecurity(site, patch.security) };
+  const live = liveConfigSchema.parse({ ...site.live, ...(patch.live ?? {}) });
+  return { widget, connector, knowledge, assistant: s.behaviour, security: mergeSecurity(site, patch.security), live };
 }
 
 export async function settingsHash(settings: Settings): Promise<string> {
@@ -316,6 +321,7 @@ settingsRoutes.put('/settings', async (c) => {
     knowledge: next.knowledge,
     assistant: next.assistant,
     security: next.security,
+    live: next.live,
     settings: { at: ctx.platform.now(), by: admin.via === 'api-key' ? 'cli' : admin.email, hash },
   });
   await kv.put(siteConfigKey(siteId), JSON.stringify(record));

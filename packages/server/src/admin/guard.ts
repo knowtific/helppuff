@@ -14,8 +14,49 @@ import { cookieValue, passwordFingerprint, readSession, SESSION_COOKIE } from '.
  *    owner.
  */
 
+/**
+ * What a dashboard account may do. The owner and admins: everything.
+ * Members: the inbox only — conversations, contacts, callbacks, live chat and
+ * their own notification settings (`memberMay`).
+ */
+export type Role = 'owner' | 'admin' | 'member';
+export const ROLES = ['admin', 'member'] as const;
+
 /** `api-key`: the deployment's ADMIN_API_KEY (the CLI, full access). `key`: a scoped key from `/api/v1/keys`. */
-export type Admin = { email: string; owner: boolean; via: 'session' | 'api-key' | 'key' };
+export type Admin = { email: string; owner: boolean; role: Role; name: string | null; via: 'session' | 'api-key' | 'key' };
+
+/**
+ * The routes a member may use, by method and path below the API base. Fail
+ * closed: anything not listed (settings, knowledge, prompt, webhooks, keys,
+ * the team, analytics) is refused, whatever is added later.
+ */
+const MEMBER_ROUTES: [method: string | '*', path: RegExp][] = [
+  ['GET', /^\/me$/],
+  ['POST', /^\/logout$/],
+  ['GET', /^\/admins$/],
+  ['GET', /^\/conversations$/],
+  ['*', /^\/conversations\/[^/]+(\/(reply|notes|close|assign|handback|takeover|summary))?$/],
+  ['GET', /^\/leads(\.csv)?$/],
+  ['POST', /^\/leads$/],
+  ['*', /^\/leads\/[^/]+(\/notes)?$/],
+  ['*', /^\/notes\/[^/]+$/],
+  ['*', /^\/callbacks(\/[^/]+)?$/],
+  ['GET', /^\/labels$/],
+  ['*', /^\/prefs$/],
+  ['GET', /^\/live\/(status|socket)$/],
+];
+
+export function memberMay(method: string, path: string): boolean {
+  const relative = path.replace(/^\/(admin\/api|api\/v1)/, '') || '/';
+  // Deleting is for admins: a member can close a conversation, not erase it.
+  if (method === 'DELETE' && !/^\/notes\//.test(relative)) return false;
+  return MEMBER_ROUTES.some(([m, re]) => (m === '*' || m === method) && re.test(relative));
+}
+
+/** Refuse a member: for handlers that need an admin whatever the route table says. */
+export function assertAdmin(admin: Admin): void {
+  if (admin.role === 'member') throw new HelpPuffError('forbidden', { message: 'Only an admin can do this.', detail: 'admin_role_member' });
+}
 
 /** The public API (`/api/v1`): API keys only, never a dashboard cookie. */
 export const isPublicApi = (c: Context<HonoEnv>) => c.req.path.startsWith('/api/');
@@ -66,11 +107,12 @@ export async function currentAdmin(c: Context<HonoEnv>): Promise<Admin> {
   const key = c.get('apiKey');
   if (key) {
     c.set('actor', `key:${key.id}`);
-    return { email: `key:${key.id}`, owner: false, via: 'key' };
+    // A key's scopes are its role (api/auth.ts).
+    return { email: `key:${key.id}`, owner: false, role: 'admin', name: key.name, via: 'key' };
   }
   if (await viaApiKey(c)) {
     c.set('actor', 'admin-key');
-    return { email: 'api-key', owner: true, via: 'api-key' };
+    return { email: 'api-key', owner: true, role: 'owner', name: null, via: 'api-key' };
   }
   if (isPublicApi(c)) throw new HelpPuffError('unauthorized', { message: 'Send an API key: Authorization: Bearer hp_live_…', detail: 'api_no_key' });
   const ctx = c.get('helppuff');
@@ -82,7 +124,7 @@ export async function currentAdmin(c: Context<HonoEnv>): Promise<Admin> {
   const d = db(c);
   // Removed accounts, changed passwords and signed-out sessions lose access at their next request, not in seven days.
   const [row, signedOut] = await Promise.all([
-    isOwner ? null : d.prepare('SELECT email, password_hash FROM admins WHERE email = ?').bind(session.email).first<{ email: string; password_hash: string }>(),
+    d.prepare('SELECT email, password_hash, name, role FROM admins WHERE email = ?').bind(session.email).first<{ email: string; password_hash: string; name: string | null; role: string | null }>(),
     d.prepare('SELECT 1 AS x FROM admin_signed_out WHERE id = ?').bind(session.id).first(),
   ]);
   if (!isOwner && !row) throw new HelpPuffError('unauthorized', { message: 'Please sign in.', detail: 'admin_revoked' });
@@ -91,10 +133,16 @@ export async function currentAdmin(c: Context<HonoEnv>): Promise<Admin> {
     throw new HelpPuffError('unauthorized', { message: 'Please sign in.', detail: signedOut ? 'admin_signed_out' : 'admin_password_changed' });
   }
   c.set('actor', session.email);
-  if (isOwner) return { email: session.email, owner: true, via: 'session' };
+  const name = row?.name ?? null;
+  if (isOwner) return { email: session.email, owner: true, role: 'owner', name, via: 'session' };
   // Without an owner in Worker config, the first account (made at setup) is the owner.
   const first = owner ? null : await d.prepare('SELECT email FROM admins ORDER BY created_at LIMIT 1').first<{ email: string }>();
-  return { email: session.email, owner: first?.email === session.email, via: 'session' };
+  if (first?.email === session.email) return { email: session.email, owner: true, role: 'owner', name, via: 'session' };
+  const role: Role = row?.role === 'member' ? 'member' : 'admin';
+  if (role === 'member' && !memberMay(c.req.method, c.req.path)) {
+    throw new HelpPuffError('forbidden', { message: 'Only an admin can do this. Ask the owner if you need it.', detail: 'admin_role_member' });
+  }
+  return { email: session.email, owner: false, role, name, via: 'session' };
 }
 
 /** The password hash a session for `email` is tied to: the owner's Worker secret, or the account's row. Null for no such account. */

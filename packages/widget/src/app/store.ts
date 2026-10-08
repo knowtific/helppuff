@@ -61,6 +61,8 @@ export type State = {
   teaserDismissed: boolean;
   sound: boolean;
   flow: FlowState | null;
+  /** A person on the team is typing (live chat). Display only. */
+  agentTyping: boolean;
 };
 
 export const initialState: State = {
@@ -80,6 +82,7 @@ export const initialState: State = {
   teaserDismissed: false,
   sound: false,
   flow: null,
+  agentTyping: false,
 };
 
 export type Action =
@@ -117,6 +120,9 @@ export type Action =
   | { type: 'flow/start'; id: string }
   | { type: 'flow/answer'; field: string; value: string }
   | { type: 'flow/end' }
+  /** A message from the team over the live connection (or a poll). Ignored if already shown. */
+  | { type: 'live/message'; message: Message }
+  | { type: 'live/typing'; on: boolean }
   | { type: 'error/dismiss' }
   | { type: 'expired' }
   | { type: 'reset' };
@@ -342,6 +348,18 @@ export function reducer(state: State, action: Action): State {
       return state.consumedActions.includes(action.id)
         ? state
         : { ...state, consumedActions: [...state.consumedActions, action.id] };
+
+    case 'live/message':
+      if (state.messages.some((m) => m.id === action.message.id)) return state;
+      return {
+        ...state,
+        agentTyping: false,
+        messages: capMessages([...state.messages, action.message]),
+        unread: state.open ? 0 : state.unread + 1,
+      };
+
+    case 'live/typing':
+      return state.agentTyping === action.on ? state : { ...state, agentTyping: action.on };
 
     case 'error/dismiss':
       return { ...state, error: null };

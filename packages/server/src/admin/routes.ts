@@ -22,6 +22,9 @@ import { settingsRoutes } from './settings.js';
 import { setupRoutes } from './setup.js';
 import { webhookRoutes } from './webhooks.js';
 import { callbackRoutes, callbackView } from './callbacks.js';
+import { attributesJson, closeCutoff, CONVERSATION_STATUSES, conversationExtras, inboxRoutes, labelsSql, mergeAttributes, parseJsonObject, parseLabels, statusFilter, statusSql, type ConversationStatus } from './inbox.js';
+import { liveRoutes } from './live.js';
+import { liveAvailable } from '../live/service.js';
 import { versionRoutes } from './version.js';
 import { dbFrom, ensureSchema, type D1Like } from '../db/d1.js';
 import { emit } from '../webhooks/deliver.js';
@@ -146,6 +149,8 @@ adminRoutes.get('/me', async (c) => {
           hostnames: turnstileHostnames(site.origins, origin),
           dailyCap: site.security.limits.messagesPerSitePerDay,
         },
+        /** Live chat is on and can run here (the Live inbox, notifications). */
+        live: liveAvailable(ctx.env, site, id),
       };
     }),
   );
@@ -302,6 +307,29 @@ adminRoutes.get('/conversations', async (c) => {
   if (filter === 'leads') where.push('c.lead_id IS NOT NULL');
   if (filter === 'unsummarized') where.push('c.summary IS NULL');
   if (filter === 'callbacks') where.push("EXISTS (SELECT 1 FROM callbacks cb WHERE cb.conversation_id = c.id AND cb.status = 'open')");
+  const cutoff = await closeCutoff(c);
+  const status = c.req.query('status');
+  if (status && status !== 'all') {
+    if (!(CONVERSATION_STATUSES as readonly string[]).includes(status)) throw new HelpPuffError('bad_request', { message: 'Status is all, bot, live or closed.', detail: 'conversation_bad_status' });
+    where.push(statusFilter(status as ConversationStatus));
+    params.push(cutoff);
+  }
+  // Live chats waiting for a reply from the team.
+  if (filter === 'waiting') where.push("c.status = 'live' AND c.waiting_since IS NOT NULL");
+  const label = c.req.query('label');
+  if (label) {
+    where.push('c.id IN (SELECT cl.conversation_id FROM conversation_labels cl JOIN labels lb ON lb.id = cl.label_id WHERE lb.id = ? OR lb.name = ? COLLATE NOCASE)');
+    params.push(label.slice(0, 64), label.slice(0, 64));
+  }
+  const assigned = c.req.query('assigned');
+  if (assigned === 'me') {
+    where.push('c.assigned_to = ?');
+    params.push((await currentAdmin(c)).email);
+  } else if (assigned === 'none') where.push('c.assigned_to IS NULL');
+  else if (assigned) {
+    where.push('c.assigned_to = ?');
+    params.push(assigned.toLowerCase().slice(0, 320));
+  }
   if (before) {
     where.push('c.last_at < ?');
     params.push(before);
@@ -310,43 +338,59 @@ adminRoutes.get('/conversations', async (c) => {
     .prepare(
       `SELECT c.id, c.site_id AS site, c.started_at AS startedAt, c.last_at AS lastAt, c.page_url AS pageUrl,
               c.country, c.first_message AS firstMessage, c.message_count AS messageCount, c.summary, c.intent,
+              ${statusSql('c')} AS status, c.assigned_to AS assignedTo, c.assigned_name AS assignedName,
+              CASE WHEN c.status = 'live' THEN c.waiting_since END AS waitingSince, c.attributes, ${labelsSql('c')} AS labels,
               l.name AS leadName, l.email AS leadEmail, l.phone AS leadPhone, l.status AS leadStatus,
               (SELECT cb.status FROM callbacks cb WHERE cb.conversation_id = c.id ORDER BY cb.status = 'open' DESC, cb.requested_at DESC LIMIT 1) AS callback
        FROM conversations c LEFT JOIN leads l ON l.id = c.lead_id
        WHERE ${where.join(' AND ')}${f.sql}
        ORDER BY c.last_at DESC LIMIT ?`,
     )
-    .bind(...params, ...f.params, limit + 1)
-    .all<{ lastAt: number }>();
+    .bind(cutoff, ...params, ...f.params, limit + 1)
+    .all<{ lastAt: number; attributes: string | null; labels: string | null; status: string; waitingSince: number | null }>();
   const more = rows.results.length > limit;
-  const items = rows.results.slice(0, limit);
+  const items = rows.results.slice(0, limit).map((row) => ({
+    ...row,
+    // A closed chat is waiting for no one.
+    waitingSince: row.status === 'live' ? row.waitingSince : null,
+    attributes: parseJsonObject(row.attributes),
+    labels: parseLabels(row.labels),
+  }));
   return c.json({ items, next: more ? items.at(-1)?.lastAt : null });
 });
 
-async function loadConversation(d: D1Like, id: string) {
-  const conversation = await d.prepare('SELECT * FROM conversations WHERE id = ?').bind(id).first<Record<string, unknown>>();
+async function loadConversation(d: D1Like, id: string, cutoff = 0) {
+  const conversation = await d.prepare(`SELECT c.*, ${statusSql('c')} AS status FROM conversations c WHERE c.id = ?`).bind(cutoff, id).first<Record<string, unknown>>();
   if (!conversation) throw new HelpPuffError('not_found', { message: 'No such conversation.', detail: 'admin_conversation_missing' });
-  const [messages, lead, callbacks] = await Promise.all([
+  const [messages, lead, callbacks, extras] = await Promise.all([
     d
-      .prepare('SELECT id, role, type, text, payload, ts, feedback FROM messages WHERE conversation_id = ? ORDER BY ts, id')
+      .prepare('SELECT id, role, type, text, payload, ts, feedback, author FROM messages WHERE conversation_id = ? ORDER BY ts, id')
       .bind(id)
       .all<{ id: string; role: string; type: string; text: string | null; payload: string | null; ts: number }>(),
-    conversation['lead_id'] ? d.prepare('SELECT * FROM leads WHERE id = ?').bind(conversation['lead_id']).first() : null,
+    conversation['lead_id'] ? d.prepare('SELECT * FROM leads WHERE id = ?').bind(conversation['lead_id']).first<Record<string, unknown>>() : null,
     d.prepare('SELECT * FROM callbacks WHERE conversation_id = ? ORDER BY requested_at DESC').bind(id).all<Parameters<typeof callbackView>[0]>(),
+    conversationExtras(d, id),
   ]);
   // The salted IP hash the per-visitor limits count by is not for anyone to read.
-  const { visitor: _visitor, ...shown } = conversation;
+  const { visitor: _visitor, attributes: _attributes, ...shown } = conversation;
   return {
-    conversation: shown,
-    lead,
+    conversation: { ...shown, waiting_since: shown['status'] === 'live' ? (shown['waiting_since'] ?? null) : null, attributes: extras.attributes } as Record<string, unknown>,
+    lead: lead && leadOut(lead),
     callbacks: callbacks.results.map(callbackView),
+    labels: extras.labels,
+    notes: extras.notes,
     messages: messages.results.map((m) => ({ ...m, payload: m.payload ? (JSON.parse(m.payload) as unknown) : null })),
   };
 }
 
+/** A lead row as answered: attributes parsed. */
+export function leadOut(row: Record<string, unknown>): Record<string, unknown> {
+  return { ...row, attributes: parseJsonObject(row['attributes']) };
+}
+
 adminRoutes.get('/conversations/:id', async (c) => {
   await currentAdmin(c);
-  const found = await loadConversation(db(c), c.req.param('id'));
+  const found = await loadConversation(db(c), c.req.param('id'), await closeCutoff(c));
   assertSiteAccess(c, found.conversation['site_id'], 'conversation');
   return c.json(found);
 });
@@ -383,8 +427,8 @@ adminRoutes.get('/leads', async (c) => {
   const where: string[] = ['1=1'];
   const params: unknown[] = [];
   if (q) {
-    where.push('(name LIKE ? OR email LIKE ? OR phone LIKE ? OR notes LIKE ?)');
-    params.push(...Array(4).fill(`%${q}%`));
+    where.push('(name LIKE ? OR email LIKE ? OR phone LIKE ? OR notes LIKE ? OR company LIKE ? OR attributes LIKE ?)');
+    params.push(...Array(6).fill(`%${q}%`));
   }
   if (status && (LEAD_STATUSES as readonly string[]).includes(status)) {
     where.push('status = ?');
@@ -392,7 +436,7 @@ adminRoutes.get('/leads', async (c) => {
   }
   const rows = await db(c)
     .prepare(
-      `SELECT id, site_id AS site, conversation_id AS conversationId, name, email, phone, fields, source, status, notes,
+      `SELECT id, site_id AS site, conversation_id AS conversationId, name, email, phone, company, address, fields, attributes, source, status, notes,
               created_at AS createdAt, updated_at AS updatedAt,
               (SELECT COUNT(*) FROM conversations c WHERE c.lead_id = leads.id) AS conversations,
               (SELECT c.id FROM conversations c WHERE c.lead_id = leads.id ORDER BY c.last_at DESC LIMIT 1) AS lastConversationId,
@@ -400,12 +444,12 @@ adminRoutes.get('/leads', async (c) => {
        FROM leads WHERE ${where.join(' AND ')}${f.sql} ORDER BY updated_at DESC LIMIT 500`,
     )
     .bind(...params, ...f.params)
-    .all();
+    .all<Record<string, unknown>>();
   const counts = await db(c)
     .prepare(`SELECT status, COUNT(*) AS n FROM leads WHERE 1=1${f.sql} GROUP BY status`)
     .bind(...f.params)
     .all<{ status: string; n: number }>();
-  return c.json({ items: rows.results, counts: Object.fromEntries(counts.results.map((r) => [r.status, r.n])) });
+  return c.json({ items: rows.results.map(leadOut), counts: Object.fromEntries(counts.results.map((r) => [r.status, r.n])) });
 });
 
 /** A lead as webhooks send it: no internal columns, form fields parsed. */
@@ -416,15 +460,49 @@ function leadView(row: Record<string, unknown>) {
   } catch {
     // Kept as null.
   }
-  return { name: row['name'] ?? null, email: row['email'] ?? null, phone: row['phone'] ?? null, status: row['status'], notes: row['notes'] ?? null, source: row['source'], fields };
+  return {
+    name: row['name'] ?? null,
+    email: row['email'] ?? null,
+    phone: row['phone'] ?? null,
+    company: row['company'] ?? null,
+    address: row['address'] ?? null,
+    status: row['status'],
+    notes: row['notes'] ?? null,
+    source: row['source'],
+    fields,
+    attributes: parseJsonObject(row['attributes']),
+  };
 }
 
 adminRoutes.patch('/leads/:id', async (c) => {
   assertSameOrigin(c);
   await currentAdmin(c);
-  const body = (await c.req.json().catch(() => ({}))) as { status?: unknown; notes?: unknown; name?: unknown };
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown> & { status?: unknown; notes?: unknown; name?: unknown };
   const sets: string[] = [];
   const params: unknown[] = [];
+  const existing = await db(c).prepare('SELECT site_id, email, attributes FROM leads WHERE id = ?').bind(c.req.param('id')).first<{ site_id: string; email: string | null; attributes: string | null }>();
+  if (!existing) throw new HelpPuffError('not_found', { message: 'No such lead.', detail: 'admin_lead_missing' });
+  assertSiteAccess(c, existing.site_id, 'lead');
+  // Contact details: a string sets, an empty string or null clears (the email can be changed, never cleared, and stays one per site).
+  for (const [key, max] of [['phone', 40], ['company', 200], ['address', 500]] as const) {
+    if (body[key] === undefined) continue;
+    sets.push(`${key} = ?`);
+    params.push(typeof body[key] === 'string' ? leadText(body[key], max) : null);
+  }
+  if (typeof body['email'] === 'string') {
+    const email = leadText(body['email'], 200)?.toLowerCase() ?? null;
+    if (!email || !LEAD_EMAIL.test(email)) throw new HelpPuffError('bad_request', { message: 'Check email: not an email address.', detail: 'lead_bad_email' });
+    if (email !== existing.email) {
+      const taken = await db(c).prepare('SELECT id FROM leads WHERE site_id = ? AND email = ? AND id != ?').bind(existing.site_id, email, c.req.param('id')).first<{ id: string }>();
+      if (taken) throw new HelpPuffError('conflict', { message: `A lead with this email exists: ${taken.id}.`, detail: 'lead_email_taken' });
+    }
+    sets.push('email = ?');
+    params.push(email);
+  }
+  if (body['attributes'] !== undefined) {
+    sets.push('attributes = ?');
+    params.push(attributesJson(mergeAttributes(parseJsonObject(existing.attributes), body['attributes'])));
+  }
   if (typeof body.status === 'string') {
     if (!(LEAD_STATUSES as readonly string[]).includes(body.status)) throw new HelpPuffError('bad_request', { message: 'Unknown status.' });
     sets.push('status = ?');
@@ -439,9 +517,6 @@ adminRoutes.patch('/leads/:id', async (c) => {
     params.push(body.name.slice(0, 200));
   }
   if (!sets.length) throw new HelpPuffError('bad_request', { message: 'Nothing to update.' });
-  const existing = await db(c).prepare('SELECT site_id FROM leads WHERE id = ?').bind(c.req.param('id')).first<{ site_id: string }>();
-  if (!existing) throw new HelpPuffError('not_found', { message: 'No such lead.', detail: 'admin_lead_missing' });
-  assertSiteAccess(c, existing.site_id, 'lead');
   sets.push('updated_at = ?');
   params.push(c.get('helppuff').platform.now());
   await db(c)
@@ -450,10 +525,14 @@ adminRoutes.patch('/leads/:id', async (c) => {
     .run();
   const lead = await db(c).prepare('SELECT * FROM leads WHERE id = ?').bind(c.req.param('id')).first<Record<string, unknown>>();
   if (lead) {
-    const changed = Object.fromEntries((['status', 'notes', 'name'] as const).filter((k) => typeof body[k] === 'string').map((k) => [k, lead[k]]));
+    const changed = Object.fromEntries(
+      (['status', 'notes', 'name', 'email', 'phone', 'company', 'address', 'attributes'] as const)
+        .filter((k) => body[k] !== undefined)
+        .map((k) => [k, k === 'attributes' ? parseJsonObject(lead[k]) : (lead[k] ?? null)]),
+    );
     emit(c.get('helppuff'), String(lead['site_id']), 'lead.updated', { leadId: lead['id'], conversationId: lead['conversation_id'] ?? null, changed, lead: leadView(lead) });
   }
-  return c.json(lead);
+  return c.json(lead && leadOut(lead));
 });
 
 const LEAD_EMAIL = /^[^@\s]+@[^@\s.]+\.[^@\s]{2,}$/;
@@ -468,6 +547,9 @@ adminRoutes.post('/leads', async (c) => {
   const name = leadText(body['name'], 200);
   const email = leadText(body['email'], 200)?.toLowerCase() ?? null;
   const phone = leadText(body['phone'], 40);
+  const company = leadText(body['company'], 200);
+  const address = leadText(body['address'], 500);
+  const attributes = body['attributes'] === undefined ? {} : mergeAttributes({}, body['attributes']);
   if (!name && !email && !phone) throw new HelpPuffError('bad_request', { message: 'Give at least a name, an email or a phone.', detail: 'lead_empty' });
   if (email && !LEAD_EMAIL.test(email)) throw new HelpPuffError('bad_request', { message: 'Check email: not an email address.', detail: 'lead_bad_email' });
   const status = body['status'] === undefined ? 'new' : body['status'];
@@ -489,14 +571,14 @@ adminRoutes.post('/leads', async (c) => {
   const notes = typeof body['notes'] === 'string' ? body['notes'].slice(0, 5000) : null;
   await d
     .prepare(
-      `INSERT INTO leads (id, site_id, conversation_id, name, email, phone, fields, source, status, notes, created_at, updated_at)
-       VALUES (?, ?, NULL, ?, ?, ?, ?, 'api', ?, ?, ?, ?)`,
+      `INSERT INTO leads (id, site_id, conversation_id, name, email, phone, company, address, fields, attributes, source, status, notes, created_at, updated_at)
+       VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, 'api', ?, ?, ?, ?)`,
     )
-    .bind(id, siteId, name, email, phone, Object.keys(fields).length ? JSON.stringify(fields) : null, status, notes, now, now)
+    .bind(id, siteId, name, email, phone, company, address, Object.keys(fields).length ? JSON.stringify(fields) : null, attributesJson(attributes), status, notes, now, now)
     .run();
   const lead = (await d.prepare('SELECT * FROM leads WHERE id = ?').bind(id).first<Record<string, unknown>>())!;
   emit(c.get('helppuff'), siteId, 'lead.captured', { conversationId: null, source: 'api', name, email, phone, fields });
-  return c.json(lead, 201);
+  return c.json(leadOut(lead), 201);
 });
 
 /** One lead, with the conversations linked to it. */
@@ -506,14 +588,32 @@ adminRoutes.get('/leads/:id', async (c) => {
   const lead = await d.prepare('SELECT * FROM leads WHERE id = ?').bind(c.req.param('id')).first<Record<string, unknown>>();
   if (!lead) throw new HelpPuffError('not_found', { message: 'No such lead.', detail: 'admin_lead_missing' });
   assertSiteAccess(c, lead['site_id'], 'lead');
-  const conversations = await d
-    .prepare(
-      `SELECT id, started_at AS startedAt, last_at AS lastAt, page_url AS pageUrl, first_message AS firstMessage, message_count AS messageCount, summary, channel
-       FROM conversations WHERE lead_id = ? ORDER BY last_at DESC LIMIT 100`,
-    )
-    .bind(lead['id'])
-    .all();
-  return c.json({ ...lead, conversations: conversations.results });
+  const cutoff = await closeCutoff(c, String(lead['site_id']));
+  const [conversations, notes, callbacks] = await Promise.all([
+    d
+      .prepare(
+        `SELECT c.id, c.started_at AS startedAt, c.last_at AS lastAt, c.page_url AS pageUrl, c.first_message AS firstMessage, c.message_count AS messageCount, c.summary, c.intent, c.channel,
+                ${statusSql('c')} AS status, c.assigned_to AS assignedTo, c.assigned_name AS assignedName, ${labelsSql('c')} AS labels, c.attributes
+         FROM conversations c WHERE c.lead_id = ? ORDER BY c.last_at DESC LIMIT 100`,
+      )
+      .bind(cutoff, lead['id'])
+      .all<Record<string, unknown>>(),
+    d
+      .prepare(
+        `SELECT id, conversation_id AS conversationId, author, author_name AS authorName, text, created_at AS createdAt, updated_at AS updatedAt FROM notes
+         WHERE lead_id = ? OR conversation_id IN (SELECT id FROM conversations WHERE lead_id = ?) ORDER BY created_at DESC LIMIT 200`,
+      )
+      .bind(lead['id'], lead['id'])
+      .all(),
+    d.prepare('SELECT cb.* FROM callbacks cb WHERE cb.lead_id = ? ORDER BY cb.requested_at DESC LIMIT 50').bind(lead['id']).all<Parameters<typeof callbackView>[0]>(),
+  ]);
+  return c.json({
+    ...leadOut(lead),
+    conversations: conversations.results.map((row) => ({ ...row, labels: parseLabels(row['labels']), attributes: parseJsonObject(row['attributes']) })),
+    /** The team's dated notes (`notes` is the lead's own notes field). */
+    teamNotes: notes.results,
+    callbacks: callbacks.results.map(callbackView),
+  });
 });
 
 /**
@@ -534,6 +634,7 @@ adminRoutes.delete('/leads/:id', async (c) => {
   await d.batch([
     d.prepare('UPDATE conversations SET lead_id = NULL WHERE lead_id = ?').bind(id),
     d.prepare('UPDATE callbacks SET lead_id = NULL WHERE lead_id = ?').bind(id),
+    d.prepare('DELETE FROM notes WHERE lead_id = ? AND conversation_id IS NULL').bind(id),
     d.prepare('DELETE FROM leads WHERE id = ?').bind(id),
   ]);
   return c.json({ id, deleted: true, conversationsDeleted: linked.length });
@@ -550,12 +651,12 @@ adminRoutes.get('/leads.csv', async (c) => {
   await currentAdmin(c);
   const f = siteFilter(c);
   const rows = await db(c)
-    .prepare(`SELECT created_at, name, email, phone, status, source, notes, site_id, conversation_id FROM leads WHERE 1=1${f.sql} ORDER BY created_at DESC`)
+    .prepare(`SELECT created_at, name, email, phone, company, address, status, source, notes, attributes, site_id, conversation_id FROM leads WHERE 1=1${f.sql} ORDER BY created_at DESC`)
     .bind(...f.params)
     .all<Record<string, unknown>>();
-  const header = ['created', 'name', 'email', 'phone', 'status', 'source', 'notes', 'site', 'conversation'];
+  const header = ['created', 'name', 'email', 'phone', 'company', 'address', 'status', 'source', 'notes', 'attributes', 'site', 'conversation'];
   const lines = rows.results.map((r) =>
-    [new Date(Number(r['created_at'])).toISOString(), r['name'], r['email'], r['phone'], r['status'], r['source'], r['notes'], r['site_id'], r['conversation_id']]
+    [new Date(Number(r['created_at'])).toISOString(), r['name'], r['email'], r['phone'], r['company'], r['address'], r['status'], r['source'], r['notes'], r['attributes'], r['site_id'], r['conversation_id']]
       .map(csvCell)
       .join(','),
   );
@@ -571,8 +672,12 @@ adminRoutes.get('/leads.csv', async (c) => {
 adminRoutes.get('/admins', async (c) => {
   const me = await currentAdmin(c);
   const owner = String(c.get('helppuff').env['ADMIN_EMAIL'] ?? '').toLowerCase();
-  const rows = await db(c).prepare('SELECT email, name, created_at AS createdAt, last_login_at AS lastLoginAt FROM admins ORDER BY created_at').all();
-  return c.json({ me: me.email, owner, admins: rows.results });
+  const rows = await db(c)
+    .prepare("SELECT email, name, COALESCE(role, 'admin') AS role, created_at AS createdAt, last_login_at AS lastLoginAt FROM admins ORDER BY created_at")
+    .all<{ email: string; role: string }>();
+  // Without an owner in Worker config, the first account is the owner.
+  const first = owner ? null : rows.results[0]?.email;
+  return c.json({ me: me.email, owner, admins: rows.results.map((row) => (row.email === first ? { ...row, role: 'owner' } : row)) });
 });
 
 // ------------------------------------------------------------ prompt versions
@@ -699,3 +804,5 @@ adminRoutes.route('/', callbackRoutes);
 adminRoutes.route('/', versionRoutes);
 adminRoutes.route('/', chatRoutes);
 adminRoutes.route('/', accessRoutes);
+adminRoutes.route('/', inboxRoutes);
+adminRoutes.route('/', liveRoutes);

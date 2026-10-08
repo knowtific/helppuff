@@ -2,7 +2,7 @@
 
 # Leads API
 
-The people who gave contact details: your CRM. Keyed by email per site. Part of the [[API reference|API-Reference]]: setup, shared types and errors are there.
+The people who gave contact details: your CRM's contacts, with custom attributes. Keyed by email per site. Part of the [[API reference|API-Reference]]: setup, shared types and errors are there.
 
 - [[List leads|API-Reference-Leads#list-leads]]: `GET /leads`
 - [[Create a lead|API-Reference-Leads#create-a-lead]]: `POST /leads`
@@ -19,7 +19,7 @@ Most recently updated first, up to 500, with counts by status.
 
 | Parameter | In | Required | Description |
 | --- | --- | --- | --- |
-| `q` | query | no | Search name, email, phone and notes. |
+| `q` | query | no | Search name, email, phone, company, notes and attributes. |
 | `status` | query | no | `new`, `contacted`, `qualified`, `won` or `lost`. |
 | `site` | query | no | The site (a key always uses its own). |
 
@@ -54,7 +54,12 @@ const data = (await response.json()) as ListLeadsResponse;
       "name": "Ada Lovelace",
       "email": "ada@example.com",
       "phone": "0400 111 222",
+      "company": "Analytical Engines",
+      "address": null,
       "fields": "{\"company\":\"Analytical Engines\"}",
+      "attributes": {
+        "plan": "pro"
+      },
       "source": "form",
       "status": "new",
       "notes": null,
@@ -79,7 +84,12 @@ type ListLeadsResponse = {
     name: string;
     email: string;
     phone: string;
+    company: string;
+    address: string | null;
     fields: string;
+    attributes: {
+      plan: string;
+    };
     source: string;
     status: string;
     notes: string | null;
@@ -105,6 +115,9 @@ Adds a contact from elsewhere (your CRM, an import). Needs a name, an email or a
 | `name` | no | Up to 200 characters. |
 | `email` | no | One lead per email per site. |
 | `phone` | no | Up to 40 characters. |
+| `company` | no | Up to 200 characters. |
+| `address` | no | Up to 500 characters. |
+| `attributes` | no | Custom attributes: an object of strings (up to 50). |
 | `fields` | no | Any other details: up to 20 string values. |
 | `status` | no | `new` (default), `contacted`, `qualified`, `won` or `lost`. |
 | `notes` | no | Up to 5000 characters. |
@@ -120,8 +133,9 @@ curl -X POST "$HELPPUFF_URL/api/v1/leads" \
   "name": "Grace Hopper",
   "email": "grace@example.com",
   "phone": "0400 333 444",
-  "fields": {
-    "company": "Navy"
+  "company": "US Navy",
+  "attributes": {
+    "plan": "pro"
   },
   "status": "new",
   "notes": "Met at the expo."
@@ -135,8 +149,16 @@ type CreateLeadRequest = {
   email?: string;
   /** Up to 40 characters. */
   phone?: string;
+  /** Up to 200 characters. */
+  company?: string;
+  /** Up to 500 characters. */
+  address?: string;
+  /** Custom attributes: an object of strings (up to 50). */
+  attributes?: {
+    plan?: string;
+  };
   /** Any other details: up to 20 string values. */
-  fields?: Record<string, string>;
+  fields?: string;
   /** `new` (default), `contacted`, `qualified`, `won` or `lost`. */
   status?: string;
   /** Up to 5000 characters. */
@@ -153,8 +175,9 @@ const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/leads`, {
     name: 'Grace Hopper',
     email: 'grace@example.com',
     phone: '0400 333 444',
-    fields: {
-      company: 'Navy'
+    company: 'US Navy',
+    attributes: {
+      plan: 'pro'
     },
     status: 'new',
     notes: 'Met at the expo.'
@@ -176,12 +199,17 @@ const data = (await response.json()) as CreateLeadResponse;
   "name": "Grace Hopper",
   "email": "grace@example.com",
   "phone": "0400 333 444",
-  "fields": "{\"company\":\"Navy\"}",
+  "fields": null,
   "source": "api",
   "status": "new",
   "notes": "Met at the expo.",
   "created_at": 1760000000000,
-  "updated_at": 1760000000000
+  "updated_at": 1760000000000,
+  "company": "US Navy",
+  "address": null,
+  "attributes": {
+    "plan": "pro"
+  }
 }
 ```
 ```ts [Type]
@@ -192,12 +220,17 @@ type CreateLeadResponse = {
   name: string;
   email: string;
   phone: string;
-  fields: string;
+  fields: string | null;
   source: string;
   status: string;
   notes: string;
   created_at: number;
   updated_at: number;
+  company: string;
+  address: string | null;
+  attributes: {
+    plan: string;
+  };
 };
 ```
 <!-- /tabs -->
@@ -212,7 +245,7 @@ type CreateLeadResponse = {
 
 `GET /leads/:id` · scope `leads:read`
 
-The lead with the conversations linked to it.
+The contact with their conversations (status, labels and attributes), the team's dated notes (`teamNotes`; `notes` is the contact's own notes field) and their callback requests: their history.
 
 | Parameter | In | Required | Description |
 | --- | --- | --- | --- |
@@ -254,6 +287,11 @@ const data = (await response.json()) as GetLeadResponse;
   "notes": null,
   "created_at": 1760000000000,
   "updated_at": 1760000000000,
+  "company": "Analytical Engines",
+  "address": null,
+  "attributes": {
+    "plan": "pro"
+  },
   "conversations": [
     {
       "id": "1b0f6a52-3c1e-4c55-9f0e-2d1c7a9e5b10",
@@ -263,7 +301,50 @@ const data = (await response.json()) as GetLeadResponse;
       "firstMessage": "How much is a blocked drain?",
       "messageCount": 6,
       "summary": null,
-      "channel": "widget"
+      "intent": "Pricing question",
+      "channel": "widget",
+      "status": "closed",
+      "assignedTo": null,
+      "assignedName": null,
+      "labels": [
+        {
+          "id": "lbl_3f2a1b0c9d8e",
+          "name": "Urgent",
+          "color": "#ef4444"
+        }
+      ],
+      "attributes": {
+        "orderId": "A-1042"
+      }
+    }
+  ],
+  "teamNotes": [
+    {
+      "id": "note_mfx2k1a9b3c4",
+      "conversationId": "1b0f6a52-3c1e-4c55-9f0e-2d1c7a9e5b10",
+      "leadId": "lead_5e3f0c8a-1f7b-4f8e-9a51-0e2b7c4d1a90",
+      "author": "sam@acme.example",
+      "authorName": "Sam",
+      "text": "Called her back, booked for Tuesday.",
+      "createdAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  ],
+  "callbacks": [
+    {
+      "id": "cb_mfx2k1a9b3c",
+      "conversationId": "1b0f6a52-3c1e-4c55-9f0e-2d1c7a9e5b10",
+      "leadId": "lead_5e3f0c8a-1f7b-4f8e-9a51-0e2b7c4d1a90",
+      "name": "Ada Lovelace",
+      "phone": "0400 111 222",
+      "email": "ada@example.com",
+      "reason": "A quote for two rooms",
+      "status": "open",
+      "note": null,
+      "requestedAt": 1760000000000,
+      "closedAt": null,
+      "closedBy": null,
+      "pageUrl": "https://acme.example/pricing"
     }
   ]
 }
@@ -282,6 +363,11 @@ type GetLeadResponse = {
   notes: string | null;
   created_at: number;
   updated_at: number;
+  company: string;
+  address: string | null;
+  attributes: {
+    plan: string;
+  };
   conversations: Array<{
     id: string;
     startedAt: number;
@@ -290,7 +376,44 @@ type GetLeadResponse = {
     firstMessage: string;
     messageCount: number;
     summary: string | null;
+    intent: string;
     channel: string;
+    status: string;
+    assignedTo: string | null;
+    assignedName: string | null;
+    labels: Array<{
+      id: string;
+      name: string;
+      color: string;
+    }>;
+    attributes: {
+      orderId: string;
+    };
+  }>;
+  teamNotes: Array<{
+    id: string;
+    conversationId: string;
+    leadId: string;
+    author: string;
+    authorName: string;
+    text: string;
+    createdAt: number;
+    updatedAt: number;
+  }>;
+  callbacks: Array<{
+    id: string;
+    conversationId: string;
+    leadId: string;
+    name: string;
+    phone: string;
+    email: string;
+    reason: string;
+    status: string;
+    note: string | null;
+    requestedAt: number;
+    closedAt: number | null;
+    closedBy: string | null;
+    pageUrl: string;
   }>;
 };
 ```
@@ -300,7 +423,7 @@ type GetLeadResponse = {
 
 `PATCH /leads/:id` · scope `leads:write`
 
-Changes the status, notes or name. Sends `lead.updated`.
+Changes the status, details, notes or custom attributes. `attributes` merges: sent keys are set, `null` removes one. Sends `lead.updated`.
 
 | Parameter | In | Required | Description |
 | --- | --- | --- | --- |
@@ -309,8 +432,13 @@ Changes the status, notes or name. Sends `lead.updated`.
 | Body field | Required | Description |
 | --- | --- | --- |
 | `status` | no | `new`, `contacted`, `qualified`, `won` or `lost`. |
-| `notes` | no | Replaces the notes (up to 5000 characters). |
 | `name` | no | Up to 200 characters. |
+| `email` | no | Changes it (still one lead per email per site). |
+| `phone` | no | Up to 40 characters; empty or null clears it. |
+| `company` | no | Up to 200 characters; empty or null clears it. |
+| `address` | no | Up to 500 characters; empty or null clears it. |
+| `attributes` | no | An object of strings; `null` removes a key. |
+| `notes` | no | Replaces the notes field (up to 5000 characters). For a dated note, use `POST /leads/:id/notes`. |
 
 **Request**
 
@@ -321,17 +449,37 @@ curl -X PATCH "$HELPPUFF_URL/api/v1/leads/ID" \
   -H "Content-Type: application/json" \
   -d '{
   "status": "contacted",
-  "notes": "Called, booked for Tuesday."
+  "company": "Analytical Engines",
+  "attributes": {
+    "plan": "pro",
+    "trial": null
+  }
 }'
 ```
 ```ts [TypeScript]
 type UpdateLeadRequest = {
   /** `new`, `contacted`, `qualified`, `won` or `lost`. */
   status?: string;
-  /** Replaces the notes (up to 5000 characters). */
-  notes?: string;
   /** Up to 200 characters. */
   name?: string;
+  /** Changes it (still one lead per email per site). */
+  email?: string;
+  /** Up to 40 characters; empty or null clears it. */
+  phone?: string;
+  /** Up to 200 characters; empty or null clears it. */
+  company?: string;
+  /** Up to 500 characters; empty or null clears it. */
+  address?: string;
+  /** An object of strings; `null` removes a key. */
+  attributes?: {
+    plan?: string;
+    trial?: string | null;
+  };
+  /**
+   * Replaces the notes field (up to 5000 characters). For a dated note, use
+   * `POST /leads/:id/notes`.
+   */
+  notes?: string;
 };
 
 const id = '…';
@@ -343,7 +491,11 @@ const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/leads/${id}`, {
   },
   body: JSON.stringify({
     status: 'contacted',
-    notes: 'Called, booked for Tuesday.'
+    company: 'Analytical Engines',
+    attributes: {
+      plan: 'pro',
+      trial: null
+    }
   } satisfies UpdateLeadRequest),
 });
 if (!response.ok) throw new Error(((await response.json()) as ApiError).error.message);
@@ -365,9 +517,14 @@ const data = (await response.json()) as UpdateLeadResponse;
   "fields": "{\"company\":\"Analytical Engines\"}",
   "source": "form",
   "status": "contacted",
-  "notes": "Called, booked for Tuesday.",
+  "notes": null,
   "created_at": 1760000000000,
-  "updated_at": 1760000000000
+  "updated_at": 1760000000000,
+  "company": "Analytical Engines",
+  "address": null,
+  "attributes": {
+    "plan": "pro"
+  }
 }
 ```
 ```ts [Type]
@@ -381,9 +538,14 @@ type UpdateLeadResponse = {
   fields: string;
   source: string;
   status: string;
-  notes: string;
+  notes: string | null;
   created_at: number;
   updated_at: number;
+  company: string;
+  address: string | null;
+  attributes: {
+    plan: string;
+  };
 };
 ```
 <!-- /tabs -->
@@ -470,8 +632,8 @@ const data: ExportLeadsAsCSVResponse = await response.text();
 
 <!-- tabs -->
 ```csv [Example]
-created,name,email,phone,status,source,notes,site,conversation
-2025-10-09T08:53:20.000Z,Ada Lovelace,ada@example.com,0400 111 222,new,form,,acme,1b0f6a52-…
+created,name,email,phone,company,address,status,source,notes,attributes,site,conversation
+2025-10-09T08:53:20.000Z,Ada Lovelace,ada@example.com,0400 111 222,Analytical Engines,,new,form,,"{""plan"":""pro""}",acme,1b0f6a52-…
 ```
 ```ts [Type]
 /** CSV text. */

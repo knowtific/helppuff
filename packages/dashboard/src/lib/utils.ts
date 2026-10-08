@@ -62,11 +62,11 @@ export function hueOf(value: string): number {
 
 export type Route = {
   /** `setup` and `signin` carry a one-time token and work signed out; `onboarding` is the guided first run. */
-  page: 'home' | 'analytics' | 'conversations' | 'leads' | 'callbacks' | 'prompt' | 'settings' | 'knowledge' | 'onboarding' | 'setup' | 'signin';
+  page: 'home' | 'analytics' | 'conversations' | 'leads' | 'contact' | 'callbacks' | 'prompt' | 'settings' | 'knowledge' | 'onboarding' | 'setup' | 'signin';
   id?: string | undefined;
 };
 
-const PAGES: Route['page'][] = ['analytics', 'conversations', 'leads', 'callbacks', 'prompt', 'settings', 'knowledge', 'onboarding', 'setup', 'signin'];
+const PAGES: Route['page'][] = ['analytics', 'conversations', 'leads', 'contact', 'callbacks', 'prompt', 'settings', 'knowledge', 'onboarding', 'setup', 'signin'];
 
 function parseHash(): Route {
   const [page, id] = window.location.hash.replace(/^#\/?/, '').split('/');
@@ -145,4 +145,31 @@ export function useTheme(): [boolean, () => void] {
     setDark(next);
   };
   return [dark, toggle];
+}
+
+/**
+ * State kept in localStorage, so a choice (a filter) survives a reload. Reads
+ * and writes never throw: in a private window it lasts for the page only.
+ */
+export function usePersisted<T extends string>(key: string, fallback: T, allowed?: readonly T[]): [T, (value: T) => void] {
+  const [value, setValue] = useState<T>(() => {
+    try {
+      const stored = localStorage.getItem(key) as T | null;
+      return stored !== null && (!allowed || allowed.includes(stored)) ? stored : fallback;
+    } catch {
+      return fallback;
+    }
+  });
+  const set = useCallback(
+    (next: T) => {
+      setValue(next);
+      try {
+        localStorage.setItem(key, next);
+      } catch {
+        // Private mode: kept for this page only.
+      }
+    },
+    [key],
+  );
+  return [value, set];
 }

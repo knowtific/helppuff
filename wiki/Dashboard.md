@@ -29,16 +29,48 @@ ratings on replies, and the lead it produced. Five minutes after a chat goes
 quiet, it is **summarised and labelled automatically**: what the visitor
 wanted, intent, sentiment, lead quality (hot, warm, cold), outcome, topics,
 the next step, and any questions the assistant could not answer (with a link
-to add the answer). **Summarise** does it on demand. Filter by leads,
-unsummarised, or search.
+to add the answer). **Summarise** does it on demand.
 
-## Leads
+Each conversation has a **status**: *AI bot* (the assistant answers), *Live
+agent* (a person has it; see [[Live chat|Live-Chat]]) or *Closed* (by the
+team, or after an hour without a message; it reopens with the assistant when
+the visitor writes again). Filter by status (*All*, *AI bot*, *Live agent*),
+by what else matters (*Waiting for a reply*, *With contact*, *Callback
+waiting*, *Not summarised*) and by label, or search. Your filters are
+remembered in your browser. A live chat waiting for your reply has an orange
+**Waiting** mark, and the menu shows how many are waiting.
+
+Beside each conversation:
+
+- **Labels**: tag it to find it later (see [Labels](#labels)).
+- **Attributes**: your own key-value details, like an order number or a plan;
+  also set over the API.
+- **Notes**: private notes for the team. The visitor and the assistant never
+  see them.
+
+### Labels
+
+Settings → **Labels** defines them: a name, a colour, and what it means.
+Anyone on the team can put them on a conversation. When a conversation goes
+quiet, the AI labels it too, with the labels it may use (**AI may use**),
+guided by what each means; it never invents one, and never removes one a
+person added. Labels are in the API (`GET /conversations?label=…`) and in
+`conversation.completed` (`tags`).
+
+## Contacts
 
 One row per **person**, keyed by email: a visitor who comes back gets their
-new chat added to the lead they already have. Each lead has a status (new →
-contacted → qualified → won / lost), notes, the form's answers and how many
-chats they have had. **Export CSV** for a spreadsheet or CRM. A person waiting
-for a callback is labelled **Callback requested**. See [[Leads]].
+new chat added to the contact they already have. Click one for their page:
+
+- **Details**: name, email, phone, company and address, all editable.
+- **Attributes**: any other details, as key-value pairs (also over the API).
+- **Notes**: the team's dated notes, with who wrote each.
+- **Conversations**: every chat, with its status and labels.
+- **History**: chats, callbacks and notes, newest first.
+
+Each contact has a status (new → contacted → qualified → won / lost).
+**Export CSV** for a spreadsheet or CRM. A person waiting for a callback is
+labelled **Callback requested**. See [[Leads]].
 
 ## Callbacks
 
@@ -81,10 +113,13 @@ Opens as a menu in the sidebar:
 | **Lead form** | The form before the chat: on/off, its fields, which are required, your own extra fields |
 | **Instructions** | What it is mainly for, tone and answer length (settings HelpPuff adds around the prompt), and a box for anything specific to your business (the prompt itself). The full prompt, its version history and everything HelpPuff adds are one click away. See [[Prompt and instructions|Prompts-and-Instructions]] |
 | **Business details** | Phone, email, address, hours, service areas: read from your site, yours to correct (a crawl never overwrites your changes) |
+| **Live chat** | Let visitors talk to a person; how long they wait before the callback form; when conversations close; [[Telegram]]. See [[Live chat|Live-Chat]] |
+| **Labels** | The labels for conversations, and which the AI may use |
+| **Notifications** | Your own: browser notifications and sound for live chats, and whether you are available. Every member of the team sets their own |
 | **Advanced** | The AI model (see [[AI models|AI-Models]]), thinking (low, medium, high), "double-check answers before replying" (the reranker), how often the site is re-learned, time zone and language. **Limits and access**: every rate limit and cap, how long a chat lasts, IP addresses (or ranges) that are never limited or are blocked, and the sign-in limits and Turnstile on the sign-in form. See [[Security|Security#every-limit]] |
 | **Webhooks** | Endpoints that receive every event as signed JSON; see [[Webhooks]] |
 | **API keys** | Keys for the public API, to use HelpPuff from your own servers: name, what it may do (scopes or a preset), expiry, IP addresses. The key is shown once. The base URL and a curl example; see [[The API|API]] |
-| **Team & security** | Who can sign in, and what to do when locked out |
+| **Team & security** | Who can sign in and their role, invitations, and what to do when locked out |
 | **Updates** | Checks the version running against the latest npm release, shows an update notice and command, and links to the [[upgrade instructions|Upgrading]] |
 
 Changes are live within a minute. If you also keep the project in git, run
@@ -94,10 +129,20 @@ overwrite them until you do.
 
 ## Team & security
 
-The first person who claims the setup link is the owner. Add or remove
-teammates from the project folder with `helppuff users add <email>` and
-`helppuff users remove <email>`; reset a password with
-`helppuff users reset <email>`. `helppuff dashboard` creates a one-time sign-in
+The first person who claims the setup link is the owner. Everyone else has a
+**role**:
+
+| Role | Can |
+| --- | --- |
+| **Admin** | Everything, like the owner (except removing the owner) |
+| **Member** | Conversations (read, reply in live chats, take, close, label, notes, attributes), contacts, callbacks, and their own notifications. No settings, knowledge, prompt, analytics, webhooks or API keys; cannot delete anything or give a chat to someone else |
+
+Invite people in Settings → **Team & security** (name, email, role: they get
+a one-time sign-in link), change a role there, or from the project folder:
+`helppuff users add <email> --role member`, `helppuff users role <email>
+admin`, `helppuff users remove <email>`; reset a password with
+`helppuff users reset <email>`. The name is what visitors see when that
+person answers a live chat. `helppuff dashboard` creates a one-time sign-in
 link when someone is locked out. Password hashes and the admin API key remain
 Worker secrets; the dashboard never shows them.
 

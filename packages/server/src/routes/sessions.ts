@@ -6,6 +6,7 @@ import { assertAllowedOrigin } from '../core/origin.js';
 import { requireSecret, type HonoEnv } from '../core/request.js';
 import { dbFrom } from '../db/d1.js';
 import { capabilitiesOf, prepareConnector } from '../core/run.js';
+import { liveAvailable } from '../live/service.js';
 import { issueToken } from '../core/token.js';
 import { startChat } from '../core/chat.js';
 import { visitorStanding } from '../core/visitor.js';
@@ -51,7 +52,7 @@ sessionRoutes.post('/v1/sites/:siteId/sessions', async (c) => {
         ttlMs: site.security.sessionTtlHours * 3600_000,
       });
       return {
-        body: { sessionToken: token, sessionId: turn.sessionId, expiresAt, messages: turn.messages, capabilities: capabilitiesOf(prepared, Boolean(dbFrom(ctx.env))) },
+        body: { sessionToken: token, sessionId: turn.sessionId, expiresAt, messages: turn.messages, capabilities: capabilitiesOf(prepared, Boolean(dbFrom(ctx.env)), liveAvailable(ctx.env, site, siteId)) },
       };
     },
   });

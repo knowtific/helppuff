@@ -43,7 +43,7 @@ function scriptedAi(replies: Reply[]) {
   return { ai, chats };
 }
 
-async function world(replies: Reply[], options: Record<string, unknown> = {}) {
+async function world(replies: Reply[], options: Record<string, unknown> = {}, extra: Partial<ConnectorContext<unknown>> = {}) {
   const db = sqliteD1();
   const vectors = fakeVectors();
   const { ai, chats } = scriptedAi(replies);
@@ -72,6 +72,7 @@ async function world(replies: Reply[], options: Record<string, unknown> = {}) {
     log: () => {},
     waitUntil: (p) => void pending.push(p),
     reportLead: (lead) => void leads.push(lead),
+    ...extra,
   };
   // Carried between messages, as the session token carries it.
   let state = { turns: 0 };
@@ -401,6 +402,42 @@ describe('replies stay safe and clean', () => {
     // The server records it from the form; the connector reports nothing more.
     expect(w.leads).toEqual([]);
     expect(textOf(messages)).toBe('Thanks Sam, the team will be in touch soon.');
+  });
+
+  it('offers request_person only when the site has live chat, and hands over through the server', async () => {
+    const off = await world([{ content: 'ok' }]);
+    await off.send('Can I talk to a person?');
+    expect(((off.chats[0]!['tools'] as { function: { name: string } }[]) ?? []).map((t) => t.function.name)).not.toContain('request_person');
+    expect((off.chats[0]!['messages'] as { content: string }[])[0]!.content).toContain('There is no live chat.');
+
+    const reasons: (string | undefined)[] = [];
+    const on = await world(
+      [{ tool_calls: [{ id: 't1', name: 'request_person', arguments: '{"reason":"wants a quote today"}' }] }, { content: 'Someone from the team will join shortly.' }],
+      {},
+      { handover: async (reason) => (reasons.push(reason), 'started') },
+    );
+    const messages = await on.send('Can I talk to a person?');
+    const first = on.chats[0]!;
+    expect((first['tools'] as { function: { name: string } }[]).map((t) => t.function.name)).toContain('request_person');
+    expect((first['messages'] as { content: string }[])[0]!.content).toContain('use request_person when the visitor asks for a person');
+    expect(reasons).toEqual(['wants a quote today']);
+    const tool = (on.chats[1]!['messages'] as { role: string; content: string }[]).at(-1)!;
+    expect(tool).toMatchObject({ role: 'tool' });
+    expect(tool.content).toContain('someone will join this chat shortly');
+    expect(textOf(messages)).toBe('Someone from the team will join shortly.');
+    // The server adds the hand-over message itself; the connector adds no form.
+    expect(messages.some((m) => m.type === 'form')).toBe(false);
+  });
+
+  it('tells the model when nobody is free, so it points to the callback form', async () => {
+    const w = await world(
+      [{ tool_calls: [{ id: 't1', name: 'request_person', arguments: '{}' }] }, { content: 'Nobody is free; leave your details below.' }],
+      {},
+      { handover: async () => 'unavailable' },
+    );
+    await w.send('A human please');
+    const tool = (w.chats[1]!['messages'] as { role: string; content: string }[]).at(-1)!;
+    expect(tool.content).toContain('Nobody from the team is free right now');
   });
 
   it('shows the callback form with an id the server recognises', async () => {

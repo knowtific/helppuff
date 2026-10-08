@@ -370,9 +370,24 @@ export async function recordFeedback(db: D1Like, sessionId: string, messageId: s
   return changes === undefined ? true : changes > 0;
 }
 
+/**
+ * What a turn does to the conversation's status: `bot` (the assistant
+ * answered: a closed or quiet chat is open again, with the assistant),
+ * `live` (a visitor wrote in a live chat: now waiting for the team's reply),
+ * `keep` (the assistant answered a live chat still waiting for a person, or
+ * this turn handed it over, which writes the status itself).
+ */
+export type TurnStatus = 'bot' | 'live' | 'keep';
+
+const STATUS_SET: Record<TurnStatus, string> = {
+  bot: ", status = 'bot', closed_at = NULL, waiting_since = NULL",
+  live: ', waiting_since = COALESCE(waiting_since, ?)',
+  keep: '',
+};
+
 export function recordTurn(
   ctx: RequestCtx,
-  input: { siteId: string; sessionId: string; request: SendRequest; messages: Message[] },
+  input: { siteId: string; sessionId: string; request: SendRequest; messages: Message[]; status?: TurnStatus },
 ): void {
   const text = input.request.kind === 'text' ? input.request.text : input.request.label || input.request.value;
   const typed = input.request.kind === 'text' ? contactIn(text) : {};
@@ -393,9 +408,9 @@ export function recordTurn(
       db
         .prepare(
           `UPDATE conversations SET last_at = ?, message_count = message_count + ?,
-             first_message = COALESCE(first_message, ?) WHERE id = ?`,
+             first_message = COALESCE(first_message, ?)${STATUS_SET[input.status ?? 'bot']} WHERE id = ?`,
         )
-        .bind(now, 1 + input.messages.length, text.slice(0, 500), input.sessionId),
+        .bind(now, 1 + input.messages.length, text.slice(0, 500), ...(input.status === 'live' ? [now] : []), input.sessionId),
     ];
     if (typed.email || typed.phone) {
       statements.push(...leadStatements(db, input.siteId, input.sessionId, typed, 'chat', now));

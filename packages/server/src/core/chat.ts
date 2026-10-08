@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
-import { cleanText, stripChatTokens, type Message, type SendRequest, type StartSessionRequest } from '@helppuff/protocol';
-import { isCallbackForm } from '@helppuff/connector-types';
+import { cleanText, HANDOVER_ACTION, stripChatTokens, type Message, type SendRequest, type StartSessionRequest } from '@helppuff/protocol';
+import { isCallbackForm, notice } from '@helppuff/connector-types';
 import type { SiteConfig } from '../config/schema.js';
 import { resolveSecrets } from '../config/load.js';
 import { formLead, recordLead, recordStart, recordTurn } from '../admin/record.js';
@@ -18,6 +18,8 @@ import { streamResponse, textRelay, wantsStream } from './stream.js';
 import { newSessionId } from './token.js';
 import { assertTurnstile } from './turnstile.js';
 import type { Standing } from './visitor.js';
+import { COPY, isLive, LIVE_CALLBACK_FORM, liveDeps, noHandover, readLiveState, relayVisitorMessage, startHandover, type HandoverResult } from '../live/service.js';
+import type { TurnStatus } from '../admin/record.js';
 
 /**
  * A conversation with the assistant, whoever holds it: the widget (a browser
@@ -227,10 +229,18 @@ export async function sendChat<T>(c: Context<HonoEnv>, options: { session: ChatS
   if (length > site.security.limits.maxMessageLength) {
     throw new HelpPuffError('bad_request', { message: 'That message is a little too long.', detail: 'message_too_long' });
   }
-  // A form is answered only if this chat was shown it (see core/forms.ts).
+  // Live chat: whether a person has this conversation (one read, started now, awaited with the limits).
+  const live = site.live.enabled ? liveDeps(ctx) : null;
+  const liveRead = live ? readLiveState(live.db, sessionId) : Promise.resolve(null);
+  liveRead.catch(() => {});
+  // A form is answered only if this chat was shown it (see core/forms.ts). The callback form offered
+  // over the live socket (nobody took the chat in time) is for a conversation that was handed over.
   if (isFormSubmission(input) && !formWasOffered(input.actionId, session.forms, site.widget.forms)) {
-    ctx.platform.log('form.not_offered', { siteId });
-    throw new HelpPuffError('bad_request', { message: 'This form has expired. Please refresh the page and try again.', detail: 'form_not_offered' });
+    const handedOver = input.actionId === LIVE_CALLBACK_FORM && Boolean((await liveRead)?.handover_at);
+    if (!handedOver) {
+      ctx.platform.log('form.not_offered', { siteId });
+      throw new HelpPuffError('bad_request', { message: 'This form has expired. Please refresh the page and try again.', detail: 'form_not_offered' });
+    }
   }
 
   /*
@@ -298,22 +308,67 @@ export async function sendChat<T>(c: Context<HonoEnv>, options: { session: ChatS
   const verdict = checkLimits();
   const gate = verdict.then(() => undefined);
   gate.catch(() => {});
+  const submitted = formLead(input, limits);
+  const callbackLead = submitted && input.kind === 'action' && isCallbackForm(input.actionId) ? { ...submitted, request: 'callback' } : submitted;
+  const visitorText = input.kind === 'text' ? input.text : input.label || input.value;
+
+  // A person has this chat: the message goes to the team, not the assistant (unless the
+  // site lets the assistant answer until someone takes it). No reply now; it comes over the live socket.
+  const state = live ? await liveRead : null;
+  const liveNow = live !== null && isLive(state, site.live, ctx.platform.now());
+  if (live && liveNow && !(site.live.aiWhileWaiting && !state?.assigned_to)) {
+    const count = await verdict;
+    if (callbackLead) reportLead(callbackLead, 'form');
+    const messages = callbackLead ? [notice(COPY.thanks)] : [];
+    recordTurn(ctx, { siteId, sessionId, request: input, messages, status: 'live' });
+    relayVisitorMessage(live, siteId, sessionId, visitorText);
+    ctx.platform.log('message.live', { siteId, sessionId, count });
+    return answer(c, ctx, false, relay, Promise.resolve({ sessionId, messages, state: session.state, forms: [...(session.forms ?? [])], count }), options.respond);
+  }
+
+  // "Talk to a person": the server's own, whichever backend runs the chat.
+  if (input.kind === 'action' && input.actionId === HANDOVER_ACTION) {
+    const count = await verdict;
+    const result: HandoverResult = live
+      ? await startHandover(live, site, { siteId, conversationId: sessionId, visitor: channel.visitor, exempt, reason: 'asked' })
+      : noHandover('unavailable', ctx.platform.now());
+    recordTurn(ctx, { siteId, sessionId, request: input, messages: result.messages, status: result.status === 'started' ? 'keep' : liveNow ? 'keep' : 'bot' });
+    return answer(c, ctx, false, relay, Promise.resolve({ sessionId, messages: result.messages, state: session.state, forms: offeredForms(session.forms, result.messages), count }), options.respond);
+  }
 
   const finish = async (): Promise<ChatTurn> => {
     const cctx = connectorContext(ctx, prepared, siteId, sessionId, streaming ? relay.onText : undefined, (lead) => reportLead(lead));
     if (prepared.connector.gated) cctx.gate = gate;
+    // The assistant may hand over itself (workers-ai's `request_person`), once per turn.
+    let handover: HandoverResult | null = null;
+    if (live && !liveNow) {
+      cctx.handover = async (reason) => {
+        try {
+          await verdict;
+          handover ??= await startHandover(live, site, { siteId, conversationId: sessionId, visitor: channel.visitor, exempt, reason });
+          return handover.status;
+        } catch {
+          return 'unavailable';
+        }
+      };
+    }
     const result = await ctx.timing.span('connector', () => runConnector(ctx, 'send', () => prepared.connector.send(cctx, session.state, input)));
     const count = await verdict;
-    const messages = guardReplies(sanitizeConnectorMessages(result.messages, ctx.platform), prepared.guidance, ctx.platform);
+    const handed = handover as HandoverResult | null;
+    const messages = [
+      ...guardReplies(sanitizeConnectorMessages(result.messages, ctx.platform, { allowEmpty: Boolean(handed) }), prepared.guidance, ctx.platform),
+      ...(handed?.messages ?? []),
+    ];
     ctx.platform.log('message.sent', { siteId, sessionId, count });
-    recordTurn(ctx, { siteId, sessionId, request: input, messages });
+    const status: TurnStatus = handed?.status === 'started' || liveNow ? 'keep' : 'bot';
+    recordTurn(ctx, { siteId, sessionId, request: input, messages, status });
+    if (liveNow && live) relayVisitorMessage(live, siteId, sessionId, visitorText);
     return { sessionId, messages, state: result.state === undefined ? session.state : result.state, forms: offeredForms(session.forms, messages), count };
   };
 
   const { work } = await gated(prepared, verdict, finish);
-  const submitted = formLead(input, limits);
   // The callback form is itself the request: recorded once, here, whatever the model says next.
-  if (submitted) reportLead(input.kind === 'action' && isCallbackForm(input.actionId) ? { ...submitted, request: 'callback' } : submitted, 'form');
+  if (callbackLead) reportLead(callbackLead, 'form');
   return answer(c, ctx, streaming, relay, work, options.respond);
 }
 

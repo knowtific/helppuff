@@ -45,8 +45,16 @@ export type Site = {
   website: string | null;
   /** The "Before you go live" checklist. Absent from older Workers. */
   production?: { turnstile: boolean; hostnames: string[]; dailyCap: number };
+  /** Live chat is on and can run (the live socket, notifications). Absent from older Workers. */
+  live?: boolean;
 };
-export type Me = { admin: { email: string; owner: boolean }; sites: Site[]; summaries: boolean };
+/** `member`: the inbox only (conversations, contacts, callbacks, live chat); `admin` and `owner`: everything. */
+export type Role = 'owner' | 'admin' | 'member';
+export type Me = { admin: { email: string; owner: boolean; role?: Role; name?: string | null }; sites: Site[]; summaries: boolean };
+
+/** Older Workers have no roles: everyone is an admin there. */
+export const roleOf = (me: Me): Role => me.admin.role ?? (me.admin.owner ? 'owner' : 'admin');
+export const isMember = (me: Me) => roleOf(me) === 'member';
 
 export type Overview = {
   range: { days: number; since: number };
@@ -77,7 +85,21 @@ export type ConversationRow = {
   leadStatus: LeadStatus | null;
   /** This conversation's callback request: the open one if any, else the latest. */
   callback: 'open' | 'done' | 'dismissed' | null;
+  /** Absent from older Workers. */
+  status?: ConversationStatus;
+  assignedTo?: string | null;
+  assignedName?: string | null;
+  /** A live chat whose visitor is waiting for the team's reply, since then. */
+  waitingSince?: number | null;
+  attributes?: Record<string, string>;
+  labels?: LabelRef[];
 };
+
+/** `bot`: the assistant answers; `live`: a person does; `closed`: by the team, or quiet for a while. */
+export type ConversationStatus = 'bot' | 'live' | 'closed';
+export type LabelRef = { id: string; name: string; color: string };
+export type Label = LabelRef & { description: string | null; ai: boolean };
+export type Note = { id: string; conversationId?: string | null; leadId?: string | null; author: string; authorName: string | null; text: string; createdAt: number; updatedAt: number };
 
 /** A conversation's AI summary and labels: written when it goes quiet (or by the Summarise button). */
 export type Summary = {
@@ -100,6 +122,8 @@ export type StoredMessage = {
   ts: number;
   /** A visitor's rating of an assistant reply: 1, -1, or null. */
   feedback?: number | null;
+  /** Who on the team wrote it (live chat); null for the assistant and the visitor. */
+  author?: string | null;
 };
 
 export type Lead = {
@@ -111,8 +135,11 @@ export type Lead = {
   name: string | null;
   email: string | null;
   phone: string | null;
+  company?: string | null;
+  address?: string | null;
+  attributes?: Record<string, string>;
   fields: string | null;
-  source: 'form' | 'chat' | 'ai';
+  source: 'form' | 'chat' | 'ai' | 'api';
   status: LeadStatus;
   notes: string | null;
   createdAt?: number;
@@ -126,11 +153,84 @@ export type Lead = {
 };
 
 export type ConversationDetail = {
-  conversation: Record<string, unknown> & { id: string; summary: string | null; started_at: number; last_at: number };
+  conversation: Record<string, unknown> & {
+    id: string;
+    summary: string | null;
+    started_at: number;
+    last_at: number;
+    status?: ConversationStatus;
+    assigned_to?: string | null;
+    assigned_name?: string | null;
+    waiting_since?: number | null;
+    attributes?: Record<string, string>;
+  };
   lead: Lead | null;
   callbacks: Callback[];
+  labels?: (LabelRef & { addedBy: string; addedAt: number })[];
+  notes?: Note[];
   messages: StoredMessage[];
 };
+
+/** A contact's page: their details, every conversation, the team's notes and callback requests. */
+export type ContactDetail = Lead & {
+  conversations: {
+    id: string;
+    startedAt: number;
+    lastAt: number;
+    pageUrl: string | null;
+    firstMessage: string | null;
+    messageCount: number;
+    summary: string | null;
+    intent?: string | null;
+    channel: string | null;
+    status?: ConversationStatus;
+    assignedName?: string | null;
+    labels?: LabelRef[];
+  }[];
+  teamNotes?: Note[];
+  callbacks?: Callback[];
+};
+
+export type TeamMember = { email: string; name: string | null; role: Role; createdAt: number; lastLoginAt: number | null };
+export type Team = { me: string; owner: string; admins: TeamMember[] };
+
+/** Each person's own live-chat notification settings. */
+export type Prefs = {
+  available: boolean;
+  notifyNewChat: boolean;
+  notifyNewMessage: boolean;
+  soundNewChat: boolean;
+  soundNewMessage: boolean;
+  sound: 'chime' | 'bell' | 'pop';
+  volume: number;
+  repeatUntilTaken: boolean;
+};
+
+export type LiveStatus = {
+  enabled: boolean;
+  hub: boolean;
+  available: number;
+  agents: { email: string; name: string | null; available: boolean }[];
+  telegram: { connected: boolean; linked: boolean };
+  live: number;
+  unassigned: number;
+  waiting: number;
+  mine: number;
+};
+
+export type TelegramView = {
+  connected: boolean;
+  linked: boolean;
+  bot: { name: string; username: string } | null;
+  chat: { title: string | null; topics: boolean } | null;
+  linkCode: string | null;
+  shareContact: boolean;
+  status: string | null;
+  lastError: string | null;
+  updatedAt: number | null;
+};
+
+export type LiveSettings = { enabled: boolean; waitSeconds: number; closeAfterMinutes: number; showAgentName: boolean; aiWhileWaiting: boolean };
 
 export const LEAD_STATUSES = ['new', 'contacted', 'qualified', 'won', 'lost'] as const;
 export type LeadStatus = (typeof LEAD_STATUSES)[number];
@@ -288,6 +388,8 @@ export type Settings = {
   crawl: { schedule: 'off' | 'daily' | 'weekly' | 'monthly'; include: string[]; exclude: string[]; renderJs: 'auto' | 'always' | 'never' };
   /** Limits, sign-in and IP lists (`security` in helppuff.json, Turnstile keys aside). Absent from older Workers. */
   security?: SecuritySettings;
+  /** Live chat. Absent from older Workers. */
+  live?: LiveSettings;
 };
 export type Limits = {
   messagesPerIpPerMinute: number;
@@ -305,6 +407,9 @@ export type Limits = {
   retellLookupsPerMinute: number;
   apiRequestsPerKeyPerMinute: number;
   apiKeysPerSite: number;
+  handoversPerIpPerDay?: number;
+  waitingPerSite?: number;
+  liveSocketsPerIp?: number;
 };
 export type SecuritySettings = {
   limits: Limits;

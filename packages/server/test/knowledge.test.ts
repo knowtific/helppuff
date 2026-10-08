@@ -295,7 +295,7 @@ describe('one-time links', () => {
     expect(claimed.status).toBe(200);
     const cookie = claimed.headers.get('Set-Cookie')!.split(';')[0]!;
     const me = (await (await browser.fetch('/admin/api/me', { headers: { Cookie: cookie } })).json()) as { admin: { email: string; owner: boolean } };
-    expect(me.admin).toEqual({ email: 'owner@acme.test', owner: true, via: 'session' });
+    expect(me.admin).toEqual({ email: 'owner@acme.test', owner: true, role: 'owner', name: null, via: 'session' });
 
     // Used, and setup is over: the same link and a new setup link both fail.
     expect((await browser.post('/admin/api/setup', { token, email: 'x@acme.test', password: 'a long enough password' })).status).toBe(404);

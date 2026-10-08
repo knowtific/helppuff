@@ -16,12 +16,18 @@ import { CaptchaError, getCaptchaToken } from '../lib/turnstile.js';
 import type { Action, Message, MessageBody, Option, Shortcut, WidgetConfig } from '@helppuff/protocol';
 import { cleanText } from '@helppuff/protocol/text';
 import { localFormId } from '@helppuff/protocol/forms';
+import { HANDOVER_ACTION } from '@helppuff/protocol/live';
+import type { connectLive, LiveConnection } from '../live/index.js';
+import { parseMessage } from './validate.js';
 import type { Runtime } from '../loader.js';
 import { toWidgetError, type Api } from './api.js';
 import { clientId, pageContext, pathAllowed, currentPath } from './context.js';
 import { clear as clearStorage, load as loadStored, save as saveStored } from './persist.js';
 import { makeStrings } from './strings.js';
 import { GREETING_PREFIX } from './store.js';
+
+/** The live chunk's file, set at build time (absent in tests: no live connection there). */
+declare const __HELPPUFF_LIVE_FILE__: string | undefined;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-/i;
 /** Ids the widget made itself (greetings, flow steps, local notes) never reach the server's records. */
@@ -149,6 +155,78 @@ export function App({
   if (state.lead) leadRef.current = { ...(leadRef.current ?? {}), ...state.lead };
 
   const t = useMemo(() => makeStrings(config.strings), [config]);
+
+  /**
+   * Live chat: on a site with live chat, an open chat loads the live chunk and
+   * stays connected, so a person can take it over at any time. Whether one has
+   * it now is the latest handover message.
+   */
+  const { handover, handedOver } = useMemo(() => {
+    let latest: Extract<Message, { type: 'handover' }> | null = null;
+    for (let i = state.messages.length - 1; i >= 0; i--) {
+      const m = state.messages[i]!;
+      if (m.type !== 'handover') continue;
+      latest ??= m;
+      // `missed` is live only after a `waiting` (nobody took it in time; the visitor may keep
+      // waiting). Without one, the chat was never handed over: nobody was free to begin with.
+      if (latest.status !== 'missed') return { handover: latest, handedOver: latest.status === 'waiting' || latest.status === 'joined' };
+      if (m.status === 'waiting' || m.status === 'joined') return { handover: latest, handedOver: true };
+      if (m.status === 'left' || m.status === 'closed') break;
+    }
+    return { handover: latest, handedOver: false };
+  }, [state.messages]);
+  // Connected while a chat is open (a person can take it over at any time); polling only while one has it.
+  const liveOn = Boolean(runtime.capabilities.live) && Boolean(state.session);
+  const handedOverRef = useRef(handedOver);
+  handedOverRef.current = handedOver;
+  const liveConn = useRef<LiveConnection | null>(null);
+  useEffect(() => {
+    if (!liveOn || typeof __HELPPUFF_LIVE_FILE__ !== 'string') return;
+    let cancelled = false;
+    let url: string;
+    try {
+      url = new URL(/* @vite-ignore */ __HELPPUFF_LIVE_FILE__, import.meta.url).href;
+    } catch {
+      return;
+    }
+    import(/* @vite-ignore */ url)
+      .then((mod: { connectLive: typeof connectLive }) => {
+        if (cancelled) return;
+        liveConn.current = mod.connectLive({
+          apiBase: runtime.apiBase,
+          token: () => stateRef.current.session?.token ?? null,
+          // The server's clock: the newest message it stamped.
+          lastTs: () => stateRef.current.messages.reduce((max, m) => (m.role !== 'user' && m.ts > max ? m.ts : max), 0),
+          active: () => handedOverRef.current,
+          hooks: {
+            onMessage: (message) => dispatch({ type: 'live/message', message }),
+            onStatus: () => {},
+            onTyping: (on) => dispatch({ type: 'live/typing', on }),
+            parse: parseMessage,
+          },
+        });
+      })
+      // No live chunk (offline, CSP): the visitor's next message still reaches the team.
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+      liveConn.current?.close();
+      liveConn.current = null;
+      dispatch({ type: 'live/typing', on: false });
+    };
+  }, [liveOn, state.session?.id, runtime.apiBase]);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onDraft = (text: string) => {
+    dispatch({ type: 'draft', text });
+    const conn = liveConn.current;
+    if (!conn) return;
+    if (!typingTimer.current) conn.typing(true);
+    else clearTimeout(typingTimer.current);
+    typingTimer.current = setTimeout(() => {
+      conn.typing(false);
+      typingTimer.current = null;
+    }, 3000);
+  };
 
   // ---------------------------------------------------------------- effects
 
@@ -746,6 +824,10 @@ export function App({
             config={config}
             thinking={busy}
             showBack={state.screen !== 'home' && !state.session}
+            {...(handover?.status === 'joined' ? { status: handover.agentName ? `${handover.agentName} · ${t('liveStatus')}` : t('liveStatus') } : {})}
+            {...(runtime.capabilities.live && state.session && state.screen === 'chat' && !handedOver
+              ? { onPerson: () => void doSend({ kind: 'action', actionId: HANDOVER_ACTION, value: 'person', label: t('talkToPerson') }) }
+              : {})}
             t={t}
             onBack={() => dispatch({ type: 'screen', screen: 'home' })}
             onClose={close}
@@ -782,7 +864,7 @@ export function App({
             <div class="hp-screen">
               <Thread
                 messages={messages}
-                busy={busy}
+                busy={busy || state.agentTyping}
                 preview={state.preview}
                 pendingIds={pendingIds}
                 handlers={handlers}
@@ -816,7 +898,7 @@ export function App({
                 offline={offline}
                 placeholder={config.chat.placeholder ?? t('placeholder')}
                 t={t}
-                onInput={(text) => dispatch({ type: 'draft', text })}
+                onInput={onDraft}
                 onSend={onComposerSend}
               />
             </div>

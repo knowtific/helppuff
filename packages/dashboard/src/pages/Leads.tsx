@@ -1,34 +1,15 @@
 import { Download, MessageSquare, Search, Users } from 'lucide-react';
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useState } from 'react';
 import { PageHeader } from '../components/Shell';
-import { Avatar, Badge, Button, Card, Empty, ErrorNote, Input, Select, Skeleton, Textarea, statusLabel } from '../components/ui';
+import { Avatar, Badge, Button, Card, Empty, ErrorNote, Input, Select, Skeleton, statusLabel } from '../components/ui';
 import { api, LEAD_STATUSES, type Lead, type LeadStatus } from '../lib/api';
 import { cn, fmtRelative, href, useData, useDebounced } from '../lib/utils';
 
-const SOURCE: Record<Lead['source'], string> = { form: 'Form', chat: 'Typed in chat', ai: 'Found by AI' };
-
-function Notes({ lead, onSaved }: { lead: Lead; onSaved: (lead: Lead) => void }) {
-  const [value, setValue] = useState(lead.notes ?? '');
-  const [state, setState] = useState<'idle' | 'saving' | 'saved'>('idle');
-  useEffect(() => setValue(lead.notes ?? ''), [lead.id, lead.notes]);
-  const save = async () => {
-    if (value === (lead.notes ?? '')) return;
-    setState('saving');
-    onSaved(await api<Lead>(`/leads/${lead.id}`, { method: 'PATCH', json: { notes: value } }));
-    setState('saved');
-  };
-  return (
-    <div className="space-y-1">
-      <Textarea rows={2} value={value} onChange={(e) => setValue(e.target.value)} onBlur={() => void save()} placeholder="Add a note…" aria-label="Notes" />
-      <p className="h-3 text-[11px] text-muted-foreground">{state === 'saving' ? 'Saving…' : state === 'saved' ? 'Saved' : ''}</p>
-    </div>
-  );
-}
+const SOURCE: Record<Lead['source'], string> = { form: 'Form', chat: 'Typed in chat', ai: 'Found by AI', api: 'Added over the API' };
 
 export function Leads() {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<LeadStatus | ''>('');
-  const [open, setOpen] = useState<string | null>(null);
   const q = useDebounced(query);
   const { data, error, loading, reload } = useData(
     () => api<{ items: Lead[]; counts: Record<string, number> }>(`/leads?q=${encodeURIComponent(q)}${status ? `&status=${status}` : ''}`),
@@ -47,8 +28,8 @@ export function Leads() {
   return (
     <>
       <PageHeader
-        title="Leads"
-        description="People who left their details. Move them through your pipeline."
+        title="Contacts"
+        description="People who left their details. Open one for their history, notes and attributes."
         help="Leads"
         actions={
           <Button variant="outline" onClick={() => (window.location.href = '/admin/api/leads.csv')}>
@@ -60,7 +41,7 @@ export function Leads() {
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative w-full max-w-xs">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name, email, phone, notes…" className="pl-8" aria-label="Search leads" />
+            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name, email, company, notes…" className="pl-8" aria-label="Search contacts" />
           </div>
           <div className="flex flex-wrap gap-1" role="group" aria-label="Filter by status">
             {(['', ...LEAD_STATUSES] as const).map((s) => (
@@ -110,11 +91,14 @@ export function Leads() {
                     const chats = lead.conversations ?? 1;
                     return (
                       <Fragment key={lead.id}>
-                        <tr className="cursor-pointer hover:bg-subtle" onClick={() => setOpen(open === lead.id ? null : lead.id)}>
+                        <tr className="cursor-pointer hover:bg-subtle" onClick={() => (window.location.hash = href({ page: 'contact', id: lead.id }))}>
                           <td className="px-4 py-2.5">
                             <span className="flex items-center gap-2.5">
                               <Avatar name={lead.name ?? lead.email} />
-                              <span className="font-medium">{lead.name ?? <span className="text-muted-foreground">Unnamed</span>}</span>
+                              <a href={href({ page: 'contact', id: lead.id })} className="font-medium hover:underline" onClick={(e) => e.stopPropagation()}>
+                                {lead.name ?? <span className="text-muted-foreground">Unnamed</span>}
+                              </a>
+                              {lead.company && <span className="text-xs text-muted-foreground">{lead.company}</span>}
                               {Boolean(lead.openCallbacks) && (
                                 <a href={href({ page: 'callbacks' })} title="Waiting for a callback">
                                   <Badge dot="#d97706">Callback requested</Badge>
@@ -157,13 +141,6 @@ export function Leads() {
                             )}
                           </td>
                         </tr>
-                        {open === lead.id && (
-                          <tr key={`${lead.id}-notes`} className="bg-subtle">
-                            <td colSpan={6} className="px-4 py-3">
-                              <Notes lead={lead} onSaved={(saved) => setEdits((e) => ({ ...e, [lead.id]: { ...lead, ...saved } }))} />
-                            </td>
-                          </tr>
-                        )}
                       </Fragment>
                     );
                   })}

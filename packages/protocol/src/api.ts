@@ -94,6 +94,8 @@ export const capabilitiesSchema = z.object({
   stream: z.boolean().optional(),
   /** Whether replies can be rated (thumbs up/down): the deployment records conversations. */
   feedback: z.boolean().optional(),
+  /** Whether the visitor can ask for a person (live chat is on for the site). */
+  live: z.boolean().optional(),
 });
 export type Capabilities = z.infer<typeof capabilitiesSchema>;
 

@@ -329,16 +329,51 @@ Print the <script> tag to paste into the site.
 ### `helppuff users`
 
 ```
-helppuff users list | add <email> | remove <email> | reset <email> [--password <p>]
+helppuff users list | add <email> [--role admin|member] | role <email> admin|member | remove <email> | reset <email> [--password <p>]
 ```
 
-Manage who can sign in to the dashboard. The owner is dashboard.adminEmail; others are stored in the D1 database. A password is generated and shown once when --password is omitted.
+Manage who can sign in to the dashboard. The owner is dashboard.adminEmail; others are stored in the D1 database. Admins (the default) can do everything; members see only conversations, contacts, callbacks and live chat, and their own notifications. A password is generated and shown once when --password is omitted.
 
 ```bash
-helppuff users add sam@acme.com
+helppuff users add sam@acme.com --role member
+helppuff users role sam@acme.com admin
 helppuff users reset owner@acme.com --json
 helppuff users list
 ```
+
+### `helppuff live`
+
+```
+helppuff live on [--wait <seconds>] [--close-after <minutes>] [--names|--no-names] | off | status
+```
+
+Live chat: a visitor who asks for a person is handed to your team, who answer from the dashboard (with a notification and a sound) or Telegram. When nobody is available, or nobody takes the chat in --wait seconds (default 120), the visitor gets the callback form. Conversations close after --close-after minutes without a message (default 60); a visitor who writes again is answered by the assistant. Off by default. Saved live and in helppuff.json (`live`).
+
+```bash
+helppuff live on --json
+helppuff live on --wait 180 --no-names
+helppuff live status --json
+helppuff live off
+```
+
+Someone has to be able to take chats: a dashboard open and set to Available, or Telegram linked (`helppuff telegram connect`).
+
+### `helppuff telegram`
+
+```
+helppuff telegram connect [--token <bot token>] | status | test | disconnect
+```
+
+Answer live chats from Telegram: each chat is a thread in your team's group (Topics on, the bot an admin with "Manage topics") or in your own chat with the bot. connect takes the token @BotFather gives you (from --token, piped, or prompted; stored encrypted on the Worker), then send /link <code> in the chat to answer from. In a thread: write to answer, /take, /close, /ai (back to the assistant), /info.
+
+```bash
+helppuff telegram connect --token 7123456789:AA… --json
+echo "$BOT_TOKEN" | helppuff telegram connect
+helppuff telegram status --json
+helppuff telegram test
+```
+
+Making the bot with @BotFather, and sending /link in the chat, are steps for the person: an agent can run everything else once it has the token.
 
 ### `helppuff webhooks`
 

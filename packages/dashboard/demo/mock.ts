@@ -1,6 +1,6 @@
 import { WEBHOOK_EVENTS } from '@helppuff/protocol';
-import type { Callback, CallbackStatus, KnowledgePage, Lead, LeadStatus, Overview, PromptVersion, Settings, Summary } from '../src/lib/api';
-import { FACTS, PAGES, PROMPT_TEXT, SITE, callbacks, conversations, leads } from './data';
+import type { Callback, CallbackStatus, KnowledgePage, Label, Lead, LeadStatus, Note, Overview, Prefs, PromptVersion, Settings, StoredMessage, Summary } from '../src/lib/api';
+import { FACTS, LABELS, PAGES, PROMPT_TEXT, SITE, callbacks, conversations, leads, notes } from './data';
 
 /**
  * The admin API, answered inside the page with the sample data in `data.ts`.
@@ -58,13 +58,19 @@ let settings: Settings = {
       retellLookupsPerMinute: 120,
       apiRequestsPerKeyPerMinute: 120,
       apiKeysPerSite: 50,
+      handoversPerIpPerDay: 3,
+      waitingPerSite: 20,
+      liveSocketsPerIp: 3,
     },
     signIn: { attemptsPerIp: 10, attemptsPerAccount: 5, windowMinutes: 15, captcha: true },
     allowIps: [],
     blockIps: [],
     sessionTtlHours: 24,
   },
+  live: { enabled: true, waitSeconds: 120, closeAfterMinutes: 60, showAgentName: true, aiWhileWaiting: false },
 };
+let prefs: Prefs = { available: true, notifyNewChat: true, notifyNewMessage: true, soundNewChat: true, soundNewMessage: true, sound: 'chime', volume: 0.7, repeatUntilTaken: false };
+const labels: Label[] = LABELS.map((l) => ({ ...l }));
 let settingsAt = NOW - 6 * DAY;
 const DEMO_KEY = {
   id: 'k7m3p9q2r4s8',
@@ -220,7 +226,40 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
   const parts = path.split('/').filter(Boolean);
   const [head, id, sub] = parts;
 
-  if (path === '/me') return json({ admin: { email: OWNER, owner: true }, sites: [SITE], summaries: true });
+  if (path === '/me') return json({ admin: { email: OWNER, owner: true, role: 'owner', name: 'Dan' }, sites: [SITE], summaries: true });
+  if (path === '/prefs') {
+    if (method === 'PUT') prefs = { ...prefs, ...(body as Partial<Prefs>) };
+    return json(prefs);
+  }
+  if (path === '/live/status') {
+    const live = conversations.filter((c) => c.status === 'live');
+    return json({ enabled: true, hub: true, available: 1, agents: [{ email: OWNER, name: 'Dan', available: true }], telegram: { connected: true, linked: true }, live: live.length, unassigned: live.filter((c) => !c.assignedTo).length, waiting: live.filter((c) => c.waitingSince).length, mine: 0 });
+  }
+  if (path === '/live/telegram') {
+    return json({ connected: true, linked: true, bot: { name: 'Harbour Desk', username: 'harbour_desk_bot' }, chat: { title: 'Harbour team', topics: true }, linkCode: null, shareContact: true, status: 'ok', lastError: null, updatedAt: NOW - 5 * DAY });
+  }
+  if (path === '/live/telegram/test') return json({ ok: true });
+  if (head === 'labels') {
+    if (!id && method === 'POST') {
+      const label: Label = { id: `lbl_${labels.length + 1}`, name: String(body['name'] ?? 'Label'), color: String(body['color'] ?? '#6b7280'), description: (body['description'] as string) || null, ai: body['ai'] !== false };
+      labels.push(label);
+      return json(label, 201);
+    }
+    const at = labels.findIndex((l) => l.id === id);
+    if (id && method === 'DELETE' && at >= 0) {
+      labels.splice(at, 1);
+      for (const c of conversations) c.labels = (c.labels ?? []).filter((l) => l.id !== id);
+      return json({ id, deleted: true });
+    }
+    if (id && method === 'PATCH' && at >= 0) return json(Object.assign(labels[at]!, body));
+    return json({ labels, colors: ['#6b7280', '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#3b82f6', '#8b5cf6', '#ec4899'] });
+  }
+  if (head === 'notes' && id) {
+    const at = notes.findIndex((n) => n.id === id);
+    if (method === 'DELETE' && at >= 0) notes.splice(at, 1);
+    if (method === 'PATCH' && at >= 0) Object.assign(notes[at]!, { text: String(body['text'] ?? ''), updatedAt: Date.now() });
+    return json(notes[at] ?? { id, deleted: true });
+  }
   if (['/login', '/logout', '/login-link'].includes(path)) return json({ ok: true });
   if (path === '/login/options') return json({ captcha: null });
   if (path === '/keys') {
@@ -247,17 +286,22 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
   if (path === '/version') {
     return json({ current: __HELPPUFF_VERSION__, latest: __HELPPUFF_VERSION__, upgradeAvailable: false, schema: { applied: 9, expected: 9 }, command: 'npx @knowtific/helppuff upgrade', releaseNotes: '' });
   }
-  if (path === '/admins') return json({ me: OWNER, owner: OWNER, admins: [{ email: OWNER, name: 'Dan Harbour', createdAt: NOW - 60 * DAY, lastLoginAt: NOW - 3600_000 }, { email: 'office@harbourplumbing.example', name: 'Priya (office)', createdAt: NOW - 30 * DAY, lastLoginAt: NOW - DAY }] });
+  if (path === '/admins') return json({ me: OWNER, owner: OWNER, admins: [{ email: 'office@harbourplumbing.example', name: 'Priya', role: 'member', createdAt: NOW - 30 * DAY, lastLoginAt: NOW - DAY }] });
   if (path === '/install-check') return json({ installed: true, url: SITE.website, reason: null });
   if (path === '/overview') return json(overview(Number(params.get('days') ?? 30)));
 
   if (head === 'conversations') {
     if (!id) {
       const filter = params.get('filter') ?? 'all';
+      const status = params.get('status') ?? 'all';
+      const label = params.get('label');
       const q = (params.get('q') ?? '').toLowerCase();
       const before = Number(params.get('before') ?? 0);
       const list = conversations.filter(
         (c) =>
+          (status === 'all' || c.status === status) &&
+          (!label || (c.labels ?? []).some((l) => l.name === label || l.id === label)) &&
+          (filter !== 'waiting' || c.waitingSince) &&
           (filter !== 'leads' || c.leadId) &&
           (filter !== 'unsummarized' || !c.summary) &&
           (filter !== 'callbacks' || c.callback === 'open') &&
@@ -269,6 +313,51 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
     }
     const c = conversations.find((x) => x.id === id);
     if (!c) return notFound();
+    const extras = () => ({ id: c.id, labels: (c.labels ?? []).map((l) => ({ ...l, addedBy: 'ai', addedAt: c.startedAt })), attributes: c.attributes ?? {}, notes: notes.filter((n) => n.conversationId === c.id) });
+    if (method === 'PATCH' && !sub) {
+      if (Array.isArray(body['labels'])) c.labels = labels.filter((l) => (body['labels'] as string[]).includes(l.id)).map(({ id: lid, name, color }) => ({ id: lid, name, color }));
+      if (body['attributes'] && typeof body['attributes'] === 'object') {
+        const next = { ...(c.attributes ?? {}) };
+        for (const [k, v] of Object.entries(body['attributes'] as Record<string, string | null>)) if (v === null) delete next[k]; else next[k] = String(v);
+        c.attributes = next;
+      }
+      return json(extras());
+    }
+    if (sub === 'notes' && method === 'POST') {
+      const note: Note = { id: `note_${notes.length + 2}`, conversationId: c.id, leadId: c.leadId, author: OWNER, authorName: 'Dan', text: String(body['text'] ?? ''), createdAt: Date.now(), updatedAt: Date.now() };
+      notes.push(note);
+      return json(note, 201);
+    }
+    if (sub === 'reply' && method === 'POST') {
+      const message: StoredMessage = { id: `${c.id}_r${Date.now()}`, role: 'agent', type: 'text', text: String(body['text'] ?? ''), payload: { meta: { human: true, agentName: 'Dan' } }, ts: Date.now(), author: OWNER };
+      c.messages.push(message);
+      c.assignedTo ??= OWNER;
+      c.assignedName ??= 'Dan';
+      c.waitingSince = null;
+      c.lastAt = Date.now();
+      return json(message, 201);
+    }
+    if (sub === 'assign' && method === 'POST') {
+      const to = body['to'] === 'me' ? OWNER : (body['to'] as string | null);
+      c.assignedTo = to;
+      c.assignedName = to === OWNER ? 'Dan' : to ? 'Priya' : null;
+      return json({ conversationId: c.id, assignedTo: c.assignedTo, assignedName: c.assignedName });
+    }
+    if (sub === 'takeover' && method === 'POST') {
+      c.status = 'live';
+      c.assignedTo = OWNER;
+      c.assignedName = 'Dan';
+      c.waitingSince = null;
+      c.lastAt = Date.now();
+      c.messages.push({ id: `${c.id}_take${Date.now()}`, role: 'system', type: 'handover', text: 'Dan joined the chat.', payload: { status: 'joined' }, ts: Date.now(), author: null });
+      return json({ conversationId: c.id, status: 'live', assignedTo: OWNER, assignedName: 'Dan' });
+    }
+    if ((sub === 'close' || sub === 'handback') && method === 'POST') {
+      c.status = sub === 'close' ? 'closed' : 'bot';
+      c.waitingSince = null;
+      c.messages.push({ id: `${c.id}_${sub}${Date.now()}`, role: 'system', type: 'handover', text: sub === 'close' ? 'This chat was closed.' : 'You’re back with the assistant.', payload: null, ts: Date.now(), author: null });
+      return json({ conversationId: c.id, status: c.status });
+    }
     if (sub === 'summary' && method === 'POST') {
       const summary: Summary = JSON.parse(c.summaryJson ?? JSON.stringify({ summary: `Asked: ${c.firstMessage}`, intent: 'information', sentiment: 'neutral', followUp: null, leadQuality: 'cold', outcome: 'answered', topics: [], unanswered: [] })) as Summary;
       c.summaryJson = JSON.stringify(summary);
@@ -289,9 +378,16 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
         locale: c.locale,
         summary: c.summaryJson,
         lead_id: c.leadId,
+        status: c.status,
+        assigned_to: c.assignedTo ?? null,
+        assigned_name: c.assignedName ?? null,
+        waiting_since: c.waitingSince ?? null,
+        attributes: c.attributes ?? {},
       },
       lead: lead ? { ...lead, created_at: lead.createdAt } : null,
       callbacks: callbacks.filter((cb) => cb.conversationId === c.id),
+      labels: extras().labels,
+      notes: extras().notes,
       messages: c.messages,
     });
   }
@@ -307,8 +403,28 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
     }
     const lead = leads.find((l) => l.id === id);
     if (!lead) return notFound();
+    if (sub === 'notes' && method === 'POST') {
+      const note: Note = { id: `note_${notes.length + 2}`, conversationId: null, leadId: lead.id, author: OWNER, authorName: 'Dan', text: String(body['text'] ?? ''), createdAt: Date.now(), updatedAt: Date.now() };
+      notes.push(note);
+      return json(note, 201);
+    }
+    if (method === 'GET') {
+      const own = conversations.filter((c) => c.leadId === lead.id);
+      return json({
+        ...lead,
+        conversations: own.map((c) => ({ id: c.id, startedAt: c.startedAt, lastAt: c.lastAt, pageUrl: c.pageUrl, firstMessage: c.firstMessage, messageCount: c.messageCount, summary: c.summaryJson, intent: c.intent, channel: 'widget', status: c.status, assignedName: c.assignedName ?? null, labels: c.labels ?? [] })),
+        teamNotes: notes.filter((n) => n.leadId === lead.id).sort((a, b) => b.createdAt - a.createdAt),
+        callbacks: callbacks.filter((cb) => cb.leadId === lead.id),
+      });
+    }
     if (typeof body['status'] === 'string') lead.status = body['status'] as LeadStatus;
     if (typeof body['notes'] === 'string') lead.notes = body['notes'];
+    for (const key of ['name', 'email', 'phone', 'company', 'address'] as const) if (key in body) (lead as Record<string, unknown>)[key] = body[key] ?? null;
+    if (body['attributes'] && typeof body['attributes'] === 'object') {
+      const next = { ...(lead.attributes ?? {}) };
+      for (const [k, v] of Object.entries(body['attributes'] as Record<string, string | null>)) if (v === null) delete next[k]; else next[k] = String(v);
+      lead.attributes = next;
+    }
     lead.updatedAt = Date.now();
     syncConversationLead(lead);
     return json(lead);

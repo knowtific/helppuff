@@ -41,6 +41,7 @@ export default defineConfig(({ command }) => ({
   define: {
     __HELPPUFF_VERSION__: JSON.stringify('0.1.0-dev'),
     __HELPPUFF_APP_FILE__: JSON.stringify('/src/app/index.tsx'),
+    __HELPPUFF_LIVE_FILE__: JSON.stringify('/src/live/index.ts'),
     // The playground's preview embeds the source in dev and the built bundle
     // (copied next to it by `scripts/build-playground.mjs`) when published.
     __HELPPUFF_PLAYGROUND_LOADER__: JSON.stringify(command === 'build' ? 'widget/loader.js' : '/src/loader.ts'),

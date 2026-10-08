@@ -35,11 +35,12 @@ export function prepareConnector(ctx: RequestCtx, site: SiteConfig): PreparedCon
 }
 
 /** What the widget is told the connector can do, streaming included. */
-export function capabilitiesOf(prepared: PreparedConnector, records = false): Capabilities {
+export function capabilitiesOf(prepared: PreparedConnector, records = false, live = false): Capabilities {
   return {
     ...prepared.connector.capabilities,
     stream: prepared.connector.streams(prepared.options),
     ...(records ? { feedback: true } : {}),
+    ...(live ? { live: true } : {}),
   };
 }
 

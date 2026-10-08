@@ -25,6 +25,9 @@ export default tseslint.config(
       'private/**',
       // Plain browser scripts copied as-is (the dashboard's theme, before first paint).
       'packages/dashboard/public/**',
+      // The live-chat e2e Worker's built dashboard and local state (e2e/live/serve.mjs).
+      'e2e/live/.assets/**',
+      'e2e/live/.state/**',
     ],
   },
 
@@ -70,6 +73,7 @@ export default tseslint.config(
     files: [
       '**/*.config.{js,ts,mjs}',
       '**/scripts/**/*.mjs',
+      'e2e/live/*.mjs',
       '**/demo/fixtures/*.js',
       'eslint.config.js',
     ],
