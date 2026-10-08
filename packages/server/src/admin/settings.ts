@@ -9,6 +9,7 @@ import { HelpPuffError } from '../core/errors.js';
 import type { HonoEnv } from '../core/request.js';
 import { assertSameOrigin, currentAdmin, jsonBody, siteParam } from './guard.js';
 import { QUOTE_FLOW_ID } from '../jobs/widget.js';
+import { isAssistant, knowledgeOf, providerOf } from '../core/assistant.js';
 import { dismissSuggestedHome, readSuggestedHome } from '../home/suggest.js';
 
 /**
@@ -204,7 +205,7 @@ export function readSettings(site: SiteConfig): Settings {
     launcherIcon: w.launcher.icon,
     leads: { enabled: w.leadForm.enabled, fields },
     assistant:
-      site.connector.type === 'workers-ai'
+      isAssistant(site)
         ? { model: str(o['model']) ?? '@cf/zai-org/glm-4.7-flash', locale: str(o['locale']), timezone: str(o['timezone']), rerank: obj(o['retrieval'])['rerankerModel'] !== null, reasoning: answerReasoning(o['reasoning']) }
         : null,
     behaviour: site.assistant,
@@ -283,14 +284,14 @@ export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<Site
   };
 
   let connector = site.connector;
-  if (s.assistant && site.connector.type === 'workers-ai') {
+  if (s.assistant && isAssistant(site)) {
     const { locale: _locale, timezone: _timezone, retrieval: _retrieval, reasoning: _reasoning, ...rest } = obj(site.connector.options);
     // Off is an explicit null; on keeps a chosen reranker, or drops the key for the default.
     const { rerankerModel, ...retrieval } = obj(_retrieval);
     if (!s.assistant.rerank) retrieval['rerankerModel'] = null;
     else if (typeof rerankerModel === 'string') retrieval['rerankerModel'] = rerankerModel;
     connector = {
-      type: 'workers-ai',
+      type: site.connector.type,
       options: {
         ...rest,
         model: s.assistant.model,
@@ -329,6 +330,8 @@ settingsRoutes.get('/settings', async (c) => {
     captcha: Boolean(site.security.captcha),
     // What the widget shows until the home screen is set up here: suggested from the website.
     suggestedHome: suggested && !suggested.dismissed ? { questions: suggested.questions ?? [], links: suggested.links ?? null, at: suggested.at } : null,
+    // The model and knowledge: shown, changed only with the CLI (`helppuff model`, `helppuff rag`) and a deploy.
+    ai: isAssistant(site) ? { provider: providerOf(site), model: readSettings(site).assistant?.model ?? null, knowledge: knowledgeOf(site) } : null,
     // What a form or flow shortcut can open.
     forms: Object.entries(site.widget.forms ?? {}).map(([id, form]) => ({ id, title: form.title ?? id })),
     flows: (site.widget.flows ?? []).filter((f) => f.id !== QUOTE_FLOW_ID).map((f) => ({ id: f.id, title: f.steps[0]?.ask ?? f.id })),
@@ -362,6 +365,18 @@ settingsRoutes.put('/settings', async (c) => {
   if (!kv) throw new HelpPuffError('internal', { message: 'This deployment has no KV namespace.', detail: 'admin_no_kv' });
 
   const site = await resolveSite(ctx, siteId);
+  // The model and how it reads the knowledge base change only with the CLI, then a deploy.
+  const current = readSettings(site).assistant;
+  const asked = parsed.data.assistant;
+  if (current && asked) {
+    const changed = (['model', 'rerank', 'reasoning'] as const).filter((key) => asked[key] !== undefined && asked[key] !== current[key]);
+    if (changed.length) {
+      throw new HelpPuffError('bad_request', {
+        message: `The ${changed.join(' and ')} change${changed.length === 1 ? 's' : ''} only with the CLI: \`helppuff model set …\` (or \`helppuff config set\`), then \`helppuff deploy\`.`,
+        detail: 'settings_model_cli_only',
+      });
+    }
+  }
   try {
     mergeSecurity(site, parsed.data.security);
   } catch (thrown) {

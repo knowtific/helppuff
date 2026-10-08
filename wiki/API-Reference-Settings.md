@@ -4,9 +4,92 @@
 
 The assistant, widget, lead form, limits and IP lists, as one object. Part of the [[API reference|API-Reference]]: setup, shared types and errors are there.
 
+- [[Test the model or the knowledge base|API-Reference-Settings#test-the-model-or-the-knowledge-base]]: `POST /assistant/test`
 - [[Suggest the home screen|API-Reference-Settings#suggest-the-home-screen]]: `POST /home/suggest`
 - [[The settings|API-Reference-Settings#the-settings]]: `GET /settings`
 - [[Change settings|API-Reference-Settings#change-settings]]: `PUT /settings`
+
+## Test the model or the knowledge base
+
+`POST /assistant/test` · scope `settings:write`
+
+One question through the deployed assistant's own model (`part: "model"`) or knowledge base (`part: "knowledge"`), as configured: keys, gateway and custom modules included. Nothing is recorded. A failure answers `ok: false` with what to fix (a missing secret, a refused key). What `helppuff model test` and `helppuff rag test` call. The model and knowledge base are changed only with the CLI, then a deploy.
+
+| Body field | Required | Description |
+| --- | --- | --- |
+| `part` | no | `model` (default) or `knowledge`. |
+| `question` | no | What to ask or search for. |
+
+**Request**
+
+<!-- tabs -->
+```bash [curl]
+curl -X POST "$HELPPUFF_URL/api/v1/assistant/test" \
+  -H "Authorization: Bearer $HELPPUFF_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "part": "model",
+  "question": "Do you do emergency callouts?"
+}'
+```
+```ts [TypeScript]
+type TestModelKnowledgeBaseRequest = {
+  /** `model` (default) or `knowledge`. */
+  part?: string;
+  /** What to ask or search for. */
+  question?: string;
+};
+
+const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/assistant/test`, {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${process.env.HELPPUFF_API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    part: 'model',
+    question: 'Do you do emergency callouts?'
+  } satisfies TestModelKnowledgeBaseRequest),
+});
+if (!response.ok) throw new Error(((await response.json()) as ApiError).error.message);
+const data = (await response.json()) as TestModelKnowledgeBaseResponse;
+```
+<!-- /tabs -->
+
+**Response** `200`
+
+<!-- tabs -->
+```json [Example]
+{
+  "provider": "openai-compatible",
+  "knowledge": "helppuff",
+  "part": "model",
+  "ok": true,
+  "model": "deepseek-ai/DeepSeek-V3.1",
+  "reply": "Yes, we answer emergency callouts 24/7.",
+  "usage": {
+    "input": 42,
+    "output": 11
+  },
+  "ms": 812
+}
+```
+```ts [Type]
+type TestModelKnowledgeBaseResponse = {
+  provider: string;
+  knowledge: string;
+  part: string;
+  ok: boolean;
+  model: string;
+  reply: string;
+  usage: {
+    input: number;
+    output: number;
+  } | null;
+  ms: number;
+};
+```
+<!-- /tabs -->
 
 ## Suggest the home screen
 
@@ -100,7 +183,7 @@ type SuggestHomeScreenResponse = {
 
 `GET /settings` · scope `settings:read`
 
-The assistant, widget, home screen, lead form, crawl and security settings as one object, with a hash of it. Also: `suggestedHome`, what the widget shows on its home screen until it is set up (questions and links suggested from the website; null once the home screen was saved), and the `forms` and `flows` a shortcut can open.
+The assistant, widget, home screen, lead form, crawl and security settings as one object, with a hash of it. Also: `ai`, who writes the answers and what they come from (changed only with the CLI, `helppuff model` and `helppuff rag`, then a deploy); `suggestedHome`, what the widget shows on its home screen until it is set up (questions and links suggested from the website; null once the home screen was saved), and the `forms` and `flows` a shortcut can open.
 
 | Parameter | In | Required | Description |
 | --- | --- | --- | --- |
@@ -256,6 +339,11 @@ const data = (await response.json()) as SettingsResponse;
     },
     "at": 1760000000000
   },
+  "ai": {
+    "provider": "workers-ai",
+    "model": "@cf/zai-org/glm-4.7-flash",
+    "knowledge": "helppuff"
+  },
   "forms": [
     {
       "id": "booking",
@@ -367,6 +455,11 @@ type SettingsResponse = {
       }>;
     };
     at: number;
+  } | null;
+  ai: {
+    provider: string;
+    model: string;
+    knowledge: string;
   } | null;
   forms: Array<{
     id: string;

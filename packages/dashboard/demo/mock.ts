@@ -239,6 +239,19 @@ const SUGGESTED_LINKS = {
   ],
 };
 
+/**
+ * Live chat's controls (the Available switch, the filters, the team's reply
+ * box), for the website's screenshots: they set `hp-demo-live` and stand in
+ * for the live socket. The public demo leaves it off: it has nothing to connect to.
+ */
+function liveShown(): boolean {
+  try {
+    return localStorage.getItem('hp-demo-live') === '1';
+  } catch {
+    return false;
+  }
+}
+
 // ------------------------------------------------------------------ router
 
 type Body = Record<string, unknown>;
@@ -249,7 +262,7 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
 
   const jobs = jobsRoute(method, parts, params, body);
   if (jobs) return jobs;
-  if (path === '/me') return json({ admin: { email: OWNER, owner: true, role: 'owner', name: 'Dan' }, sites: [SITE], summaries: true });
+  if (path === '/me') return json({ admin: { email: OWNER, owner: true, role: 'owner', name: 'Dan' }, sites: [{ ...SITE, live: SITE.live || liveShown() }], summaries: true });
   if (path === '/prefs') {
     if (method === 'PUT') prefs = { ...prefs, ...(body as Partial<Prefs>) };
     return json(prefs);
@@ -488,6 +501,7 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
       hash: String(settingsAt),
       meta: { at: settingsAt, by: OWNER },
       captcha: true,
+      ai: { provider: 'workers-ai', model: settings.assistant?.model ?? null, knowledge: 'helppuff' },
       // The links the widget shows until the owner saves the home screen: picked from the website.
       suggestedHome: homeSuggested ? { questions: [], links: SUGGESTED_LINKS, at: NOW - 6 * DAY } : null,
       forms: [{ id: 'booking', title: 'Book a visit' }],

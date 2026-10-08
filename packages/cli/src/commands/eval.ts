@@ -6,7 +6,7 @@ import { c } from '../output.js';
 import { adminApi } from '../engine/admin-api.js';
 import { chat } from '../engine/chat.js';
 import { loadEnv } from '../engine/env.js';
-import { loadProject } from '../engine/project.js';
+import { usesHelpPuffKnowledge, loadProject } from '../engine/project.js';
 import type { Ctx } from './context.js';
 
 /**
@@ -62,7 +62,7 @@ export async function evalCommand(ctx: Ctx): Promise<number> {
   const url = str(ctx.flags, 'url') ?? loaded.project.cloudflare.url;
   if (!url) throw new CliError('not_deployed', 'Deploy first.', { hint: 'helppuff deploy' });
   const min = Number(str(ctx.flags, 'min') ?? 0.8);
-  const api = loaded.project.backend.type === 'workers-ai' ? adminApi(loaded, { url }) : null;
+  const api = usesHelpPuffKnowledge(loaded.project) ? adminApi(loaded, { url }) : null;
   const secret = loadEnv(loaded.dir)['HELPPUFF_SECRET'];
 
   const results: Scored[] = [];

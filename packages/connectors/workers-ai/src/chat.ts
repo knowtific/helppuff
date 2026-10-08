@@ -13,19 +13,8 @@ import { reasoningInputs, thinkingRoom, type AiLike, type Reasoning } from '@hel
  * are read, so swapping the model in config never needs a code change.
  */
 
-export type ChatMessage =
-  | { role: 'system' | 'user'; content: string }
-  | { role: 'assistant'; content: string; tool_calls?: { id: string; type: 'function'; function: { name: string; arguments: string } }[] }
-  | { role: 'tool'; tool_call_id: string; content: string };
-
-export type ToolDef = {
-  type: 'function';
-  function: { name: string; description: string; parameters: Record<string, unknown> };
-};
-
-export type ToolCall = { id: string; name: string; arguments: string };
-
-export type Completion = { content: string; toolCalls: ToolCall[]; usage: { input: number; output: number } | null };
+export type { ChatMessage, ToolDef, ToolCall, Completion } from '@helppuff/connector-types';
+import type { ChatMessage, ToolDef, ToolCall, Completion } from '@helppuff/connector-types';
 
 export type CompleteOptions = {
   maxTokens: number;
@@ -108,7 +97,7 @@ export function textCalls(content: string, toolNames: string[]): { content: stri
   return { content: text.replace(/\n{3,}/g, '\n\n').trim(), calls };
 }
 
-function withTextCalls(completion: Completion, toolNames: string[]): Completion {
+export function withTextCalls(completion: Completion, toolNames: string[]): Completion {
   if (completion.toolCalls.length) return { ...completion, content: textCalls(completion.content, []).content };
   const found = textCalls(completion.content, toolNames);
   return { ...completion, content: found.content, toolCalls: found.calls };

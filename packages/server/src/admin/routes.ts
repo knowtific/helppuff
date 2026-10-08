@@ -26,6 +26,7 @@ import { attributesJson, closeCutoff, CONVERSATION_STATUSES, conversationExtras,
 import { liveRoutes } from './live.js';
 import { jobRoutes, maybeSetup } from './jobs.js';
 import { homeRoutes, maybeSuggestHome } from './home.js';
+import { assistantRoutes } from './assistant.js';
 import { liveAvailable } from '../live/service.js';
 import { versionRoutes } from './version.js';
 import { dbFrom, ensureSchema, type D1Like } from '../db/d1.js';
@@ -817,3 +818,4 @@ adminRoutes.route('/', inboxRoutes);
 adminRoutes.route('/', liveRoutes);
 adminRoutes.route('/', jobRoutes);
 adminRoutes.route('/', homeRoutes);
+adminRoutes.route('/', assistantRoutes);

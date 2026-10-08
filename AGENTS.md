@@ -44,11 +44,12 @@ as few questions as possible.
 | `packages/server/src/knowledge`, `src/workflows/crawl.ts` | | Crawl control (`startCrawl`, cron re-crawls) and the `CrawlWorkflow` class: the Worker's one background-job runner (crawl parts, files, conversation ends, webhook retries — dispatched on `payload.kind`). Only `index.ts`/`runtime.ts` import it (`cloudflare:workers`). New background work becomes a new `kind` with a step function testable on a fake `StepLike`, not a new Workflow |
 | `packages/rag` | `@helppuff/rag` | The knowledge base, Workers-free logic: `discover`, `robots`, `sitemap`, `categorise`, `extract` (HTML→Markdown + facts), `boilerplate`, `chunk` (`chunkPage`), `ai` (embed/rerank), `store` (D1 + Vectorize), `retrieve` (hybrid + RRF + rerank), `crawl` (`runCrawlPart` on a `StepLike`), `files` (uploads: read → distill → learn, `runFileJob`), `pricing` (neurons) |
 | `packages/connectors/_types` | `@helppuff/connector-types` | `Connector` interface + `defineConnector`, helpers, rich messages, prompt, history, shared `ai-search.ts` |
-| `packages/connectors/*` | `@helppuff/connector-<name>` | `workers-ai` (default: Workers AI + `@helppuff/rag`, tools, budget), `echo` (dev/test, no key), `cloudflare` (AI Search), `openai`, `gemini`, `anthropic` (via AI Search), `http` (own API), `retell` |
+| `packages/connectors/workers-ai` | `@helppuff/connector-workers-ai` | **HelpPuff's assistant**, registered as `assistant` (and `workers-ai`, its name in older configs): prompt, tools, grounding, guardrails, budget, around a pluggable model (`models.ts`: Workers AI, any OpenAI-compatible API, Claude's Messages API, a site's own `custom` module) and knowledge source (`retrievers.ts`: HelpPuff's own via `@helppuff/rag`, AI Search, OpenAI vector store, HTTP, `custom`, none). The interfaces (`LanguageModel`, `Retriever`) are `connector-types/src/assistant.ts`, published as `@knowtific/helppuff/sdk`; site modules arrive through `createWorker(config, extensions)` |
+| `packages/connectors/*` | `@helppuff/connector-<name>` | Whole backends: `echo` (dev/test, no key), `cloudflare` (AI Search), `openai`, `gemini`, `anthropic` (via AI Search), `http` (own API), `retell` |
 | `packages/sinks/*` | `@helppuff/sink-*` | Lead destinations (`webhook`) |
 | `packages/widget` | `@helppuff/widget` | Preact widget in a shadow root. `src/loader.ts` (tiny loader, no Preact, owns fail-safe) → lazy `src/app/` (store, api, persist, strings, validate) + `components/` + `flows/` + `lib/` (markdown, safe, turnstile…) + `styles/` (CSS in TS template literals). `src/live/` = live chat's client, its own chunk (`live-*.js`, ≤ 6 kb gz, no Preact/Zod), loaded by the app only when a chat is handed over. `demo/` = playground (local Worker), options playground (`playground.html` + `preview.html`, an in-page API on the echo connector; published to GitHub Pages by `pnpm build:playground` / `.github/workflows/playground.yml`), gallery, hostile-host fixtures |
 | `packages/dashboard` | `@helppuff/dashboard` | React + Tailwind v4 dashboard served at `/admin/`: Home (test chat), Conversations, Leads, Knowledge, Analytics, Settings (sub-pages, incl. Webhooks and Updates). Look: shadcn / Notion / Twenty, minimal. `lib/live.ts` = the team's live socket, notifications and Web Audio sounds; `components/inbox.tsx` = status, labels, attributes, notes; `pages/Contact.tsx` = a contact's page; `pages/Jobs.tsx` = the board, list and a job's panel (`RelatedJobs`, `NewJob` reused on contacts, conversations, callbacks); `components/JobsSettings.tsx` = Settings → Jobs; `components/HomeScreenSettings.tsx` = Settings → Home screen. `demo/` + `demo.html` = the website's dashboard demo: the real app with `/admin/api` answered in the page from seeded sample data (`demo/mock.ts`, `demo/data.ts`; `build:demo`). A new endpoint the pages call needs a route there too |
-| `packages/cli` | `@knowtific/helppuff` | The published CLI. `src/cli.ts` (command table), `commands/` (incl. `upgrade.ts`, `webhooks.ts`), `engine/` (init, deploy, compile, admin-api, knowledge, cloudflare, wrangler, doctor, `version.ts`, `reference.ts` (wiki config page)…), `help.ts` (the wiki's CLI page is generated from it by `pnpm sync:docs`) |
+| `packages/cli` | `@knowtific/helppuff` | The published CLI. `src/cli.ts` (command table), `commands/` (incl. `upgrade.ts`, `webhooks.ts`, `models.ts`: `model`, `rag`, `scaffold`), `engine/` (init, deploy, compile, admin-api, knowledge, cloudflare, wrangler, doctor, `version.ts`, `reference.ts` (wiki config page)…), `help.ts` (the wiki's CLI page is generated from it by `pnpm sync:docs`) |
 | `website` | `@helppuff/website` | The site on GitHub Pages (VitePress): landing page (`.vitepress/theme/components/Landing.vue`), docs generated from `wiki/` into the gitignored `docs/` (`.vitepress/wiki.ts`, sidebar from `wiki/_Sidebar.md`), the playground copied to `/playground/`. Pictures in `public/shots/` are real screenshots from `scripts/screenshots.mjs` (rerun after a visual widget change) |
 | `instructions.md` | | The cross-agent install, deploy, test and upgrade workflow linked from the README and wiki. No plugin, skill or MCP setup is required. |
 | `e2e/` | | Playwright suites against real Worker + widget |
@@ -201,7 +202,15 @@ pnpm check          # lint + typecheck + test + build + e2e (what CI runs)
   real SQLite with the production migrations, fake AI/Vectorize in
   `rag/test/helpers.ts`); a new D1 table or column is a new entry at the end of
   `server/src/db/migrations.ts`, never an edit.
-- **New connector**: create `packages/connectors/<name>` (copy `echo`'s
+- **New built-in model provider**: usually none needed. An OpenAI-compatible
+  API is a preset in `PRESETS` (`cli/src/engine/project.ts`, address and key
+  name verified against the provider's docs); anything else is a new
+  `provider` type in `connectors/workers-ai/src/options.ts` + `models.ts`
+  (one `chat` returning a `Completion`), compiled in
+  `cli/src/engine/compile.ts` (`assistantOptions`). A new knowledge source is
+  the same in `retrievers.ts` (one `search` returning passages). Document it
+  in `wiki/Models-and-Providers.md` or `wiki/Providers.md`.
+- **New connector** (a whole backend that runs the conversation itself): create `packages/connectors/<name>` (copy `echo`'s
   shape: `package.json`, `tsconfig.json`, `src/index.ts` exporting
   `defineConnector({...})`, `test/`), register it in
   `packages/server/src/core/registry.ts`, add the dep to
@@ -241,5 +250,7 @@ dashboard's React tests are their own vitest project, `--project dashboard`,
 with `test/helpers.tsx` answering `/admin/api` in the page), `e2e/*.spec.ts` (Playwright; the widget is inside
 the `helppuff-widget` shadow root — see `e2e/helpers.ts`; `e2e/live.spec.ts`
 and `e2e/jobs.spec.ts` run against a second Worker (:8796 in e2e) with D1, the live hub and the dashboard,
-started by `e2e/live/serve.mjs`; lead-form fills are
+started by `e2e/live/serve.mjs`, which also serves the `models` site:
+another model (a fake OpenAI-compatible API at `/fake-llm/v1` on the same
+Worker) and a custom retriever (`e2e/models.spec.ts`); lead-form fills are
 driven by what renders, not a fixed field list).

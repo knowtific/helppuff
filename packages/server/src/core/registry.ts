@@ -7,7 +7,7 @@ import geminiConnector from '@helppuff/connector-gemini';
 import cloudflareConnector from '@helppuff/connector-cloudflare';
 import anthropicConnector from '@helppuff/connector-anthropic';
 import httpConnector from '@helppuff/connector-http';
-import workersAiConnector from '@helppuff/connector-workers-ai';
+import workersAiConnector, { assistantConnector } from '@helppuff/connector-workers-ai';
 import webhookSink from '@helppuff/sink-webhook';
 import { HelpPuffError } from './errors.js';
 
@@ -24,6 +24,7 @@ export const connectors: Readonly<Record<string, ErasedConnector>> = {
   anthropic: anthropicConnector,
   http: httpConnector,
   'workers-ai': workersAiConnector,
+  assistant: assistantConnector,
 };
 
 export function getConnector(type: string): ErasedConnector {

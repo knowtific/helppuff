@@ -1,6 +1,8 @@
 # Provider: Google Gemini
 
-`"backend": { "type": "gemini" }`
+`"model": { "provider": "gemini" }`, with any knowledge (`knowledge.retrieval`; HelpPuff's own by default). See [[Models and providers|Models-and-Providers]].
+
+This page describes the whole `"backend": { "type": "gemini" }`, still used for Gemini File Search (Google has no search-only call, so File Search stays with Gemini answering).
 
 Answers with Google Gemini (the Interactions API). Knowledge comes from Gemini
 **File Search** (Google chunks, embeds and retrieves), or from HelpPuff's own

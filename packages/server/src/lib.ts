@@ -4,6 +4,7 @@ export { resolveSite, siteConfigKey, SITE_CONFIG_PREFIX } from './config/site.js
 export * from './config/schema.js';
 export { createApp } from './app.js';
 export { createWorker } from './worker.js';
+export { isAssistant, providerOf, knowledgeOf, workersAiModelOf } from './core/assistant.js';
 export { HelpPuffError, isHelpPuffError, toHelpPuffError } from './core/errors.js';
 export { memoryKv, resilientKv, hashIp, type Platform } from './core/platform.js';
 export { connectors, sinks, getConnector } from './core/registry.js';

@@ -5,7 +5,7 @@ be changed live in the dashboard.
 
 | | Holds | Changed by |
 | --- | --- | --- |
-| `helppuff.json` | What the assistant is: website, backend and model, knowledge, widget, limits, dashboard, and where it is deployed | you, an agent, `helppuff config set`, `helppuff config pull` |
+| `helppuff.json` | What the assistant is: website, model, knowledge, widget, limits, dashboard, and where it is deployed | you, an agent, `helppuff config set`, `helppuff config pull` |
 | `prompt.md` | How it talks: the system prompt | you, an agent, `helppuff prompt pull`; the dashboard's Instructions write it too |
 | `.env` | Secrets: provider keys, `HELPPUFF_SECRET`, `ADMIN_API_KEY`, an optional Cloudflare token | `helppuff secret set`, `helppuff deploy` (generates the HelpPuff secrets) |
 
@@ -23,12 +23,12 @@ check fields as you type.
   "site": "acme",
   "name": "Acme Plumbing",
   "website": "https://acme.com.au",
-  "origins": ["https://acme.com.au", "https://www.acme.com.au"],
-  "backend": { "type": "workers-ai" }
+  "origins": ["https://acme.com.au", "https://www.acme.com.au"]
 }
 ```
 
-Everything else has a default. A fuller example:
+Everything else has a default: Workers AI writes the answers, from HelpPuff's
+own knowledge base (your site and files). A fuller example:
 
 ```json
 {
@@ -36,16 +36,16 @@ Everything else has a default. A fuller example:
   "name": "Acme Plumbing",
   "website": "https://acme.com.au",
   "origins": ["https://acme.com.au", "https://www.acme.com.au", "https://staging.acme.com.au"],
-  "backend": {
-    "type": "workers-ai",
+  "model": {
+    "provider": "workers-ai",
     "model": "@cf/zai-org/glm-4.7-flash",
     "timezone": "Australia/Melbourne",
-    "locale": "en-AU",
-    "retrieval": { "rerankerModel": "@cf/baai/bge-reranker-base" }
+    "locale": "en-AU"
   },
   "knowledge": {
     "website": { "include": ["**/services/**", "**/faq**"], "schedule": "weekly" },
-    "files": ["./docs/price-list.pdf", "./docs/faq.md"]
+    "files": ["./docs/price-list.pdf", "./docs/faq.md"],
+    "retrieval": { "type": "helppuff", "rerankerModel": "@cf/baai/bge-reranker-base" }
   },
   "widget": {
     "brand": { "agentName": "Ava", "accent": "#0F766E" },
@@ -68,7 +68,7 @@ Everything else has a default. A fuller example:
 ## Changing it
 
 ```bash
-helppuff config get backend                               # read by dotted path
+helppuff config get model                                 # read by dotted path
 helppuff config set widget.brand.accent "#0EA5E9"          # validated before it is saved
 helppuff config set knowledge.files '["./docs"]'           # JSON values are parsed
 helppuff deploy                                            # publish
@@ -99,7 +99,7 @@ Secrets are never written into `helppuff.json`. A field that needs one names
 the environment variable instead:
 
 ```json
-"backend": { "type": "openai", "apiKey": { "env": "OPENAI_API_KEY" } }
+"model": { "provider": "openai", "apiKey": { "env": "OPENAI_API_KEY" } }
 ```
 
 ```bash

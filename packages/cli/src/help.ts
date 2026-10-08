@@ -73,6 +73,9 @@ COMMANDS
     api <METHOD> <path>  Call any public API endpoint with this project's admin key (--data '{…}')
     callbacks            Visitors waiting to be called back: list them, mark them done
     jobs                 Requests, quotes and work on the pipeline: list, create, move, set up
+    model [set|test]     Who writes the answers: Workers AI (default), any OpenAI-compatible API, Claude, or your own
+    rag [set|test]       What answers come from: HelpPuff's knowledge base (default), AI Search, your own, or none
+    scaffold model|rag   A typed starter file for your own model or knowledge base
     dashboard            A one-time sign-in link to the dashboard (or the setup link, before setup)
     validate             Check helppuff.json and prompt.md without deploying
     schema               Print the JSON Schema of helppuff.json (every field, with descriptions)
@@ -358,6 +361,31 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     summary:
       'Requests, quotes and work on the site\'s pipeline, the same as the dashboard\'s Jobs page and Settings → Jobs. They come from the assistant (when a visitor asks for a quote or work done), the widget\'s quote questions, the API, and by hand. A job is named by its number (1042) or id; a stage by its name or id. `pipeline` shows the stages, fields and quote questions; `template` starts again from one (service-quote, projects, support, sales-demo, bookings, custom-orders, basic); `setup` lets the AI read the website and choose. Each change sends the job.* webhooks.',
     examples: ['helppuff jobs --json', 'helppuff jobs create --name "Ada Lovelace" --email ada@example.com --fields \'{"service":"Hot water","address":"Glebe"}\'', 'helppuff jobs move 1042 "Quote sent"', 'helppuff jobs move 1042 Lost --reason "Went with another quote"', 'helppuff jobs setup --json'],
+  },
+  model: {
+    usage: 'helppuff model | model set <workers-ai|openai-compatible|openai|gemini|anthropic|custom> [--model …] [--preset …] [--base-url …] [--key-env NAME] [--module ./llm.ts] [--secrets A,B] [--gateway …] [--gateway-id …] [--account-id …] [--yes] | model test ["question"]',
+    summary:
+      'Who writes the answers, chosen separately from the knowledge base (`helppuff rag`). Workers AI is the default (no key, on the Free plan). `openai-compatible` is any /chat/completions API with tools; presets fill the address and the key\'s name: deepinfra, openrouter, deepseek, groq, together, mistral, fireworks, vercel-ai-gateway, cloudflare-ai-gateway. `openai`, `gemini` and `anthropic` are those providers; `custom` is your own TypeScript file (`helppuff scaffold model`). HelpPuff\'s assistant (prompt, tools, citations, guardrails) stays the same whoever writes. A missing key answers needs_input: the user stores it with `helppuff secret set NAME`. Changed only here (never in the dashboard), then `helppuff deploy`; `model test` asks the deployed Worker.',
+    examples: [
+      'helppuff model --json',
+      'helppuff model set openai-compatible --preset deepinfra --model deepseek-ai/DeepSeek-V3.1 --json',
+      'helppuff model set openai-compatible --preset openrouter --model anthropic/claude-sonnet-5 --json',
+      'helppuff model set anthropic --model claude-opus-5 --json',
+      'helppuff model set custom --module ./llm.ts --secrets MY_MODEL_KEY --json',
+      'helppuff model test "Do you do emergency callouts?" --json',
+    ],
+  },
+  rag: {
+    usage: 'helppuff rag | rag set <helppuff|none|ai-search|openai-vector-store|http|custom> [--url …] [--token-env NAME] [--module ./rag.ts] [--secrets A,B] [--vector-store vs_…] [--key-env NAME] [--instance …] [--endpoint …] | rag test ["question"]',
+    summary:
+      'What answers come from, chosen separately from the model. `helppuff` (the default): your site and files, learned by the Worker. `none`: the prompt and the business details only. `ai-search`: Cloudflare AI Search. `openai-vector-store`: a store you fill in OpenAI. `http`: your own search endpoint (`{ query, question, siteId, limit }` → `{ passages }`). `custom`: your own TypeScript file (`helppuff scaffold rag`); HelpPuff only calls its `search`. Changed only here, then `helppuff deploy`; `rag test` shows the passages the deployed Worker finds.',
+    examples: ['helppuff rag --json', 'helppuff rag set http --url https://search.example.com/query --token-env SEARCH_TOKEN --json', 'helppuff rag set custom --module ./rag.ts --secrets MY_SEARCH_KEY --json', 'helppuff rag set none --json', 'helppuff rag test "price of a blocked drain" --json'],
+  },
+  scaffold: {
+    usage: 'helppuff scaffold model|rag [--file ./llm.ts] [--use] [--force]',
+    summary:
+      'Write a starter TypeScript file for your own model (`defineModel`-shaped: one `chat` function) or knowledge base (one `search` function). It imports only types from `@knowtific/helppuff/sdk`, so it deploys without installing anything (install the package for editor types). `--use` also points helppuff.json at it. Then set its secret, deploy, and test.',
+    examples: ['helppuff scaffold model --use --json', 'helppuff scaffold rag --file ./search/rag.ts'],
   },
   dashboard: {
     usage: 'helppuff dashboard [--email <e>] [--no-browser]',

@@ -1,45 +1,80 @@
 # Providers
 
-The **backend** is what answers your visitors. HelpPuff talks to each one
-through a connector, so the widget, dashboard, leads and webhooks work the
-same whichever you choose. Pick one at setup (`helppuff init --backend <type>`,
-or `--no-defaults` to choose interactively), or change `backend` in
-`helppuff.json` and deploy.
+HelpPuff's assistant has two parts you choose separately:
 
-| Backend | What answers | Knowledge comes from | Needs | Cost |
-| --- | --- | --- | --- | --- |
-| [[`workers-ai`|Provider-Workers-AI]] *(default)* | Cloudflare Workers AI (GLM-4.7 Flash by default) | HelpPuff's own knowledge base: your site and files in Vectorize + D1 on your account | a Cloudflare account | Workers Free plan |
-| [[`cloudflare`|Provider-Cloudflare-AI-Search]] | Cloudflare AI Search with a Workers AI model | AI Search: your site and files, or an existing instance | a Cloudflare account | AI Search's free beta limits, plus Workers AI |
-| [[`openai`|Provider-OpenAI]] | OpenAI (Responses API), or a compatible endpoint | an OpenAI vector store, or HelpPuff's knowledge base | `OPENAI_API_KEY` | OpenAI's pricing |
-| [[`gemini`|Provider-Gemini]] | Google Gemini | Gemini File Search, or HelpPuff's knowledge base | `GEMINI_API_KEY` | Google's pricing |
-| [[`anthropic`|Provider-Anthropic]] | Anthropic Claude | Cloudflare AI Search, or HelpPuff's knowledge base | `ANTHROPIC_API_KEY` | Anthropic's pricing |
-| [[`retell`|Provider-Retell]] | A Retell chat agent | yours, in Retell; or HelpPuff's knowledge base as a custom function | `RETELL_API_KEY` | Retell's pricing |
-| [[`http`|Provider-Your-Own-API]] | Your own API: the HelpPuff backend protocol, or any OpenAI-compatible `/chat/completions` | yours | a URL | yours |
-| `echo` | Nothing: echoes what it is sent and demonstrates every widget feature | — | nothing | free (development only) |
+- **The model** (`model` in `helppuff.json`): who writes the answers.
+- **The knowledge** (`knowledge.retrieval`): what the answers come from.
+
+The assistant around them stays the same whichever you pick: the prompt and
+its rules, the tools (callbacks, jobs, live chat hand-over, opening hours),
+citations, guardrails, history, the widget, dashboard, leads and
+[[Webhooks]]. Both are changed with the CLI and a deploy, never in the
+dashboard.
+
+| Model (`model.provider`) | What writes the answers | Needs |
+| --- | --- | --- |
+| `workers-ai` *(default)* | Cloudflare Workers AI (GLM-4.7 Flash by default). See [[Workers AI|Provider-Workers-AI]] | nothing: your Cloudflare account, the Free plan |
+| `openai-compatible` | Any OpenAI-compatible API with tools, with presets for DeepInfra, OpenRouter, DeepSeek, Groq, Together, Mistral, Fireworks, the Vercel AI Gateway and the Cloudflare AI Gateway | that provider's key |
+| `openai` | OpenAI | `OPENAI_API_KEY` |
+| `gemini` | Google Gemini | `GEMINI_API_KEY` |
+| `anthropic` | Anthropic Claude | `ANTHROPIC_API_KEY` |
+| `custom` | Your own code: a TypeScript file with one `chat` function. See [[Custom model|Custom-Model]] | whatever it calls |
+
+| Knowledge (`knowledge.retrieval.type`) | What answers come from | Filled by |
+| --- | --- | --- |
+| `helppuff` *(default)* | HelpPuff's own knowledge base: your site and files, in Vectorize + D1 on your account. See [[Knowledge base|Knowledge-Base]] | the Worker's crawl, your files, the dashboard |
+| `none` | Nothing but the prompt and the business details | n/a |
+| `ai-search` | Cloudflare AI Search | AI Search's crawl, or your files on deploy |
+| `openai-vector-store` | An OpenAI vector store | you, in OpenAI |
+| `http` | Your own search endpoint | you |
+| `custom` | Your own code: a TypeScript file with one `search` function. See [[Custom knowledge base|Custom-Knowledge-Base]] | you |
+
+The full list of models, presets and how to switch: [[Models and providers|Models-and-Providers]].
+
+## Backends that run the whole conversation
+
+A few backends run the conversation themselves, so they take no `model` or
+`knowledge.retrieval`; set `backend` instead:
+
+| `backend.type` | What answers | Needs |
+| --- | --- | --- |
+| [[`retell`|Provider-Retell]] | A Retell chat agent (it can search HelpPuff's knowledge base through a custom function) | `RETELL_API_KEY` |
+| [[`http`|Provider-Your-Own-API]] | Your own API, speaking the HelpPuff backend protocol | a URL |
+| [[`openai`|Provider-OpenAI]] | OpenAI's Responses API with a stored prompt, a vector store HelpPuff fills for you, or another base URL | `OPENAI_API_KEY` |
+| [[`gemini`|Provider-Gemini]] | Gemini with File Search | `GEMINI_API_KEY` |
+| `echo` | Nothing: echoes what it is sent and demonstrates every widget feature | nothing (development only) |
 
 ## Choosing
 
-- **Start with `workers-ai`.** It is free, needs only a Cloudflare login, and
-  answers only from your own site and files, saying "not sure" (and offering a
-  callback) rather than guessing.
-- **Want a particular model?** `openai`, `gemini` and `anthropic` can keep
-  HelpPuff's knowledge base (`"retrieval": "helppuff"`) and move only the writing
-  of answers to that model. You keep the same crawling, files, facts and
-  dashboard.
-- **Already have an agent?** Use `retell` for a Retell agent, or `http` for
-  anything you have built yourself.
+- **Start with the defaults**: Workers AI and HelpPuff's knowledge base. Free,
+  only a Cloudflare login, and it answers only from your own site and files,
+  saying "not sure" (and offering a callback) rather than guessing.
+- **Want a particular model?** Change only `model`. Your crawl, files,
+  business details and dashboard stay as they are.
+- **Your knowledge lives elsewhere?** Change only `knowledge.retrieval`: AI
+  Search, an OpenAI vector store, your own search over HTTP, or your own code.
+- **Already have a whole agent?** Use `retell`, or your own API (`http`).
 
 ## Switching
 
 ```bash
-helppuff config set backend '{"type":"openai","model":"gpt-5-mini","retrieval":"helppuff"}'
-helppuff secret set OPENAI_API_KEY
+helppuff model set openai-compatible --preset deepinfra --model deepseek-ai/DeepSeek-V3.1
+helppuff secret set DEEPINFRA_API_KEY
 helppuff deploy
+helppuff model test "Do you do emergency callouts?"
 ```
 
 Conversations, leads, settings and the knowledge base are kept. The prompt
-(`prompt.md`) carries over to every backend that takes one; Retell, an OpenAI
-stored prompt and your own API in `helppuff` mode keep theirs.
+(`prompt.md`) carries over to every model; Retell, an OpenAI stored prompt and
+your own API in `helppuff` mode keep theirs.
+
+## Costs and limits
+
+Workers AI is counted in neurons against the daily budget
+(`model.budget.dailyNeurons`, 9,000 by default, under the free 10,000). Other
+providers bill you directly at their own prices: cap them with the daily
+message limit, `security.limits.messagesPerSitePerDay`. See
+[[Costs and limits|Costs-and-Limits]].
 
 ## What every backend gets
 
@@ -48,8 +83,3 @@ stored prompt and your own API in `helppuff` mode keep theirs.
 - The same dashboard, leads and [[Webhooks]].
 - The same limits and security: origin allowlist, signed sessions, rate
   limits, the daily cap, optional Turnstile.
-
-Rich messages come from three tools the model can call (`show_options`,
-`show_card`, `show_links`); backends that cannot take tools end a reply with an
-options marker instead, which becomes the same chips. See
-[[Extending|Extending#rich-messages]].

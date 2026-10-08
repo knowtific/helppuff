@@ -122,3 +122,23 @@ describe('Settings → Chat', () => {
     expect(settings).not.toHaveProperty('starterQuestions');
   });
 });
+
+describe('Settings → Advanced', () => {
+  it('shows the model and knowledge read-only, with how to change them, and saves the rest', async () => {
+    const assistant = { model: 'deepseek-ai/DeepSeek-V3.1', locale: null, timezone: null, rerank: true, reasoning: 'medium' };
+    const calls = fakeApi({
+      'GET /settings': view({ settings: { ...SETTINGS, assistant } as unknown as Settings, ai: { provider: 'openai-compatible', model: 'deepseek-ai/DeepSeek-V3.1', knowledge: 'http' } }),
+      'PUT /settings': view(),
+    });
+    const page = await mount(<SettingsForm section="advanced" knowledge />);
+    const panel = page.querySelector('[aria-label="Model and knowledge"]')!;
+    expect(panel.textContent).toContain('An OpenAI-compatible API · deepseek-ai/DeepSeek-V3.1');
+    expect(panel.textContent).toContain('Your own search (HTTP)');
+    expect(panel.textContent).toContain('helppuff model set');
+    expect([...page.querySelectorAll('select')].some((s) => s.querySelector('option[value="@cf/zai-org/glm-4.7-flash"]'))).toBe(false);
+    await type(page.querySelector('input[placeholder="Australia/Melbourne"]'), 'Australia/Perth');
+    await click(button(page, /Save/));
+    expect((sent(calls) as unknown as { assistant: Record<string, unknown> }).assistant).toMatchObject({ timezone: 'Australia/Perth', model: 'deepseek-ai/DeepSeek-V3.1', rerank: true });
+  });
+});
+

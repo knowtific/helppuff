@@ -2,7 +2,7 @@ import type { HelpPuffConfig, SiteConfig } from './config/schema.js';
 import { resolveSite } from './config/site.js';
 import { createApp } from './app.js';
 import { resilientKv } from './core/platform.js';
-import type { KvStore } from '@helppuff/connector-types';
+import { setExtensions, type Extensions, type KvStore } from '@helppuff/connector-types';
 import { knowledgeEnv } from './knowledge/env.js';
 import { runScheduledCrawls } from './knowledge/crawl.js';
 import { ensureSchema } from './db/d1.js';
@@ -13,8 +13,12 @@ type Ctx = { waitUntil(promise: Promise<unknown>): void };
  * The Worker: the HTTP app, plus the cron that keeps each site's knowledge
  * base fresh. The crawl itself is the `CrawlWorkflow` export, which only the
  * Worker entry (`index.ts` / `runtime.ts`) can import.
+ *
+ * `extensions` are the site's own models and knowledge bases (`custom` in
+ * helppuff.json), imported from its TypeScript files by the generated entry.
  */
-export function createWorker(config: HelpPuffConfig) {
+export function createWorker(config: HelpPuffConfig, extensions: Extensions = {}) {
+  setExtensions(extensions);
   const app = createApp(config);
   return {
     fetch: app.fetch,

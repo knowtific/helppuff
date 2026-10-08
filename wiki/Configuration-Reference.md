@@ -19,6 +19,47 @@ variable, e.g. `{ "env": "OPENAI_API_KEY" }`, whose value lives in `.env` and on
 | `name` **(required)** | string |  | The business name, as visitors see it. · 1–60 chars |
 | `website` | string |  | The website the assistant is for, and learns from. · URL |
 | `origins` **(required)** | string[] |  | Every origin the widget may be embedded on. The preview page is added automatically. · ≥ 1 items |
+| `model` | object |  | Who writes the answers. Leave it out for Workers AI. Changed only here (or with `helppuff model set`), then `helppuff deploy`. |
+| `model.provider` **(required)** | `"workers-ai"` \| `"openai-compatible"` \| `"openai"` \| `"gemini"` \| `"anthropic"` \| `"custom"` |  | `"workers-ai"` Workers AI, on your Cloudflare account. The default: no key, on the Free plan. · `"openai-compatible"` Any OpenAI-compatible `/chat/completions` API with tools. · `"openai"` OpenAI. · `"gemini"` Google Gemini (its OpenAI-compatible API). · `"anthropic"` Anthropic Claude (the Messages API). · `"custom"` Your own model: a TypeScript file whose default export is `defineModel({ id, chat })`. See the wiki's Custom model page. |
+| `model.model` | string |  | A Workers AI model id. Default: GLM-4.7 Flash. · 1–200 chars |
+| `model.budget` | object |  | Spend guards. Other providers bill you directly; cap them with `security.limits.messagesPerSitePerDay`. |
+| `model.budget.dailyNeurons` | integer |  | Workers AI only: neurons per UTC day before answers stop (default 9,000; the free allocation is 10,000). Raise it on Workers Paid. · 0–10000000 |
+| `model.budget.maxInputTokens` | integer |  | The most tokens sent to the model per answer: prompt, passages and history, trimmed to fit. · 1000–100000 |
+| `model.reasoning` | `"low"` \| `"medium"` \| `"high"` | `"medium"` | How long the model thinks before answering: `low`, `medium` or `high`. Deeper is better on multi-step questions, slower to start, and the thinking is billed. Models that only switch thinking on or off treat every level as on. |
+| `model.fallbackModel` | string |  | Tried once when the main model fails for any reason other than the budget. · 1–200 chars |
+| `model.locale` | string |  | BCP 47, e.g. `en-AU`: spelling and date style of answers. · ≤ 35 chars |
+| `model.timezone` | string |  | IANA, e.g. `Australia/Melbourne`: "are you open now?". · ≤ 64 chars |
+| `model.maxAnswerSentences` | integer | `4` | The longest answer, in sentences. Short answers cost less and read better in a chat. · 1–20 |
+| `model.maxOutputTokens` | integer | `600` | A hard cap on tokens per answer. · 64–4096 |
+| `model.historyMessages` | integer | `6` | Earlier messages sent with each question. The main cost lever after retrieval. · 0–24 |
+| `model.richMessages` | boolean | `true` | Let the model offer next-step chips (option buttons) after an answer. |
+| `model.tools` | object | `{}` | What the assistant can do besides answering. |
+| `model.tools.callback` | boolean | `true` | Offer to have the team call or email back — the default way to a person. |
+| `model.tools.businessHours` | boolean | `true` | Answer "are you open now?" from the business hours and time zone. |
+| `model.tools.captureLead` | boolean |  | Retired. Accepted from older configs and ignored. |
+| `model.tools.handoff` | boolean |  | Retired. Accepted from older configs and ignored. |
+| `model.tools.booking` | boolean |  | Retired. Accepted from older configs and ignored. |
+| `model.business` | object | `{}` | Details the owner confirmed. Usually left empty: the details learned from the site, and edited in the dashboard, are used. |
+| `model.business.name` | string |  | The business name. · ≤ 200 chars |
+| `model.business.phone` | string |  | The main phone number. · ≤ 100 chars |
+| `model.business.email` | string |  | The contact email. · ≤ 200 chars |
+| `model.business.address` | string |  | The street address. · ≤ 400 chars |
+| `model.business.hours` | string[] | `[]` | Opening hours, one line per day or range, e.g. "Mon-Fri 7am-5pm". · ≤ 14 items |
+| `model.business.serviceAreas` | string[] | `[]` | Suburbs or regions served. · ≤ 100 items |
+| `model.gateway` | string |  | With `provider: "workers-ai"`. An AI Gateway id: caching, logs and rate limits in front of every Workers AI call. · 1–64 chars |
+| `model.preset` | `"deepinfra"` \| `"openrouter"` \| `"deepseek"` \| `"groq"` \| `"together"` \| `"mistral"` \| `"fireworks"` \| `"vercel-ai-gateway"` \| `"cloudflare-ai-gateway"` |  | With `provider: "openai-compatible"`. Fills `baseUrl` and the key's variable name: deepinfra, openrouter, deepseek, groq, together, mistral, fireworks, vercel-ai-gateway, cloudflare-ai-gateway. |
+| `model.baseUrl` | string |  | With `provider: "openai-compatible"`. The API base, before `/chat/completions`. Needed without a preset. · URL |
+| `model.apiKey` | `{ env }` |  | With `provider: "openai-compatible"`. The key, by environment variable name. Default: the preset's (e.g. `DEEPINFRA_API_KEY`). |
+| `model.headers` | map of string \| `{ env }` |  | With `provider: "openai-compatible"`. Extra headers; a value may be a secret (`{ env }`). |
+| `model.nativeTools` | boolean |  | With `provider: "openai-compatible"`. The model calls tools natively (default true). Off: tool calls it writes in its text are still read. |
+| `model.accountId` | string |  | With `provider: "openai-compatible"`. cloudflare-ai-gateway: the account (default: the one deployed to). |
+| `model.gatewayId` | string |  | With `provider: "openai-compatible"`. cloudflare-ai-gateway: the gateway (default: `default`). · 1–64 chars |
+| `model.gatewayToken` | `{ env }` |  | With `provider: "openai-compatible"`. cloudflare-ai-gateway: an authenticated gateway's token, sent as `cf-aig-authorization`. |
+| `model.apiKey` | `{ env }` | `{"env":"OPENAI_API_KEY"}` | With `provider: "openai"`. Your OpenAI API key, by environment variable name. |
+| `model.apiKey` | `{ env }` | `{"env":"GEMINI_API_KEY"}` | With `provider: "gemini"`. Your Gemini API key, by environment variable name. |
+| `model.apiKey` | `{ env }` | `{"env":"ANTHROPIC_API_KEY"}` | With `provider: "anthropic"`. Your Anthropic API key, by environment variable name. |
+| `model.module` **(required)** | string |  | With `provider: "custom"`. The file, relative to helppuff.json, e.g. `./llm.ts`. Bundled into the Worker at deploy. |
+| `model.secrets` | string[] |  | With `provider: "custom"`. The environment variables your file reads (`env.NAME`): uploaded as Worker secrets at deploy. · ≤ 20 items |
 | `prompt` | string | `"prompt.md"` | Path to the system prompt, relative to helppuff.json. |
 | `assistant` | object | `{}` | How the assistant behaves: goal, tone, answer length. HelpPuff writes these around prompt.md on every answer, so prompt.md holds only what is specific to the business. |
 | `assistant.goal` | `"callbacks"` \| `"answers"` \| `"bookings"` | `"callbacks"` | What the assistant is for: `callbacks` (help, then get the team in touch), `answers`, or `bookings`. |
@@ -35,7 +76,14 @@ variable, e.g. `{ "env": "OPENAI_API_KEY" }`, whose value lives in `.env` and on
 
 ## `backend`
 
-What answers visitors. `type` picks it; the other fields depend on the type.
+Only for a backend that runs the whole conversation itself: `retell`, `http` (your own API), `echo`, or `openai` / `gemini` with their own file stores. Otherwise leave it out and use `model` and `knowledge.retrieval`.
+
+### `"type": "assistant"`
+
+HelpPuff's own assistant, set up by `model` and `knowledge.retrieval`. Implied when `backend` is left out; never written by hand.
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
 
 ### `"type": "workers-ai"`
 
@@ -179,6 +227,25 @@ What the assistant learns from: the website, and your own files.
 | `knowledge.website.renderJs` | `"auto"` \| `"always"` \| `"never"` |  | workers-ai: render pages drawn by JavaScript with Browser Rendering (`auto` = only when needed). |
 | `knowledge.website.schedule` | `"off"` \| `"daily"` \| `"weekly"` \| `"monthly"` |  | workers-ai: re-crawl the selected pages on this schedule. |
 | `knowledge.files` | string[] | `[]` | Files and folders to index, relative to helppuff.json. PDF, Markdown, text, HTML, DOCX. |
+| `knowledge.retrieval` | object |  | What answers come from. Left out: HelpPuff's own knowledge base. `none` for none. Changed only here (or with `helppuff rag set`), then `helppuff deploy`. |
+| `knowledge.retrieval.type` **(required)** | `"helppuff"` \| `"none"` \| `"ai-search"` \| `"openai-vector-store"` \| `"http"` \| `"custom"` |  | `"helppuff"` HelpPuff's own knowledge base: your site and files, learned by the Worker (Vectorize + D1). · `"none"` No knowledge base: the prompt and the business details only. · `"ai-search"` Cloudflare AI Search, searched for passages; your model writes the answer. · `"openai-vector-store"` An OpenAI vector store you fill in OpenAI, searched for passages. · `"http"` Your own search over HTTP: `POST url { query, question, siteId, limit }` → `{ passages: [{ title, content, url? }] }`. · `"custom"` Your own knowledge base: a TypeScript file whose default export is `defineRetriever({ id, search })`. See the wiki's Custom knowledge base page. |
+| `knowledge.retrieval.embeddingModel` | string | `"@cf/baai/bge-m3"` | With `type: "helppuff"`. Turns pages and questions into vectors. Changing it re-learns the site (and uploaded files) on the next deploy. · 1–200 chars |
+| `knowledge.retrieval.rerankerModel` | string \| null | `"@cf/baai/bge-reranker-base"` | With `type: "helppuff"`. Re-reads the passages search found and keeps only those that answer the question. `null` turns it off: about half a second faster, but more likely to answer from the wrong page. |
+| `knowledge.retrieval.topKVector` | integer | `20` | With `type: "helppuff"`. Passages taken from meaning (vector) search before re-scoring. · 1–50 |
+| `knowledge.retrieval.topKKeyword` | integer | `20` | With `type: "helppuff"`. Passages taken from keyword (full-text) search before re-scoring. · 1–50 |
+| `knowledge.retrieval.finalK` | integer | `4` | With `type: "helppuff"`. Passages the model reads for each answer. · 1–10 |
+| `knowledge.retrieval.minScore` | number | `0.2` | With `type: "helppuff"`. Passages scored below this are dropped. With none left, the assistant says it is not sure and offers a callback instead of guessing. · 0–1 |
+| `knowledge.retrieval.queryRewrite` | `"heuristic"` \| `"llm"` \| `"off"` | `"heuristic"` | With `type: "helppuff"`. `heuristic`: follow-ups borrow the previous question. `llm`: one extra small call rewrites it. |
+| `knowledge.retrieval.intentModel` | string \| null | `null` | With `type: "helppuff"`. e.g. `@cf/cloudflare/clef-flash`: classify each question to steer retrieval. Off by default. |
+| `knowledge.retrieval.instance` | string |  | With `type: "ai-search"`. Instance name on your account. Created by `helppuff deploy` if it does not exist. |
+| `knowledge.retrieval.endpoint` | string |  | With `type: "ai-search"`. Use an existing public endpoint instead of a binding, e.g. https://search.example.com · URL |
+| `knowledge.retrieval.maxResults` | integer |  | With `type: "ai-search"`. Passages per question. · 1–50 |
+| `knowledge.retrieval.vectorStoreId` **(required)** | string |  | With `type: "openai-vector-store"`. The vector store id, e.g. `vs_…`. |
+| `knowledge.retrieval.apiKey` | `{ env }` | `{"env":"OPENAI_API_KEY"}` | With `type: "openai-vector-store"`. An OpenAI API key that can read it. |
+| `knowledge.retrieval.url` **(required)** | string |  | With `type: "http"`. Your endpoint. · URL |
+| `knowledge.retrieval.token` | `{ env }` |  | With `type: "http"`. Sent as `Authorization: Bearer …`. |
+| `knowledge.retrieval.module` **(required)** | string |  | With `type: "custom"`. The file, relative to helppuff.json, e.g. `./rag.ts`. |
+| `knowledge.retrieval.secrets` | string[] |  | With `type: "custom"`. The environment variables your file reads: uploaded as Worker secrets at deploy. · ≤ 20 items |
 
 ## `security`
 

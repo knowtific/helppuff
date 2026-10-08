@@ -42,6 +42,9 @@
 
 **Providers**
 - [[Overview|Providers]]
+- [[Models and providers|Models-and-Providers]]
+- [[Custom model|Custom-Model]]
+- [[Custom knowledge base|Custom-Knowledge-Base]]
 - [[Workers AI (default)|Provider-Workers-AI]]
 - [[AI models: speed, quality, cost|AI-Models]]
 - [[Cloudflare AI Search|Provider-Cloudflare-AI-Search]]

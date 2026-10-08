@@ -175,6 +175,7 @@ The business-specific instructions, versioned.
 
 The assistant, widget, lead form, limits and IP lists, as one object.
 
+- [[Test the model or the knowledge base|API-Reference-Settings#test-the-model-or-the-knowledge-base]]: `POST /assistant/test`
 - [[Suggest the home screen|API-Reference-Settings#suggest-the-home-screen]]: `POST /home/suggest`
 - [[The settings|API-Reference-Settings#the-settings]]: `GET /settings`
 - [[Change settings|API-Reference-Settings#change-settings]]: `PUT /settings`

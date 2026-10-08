@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CliError } from '../errors.js';
 import type { Compiled } from './compile.js';
 import { GENERATED_DIR, type Project } from './project.js';
+import { CUSTOM_MODEL, CUSTOM_RETRIEVER, customModules } from './compile.js';
 
 /**
  * Writes `.helppuff/` — a complete, self-contained Worker project that
@@ -79,7 +80,7 @@ export function writeWorker(
       'export { CrawlWorkflow };',
       "// Live chat's hub (a Durable Object); wrangler.json binds it as LIVE_HUB.",
       'export { LiveHub };',
-      'export default createWorker(config);',
+      ...customImports(projectDir, out, project),
       '',
     ].join('\n'),
   );
@@ -197,3 +198,67 @@ export function previewPage(project: Project): string {
 </html>
 `;
 }
+
+/**
+ * The entry's last lines: the site's own model and knowledge files
+ * (`model.provider: "custom"`, `knowledge.retrieval.type: "custom"`),
+ * imported so wrangler bundles them (TypeScript included), and handed to the
+ * Worker under the ids the config names.
+ */
+export function customImports(projectDir: string, out: string, project: Project): string[] {
+  const own = customModules(project);
+  const path = (module: string) => {
+    const file = resolve(projectDir, module);
+    if (!existsSync(file)) {
+      throw new CliError('custom_module_missing', `${module} does not exist.`, { hint: 'Create it (`helppuff scaffold model` or `helppuff scaffold rag` writes a starter), or fix the path in helppuff.json.' });
+    }
+    const rel = relative(out, file).split(sep).join('/');
+    return rel.startsWith('.') ? rel : `./${rel}`;
+  };
+  const lines: string[] = [];
+  const models: string[] = [];
+  const retrievers: string[] = [];
+  if (own.model) {
+    lines.push(`import siteModel from ${JSON.stringify(path(own.model))};`);
+    models.push(`${JSON.stringify(CUSTOM_MODEL)}: siteModel`);
+  }
+  if (own.retriever) {
+    lines.push(`import siteRetriever from ${JSON.stringify(path(own.retriever))};`);
+    retrievers.push(`${JSON.stringify(CUSTOM_RETRIEVER)}: siteRetriever`);
+  }
+  if (!lines.length) return ['export default createWorker(config);', ''];
+  return [
+    "// The site's own model and knowledge base (helppuff.json: `custom`).",
+    ...lines,
+    `export default createWorker(config, { models: { ${models.join(', ')} }, retrievers: { ${retrievers.join(', ')} } });`,
+    '',
+  ];
+}
+
+/** A fingerprint of the site's own module files (and those beside them), so editing one redeploys the Worker. */
+export function customModulesHash(projectDir: string, project: Project): string | null {
+  const own = customModules(project);
+  const files = [own.model, own.retriever].filter((m): m is string => Boolean(m));
+  if (!files.length) return null;
+  const hash = createHash('sha256');
+  const seen = new Set<string>();
+  const walk = (dir: string, depth: number) => {
+    if (depth > 3 || seen.has(dir) || !existsSync(dir)) return;
+    seen.add(dir);
+    for (const entry of readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) walk(path, depth + 1);
+      else if (/\.(ts|js|mjs|json)$/.test(entry.name) && entry.name !== 'helppuff.json') hash.update(path).update(readFileSync(path));
+    }
+  };
+  for (const file of files) {
+    const path = resolve(projectDir, file);
+    if (existsSync(path)) hash.update(readFileSync(path));
+    // Files it may import from its own folder (not the project root: that is the website's).
+    const dir = dirname(path);
+    if (resolve(dir) !== resolve(projectDir)) walk(dir, 0);
+  }
+  return hash.digest('hex').slice(0, 16);
+}
+

@@ -2,7 +2,8 @@ import { compile, embedSnippet } from './compile.js';
 import { cloudflareSession, type CloudflareSession } from './credentials.js';
 import { loadEnv } from './env.js';
 import { checkKey } from './providers.js';
-import { aiSearchInstanceFor, hasKnowledge, loadProject, usesHelpPuffKnowledge, vectorizeIndexFor, workerNameFor, type LoadedProject } from './project.js';
+import { aiSearchInstanceFor, hasKnowledge, loadProject, modelOf, retrievalOf, usesHelpPuffKnowledge, vectorizeIndexFor, workerNameFor, type LoadedProject } from './project.js';
+import { missingModules, secretsOf } from './assistant.js';
 import { EMBEDDING_DIMENSIONS } from '@helppuff/rag';
 import { adminApi } from './admin-api.js';
 import { PROVIDER_KEYS } from './questions.js';
@@ -81,6 +82,24 @@ export async function doctor(cwd: string, doFetch: typeof fetch = fetch): Promis
       detail: result.ok === true ? `${keyName} works` : result.reason,
       ...(result.ok === false ? { fix: `helppuff secret set ${keyName}` } : {}),
     });
+  }
+
+  // HelpPuff's assistant: the keys its model and knowledge read, and its own module files.
+  const model = modelOf(project);
+  if (model) {
+    const { needed, missing } = secretsOf(loaded);
+    const files = missingModules(loaded);
+    const retrieval = retrievalOf(project)!;
+    checks.push(
+      missing.length || files.length
+        ? {
+            name: 'model',
+            status: 'fail',
+            detail: [missing.length ? `${missing.join(', ')} not in .env` : '', files.length ? `${files.join(', ')} not found` : ''].filter(Boolean).join('; '),
+            fix: [...missing.map((name) => `helppuff secret set ${name}`), ...(files.length ? ['helppuff scaffold model|rag, or fix the path in helppuff.json'] : []), 'helppuff deploy'].join(' && '),
+          }
+        : { name: 'model', status: 'pass', detail: `${model.provider}${'model' in model && model.model ? ` · ${String(model.model)}` : ''}, knowledge: ${retrieval.type}${needed.length ? `; ${needed.join(', ')} set` : ''}` },
+    );
   }
 
   let cf: CloudflareSession | null = null;

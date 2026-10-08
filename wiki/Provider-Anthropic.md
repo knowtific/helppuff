@@ -1,6 +1,6 @@
 # Provider: Anthropic Claude
 
-`"backend": { "type": "anthropic" }`
+`"model": { "provider": "anthropic" }`, with any knowledge (`knowledge.retrieval`: HelpPuff's own by default, or `ai-search`). See [[Models and providers|Models-and-Providers]]. Older projects' `"backend": { "type": "anthropic" }` is converted by `helppuff upgrade`.
 
 Answers with Claude (the Messages API, through Anthropic's official SDK).
 Claude has no hosted retrieval, so knowledge comes from **Cloudflare AI

@@ -10,6 +10,7 @@ export * from './rich.js';
 export * from './prompt.js';
 export * from './history.js';
 export * from './ai-search.js';
+export * from './assistant.js';
 
 /** A minimal key/value store with TTL — Workers KV in production. */
 export interface KvStore {

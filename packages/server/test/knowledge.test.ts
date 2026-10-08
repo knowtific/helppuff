@@ -4,6 +4,7 @@ import { defineConfig } from '../src/config/load.js';
 import { resetSchemaMemo } from '../src/db/d1.js';
 import { memoryKv } from '../src/core/platform.js';
 import { siteConfigKey } from '../src/config/site.js';
+import { applySettings } from '../src/admin/settings.js';
 import { harness, ORIGIN, SECRET, startSession, withForms, type Harness } from './helpers.js';
 import { fakeAi, fakeVectors, inlineSteps, site as fakeSite, sqliteD1 } from '../../rag/test/helpers.js';
 
@@ -230,20 +231,28 @@ describe('settings', () => {
     expect(again.hash).toBe(stored.settings.hash);
   });
 
-  it('turns the reranker off and on again, keeping the other retrieval options', async () => {
+  it('shows the model, the reranker and thinking, and changes them only from the CLI', async () => {
     const w = world();
-    const read = (await (await get(w.api, '/admin/api/settings')).json()) as { settings: { assistant: { rerank: boolean } } };
-    expect(read.settings.assistant.rerank).toBe(true);
+    const view = (await (await get(w.api, '/admin/api/settings')).json()) as { settings: { assistant: { rerank: boolean; reasoning: string } }; ai: Record<string, unknown> };
+    expect(view.settings.assistant).toMatchObject({ rerank: true, reasoning: 'medium' });
+    expect(view.ai).toEqual({ provider: 'workers-ai', model: '@cf/zai-org/glm-4.7-flash', knowledge: 'helppuff' });
+    for (const assistant of [{ rerank: false }, { reasoning: 'high' }, { model: '@cf/openai/gpt-oss-20b' }]) {
+      const refused = await send(w.api, 'PUT', '/admin/api/settings', { settings: { assistant } });
+      expect(refused.status).toBe(400);
+      expect(((await refused.json()) as { error: { message: string } }).error.message).toContain('helppuff model set');
+    }
+    // The same values (a full settings object sent back) and the time zone are fine.
+    expect((await send(w.api, 'PUT', '/admin/api/settings', { settings: { assistant: { rerank: true, timezone: 'Australia/Perth' } } })).status).toBe(200);
+  });
 
-    const options = async () =>
-      (JSON.parse((await w.kv.get(siteConfigKey('acme')))!) as { connector: { options: { retrieval?: Record<string, unknown> } } }).connector.options;
-    await send(w.api, 'PUT', '/admin/api/settings', { settings: { assistant: { rerank: false } } });
-    expect((await options()).retrieval).toEqual({ rerankerModel: null });
-    const off = (await (await get(w.api, '/admin/api/settings')).json()) as { settings: { assistant: { rerank: boolean } } };
-    expect(off.settings.assistant.rerank).toBe(false);
-
-    await send(w.api, 'PUT', '/admin/api/settings', { settings: { assistant: { rerank: true } } });
-    expect((await options()).retrieval).toBeUndefined();
+  it('maps the reranker and thinking into the connector options (what `config pull` writes)', () => {
+    const site = config().sites['acme']!;
+    const options = (patch: Record<string, unknown>) => applySettings(site, { assistant: patch } as never).connector.options as Record<string, unknown>;
+    expect(options({ rerank: false })['retrieval']).toEqual({ rerankerModel: null });
+    expect(options({ rerank: true })['retrieval']).toBeUndefined();
+    expect(options({ reasoning: 'high' })['reasoning']).toBe('high');
+    // Medium is the default: left out, so a later default applies.
+    expect(options({ reasoning: 'medium' })['reasoning']).toBeUndefined();
   });
 
   it('shows the rules HelpPuff adds to the prompt, read-only, next to it', async () => {
@@ -254,18 +263,8 @@ describe('settings', () => {
     expect(view.builtIn).toContain('Never promise discounts');
   });
 
-  it('sets how long the model thinks: medium unless changed, stored only when not the default', async () => {
+  it('refuses a thinking level that is not one', async () => {
     const w = world();
-    const read = async () => ((await (await get(w.api, '/admin/api/settings')).json()) as { settings: { assistant: { reasoning: string } } }).settings.assistant.reasoning;
-    const options = async () => (JSON.parse((await w.kv.get(siteConfigKey('acme')))!) as { connector: { options: Record<string, unknown> } }).connector.options;
-    expect(await read()).toBe('medium');
-
-    await send(w.api, 'PUT', '/admin/api/settings', { settings: { assistant: { reasoning: 'high' } } });
-    expect((await options())['reasoning']).toBe('high');
-    expect(await read()).toBe('high');
-
-    await send(w.api, 'PUT', '/admin/api/settings', { settings: { assistant: { reasoning: 'medium' } } });
-    expect((await options())['reasoning']).toBeUndefined();
     // Off is not a choice: answers without thinking proved unsafe.
     expect((await send(w.api, 'PUT', '/admin/api/settings', { settings: { assistant: { reasoning: 'off' } } })).status).toBe(400);
   });

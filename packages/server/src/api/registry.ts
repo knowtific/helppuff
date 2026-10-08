@@ -1163,6 +1163,22 @@ export const ENDPOINTS: Endpoint[] = [
   },
   {
     method: 'POST',
+    path: '/assistant/test',
+    scope: 'settings:write',
+    tag: 'Settings',
+    summary: 'Test the model or the knowledge base',
+    description:
+      'One question through the deployed assistant\'s own model (`part: "model"`) or knowledge base (`part: "knowledge"`), as configured: keys, gateway and custom modules included. Nothing is recorded. A failure answers `ok: false` with what to fix (a missing secret, a refused key). What `helppuff model test` and `helppuff rag test` call. The model and knowledge base are changed only with the CLI, then a deploy.',
+    fields: [
+      { name: 'part', description: '`model` (default) or `knowledge`.' },
+      { name: 'question', description: 'What to ask or search for.' },
+    ],
+    body: { part: 'model', question: 'Do you do emergency callouts?' },
+    response: { provider: 'openai-compatible', knowledge: 'helppuff', part: 'model', ok: true, model: 'deepseek-ai/DeepSeek-V3.1', reply: 'Yes, we answer emergency callouts 24/7.', usage: { input: 42, output: 11 }, ms: 812 },
+    nullable: ['usage'],
+  },
+  {
+    method: 'POST',
     path: '/home/suggest',
     scope: 'settings:write',
     tag: 'Settings',
@@ -1324,7 +1340,7 @@ export const ENDPOINTS: Endpoint[] = [
     scope: 'settings:read',
     tag: 'Settings',
     summary: 'The settings',
-    description: 'The assistant, widget, home screen, lead form, crawl and security settings as one object, with a hash of it. Also: `suggestedHome`, what the widget shows on its home screen until it is set up (questions and links suggested from the website; null once the home screen was saved), and the `forms` and `flows` a shortcut can open.',
+    description: 'The assistant, widget, home screen, lead form, crawl and security settings as one object, with a hash of it. Also: `ai`, who writes the answers and what they come from (changed only with the CLI, `helppuff model` and `helppuff rag`, then a deploy); `suggestedHome`, what the widget shows on its home screen until it is set up (questions and links suggested from the website; null once the home screen was saved), and the `forms` and `flows` a shortcut can open.',
     query: [siteQuery],
     response: {
       site: 'acme',
@@ -1334,10 +1350,11 @@ export const ENDPOINTS: Endpoint[] = [
       meta: null,
       captcha: false,
       suggestedHome: { questions: ['How much is a blocked drain?'], links: homeLinks, at: T },
+      ai: { provider: 'workers-ai', model: '@cf/zai-org/glm-4.7-flash', knowledge: 'helppuff' },
       forms: [{ id: 'booking', title: 'Book a visit' }],
       flows: [{ id: 'quote', title: 'Which service do you need?' }],
     },
-    nullable: ['suggestedHome', 'meta'],
+    nullable: ['suggestedHome', 'meta', 'ai'],
   },
   {
     method: 'PUT',

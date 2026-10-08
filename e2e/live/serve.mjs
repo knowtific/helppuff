@@ -43,10 +43,12 @@ writeFileSync(
 <script src="/loader.js" data-site="demo" data-open async></script>`,
   ),
 );
+// The `models` site: another model and the site's own knowledge base (config.ts).
+writeFileSync(join(assets, 'models.html'), page('Models', '<main style="padding: 12vh 2rem"><h1>Acme Plumbing</h1></main><script src="/loader.js" data-site="models" data-open async></script>'));
 // The dashboard's Home: just the widget, open.
 writeFileSync(join(assets, 'chat.html'), page('Chat', '<script src="/loader.js" data-site="demo" data-open data-fill async></script>'));
 
-const worker = spawn('pnpm', ['--filter', '@helppuff/server', 'exec', 'wrangler', 'dev', '--config', join(here, 'wrangler.toml'), '--port', port, '--local', '--persist-to', state, '--assets', assets], {
+const worker = spawn('pnpm', ['--filter', '@helppuff/server', 'exec', 'wrangler', 'dev', '--config', join(here, 'wrangler.toml'), '--port', port, '--local', '--persist-to', state, '--assets', assets, '--var', `FAKE_LLM_URL:http://localhost:${port}/fake-llm/v1`, '--var', 'FAKE_LLM_KEY:e2e-fake-llm-key'], {
   cwd: repo,
   stdio: 'inherit',
 });

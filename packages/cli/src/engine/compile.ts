@@ -12,6 +12,7 @@ import {
   getConnector,
 } from '@helppuff/server';
 import { CliError } from '../errors.js';
+import { customModulesHash } from './build.js';
 import {
   BACKENDS_WITH_PROMPT,
   aiSearchInstanceFor,
@@ -22,7 +23,12 @@ import {
   vectorizeIndexFor,
   usesAnthropicKnowledge,
   workerNameFor,
+  modelOf,
+  retrievalOf,
+  usesWorkersAi,
+  PRESETS,
   type LoadedProject,
+  type ModelConfig,
   type Project,
 } from './project.js';
 
@@ -91,6 +97,8 @@ export function connectorFor(project: Project, prompt: string | undefined): { ty
   const backend = project.backend;
   const instructions = prompt ? { instructions: prompt } : {};
   switch (backend.type) {
+    case 'assistant':
+      return { type: 'assistant', options: { ...assistantOptions(project), ...instructions, stream: true } };
     case 'workers-ai': {
       const { type: _type, ...options } = backend;
       return { type: 'workers-ai', options: { ...options, ...instructions, stream: true } };
@@ -174,6 +182,102 @@ export function connectorFor(project: Project, prompt: string | undefined): { ty
   }
 }
 
+/**
+ * The assistant's options: the model's provider (presets resolved to a base
+ * URL), its tuning, and the knowledge source. Secrets stay `{ env }`
+ * references; the Worker fills them in.
+ */
+export function assistantOptions(project: Project): Record<string, unknown> {
+  const model = modelOf(project)!;
+  const retrieval = retrievalOf(project)!;
+  const { provider: _provider, budget, ...rest } = model as ModelConfig & Record<string, unknown>;
+  const tuning = Object.fromEntries(Object.entries(rest).filter(([key]) => TUNING.has(key)));
+  const options: Record<string, unknown> = { ...tuning, ...(budget ? { budget: Object.fromEntries(Object.entries(budget).filter(([, v]) => v !== undefined)) } : {}) };
+
+  switch (model.provider) {
+    case 'workers-ai':
+      Object.assign(options, { provider: { type: 'workers-ai' }, ...(model.model ? { model: model.model } : {}), ...(model.gateway ? { gateway: model.gateway } : {}) });
+      break;
+    case 'openai-compatible': {
+      const preset = model.preset ? PRESETS[model.preset] : null;
+      let baseUrl = model.baseUrl ?? preset!.baseUrl;
+      if (model.preset === 'cloudflare-ai-gateway') {
+        const accountId = model.accountId ?? project.cloudflare.accountId;
+        if (!accountId) throw new CliError('needs_input', 'The Cloudflare AI Gateway preset needs the account id.', { hint: 'Deploy once (it records the account), or set `model.accountId`.' });
+        baseUrl = baseUrl.replace('{accountId}', accountId).replace('{gatewayId}', model.gatewayId ?? 'default');
+      }
+      const headers = { ...(model.headers ?? {}), ...(model.gatewayToken ? { 'cf-aig-authorization': model.gatewayToken } : {}) };
+      Object.assign(options, {
+        model: model.model,
+        provider: {
+          type: 'openai-compatible',
+          baseUrl,
+          apiKey: model.apiKey ?? (preset ? { env: preset.key } : undefined),
+          ...(Object.keys(headers).length ? { headers } : {}),
+          ...(model.nativeTools === false ? { tools: false } : {}),
+          label: model.preset ?? 'openai_compatible',
+        },
+      });
+      if (!(options['provider'] as Record<string, unknown>)['apiKey']) delete (options['provider'] as Record<string, unknown>)['apiKey'];
+      break;
+    }
+    case 'openai':
+      // OpenAI's reasoning models take `max_completion_tokens` and no temperature.
+      Object.assign(options, { model: model.model, provider: { type: 'openai-compatible', baseUrl: 'https://api.openai.com/v1', apiKey: model.apiKey, temperature: false, maxTokensField: 'max_completion_tokens', label: 'openai' } });
+      break;
+    case 'gemini':
+      Object.assign(options, { model: model.model, provider: { type: 'openai-compatible', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', apiKey: model.apiKey, label: 'gemini' } });
+      break;
+    case 'anthropic':
+      Object.assign(options, { model: model.model, provider: { type: 'anthropic', apiKey: model.apiKey } });
+      break;
+    case 'custom':
+      Object.assign(options, { model: model.model ?? 'custom', provider: { type: 'custom', id: CUSTOM_MODEL } });
+      break;
+  }
+
+  switch (retrieval.type) {
+    case 'helppuff': {
+      const { type: _type, ...tuned } = retrieval;
+      Object.assign(options, { knowledge: { type: 'helppuff' }, ...(Object.keys(tuned).length ? { retrieval: tuned } : {}) });
+      break;
+    }
+    case 'none':
+      options['knowledge'] = { type: 'none' };
+      break;
+    case 'ai-search':
+      options['knowledge'] = { type: 'ai-search', ...(retrieval.endpoint ? { endpoint: retrieval.endpoint } : { binding: AI_SEARCH_BINDING }) };
+      if (retrieval.maxResults) options['retrieval'] = { finalK: Math.min(10, retrieval.maxResults) };
+      break;
+    case 'openai-vector-store':
+      options['knowledge'] = { type: 'openai-vector-store', vectorStoreId: retrieval.vectorStoreId, apiKey: retrieval.apiKey };
+      break;
+    case 'http':
+      options['knowledge'] = { type: 'http', url: retrieval.url, ...(retrieval.token ? { token: retrieval.token } : {}) };
+      break;
+    case 'custom':
+      options['knowledge'] = { type: 'custom', id: CUSTOM_RETRIEVER };
+      break;
+  }
+  return options;
+}
+
+/** The ids a site's own modules are registered under in the Worker (`createWorker(config, { models, retrievers })`). */
+export const CUSTOM_MODEL = 'site-model';
+export const CUSTOM_RETRIEVER = 'site-retriever';
+const TUNING = new Set(['reasoning', 'fallbackModel', 'locale', 'timezone', 'maxAnswerSentences', 'maxOutputTokens', 'historyMessages', 'richMessages', 'tools', 'business']);
+
+/** The site's own model and knowledge files, and the secrets they read. */
+export function customModules(project: Project): { model: string | null; retriever: string | null; secrets: string[] } {
+  const model = modelOf(project);
+  const retrieval = retrievalOf(project);
+  return {
+    model: model?.provider === 'custom' ? model.module : null,
+    retriever: retrieval?.type === 'custom' ? retrieval.module : null,
+    secrets: [...(model?.provider === 'custom' ? (model.secrets ?? []) : []), ...(retrieval?.type === 'custom' ? (retrieval.secrets ?? []) : [])],
+  };
+}
+
 export function compile(
   loaded: LoadedProject,
   options: {
@@ -250,6 +354,7 @@ export function compile(
   const ownKnowledge = usesHelpPuffKnowledge(project);
   const secrets = [
     ...collectSecretNames(site),
+    ...customModules(project).secrets,
     ...(owner ? ['ADMIN_PASSWORD_HASH'] : []),
     ...(database ? [ADMIN_API_KEY] : []),
   ].sort();
@@ -272,8 +377,6 @@ export function compile(
           d1_databases: [
             { binding: DB_BINDING, database_name: resourceName(project.site), database_id: options.d1DatabaseId ?? 'helppuff-local' },
           ],
-          // Workers AI: answers and embeddings (workers-ai), conversation summaries (dashboard).
-          ai: { binding: 'AI' },
           // Background jobs: crawls and files (workers-ai), the end of each conversation, webhook retries.
           workflows: [{ name: `${workerName}-crawl`.slice(0, 64), binding: WORKFLOW_BINDING, class_name: 'CrawlWorkflow' }],
           // Live chat's hub, one per site: deployed always (it costs nothing unused), so the dashboard's switch needs no redeploy.
@@ -282,6 +385,8 @@ export function compile(
           migrations: [{ tag: 'live-hub-v1', new_sqlite_classes: ['LiveHub'] }],
         }
       : {}),
+    // Workers AI: answers (when it writes them), embeddings (HelpPuff's knowledge base), summaries (the dashboard).
+    ...(database || ownKnowledge || usesWorkersAi(project) ? { ai: { binding: 'AI' } } : {}),
     ...(ownKnowledge
       ? {
           vectorize: [{ binding: VECTORS_BINDING, index_name: vectorizeIndexFor(project), ...(options.dev ? { remote: true } : {}) }],
@@ -302,7 +407,7 @@ export function compile(
   };
 
   const workerHash = createHash('sha256')
-    .update(JSON.stringify({ wrangler, origins, site: project.site, runtime: options.runtimeVersion ?? 'dev' }))
+    .update(JSON.stringify({ wrangler, origins, site: project.site, runtime: options.runtimeVersion ?? 'dev', custom: customModulesHash(loaded.dir, project) }))
     .digest('hex')
     .slice(0, 16);
 

@@ -5,13 +5,14 @@
  *   dist/runtime/server.js   the HelpPuff server, prebundled for Workers
  *   dist/runtime/widget/     the widget bundles, served as static assets
  *   dist/runtime/version.json
+ *   dist/sdk.js, sdk.d.ts     `@knowtific/helppuff/sdk`: types for a site's own model or knowledge base
  *
  * Nothing in the workspace is needed at run time: `npx @knowtific/helppuff` works
  * from the registry alone.
  */
 import { build } from 'esbuild';
 import { execFileSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -74,6 +75,18 @@ await build({
   logLevel: 'warning',
 });
 chmodSync(join(dist, 'cli.js'), 0o755);
+
+// 4. The SDK (`@knowtific/helppuff/sdk`): the types and helpers for a site's own model or
+// knowledge base. One source, the interfaces the assistant itself uses, so they cannot drift.
+const sdkSource = join(repo, 'packages', 'connectors', '_types', 'src', 'assistant.ts');
+await build({ entryPoints: [sdkSource], outfile: join(dist, 'sdk.js'), bundle: true, format: 'esm', platform: 'neutral', target: 'es2022', legalComments: 'none', logLevel: 'warning' });
+execFileSync(
+  process.execPath,
+  [join(repo, 'node_modules', 'typescript', 'bin', 'tsc'), sdkSource, '--declaration', '--emitDeclarationOnly', '--outDir', join(dist, 'sdk-types'), '--target', 'es2022', '--module', 'esnext', '--moduleResolution', 'bundler', '--skipLibCheck', '--lib', 'es2022,dom'],
+  { stdio: 'inherit' },
+);
+renameSync(join(dist, 'sdk-types', 'assistant.d.ts'), join(dist, 'sdk.d.ts'));
+rmSync(join(dist, 'sdk-types'), { recursive: true, force: true });
 
 const size = (file) => `${(readFileSync(file).length / 1024).toFixed(0)} kB`;
 console.log(`cli.js ${size(join(dist, 'cli.js'))} · runtime/server.js ${size(join(dist, 'runtime', 'server.js'))}`);

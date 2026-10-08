@@ -7,6 +7,7 @@ import { dbFrom } from '../db/d1.js';
 import { suggestAfterLearning, suggestHome } from '../home/suggest.js';
 import { aiSettingsFor } from '../knowledge/env.js';
 import { assertAdmin, assertSameOrigin, currentAdmin, jsonBody, siteParam } from './guard.js';
+import { knowledgeOf } from '../core/assistant.js';
 
 /**
  * The widget's home screen, suggested from the website (`home/suggest.ts`).
@@ -45,7 +46,7 @@ export async function maybeSuggestHome(ctx: Pick<RequestCtx, 'env' | 'config' | 
   const db = dbFrom(ctx.env);
   if (!db) return;
   const site = await resolveSite(ctx, siteId);
-  if (site.connector.type !== 'workers-ai') return;
+  if (knowledgeOf(site) !== 'helppuff') return;
   const { ai, model } = aiFor(ctx.env, site);
   await suggestAfterLearning({ db, ai, kv: ctx.env['HELPPUFF_KV'] as KvStore | undefined, model, now: () => ctx.platform.now() }, siteId, site.widget.brand.name);
 }
