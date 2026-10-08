@@ -57,6 +57,16 @@ guided by what each means; it never invents one, and never removes one a
 person added. Labels are in the API (`GET /conversations?label=…`) and in
 `conversation.completed` (`tags`).
 
+## Jobs
+
+Requests, quotes and work on a board, one column per stage: drag a card (or
+use its menu) to move it, drop it on **Done** or **Lost** to close it. A job
+has its fields, updates, private notes, the contact and conversation it came
+from, and its whole history. **List** shows them all, won and lost too. They
+come from the assistant, the widget's quote questions, the API and by hand
+(also from a contact, a conversation or a callback request). The first time
+the AI sets them up from your website, Home says what it chose. See [[Jobs]].
+
 ## Contacts
 
 One row per **person**, keyed by email: a visitor who comes back gets their
@@ -108,13 +118,15 @@ Opens as a menu in the sidebar:
 
 | Page | What it changes |
 | --- | --- |
-| **Chat** | The assistant's name, the business name, the welcome message, suggested questions (**Suggest from my site** writes them) |
+| **Chat** | The assistant's name, the business name, the welcome message |
+| **Home screen** | What visitors see when they open the chat: the heading, the buttons (questions, a page, call, email, a form) and useful pages, with a preview. Suggested from your website until you save it; **Suggest from my site** adds more. See [[The widget|Widget#the-home-screen]] |
 | **Appearance** | Colour (taken from your site), position, the button's icon |
 | **Lead form** | The form before the chat: on/off, its fields, which are required, your own extra fields |
 | **Instructions** | What it is mainly for, tone and answer length (settings HelpPuff adds around the prompt), and a box for anything specific to your business (the prompt itself). The full prompt, its version history and everything HelpPuff adds are one click away. See [[Prompt and instructions|Prompts-and-Instructions]] |
 | **Business details** | Phone, email, address, hours, service areas: read from your site, yours to correct (a crawl never overwrites your changes) |
 | **Live chat** | Let visitors talk to a person; how long they wait before the callback form; when conversations close; [[Telegram]]. See [[Live chat|Live-Chat]] |
 | **Labels** | The labels for conversations, and which the AI may use |
+| **Jobs** | The template (and **Let the AI choose again**), what a job is called, the stages, the fields, the widget's quote questions, and a `curl` to send jobs from other tools. See [[Jobs]] |
 | **Notifications** | Your own: browser notifications and sound for live chats, and whether you are available. Every member of the team sets their own |
 | **Advanced** | The AI model (see [[AI models|AI-Models]]), thinking (low, medium, high), "double-check answers before replying" (the reranker), how often the site is re-learned, time zone and language. **Limits and access**: every rate limit and cap, how long a chat lasts, IP addresses (or ranges) that are never limited or are blocked, and the sign-in limits and Turnstile on the sign-in form. See [[Security|Security#every-limit]] |
 | **Webhooks** | Endpoints that receive every event as signed JSON; see [[Webhooks]] |
@@ -135,7 +147,7 @@ The first person who claims the setup link is the owner. Everyone else has a
 | Role | Can |
 | --- | --- |
 | **Admin** | Everything, like the owner (except removing the owner) |
-| **Member** | Conversations (read, reply in live chats, take, close, label, notes, attributes), contacts, callbacks, and their own notifications. No settings, knowledge, prompt, analytics, webhooks or API keys; cannot delete anything or give a chat to someone else |
+| **Member** | Conversations (read, reply in live chats, take, close, label, notes, attributes), jobs (create, move, edit, updates, notes), contacts, callbacks, and their own notifications. No settings, knowledge, prompt, analytics, webhooks or API keys; cannot delete anything or give a chat to someone else |
 
 Invite people in Settings → **Team & security** (name, email, role: they get
 a one-time sign-in link), change a role there, or from the project folder:

@@ -37,6 +37,8 @@ as few questions as possible.
 | `packages/server/src/admin` | | One router, mounted twice: `/admin/api/*` (dashboard, CLI) and `/api/v1/*` (public; registered routes only). A new route goes in `api/registry.ts` too, or keys cannot reach it: `guard.ts` (cookie session or `Bearer ADMIN_API_KEY`), `auth.ts`, `record.ts` (conversations, leads keyed by email, ratings), `routes.ts`, `knowledge.ts` (pages, files, facts, search), `settings.ts` (the flat settings object ↔ site config), `setup.ts` (one-time setup/sign-in links), `prompts.ts`, `webhooks.ts`, `callbacks.ts` (callback requests as tasks: list, done/dismiss), `overlaps.ts` (prompt lines a setting or rule already covers), `version.ts` (running vs latest release), `chat.ts` (chat over the API), `access.ts` (team and roles, API keys, audit log), `inbox.ts` (conversation status SQL, custom attributes, labels, notes, each person's prefs), `live.ts` (live chat for the team: reply, assign, close, hand back, status, Telegram; the team's socket). `guard.ts` also holds roles: a `member` reaches only the routes in `MEMBER_ROUTES` (fail closed) |
 | `packages/server/src/webhooks` | | `deliver.ts` (signed delivery, retry, delivery log, `emit`/`emitTo`), `events.ts` (conversation → events). Endpoints live in D1 `webhooks`, managed by `admin/webhooks.ts`; event names and envelope in `protocol/src/webhooks.ts` |
 | `packages/server/src/live` | | Live chat: `hub.ts` (pure `HubCore`: sockets, presence, timers, testable without the runtime), `object.ts` (`LiveHub`, the thin Durable Object, one per site; only it and `index.ts`/`runtime.ts` import `cloudflare:workers`), `service.ts` (handover, team replies, assign, close, hand back; writes D1 then publishes to the hub), `telegram.ts` (Bot API, threads, `/link`). Visitor socket and Telegram webhook in `routes/live.ts`, mounted before everything (a 101's headers are immutable) |
+| `packages/server/src/jobs` | | Jobs (the pipeline): `templates.ts` (service-quote, projects, support, sales-demo, bookings, custom-orders, basic), `store.ts` (pipeline, stages, fields, jobs, history; `savePipeline` takes whole lists), `setup.ts` (the AI picks and customises a template from the site's text), `widget.ts` (the quote questions as a widget flow, KV `quote:<site>`, merged into `/config`), `chat.ts` (the assistant's `create_job` handle, the form for missing details, quote answers → a job). Routes in `admin/jobs.ts` |
+| `packages/server/src/home` | | The widget's home screen suggested from the website (`suggest.ts`): links, questions, call/email buttons; the suggestions layer in KV `home:<site>`, merged into `/config` until the owner saves `home` in the settings. Routes in `admin/home.ts` |
 | `packages/server/src/conversations` | | `summary.ts` (AI summary + labels, shared by the dashboard button and the job), `complete.ts` (`runConversationJob`: sleeps until 5 min after the last message, then summarises and sends `conversation.completed`) |
 | `packages/server/src/db` | | `migrations.ts` (numbered, append-only D1 schema; applied by deploy and per isolate), `d1.ts` (binding helpers) |
 | `packages/server/src/knowledge`, `src/workflows/crawl.ts` | | Crawl control (`startCrawl`, cron re-crawls) and the `CrawlWorkflow` class: the Worker's one background-job runner (crawl parts, files, conversation ends, webhook retries — dispatched on `payload.kind`). Only `index.ts`/`runtime.ts` import it (`cloudflare:workers`). New background work becomes a new `kind` with a step function testable on a fake `StepLike`, not a new Workflow |
@@ -45,7 +47,7 @@ as few questions as possible.
 | `packages/connectors/*` | `@helppuff/connector-<name>` | `workers-ai` (default: Workers AI + `@helppuff/rag`, tools, budget), `echo` (dev/test, no key), `cloudflare` (AI Search), `openai`, `gemini`, `anthropic` (via AI Search), `http` (own API), `retell` |
 | `packages/sinks/*` | `@helppuff/sink-*` | Lead destinations (`webhook`) |
 | `packages/widget` | `@helppuff/widget` | Preact widget in a shadow root. `src/loader.ts` (tiny loader, no Preact, owns fail-safe) → lazy `src/app/` (store, api, persist, strings, validate) + `components/` + `flows/` + `lib/` (markdown, safe, turnstile…) + `styles/` (CSS in TS template literals). `src/live/` = live chat's client, its own chunk (`live-*.js`, ≤ 6 kb gz, no Preact/Zod), loaded by the app only when a chat is handed over. `demo/` = playground (local Worker), options playground (`playground.html` + `preview.html`, an in-page API on the echo connector; published to GitHub Pages by `pnpm build:playground` / `.github/workflows/playground.yml`), gallery, hostile-host fixtures |
-| `packages/dashboard` | `@helppuff/dashboard` | React + Tailwind v4 dashboard served at `/admin/`: Home (test chat), Conversations, Leads, Knowledge, Analytics, Settings (sub-pages, incl. Webhooks and Updates). Look: shadcn / Notion / Twenty, minimal. `lib/live.ts` = the team's live socket, notifications and Web Audio sounds; `components/inbox.tsx` = status, labels, attributes, notes; `pages/Contact.tsx` = a contact's page. `demo/` + `demo.html` = the website's dashboard demo: the real app with `/admin/api` answered in the page from seeded sample data (`demo/mock.ts`, `demo/data.ts`; `build:demo`). A new endpoint the pages call needs a route there too |
+| `packages/dashboard` | `@helppuff/dashboard` | React + Tailwind v4 dashboard served at `/admin/`: Home (test chat), Conversations, Leads, Knowledge, Analytics, Settings (sub-pages, incl. Webhooks and Updates). Look: shadcn / Notion / Twenty, minimal. `lib/live.ts` = the team's live socket, notifications and Web Audio sounds; `components/inbox.tsx` = status, labels, attributes, notes; `pages/Contact.tsx` = a contact's page; `pages/Jobs.tsx` = the board, list and a job's panel (`RelatedJobs`, `NewJob` reused on contacts, conversations, callbacks); `components/JobsSettings.tsx` = Settings → Jobs; `components/HomeScreenSettings.tsx` = Settings → Home screen. `demo/` + `demo.html` = the website's dashboard demo: the real app with `/admin/api` answered in the page from seeded sample data (`demo/mock.ts`, `demo/data.ts`; `build:demo`). A new endpoint the pages call needs a route there too |
 | `packages/cli` | `@knowtific/helppuff` | The published CLI. `src/cli.ts` (command table), `commands/` (incl. `upgrade.ts`, `webhooks.ts`), `engine/` (init, deploy, compile, admin-api, knowledge, cloudflare, wrangler, doctor, `version.ts`, `reference.ts` (wiki config page)…), `help.ts` (the wiki's CLI page is generated from it by `pnpm sync:docs`) |
 | `website` | `@helppuff/website` | The site on GitHub Pages (VitePress): landing page (`.vitepress/theme/components/Landing.vue`), docs generated from `wiki/` into the gitignored `docs/` (`.vitepress/wiki.ts`, sidebar from `wiki/_Sidebar.md`), the playground copied to `/playground/`. Pictures in `public/shots/` are real screenshots from `scripts/screenshots.mjs` (rerun after a visual widget change) |
 | `instructions.md` | | The cross-agent install, deploy, test and upgrade workflow linked from the README and wiki. No plugin, skill or MCP setup is required. |
@@ -123,7 +125,18 @@ readers of KV config accept older shapes; helppuff.json format changes bump
 `PROJECT_FORMAT` with a step in `PROJECT_UPGRADES`. See `wiki/Upgrading.md`.
 Releases are a version bump plus a dated `CHANGELOG.md` section in a PR;
 `.github/workflows/release.yml` stages it on npm on merge, and a
-maintainer approves it with 2FA (`wiki/Contributing.md` → Releasing). Never bump the version unasked.
+maintainer approves it with 2FA (`wiki/Contributing.md` → Releasing).
+**Every change to what ships in `@knowtific/helppuff` bumps the version in
+the same PR**: anything under `packages/` (the widget, dashboard, server,
+protocol, connectors, rag and CLI are all bundled into it). Bump
+`packages/cli/package.json` (patch for fixes, minor for features, major only
+when users must act), rename `## [Unreleased]` in `CHANGELOG.md` to
+`## [x.y.z] - YYYY-MM-DD` above a new empty `## [Unreleased]`, then
+`pnpm sync:docs`. If the branch already bumped past the last release (a `vX.Y.Z`
+git tag), keep that version and add to its section. This is safe to do
+without asking: the workflow only stages the release, and nothing reaches
+users until a maintainer approves it. Docs-, test- or CI-only changes do not
+bump.
 
 ## Commands
 
@@ -174,7 +187,7 @@ pnpm check          # lint + typecheck + test + build + e2e (what CI runs)
 - Accessibility wins over visual design.
 - Bundle guards: `loader.js` ≤ 8 kb gz, app ≤ 35 kb gz, live chunk ≤ 6 kb gz.
   Don't import Preact or Zod into the loader; the widget imports protocol
-  values only from zod-free subpaths (`@helppuff/protocol/live`, `/text`, `/forms`).
+  values only from zod-free subpaths (`@helppuff/protocol/live`, `/text`, `/forms`, `/jobs`).
 - For provider APIs (Retell, OpenAI, Gemini, Cloudflare, Anthropic,
   Turnstile), check the current docs; don't invent endpoints or fields.
   `wiki/Providers.md` has the verified references.
@@ -227,6 +240,6 @@ pnpm check          # lint + typecheck + test + build + e2e (what CI runs)
 dashboard's React tests are their own vitest project, `--project dashboard`,
 with `test/helpers.tsx` answering `/admin/api` in the page), `e2e/*.spec.ts` (Playwright; the widget is inside
 the `helppuff-widget` shadow root — see `e2e/helpers.ts`; `e2e/live.spec.ts`
-runs against a second Worker on :8788 with D1, the live hub and the dashboard,
+and `e2e/jobs.spec.ts` run against a second Worker (:8796 in e2e) with D1, the live hub and the dashboard,
 started by `e2e/live/serve.mjs`; lead-form fills are
 driven by what renders, not a fixed field list).

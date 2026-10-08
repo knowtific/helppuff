@@ -24,6 +24,8 @@ import { webhookRoutes } from './webhooks.js';
 import { callbackRoutes, callbackView } from './callbacks.js';
 import { attributesJson, closeCutoff, CONVERSATION_STATUSES, conversationExtras, inboxRoutes, labelsSql, mergeAttributes, parseJsonObject, parseLabels, statusFilter, statusSql, type ConversationStatus } from './inbox.js';
 import { liveRoutes } from './live.js';
+import { jobRoutes, maybeSetup } from './jobs.js';
+import { homeRoutes, maybeSuggestHome } from './home.js';
 import { liveAvailable } from '../live/service.js';
 import { versionRoutes } from './version.js';
 import { dbFrom, ensureSchema, type D1Like } from '../db/d1.js';
@@ -154,6 +156,13 @@ adminRoutes.get('/me', async (c) => {
       };
     }),
   );
+  // Jobs set themselves up from the website once it is learned (in the background).
+  if (!key && dbFrom(ctx.env)) {
+    for (const site of sites) {
+      ctx.platform.waitUntil(maybeSetup(ctx, site.id).catch(() => ctx.platform.log('jobs.setup_failed')));
+      ctx.platform.waitUntil(maybeSuggestHome(ctx, site.id).catch(() => ctx.platform.log('home.suggest_failed')));
+    }
+  }
   return c.json({
     admin,
     ...(key ? { key: { id: key.id, name: key.name, scopes: keyScopes(key), site: key.site_id, expiresAt: key.expires_at } } : {}),
@@ -806,3 +815,5 @@ adminRoutes.route('/', chatRoutes);
 adminRoutes.route('/', accessRoutes);
 adminRoutes.route('/', inboxRoutes);
 adminRoutes.route('/', liveRoutes);
+adminRoutes.route('/', jobRoutes);
+adminRoutes.route('/', homeRoutes);

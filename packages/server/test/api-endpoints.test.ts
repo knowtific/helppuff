@@ -196,6 +196,53 @@ describe('every area, end to end through /api/v1', () => {
     expectDocumented('DELETE', `/leads/${id}`, deleted.json);
   });
 
+  it('jobs: the pipeline, a job from another tool, moved, updated, noted, won and deleted', async () => {
+    const w = await world();
+    const owner = await w.key(['settings:write', 'jobs:write']);
+    const tool = await w.key(['jobs:write']);
+    expectDocumented('GET', '/jobs/pipeline', (await w.call('GET', '/jobs/pipeline', tool)).json);
+    const chosen = await w.call('POST', '/jobs/pipeline/template', owner, { template: 'service-quote' });
+    expect(chosen.json['pipeline']).toMatchObject({ template: 'service-quote', chosenBy: 'owner' });
+    expectDocumented('POST', '/jobs/pipeline/template', chosen.json);
+    const saved = await w.call('PUT', '/jobs/pipeline', owner, { itemSingular: 'Quote', itemPlural: 'Quotes' });
+    expectDocumented('PUT', '/jobs/pipeline', saved.json);
+    const stages = saved.json['pipeline']['stages'] as Json[];
+    // A tool's key cannot change the pipeline.
+    expect((await w.call('PUT', '/jobs/pipeline', tool, { itemSingular: 'X' })).status).toBe(403);
+
+    const made = await w.call('POST', '/jobs', tool, { fields: { service: 'Blocked drains', address: 'Balmain', description: 'Kitchen sink drains slowly.' }, contact: { name: 'Ada Lovelace', email: 'ada@example.com' }, value: 450, currency: 'aud' });
+    expect(made.status, JSON.stringify(made.json)).toBe(201);
+    expect(made.json).toMatchObject({ number: 1001, source: 'api', valueCents: 45000, currency: 'AUD', contact: { name: 'Ada Lovelace' }, stage: { name: stages[0]!['name'] } });
+    expectDocumented('POST', '/jobs', made.json);
+    const id = made.json['id'] as string;
+    // Unknown fields are refused; missing required ones are not (the team fills them in).
+    expect((await w.call('POST', '/jobs', tool, { fields: { gate_code: '1234' } })).json['error']).toMatchObject({ code: 'bad_request' });
+    expect((await w.call('POST', '/jobs', tool, { title: 'Call back about a heater' })).status).toBe(201);
+
+    const found = await w.call('GET', '/jobs?q=1001', tool);
+    expect(found.json['items'].map((j: Json) => j['number'])).toEqual([1001]);
+    expectDocumented('GET', '/jobs', found.json);
+    const patched = await w.call('PATCH', `/jobs/${id}`, tool, { fields: { urgency: 'This week' }, dueAt: '2026-11-03' });
+    expect(patched.json['fields']).toMatchObject({ urgency: 'This week' });
+    expectDocumented('PATCH', `/jobs/${id}`, patched.json);
+    const moved = await w.call('POST', `/jobs/${id}/move`, tool, { stageId: stages[1]!['id'] });
+    expectDocumented('POST', `/jobs/${id}/move`, moved.json);
+    const update = await w.call('POST', `/jobs/${id}/updates`, tool, { text: 'Booked a visit.' });
+    expectDocumented('POST', `/jobs/${id}/updates`, update.json);
+    const note = await w.call('POST', `/jobs/${id}/notes`, tool, { text: 'Gate code 1234.' });
+    expect(note.status).toBe(201);
+    expectDocumented('POST', `/jobs/${id}/notes`, note.json);
+    const won = await w.call('POST', `/jobs/${id}/move`, tool, { stageId: stages.find((s) => s['kind'] === 'won')!['id'] });
+    expect(won.json).toMatchObject({ status: 'won' });
+
+    const one = await w.call('GET', `/jobs/${id}`, tool);
+    expect(one.json['history'].map((e: Json) => e['kind'])).toEqual(['created', 'field', 'edited', 'stage', 'update', 'stage']);
+    expect(one.json['notes'].map((n: Json) => n['text'])).toEqual(['Gate code 1234.']);
+    expectDocumented('GET', `/jobs/${id}`, one.json);
+    expectDocumented('DELETE', `/jobs/${id}`, (await w.call('DELETE', `/jobs/${id}`, tool)).json);
+    expect((await w.call('GET', `/jobs/${id}`, tool)).status).toBe(404);
+  });
+
   it('callbacks: lists the waiting requests and closes one', async () => {
     const w = await world();
     const now = Date.now();

@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { AttributesEditor, ConversationStatusBadge, LabelChip, NotesPanel, SideSection } from '../components/inbox';
 import { Avatar, Badge, Button, Card, CardHeader, Empty, ErrorNote, Input, Select, Skeleton, statusLabel } from '../components/ui';
 import { api, isMember, LEAD_STATUSES, parseSummary, type ContactDetail, type LeadStatus, type Me } from '../lib/api';
+import { RelatedJobs } from './Jobs';
 import { fmtDateTime, fmtRelative, href, pathOf, useData } from '../lib/utils';
 
 /**
@@ -185,6 +186,12 @@ export function Contact({ id, me }: { id: string; me: Me }) {
         </div>
 
         <div className="space-y-4">
+          <Card>
+            <CardHeader title="Jobs" description="Requests, quotes and work for this person." />
+            <div className="border-t px-4 py-3">
+              <RelatedJobs filter={{ contact: id }} context={{ contactId: id, label: `For ${data.name ?? data.email ?? 'this contact'}` }} />
+            </div>
+          </Card>
           <Card>
             <CardHeader title="Conversations" description="Every chat this person has had, newest first." />
             {data.conversations.length === 0 ? (

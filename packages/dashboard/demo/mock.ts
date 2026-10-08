@@ -1,6 +1,7 @@
 import { WEBHOOK_EVENTS } from '@helppuff/protocol';
 import type { Callback, CallbackStatus, KnowledgePage, Label, Lead, LeadStatus, Note, Overview, Prefs, PromptVersion, Settings, StoredMessage, Summary } from '../src/lib/api';
 import { FACTS, LABELS, PAGES, PROMPT_TEXT, SITE, callbacks, conversations, leads, notes } from './data';
+import { jobsRoute } from './jobs';
 
 /**
  * The admin API, answered inside the page with the sample data in `data.ts`.
@@ -27,6 +28,15 @@ let settings: Settings = {
   businessName: SITE.name,
   welcomeMessage: 'Hi, I’m Sam from Harbour Plumbing. How can I help today?',
   starterQuestions: ['How much is a blocked drain?', 'Do you do emergency callouts?', 'Can someone come tomorrow?'],
+  home: {
+    title: 'G’day! How can we help?',
+    subtitle: 'Ask anything, or pick one of these.',
+    shortcuts: [
+      ...['How much is a blocked drain?', 'Do you do emergency callouts?', 'Can someone come tomorrow?'].map((q, i) => ({ id: `ask-${i + 1}`, label: q, icon: 'chat', action: { id: `ask-${i + 1}`, kind: 'reply' as const, label: q, value: q } })),
+      { id: 'call', label: 'Call us', description: '02 9550 1234', icon: 'phone', action: { id: 'call', kind: 'tel' as const, label: 'Call us', phone: '02 9550 1234' } },
+    ],
+    links: null,
+  },
   accent: SITE.accent,
   position: 'bottom-right',
   launcherIcon: 'chat',
@@ -218,6 +228,17 @@ function search(query: string) {
   return { query, chunks, trace: { vector: chunks.length + 6, keyword: chunks.length + 2, reranked: true, threshold: 0.35, errors: [] } };
 }
 
+let homeSuggested = true;
+const SUGGESTED_LINKS = {
+  title: 'Useful pages',
+  items: [
+    { label: 'Prices', url: `${SITE.website}/pricing`, description: 'Callouts, drains and hot water, before we come' },
+    { label: '24/7 emergencies', url: `${SITE.website}/emergency`, description: 'Burst pipes and gas leaks, any hour' },
+    { label: 'Areas we cover', url: `${SITE.website}/areas`, description: 'The inner west and nearby suburbs' },
+    { label: 'Questions answered', url: `${SITE.website}/faq` },
+  ],
+};
+
 // ------------------------------------------------------------------ router
 
 type Body = Record<string, unknown>;
@@ -226,6 +247,8 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
   const parts = path.split('/').filter(Boolean);
   const [head, id, sub] = parts;
 
+  const jobs = jobsRoute(method, parts, params, body);
+  if (jobs) return jobs;
   if (path === '/me') return json({ admin: { email: OWNER, owner: true, role: 'owner', name: 'Dan' }, sites: [SITE], summaries: true });
   if (path === '/prefs') {
     if (method === 'PUT') prefs = { ...prefs, ...(body as Partial<Prefs>) };
@@ -457,7 +480,30 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
       settings = { ...settings, ...(body['settings'] as Partial<Settings>) };
       settingsAt = Date.now();
     }
-    return json({ site: SITE.id, connector: SITE.connector, settings, hash: String(settingsAt), meta: { at: settingsAt, by: OWNER }, captcha: true });
+    if (method === 'PUT' && (body['settings'] as Partial<Settings> | undefined)?.home) homeSuggested = false;
+    return json({
+      site: SITE.id,
+      connector: SITE.connector,
+      settings,
+      hash: String(settingsAt),
+      meta: { at: settingsAt, by: OWNER },
+      captcha: true,
+      // The links the widget shows until the owner saves the home screen: picked from the website.
+      suggestedHome: homeSuggested ? { questions: [], links: SUGGESTED_LINKS, at: NOW - 6 * DAY } : null,
+      forms: [{ id: 'booking', title: 'Book a visit' }],
+      flows: [],
+    });
+  }
+  if (path === '/home/suggest') {
+    return json({
+      questions: ['How much is a blocked drain?', 'Do you fix hot water on weekends?', 'Which suburbs do you cover?', 'Is there a callout fee?'],
+      links: SUGGESTED_LINKS,
+      contact: [
+        { id: 'call', label: 'Call us', description: '02 9550 1234', icon: 'phone', action: { id: 'call', kind: 'tel', label: 'Call us', phone: '02 9550 1234' } },
+        { id: 'email', label: 'Email us', description: 'jobs@harbourplumbing.example', icon: 'mail', action: { id: 'email', kind: 'email', label: 'Email us', email: 'jobs@harbourplumbing.example' } },
+      ],
+      source: 'model',
+    });
   }
 
   if (head === 'prompt') {

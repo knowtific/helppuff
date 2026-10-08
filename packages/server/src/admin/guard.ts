@@ -16,7 +16,7 @@ import { cookieValue, passwordFingerprint, readSession, SESSION_COOKIE } from '.
 
 /**
  * What a dashboard account may do. The owner and admins: everything.
- * Members: the inbox only — conversations, contacts, callbacks, live chat and
+ * Members: the inbox only — conversations, jobs, contacts, callbacks, live chat and
  * their own notification settings (`memberMay`).
  */
 export type Role = 'owner' | 'admin' | 'member';
@@ -44,6 +44,9 @@ const MEMBER_ROUTES: [method: string | '*', path: RegExp][] = [
   ['GET', /^\/labels$/],
   ['*', /^\/prefs$/],
   ['GET', /^\/live\/(status|socket)$/],
+  ['GET', /^\/jobs(\/pipeline)?$/],
+  ['POST', /^\/jobs$/],
+  ['*', /^\/jobs\/(?!pipeline|setup)[^/]+(\/(move|updates|notes))?$/],
 ];
 
 export function memberMay(method: string, path: string): boolean {

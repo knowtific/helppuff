@@ -116,6 +116,23 @@ The people who gave contact details: your CRM's contacts, with custom attributes
 - [[Delete a lead|API-Reference-Leads#delete-a-lead]]: `DELETE /leads/:id`
 - [[Export leads as CSV|API-Reference-Leads#export-leads-as-csv]]: `GET /leads.csv`
 
+### [[Jobs|API-Reference-Jobs]]
+
+Requests, quotes, projects or tickets on the site's pipeline: create them from your own forms and systems, move them through the stages, read their history.
+
+- [[List jobs|API-Reference-Jobs#list-jobs]]: `GET /jobs`
+- [[Create a job|API-Reference-Jobs#create-a-job]]: `POST /jobs`
+- [[Get a job|API-Reference-Jobs#get-a-job]]: `GET /jobs/:id`
+- [[Change a job|API-Reference-Jobs#change-a-job]]: `PATCH /jobs/:id`
+- [[Move a job|API-Reference-Jobs#move-a-job]]: `POST /jobs/:id/move`
+- [[Add an update|API-Reference-Jobs#add-an-update]]: `POST /jobs/:id/updates`
+- [[Add a note to a job|API-Reference-Jobs#add-a-note-to-a-job]]: `POST /jobs/:id/notes`
+- [[Delete a job|API-Reference-Jobs#delete-a-job]]: `DELETE /jobs/:id`
+- [[The pipeline|API-Reference-Jobs#the-pipeline]]: `GET /jobs/pipeline`
+- [[Change the pipeline|API-Reference-Jobs#change-the-pipeline]]: `PUT /jobs/pipeline`
+- [[Use another template|API-Reference-Jobs#use-another-template]]: `POST /jobs/pipeline/template`
+- [[Let the AI set the pipeline up|API-Reference-Jobs#let-the-ai-set-the-pipeline-up]]: `POST /jobs/setup`
+
 ### [[Callbacks|API-Reference-Callbacks]]
 
 Visitors who asked to be called back, as tasks.
@@ -158,6 +175,7 @@ The business-specific instructions, versioned.
 
 The assistant, widget, lead form, limits and IP lists, as one object.
 
+- [[Suggest the home screen|API-Reference-Settings#suggest-the-home-screen]]: `POST /home/suggest`
 - [[The settings|API-Reference-Settings#the-settings]]: `GET /settings`
 - [[Change settings|API-Reference-Settings#change-settings]]: `PUT /settings`
 

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { iconNames, type WidgetConfig } from '@helppuff/protocol';
+import { iconNames, linkItemSchema, shortcutSchema, type Shortcut, type WidgetConfig } from '@helppuff/protocol';
 import type { KvStore } from '@helppuff/connector-types';
 import { ANSWER_REASONING, answerReasoning } from '@helppuff/rag';
 import { assistantConfigSchema, liveConfigSchema, securitySchema, storedSiteConfigSchema, type SiteConfig, type StoredSiteConfig } from '../config/schema.js';
@@ -8,6 +8,8 @@ import { resolveSite, siteConfigKey } from '../config/site.js';
 import { HelpPuffError } from '../core/errors.js';
 import type { HonoEnv } from '../core/request.js';
 import { assertSameOrigin, currentAdmin, jsonBody, siteParam } from './guard.js';
+import { QUOTE_FLOW_ID } from '../jobs/widget.js';
+import { dismissSuggestedHome, readSuggestedHome } from '../home/suggest.js';
 
 /**
  * The assistant's settings as one flat object — what the onboarding
@@ -73,6 +75,25 @@ export function upgradeSettings(raw: unknown): unknown {
 export const securitySettingsSchema = securitySchema.omit({ captcha: true }).strict();
 export type SecuritySettings = z.infer<typeof securitySettingsSchema>;
 
+/**
+ * The widget's first screen: its heading, the shortcut buttons (questions,
+ * a call or email button, a page, a form, a flow) and the list of useful
+ * pages. The "Get a quote" button is Jobs' own (Settings → Jobs), added when
+ * the widget loads, so it is never in this list.
+ */
+const homeSettingsSchema = z
+  .object({
+    title: z.string().trim().max(120),
+    subtitle: z.string().trim().max(240),
+    shortcuts: z
+      .array(shortcutSchema)
+      .max(8)
+      .refine((list) => new Set(list.map((s) => s.id)).size === list.length, 'two shortcuts have the same id'),
+    links: z.object({ title: z.string().trim().min(1).max(120), items: z.array(linkItemSchema).min(1).max(10) }).strict().nullable(),
+  })
+  .strict();
+export type HomeSettings = z.infer<typeof homeSettingsSchema>;
+
 export const settingsSchema = z
   .object({
     botName: z.string().trim().min(1).max(60),
@@ -119,6 +140,8 @@ export const settingsSchema = z
     security: securitySettingsSchema.optional(),
     /** Live chat (the `live` site section). Absent from Workers older than live chat. */
     live: liveConfigSchema.optional(),
+    /** The home screen (`widget.home`). `starterQuestions` are its question shortcuts. Absent from older Workers. */
+    home: homeSettingsSchema.optional(),
   })
   .strict();
 export type Settings = z.infer<typeof settingsSchema>;
@@ -152,6 +175,7 @@ export const settingsPatchSchema = settingsSchema.partial().extend({
     .strict()
     .optional(),
   live: liveConfigSchema.partial().optional(),
+  home: homeSettingsSchema.partial().optional(),
 });
 export type SettingsPatch = z.infer<typeof settingsPatchSchema>;
 
@@ -187,6 +211,12 @@ export function readSettings(site: SiteConfig): Settings {
     crawl: { schedule: site.knowledge.schedule, include: site.knowledge.include, exclude: site.knowledge.exclude, renderJs: site.knowledge.renderJs },
     security: securityOf(site),
     live: site.live,
+    home: {
+      title: w.home.title,
+      subtitle: w.home.subtitle,
+      shortcuts: (w.home.shortcuts ?? []).filter((x) => x.id !== QUOTE_FLOW_ID),
+      links: w.home.links ? { title: w.home.links.title || 'Useful pages', items: w.home.links.items } : null,
+    },
   };
 }
 
@@ -221,14 +251,30 @@ export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<Site
     assistant: current.assistant && { ...current.assistant, ...(patch.assistant ?? {}) },
     crawl: { ...current.crawl, ...patch.crawl },
     security: current.security,
+    home: { ...current.home!, ...patch.home },
   } as Settings;
 
   const widget: WidgetConfig = structuredClone(site.widget);
   widget.brand = { ...widget.brand, agentName: s.botName, name: s.businessName, accent: s.accent };
   widget.launcher = { ...widget.launcher, position: s.position, icon: s.launcherIcon };
-  const others = (widget.home.shortcuts ?? []).filter((x) => x.action.kind !== 'reply');
-  const starters = s.starterQuestions.map((q, i) => ({ id: `ask-${i + 1}`, label: q, icon: 'chat' as const, action: { id: `ask-${i + 1}`, kind: 'reply' as const, label: q, value: q } }));
-  widget.home = { ...widget.home, shortcuts: [...starters, ...others].slice(0, 8) };
+  // The shortcuts: the whole list when the home screen was edited; else the questions
+  // (`starterQuestions`, as older dashboards and `knowledge suggest --apply` send them) before the others.
+  let shortcuts: Shortcut[];
+  if (patch.home?.shortcuts) shortcuts = patch.home.shortcuts;
+  else {
+    const others = (widget.home.shortcuts ?? []).filter((x) => x.action.kind !== 'reply');
+    const starters = s.starterQuestions.map((q, i): Shortcut => ({ id: `ask-${i + 1}`, label: q, icon: 'chat', action: { id: `ask-${i + 1}`, kind: 'reply', label: q, value: q } }));
+    shortcuts = [...starters, ...others];
+  }
+  const { links: _links, ...home } = widget.home;
+  const links = s.home?.links;
+  widget.home = {
+    ...home,
+    title: s.home?.title || widget.home.title,
+    subtitle: s.home?.subtitle ?? widget.home.subtitle,
+    shortcuts: shortcuts.filter((x) => x.id !== QUOTE_FLOW_ID).slice(0, 8),
+    ...(links ? { links } : {}),
+  };
   widget.chat = { ...widget.chat, initialMessages: s.welcomeMessage ? [s.welcomeMessage] : [] };
   widget.leadForm = {
     ...widget.leadForm,
@@ -273,8 +319,20 @@ settingsRoutes.get('/settings', async (c) => {
   const siteId = siteParam(c, c.req.query('site'));
   const site = await resolveSite(ctx, siteId);
   const settings = readSettings(site);
-  const stored = await readStored(ctx.env, siteId);
-  return c.json({ site: siteId, connector: site.connector.type, settings, hash: await settingsHash(settings), meta: stored?.settings ?? null, captcha: Boolean(site.security.captcha) });
+  const [stored, suggested] = await Promise.all([readStored(ctx.env, siteId), readSuggestedHome(ctx.env['HELPPUFF_KV'] as KvStore | undefined, siteId)]);
+  return c.json({
+    site: siteId,
+    connector: site.connector.type,
+    settings,
+    hash: await settingsHash(settings),
+    meta: stored?.settings ?? null,
+    captcha: Boolean(site.security.captcha),
+    // What the widget shows until the home screen is set up here: suggested from the website.
+    suggestedHome: suggested && !suggested.dismissed ? { questions: suggested.questions ?? [], links: suggested.links ?? null, at: suggested.at } : null,
+    // What a form or flow shortcut can open.
+    forms: Object.entries(site.widget.forms ?? {}).map(([id, form]) => ({ id, title: form.title ?? id })),
+    flows: (site.widget.flows ?? []).filter((f) => f.id !== QUOTE_FLOW_ID).map((f) => ({ id: f.id, title: f.steps[0]?.ask ?? f.id })),
+  });
 });
 
 async function readStored(env: Record<string, unknown>, siteId: string): Promise<StoredSiteConfig | null> {
@@ -325,5 +383,7 @@ settingsRoutes.put('/settings', async (c) => {
     settings: { at: ctx.platform.now(), by: admin.via === 'api-key' ? 'cli' : admin.email, hash },
   });
   await kv.put(siteConfigKey(siteId), JSON.stringify(record));
+  // The owner set the home screen up: the suggestions from the website stop.
+  if (parsed.data.home) await dismissSuggestedHome(kv, siteId, ctx.platform.now());
   return c.json({ site: siteId, connector: next.connector.type, settings, hash, meta: record.settings, captcha: Boolean(next.security.captcha) });
 });

@@ -68,7 +68,7 @@ describe('the shell', () => {
     </Shell>,
     );
     const nav = [...view.querySelectorAll('nav[aria-label="Main"]')[0]!.querySelectorAll(':scope > a, :scope > div > button')].map((el) => el.textContent?.replace(/\d+/g, '').trim());
-    expect(nav).toEqual(['Conversations', 'Contacts', 'Callbacks', 'Settings']);
+    expect(nav).toEqual(['Conversations', 'Jobs', 'Contacts', 'Callbacks', 'Settings']);
     const sections = [...view.querySelectorAll('#settings-menu a')].map((a) => a.textContent);
     expect(sections).toEqual(['Notifications']);
     await unmount();
@@ -112,7 +112,7 @@ describe('the shell', () => {
       </Shell>,
     );
     const nav = [...member.querySelectorAll('nav[aria-label="Main"]')[0]!.querySelectorAll(':scope > a, :scope > div > button')].map((el) => el.textContent?.trim());
-    expect(nav).toEqual(['Conversations', 'Contacts', 'Callbacks']);
+    expect(nav).toEqual(['Conversations', 'Jobs', 'Contacts', 'Callbacks']);
     await unmount();
   });
 

@@ -5,6 +5,8 @@ import { getConnector } from '../core/registry.js';
 import { dbFrom } from '../db/d1.js';
 import { capabilitiesOf, prepareConnector } from '../core/run.js';
 import { liveAvailable } from '../live/service.js';
+import { readQuote, withQuote } from '../jobs/widget.js';
+import { readSuggestedHome, withSuggestedHome } from '../home/suggest.js';
 import type { HonoEnv, RequestCtx } from '../core/request.js';
 import type { SiteConfig } from '../config/schema.js';
 import type { Platform } from '../core/platform.js';
@@ -59,9 +61,12 @@ configRoutes.get('/v1/sites/:siteId/config', async (c) => {
   const siteId = c.req.param('siteId');
   const site = await resolveSite(ctx, siteId);
 
+  // The quote questions (Settings → Jobs) and the home screen suggested from the website,
+  // each under its own key so a deploy never drops them.
+  const [quote, suggested] = dbFrom(ctx.env) ? await Promise.all([readQuote(ctx.platform.kv, siteId), readSuggestedHome(ctx.platform.kv, siteId)]) : [null, null];
   const body: ConfigResponse = {
     siteId,
-    widget: { ...site.widget, ...captchaFor(site, ctx.platform.log, siteId) },
+    widget: { ...withQuote(withSuggestedHome(site.widget, suggested), quote), ...captchaFor(site, ctx.platform.log, siteId) },
     capabilities: capabilitiesFor(ctx, site, siteId),
   };
 

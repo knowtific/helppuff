@@ -429,6 +429,35 @@ describe('replies stay safe and clean', () => {
     expect(messages.some((m) => m.type === 'form')).toBe(false);
   });
 
+  it("saves a job with what the visitor said, from the site's own fields, when it has Jobs", async () => {
+    const calls: unknown[] = [];
+    const jobs = {
+      itemSingular: 'Job',
+      fields: [
+        { name: 'service', label: 'Service', type: 'select', required: false, options: ['Blocked drains', 'Hot water'], question: 'Which service?' },
+        { name: 'address', label: 'Address or suburb', type: 'text', required: true, options: [], question: 'Where?' },
+      ],
+      create: async (input: unknown) => (calls.push(input), { number: 1042, missing: ['Address or suburb'] }),
+    };
+    const w = await world(
+      [
+        { tool_calls: [{ id: 't1', name: 'create_job', arguments: '{"title":"Blocked drain","summary":"Kitchen drain blocked since Monday.","fields":{"service":"Blocked drains","made_up":7}}' }] },
+        { content: 'Got it, request #1042. Pop your address in the form so we can quote.' },
+      ],
+      {},
+      { jobs },
+    );
+    await w.send('My kitchen drain is blocked, how much to fix?');
+    const first = w.chats[0]!;
+    const tool = (first['tools'] as { function: { name: string; parameters: { properties: { fields: { properties: Record<string, { description: string }> } } } } }[]).find((t) => t.function.name === 'create_job')!;
+    expect(Object.keys(tool.function.parameters.properties.fields.properties)).toEqual(['service', 'address']);
+    expect(tool.function.parameters.properties.fields.properties['service']!.description).toContain('Blocked drains, Hot water');
+    expect((first['messages'] as { content: string }[])[0]!.content).toContain('use create_job with what they told you');
+    expect(calls).toEqual([{ title: 'Blocked drain', summary: 'Kitchen drain blocked since Monday.', fields: { service: 'Blocked drains', made_up: '7' } }]);
+    const result = (w.chats[1]!['messages'] as { role: string; content: string }[]).at(-1)!;
+    expect(result.content).toContain('Saved as job #1042. A short form is now shown for: Address or suburb');
+  });
+
   it('tells the model when nobody is free, so it points to the callback form', async () => {
     const w = await world(
       [{ tool_calls: [{ id: 't1', name: 'request_person', arguments: '{}' }] }, { content: 'Nobody is free; leave your details below.' }],

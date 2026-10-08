@@ -5,6 +5,7 @@ import { Avatar, Badge, Button, Card, Empty, ErrorNote, Input, Segmented, Select
 import { AttributesEditor, ConversationStatusBadge, LabelChip, LabelPicker, NotesPanel, SideSection, useLabels, WaitingBadge } from '../components/inbox';
 import { api, isMember, parseSummary, type ConversationDetail, type ConversationRow, type Me, type StoredMessage, type Summary, type Team } from '../lib/api';
 import { sendTyping, useLiveEvents } from '../lib/live';
+import { RelatedJobs } from './Jobs';
 import { cn, flag, fmtDateTime, fmtRelative, fmtTime, href, pathOf, useData, useDebounced, usePersisted } from '../lib/utils';
 
 const QUALITY_DOT = { hot: '#dc2626', warm: '#f59e0b', cold: '#3b82f6', none: '#a1a1aa' } as const;
@@ -444,6 +445,9 @@ function Detail({ id, me, team, onChanged }: { id: string; me: Me; team: Team | 
             ) : (
               <p className="text-muted-foreground">No contact details shared.</p>
             )}
+          </SideSection>
+          <SideSection title="Jobs">
+            <RelatedJobs filter={{ conversation: id }} context={{ conversationId: id, label: 'From this conversation: its contact is linked.' }} />
           </SideSection>
           <SideSection title="Labels">
             <LabelPicker value={data.labels ?? []} onChange={(ids) => void patch({ labels: ids })} />

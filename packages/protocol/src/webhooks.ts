@@ -33,6 +33,11 @@ export const WEBHOOK_EVENTS = {
   'handover.ended': 'A person handed a live chat back to the assistant.',
   'conversation.assigned': 'A conversation was taken by, or given to, someone on the team (or unassigned).',
   'conversation.closed': 'A conversation was closed: by the team, or after it went quiet (`live.closeAfterMinutes`).',
+  'job.created': 'A job was created: from the assistant, the quote questions, the API or the dashboard.',
+  'job.updated': 'A job\'s details, fields, value, due date or assignee changed.',
+  'job.stage_changed': 'A job moved to another stage.',
+  'job.won': 'A job moved to a won stage (it went ahead).',
+  'job.lost': 'A job moved to a lost stage, with the reason if one was given.',
   'knowledge.crawl.finished': 'Learning the website finished.',
   'knowledge.file.processed': 'An uploaded file was learned, or failed.',
 } as const;

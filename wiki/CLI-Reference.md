@@ -332,7 +332,7 @@ Print the <script> tag to paste into the site.
 helppuff users list | add <email> [--role admin|member] | role <email> admin|member | remove <email> | reset <email> [--password <p>]
 ```
 
-Manage who can sign in to the dashboard. The owner is dashboard.adminEmail; others are stored in the D1 database. Admins (the default) can do everything; members see only conversations, contacts, callbacks and live chat, and their own notifications. A password is generated and shown once when --password is omitted.
+Manage who can sign in to the dashboard. The owner is dashboard.adminEmail; others are stored in the D1 database. Admins (the default) can do everything; members see only conversations, jobs, contacts, callbacks and live chat, and their own notifications. A password is generated and shown once when --password is omitted.
 
 ```bash
 helppuff users add sam@acme.com --role member
@@ -429,6 +429,22 @@ Visitors who asked to be called back, the same as the dashboard's Callbacks page
 helppuff callbacks --json
 helppuff callbacks done cb_k2x9 --note "Booked a measure for Tuesday"
 helppuff callbacks list --status done
+```
+
+### `helppuff jobs`
+
+```
+helppuff jobs list [--status open|won|lost|all] [--search …] | show <job> | create [--title …] [--fields '{…}'] [--name …] [--email …] [--phone …] [--details …] [--value N] | move <job> <stage> [--reason …] | update <job> <text> | pipeline | template <id> | setup
+```
+
+Requests, quotes and work on the site's pipeline, the same as the dashboard's Jobs page and Settings → Jobs. They come from the assistant (when a visitor asks for a quote or work done), the widget's quote questions, the API, and by hand. A job is named by its number (1042) or id; a stage by its name or id. `pipeline` shows the stages, fields and quote questions; `template` starts again from one (service-quote, projects, support, sales-demo, bookings, custom-orders, basic); `setup` lets the AI read the website and choose. Each change sends the job.* webhooks.
+
+```bash
+helppuff jobs --json
+helppuff jobs create --name "Ada Lovelace" --email ada@example.com --fields '{"service":"Hot water","address":"Glebe"}'
+helppuff jobs move 1042 "Quote sent"
+helppuff jobs move 1042 Lost --reason "Went with another quote"
+helppuff jobs setup --json
 ```
 
 ### `helppuff dashboard`

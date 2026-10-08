@@ -80,11 +80,17 @@ export const flowSchema = z.object({
   id: z.string().min(1).max(64).describe('What a `flow` action or shortcut starts it by.'),
   steps: z.array(flowStepSchema).min(1).max(10).describe('Questions asked one at a time, in the widget, before anything is sent.'),
   submit: z
-    .object({
-      as: z.literal('message').describe('Sent as one visitor message.'),
-      template: z.string().min(1).max(1000).describe('The message, with `{{field}}` for each answer, e.g. "Quote for {{service}} in {{suburb}}".'),
-    })
-    .describe('What happens with the answers.'),
+    .discriminatedUnion('as', [
+      z.object({
+        as: z.literal('message').describe('Sent as one visitor message.'),
+        template: z.string().min(1).max(1000).describe('The message, with `{{field}}` for each answer, e.g. "Quote for {{service}} in {{suburb}}".'),
+      }),
+      z.object({
+        as: z.literal('job').describe('Saved as a job (the site\'s Jobs pipeline), with the answers as its fields; the visitor gets its number.'),
+        template: z.string().min(1).max(1000).describe('What the visitor sees as their message, with `{{field}}` for each answer.'),
+      }),
+    ])
+    .describe('What happens with the answers: `message` sends them as one message, `job` saves them as a job.'),
 });
 export type Flow = z.infer<typeof flowSchema>;
 

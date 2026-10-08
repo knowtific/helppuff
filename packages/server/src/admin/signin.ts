@@ -21,6 +21,8 @@ import { assertTurnstile } from '../core/turnstile.js';
  * locked, and the owner's CLI (`X-HelpPuff-Owner`) is never limited.
  */
 
+const SIGN_IN_WAIT = 'Too many sign-in attempts. Wait a few minutes and try again.';
+
 export type SignInPolicy = Omit<SignInLimits, 'captcha'> & { captcha: { siteKey: string; secret: string } | null };
 
 export async function signInPolicy(c: Context<HonoEnv>): Promise<SignInPolicy> {
@@ -51,7 +53,7 @@ export async function throttleIp(c: Context<HonoEnv>, policy: SignInPolicy, scop
   const ctx = c.get('helppuff');
   if (await ctx.isOwner()) return;
   const verdict = await hitWindow(ctx.platform.kv, scope, await ctx.ipKey(), policy.attemptsPerIp, policy.windowMinutes * 60);
-  if (!verdict.allowed) throw rateLimited(verdict, scope === 'login' ? 'admin_login' : 'admin_link');
+  if (!verdict.allowed) throw rateLimited(verdict, scope === 'login' ? 'admin_login' : 'admin_link', SIGN_IN_WAIT);
 }
 
 async function accountKey(c: Context<HonoEnv>, email: string): Promise<string> {
@@ -74,6 +76,7 @@ export async function assertAccountOpen(c: Context<HonoEnv>, policy: SignInPolic
     throw rateLimited(
       { allowed: false, count: failures, retryAfter: Math.max(1, windowSeconds - elapsed) },
       'admin_login_account',
+      SIGN_IN_WAIT,
     );
   }
 }

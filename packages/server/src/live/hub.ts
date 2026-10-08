@@ -73,6 +73,8 @@ export type HubEvent =
   | { type: 'takeover'; siteId: string; conversationId: string; to: string; name: string | null; messages?: Message[]; settings: HubSettings }
   /** Back to the assistant, or closed: the visitor is told, and stays connected (the team may take it over again). */
   | { type: 'ended'; conversationId: string; status: 'left' | 'closed'; messages?: Message[] }
+  /** A new job (from the chat, the quote questions, the API): an alert for the team, like a new live chat. */
+  | { type: 'job'; jobId: string; number: number; title: string; who: string | null; source: string; conversationId?: undefined }
   /** Anything else about a conversation the dashboards should reload (labels, attributes, notes). */
   | { type: 'changed'; conversationId: string };
 
@@ -174,6 +176,10 @@ export class HubCore {
   // ---------------------------------------------------------------- events
 
   async publish(event: HubEvent): Promise<void> {
+    if (event.type === 'job') {
+      this.toAgents({ t: 'job', jobId: event.jobId, number: event.number, title: event.title, who: event.who, source: event.source });
+      return;
+    }
     const now = this.deps.now();
     const key = `${LIVE_PREFIX}${event.conversationId}`;
     switch (event.type) {

@@ -75,6 +75,14 @@ describe('config pull', () => {
       leads: { enabled: true, fields: [{ name: 'name', label: 'Name', type: 'text', required: true }, { name: 'company', label: 'Company', type: 'text', required: false }] },
       assistant: { timezone: 'Australia/Melbourne', locale: 'en-AU', rerank: false },
       crawl: { schedule: 'monthly' },
+      home: {
+        title: 'G’day',
+        shortcuts: [
+          { id: 'ask-1', label: 'Do you service Lilydale?', icon: 'chat', action: { id: 'ask-1', kind: 'reply', label: 'Do you service Lilydale?', value: 'Do you service Lilydale?' } },
+          { id: 'call', label: 'Call us', icon: 'phone', action: { id: 'call', kind: 'tel', label: 'Call us', phone: '03 9000 0000' } },
+        ],
+        links: { title: 'Useful pages', items: [{ label: 'Prices', url: 'https://acme.com.au/prices', description: 'Callouts from $99' }] },
+      },
     });
     const live = readSettings({ ...siteOf(loaded), ...changed });
 
@@ -88,6 +96,9 @@ describe('config pull', () => {
     expect(again.assistant!.rerank).toBe(false);
     expect(raw['widget']['brand']).toMatchObject({ agentName: 'Ava', accent: '#0f766e' });
     expect(raw['knowledge']['website']).toMatchObject({ schedule: 'monthly' });
+    expect(raw['widget']['home']).toMatchObject({ title: 'G’day', links: { items: [{ label: 'Prices', url: 'https://acme.com.au/prices' }] } });
+    expect(raw['widget']['home']['shortcuts'].map((x: { id: string }) => x.id)).toEqual(['ask-1', 'call']);
+    expect(again.starterQuestions).toEqual(['Do you service Lilydale?']);
   });
 });
 

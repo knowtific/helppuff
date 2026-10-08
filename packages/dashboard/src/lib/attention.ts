@@ -109,35 +109,42 @@ function drawIcon(count: number): void {
 
 // ------------------------------------------------------------------ concerns
 
-export type Concern = { kind: 'new-chat' | 'message' | 'assigned'; conversationId: string; title: string; body: string };
+export type Concern = { kind: 'new-chat' | 'message' | 'assigned' | 'job'; conversationId: string; title: string; body: string; link: string };
+
+const SOURCES: Record<string, string> = { chat: 'from the chat', quote: 'from the quote questions', api: 'from the API', callback: 'from a callback' };
 
 /**
  * What from the live connection concerns this person, and how to say it.
  * New chats waiting: everyone available. A visitor's message: in a chat that
  * is theirs, or nobody's yet. A chat given to them by someone else. Never
  * their own doing, never a colleague's chat, never the conversation they are
- * looking at.
+ * looking at. A new job from outside the team (the chat, the quote questions,
+ * the API): everyone.
  */
 export function concerns(
-  event: { t: string; conversationId?: string; conversation?: Record<string, unknown>; message?: { role?: string; text?: string }; assignedTo?: string | null; who?: string | null; to?: string | null; by?: string | null; name?: string | null },
+  event: { t: string; conversationId?: string; conversation?: Record<string, unknown>; message?: { role?: string; text?: string }; assignedTo?: string | null; who?: string | null; to?: string | null; by?: string | null; name?: string | null; jobId?: string; number?: number; title?: string; source?: string },
   me: string,
   available: boolean,
 ): Concern | null {
+  if (event.t === 'job') {
+    if (!event.jobId || !event.source || !SOURCES[event.source] || window.location.hash === `#/jobs/${event.jobId}`) return null;
+    return { kind: 'job', conversationId: event.jobId, link: `#/jobs/${event.jobId}`, title: `New request #${event.number ?? ''} ${SOURCES[event.source]}`, body: [event.who, event.title].filter(Boolean).join(': ') };
+  }
   const id = event.conversationId;
   if (!id || watching(id)) return null;
   if (event.t === 'handover') {
     if (!available) return null;
     const c = event.conversation ?? {};
     const who = String(c['leadName'] ?? c['leadEmail'] ?? 'A visitor');
-    return { kind: 'new-chat', conversationId: id, title: `${who} wants to talk to someone`, body: String(c['firstMessage'] ?? 'A new live chat is waiting.') };
+    return { kind: 'new-chat', conversationId: id, link: `#/conversations/${id}`, title: `${who} wants to talk to someone`, body: String(c['firstMessage'] ?? 'A new live chat is waiting.') };
   }
   if (event.t === 'message' && event.message?.role === 'user') {
     const mine = event.assignedTo === me;
     if (!mine && !(event.assignedTo == null && available)) return null;
-    return { kind: 'message', conversationId: id, title: event.who ? `${event.who}` : 'New message', body: event.message.text ?? '' };
+    return { kind: 'message', conversationId: id, link: `#/conversations/${id}`, title: event.who ? `${event.who}` : 'New message', body: event.message.text ?? '' };
   }
   if (event.t === 'assigned' && event.to === me && event.by && event.by !== me) {
-    return { kind: 'assigned', conversationId: id, title: 'A chat was given to you', body: `${event.by.replace(/^telegram:/, 'Telegram ')} assigned you a live chat.` };
+    return { kind: 'assigned', conversationId: id, link: `#/conversations/${id}`, title: 'A chat was given to you', body: `${event.by.replace(/^telegram:/, 'Telegram ')} assigned you a live chat.` };
   }
   return null;
 }

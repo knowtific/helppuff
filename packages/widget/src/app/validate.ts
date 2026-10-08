@@ -298,9 +298,11 @@ function parseFlow(input: unknown): Flow | null {
   const id = str(input['id'], 64);
   const steps = list(input['steps'], 10, parseFlowStep);
   const submit = isObject(input['submit']) ? input['submit'] : null;
-  const template = submit && submit['as'] === 'message' ? str(submit['template'], 1000) : undefined;
-  if (!id || steps.length === 0 || !template) return null;
-  return { id, steps, submit: { as: 'message', template } };
+  // `message`: sent as one message; `job`: saved as a job (the site's Jobs) by the server.
+  const as = submit ? oneOf(submit['as'], ['message', 'job'] as const) : undefined;
+  const template = submit && as ? str(submit['template'], 1000) : undefined;
+  if (!id || steps.length === 0 || !template || !as) return null;
+  return { id, steps, submit: { as, template } };
 }
 
 function parseForms(input: unknown): WidgetConfig['forms'] | undefined {

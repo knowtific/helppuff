@@ -36,6 +36,11 @@ leads only; see [[Leads]].
 | `conversation.closed` | A conversation was closed by the team, or a live chat went quiet for `live.closeAfterMinutes` | `conversationId`, `by`, `reason` (`team` or `idle`), `wasLive` |
 | `conversation.summarized` | Someone pressed **Summarise** in the dashboard | `conversationId`, `summary`, `intent`, `sentiment`, `leadQuality`, `outcome`, `topics`, `unanswered`, `followUp` |
 | `conversation.ended` | The visitor started a new chat, or the page called `HelpPuff.reset()`. Most visitors just leave, so prefer `conversation.completed` | `conversationId` |
+| `job.created` | A [[job|Jobs]] was created: by the assistant, the quote questions, the API or the dashboard | `job` (`id`, `number`, `title`, `stage`, `status`, `fields`, `contact`, `conversationId`, `source`, `value`, `currency`, `dueAt`, `assignedTo`…) |
+| `job.updated` | A job's title, details, fields, value, due date or assignee changed (also when a visitor fills in what the assistant asked for) | `job` |
+| `job.stage_changed` | A job moved to another stage | `job`, `from`, `to` (stage names) |
+| `job.won` | A job moved to a won stage. Sent with `job.stage_changed` | `job` |
+| `job.lost` | A job moved to a lost stage. Sent with `job.stage_changed` | `job`, `reason` |
 | `budget.warning` | Today's AI budget is 80% used; answers are kept shorter. Once a day | `day`, `neuronsUsed`, `dailyBudget`, `resetsAt` |
 | `budget.exhausted` | Today's AI budget is used up; visitors get your contact details and a callback form until `resetsAt`. Once a day | `day`, `neuronsUsed`, `dailyBudget`, `resetsAt` |
 | `knowledge.crawl.finished` | Learning the website finished | `runId`, `status`, `trigger`, `pages` `{learned,failed}`, `passages` |

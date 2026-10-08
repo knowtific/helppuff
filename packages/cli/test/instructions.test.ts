@@ -19,6 +19,11 @@ describe('shared AI-agent instructions', () => {
     expect(instructions).toContain('deploy.setupUrl');
     expect(instructions).toContain('upgrade --check --json');
     expect(instructions).toContain('Never ask the user to paste a token into chat.');
+    // After deploy: Jobs is set up by HelpPuff, and every change the user may ask for has its command.
+    expect(instructions).toContain('deploy.jobs');
+    expect(instructions).toContain('jobs pipeline --json');
+    expect(instructions).toContain('## Changing what HelpPuff does');
+    expect(instructions).toContain('config pull --json` first');
   });
 
   it('only invokes top-level commands the CLI exposes', async () => {

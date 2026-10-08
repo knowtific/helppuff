@@ -1,5 +1,5 @@
 import type { Context } from 'hono';
-import { cleanText, HANDOVER_ACTION, stripChatTokens, type Message, type SendRequest, type StartSessionRequest } from '@helppuff/protocol';
+import { cleanText, HANDOVER_ACTION, JOB_FORM_PREFIX, stripChatTokens, type Message, type SendRequest, type StartSessionRequest } from '@helppuff/protocol';
 import { isCallbackForm, notice } from '@helppuff/connector-types';
 import type { SiteConfig } from '../config/schema.js';
 import { resolveSecrets } from '../config/load.js';
@@ -20,6 +20,8 @@ import { assertTurnstile } from './turnstile.js';
 import type { Standing } from './visitor.js';
 import { COPY, isLive, LIVE_CALLBACK_FORM, liveDeps, noHandover, readLiveState, relayVisitorMessage, startHandover, type HandoverResult } from '../live/service.js';
 import type { TurnStatus } from '../admin/record.js';
+import { completeJobForm, jobsHandle, submitQuote } from '../jobs/chat.js';
+import { quoteActionId } from '../jobs/widget.js';
 
 /**
  * A conversation with the assistant, whoever holds it: the widget (a browser
@@ -235,7 +237,9 @@ export async function sendChat<T>(c: Context<HonoEnv>, options: { session: ChatS
   liveRead.catch(() => {});
   // A form is answered only if this chat was shown it (see core/forms.ts). The callback form offered
   // over the live socket (nobody took the chat in time) is for a conversation that was handed over.
-  if (isFormSubmission(input) && !formWasOffered(input.actionId, session.forms, site.widget.forms)) {
+  // The quote questions' answers (a `job` flow) are checked against the site's quote questions below.
+  const quoteAnswers = input.kind === 'action' && input.actionId === quoteActionId;
+  if (isFormSubmission(input) && !quoteAnswers && !formWasOffered(input.actionId, session.forms, site.widget.forms)) {
     const handedOver = input.actionId === LIVE_CALLBACK_FORM && Boolean((await liveRead)?.handover_at);
     if (!handedOver) {
       ctx.platform.log('form.not_offered', { siteId });
@@ -326,6 +330,24 @@ export async function sendChat<T>(c: Context<HonoEnv>, options: { session: ChatS
     return answer(c, ctx, false, relay, Promise.resolve({ sessionId, messages, state: session.state, forms: [...(session.forms ?? [])], count }), options.respond);
   }
 
+  // Jobs: the quote questions' answers, and a job's form for missing details. The server's own, whichever backend.
+  if (input.kind === 'action' && (quoteAnswers || input.actionId.startsWith(JOB_FORM_PREFIX))) {
+    const count = await verdict;
+    let messages: Message[] | null;
+    if (quoteAnswers) {
+      const quote = await submitQuote(ctx, siteId, sessionId, input.value);
+      if (!quote) throw new HelpPuffError('bad_request', { message: 'This form has expired. Please refresh the page and try again.', detail: 'quote_not_offered' });
+      messages = quote.messages;
+      if (quote.contact.email || quote.contact.phone) dispatchLead(ctx, site, siteId, { sessionId, lead: quote.contact, context: { pageUrl: channel.pageUrl } });
+    } else {
+      messages = await completeJobForm(ctx, siteId, sessionId, input.actionId, input.value);
+    }
+    if (messages) {
+      recordTurn(ctx, { siteId, sessionId, request: input, messages, status: liveNow ? 'keep' : 'bot' });
+      return answer(c, ctx, false, relay, Promise.resolve({ sessionId, messages, state: session.state, forms: [...(session.forms ?? [])], count }), options.respond);
+    }
+  }
+
   // "Talk to a person": the server's own, whichever backend runs the chat.
   if (input.kind === 'action' && input.actionId === HANDOVER_ACTION) {
     const count = await verdict;
@@ -352,12 +374,19 @@ export async function sendChat<T>(c: Context<HonoEnv>, options: { session: ChatS
         }
       };
     }
+    // The assistant may save a job (workers-ai's `create_job`); the server adds the form for missing details.
+    const jobForms: Message[] = [];
+    if (!liveNow) {
+      const jobs = await jobsHandle(ctx, siteId, sessionId, jobForms).catch(() => undefined);
+      if (jobs) cctx.jobs = jobs;
+    }
     const result = await ctx.timing.span('connector', () => runConnector(ctx, 'send', () => prepared.connector.send(cctx, session.state, input)));
     const count = await verdict;
     const handed = handover as HandoverResult | null;
     const messages = [
-      ...guardReplies(sanitizeConnectorMessages(result.messages, ctx.platform, { allowEmpty: Boolean(handed) }), prepared.guidance, ctx.platform),
+      ...guardReplies(sanitizeConnectorMessages(result.messages, ctx.platform, { allowEmpty: Boolean(handed) || jobForms.length > 0 }), prepared.guidance, ctx.platform),
       ...(handed?.messages ?? []),
+      ...jobForms,
     ];
     ctx.platform.log('message.sent', { siteId, sessionId, count });
     const status: TurnStatus = handed?.status === 'started' || liveNow ? 'keep' : 'bot';

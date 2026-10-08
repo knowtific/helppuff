@@ -116,7 +116,8 @@ Read the successful JSON result and retain:
 
 - `deploy.setupUrl`: one-time dashboard setup link, valid for 24 hours;
 - `deploy.embed`: the website script;
-- `deploy.preview`: the public demo.
+- `deploy.preview`: the public demo;
+- `deploy.jobs`: how Jobs (requests and quotes from the chat) was set up.
 
 If the user chose dashboard setup, give them `deploy.setupUrl` immediately and
 explain that it creates their sign-in, lets them choose pages, and confirms
@@ -137,6 +138,23 @@ npx -y @knowtific/helppuff knowledge status --json
 
 If pages fail, inspect their errors and fix the cause. Do not silently treat a
 partially failed crawl as complete.
+
+### Jobs are set up for the user
+
+Deploy creates the Jobs pipeline (so the assistant can record quote and work
+requests from the first visitor) and the AI picks its stages and fields from
+the website: at once for other backends, and when learning finishes for
+workers-ai (`deploy.jobs.status` is `waiting`). Do not choose a template
+yourself. After learning finishes, read what was chosen and tell the user in
+one line:
+
+```bash
+npx -y @knowtific/helppuff jobs pipeline --json
+```
+
+If `chosenBy` is still `default` with no reason, set it up now with
+`jobs setup --json`. Change templates, stages or fields only when the user
+asks (see **Changing what HelpPuff does** below).
 
 ## 6. Test it like a visitor
 
@@ -243,7 +261,7 @@ npx -y @knowtific/helppuff live on --json
 npx -y @knowtific/helppuff users add sam@example.com --role member --json
 ```
 
-Members see only conversations, contacts, callbacks and live chat. For
+Members see only conversations, jobs, contacts, callbacks and live chat. For
 Telegram, the person must create the bot with @BotFather and give you its
 token; never invent one. Then:
 
@@ -254,6 +272,56 @@ npx -y @knowtific/helppuff telegram connect --token <token> --json
 and tell the person to send the returned `/link <code>` in the Telegram group
 or chat they will answer from. Check with `live status --json` and
 `telegram status --json`. Guide: https://github.com/knowtific/helppuff/wiki/Live-Chat
+
+## Changing what HelpPuff does
+
+When the user asks to turn something on or off, or to change how it behaves,
+use the matching command below. Change only what they asked for; everything
+else keeps its default. Two kinds of setting:
+
+- **In `helppuff.json`** (the widget, the assistant, the knowledge base,
+  limits): run `config pull --json` first (the dashboard may have changed
+  them), then `config set <path> <value> --json`, then `deploy --json`.
+  Values are JSON when they look like JSON (`true`, `120`, `'["a","b"]'`).
+  `schema --json` lists every path with its meaning.
+- **On the Worker** (jobs, labels, live chat, Telegram, webhooks, the team,
+  API keys): their own commands, live at once, no deploy. Anything without a
+  command goes through `api <METHOD> <path> --data '{…}' --json`, the public
+  API with the project's admin key (the wiki's API reference lists every
+  route).
+
+| The user wants | Do |
+| --- | --- |
+| No form before the chat | `config set widget.leadForm.enabled false` |
+| Different form questions | `config set widget.leadForm.fields '[{"name":"name","label":"Name","type":"text","required":true},{"name":"email","label":"Email","type":"email","required":true}]'` |
+| What the assistant is for | `config set assistant.goal callbacks\|answers\|bookings` (`bookings` also needs `assistant.bookingUrl`) |
+| Tone, answer length | `config set assistant.tone friendly\|professional\|casual`, `assistant.length short\|detailed` |
+| Never quote prices | `config set assistant.prices quote` |
+| Its name, the business name, colour | `widget.brand.agentName`, `widget.brand.name`, `widget.brand.accent` |
+| The greeting, a teaser, the button | `widget.chat.initialMessages`, `widget.teaser`, `widget.launcher.label` / `.shape` / `.position` / `.hideOnPaths` |
+| The chat's first screen: heading, buttons, useful pages | HelpPuff suggests links and questions from the website by itself; leave them unless the user asks. To change: `api POST /home/suggest` for ideas, then `config set widget.home.title "…"`, `widget.home.links '{"title":"Useful pages","items":[{"label":"Prices","url":"https://…/prices"}]}'` (`null`: none) or `widget.home.shortcuts '[…]'` (the whole list, up to 8: `reply`, `url`, `tel`, `email`, `form` or `flow` buttons) |
+| Re-learn the site regularly | `config set knowledge.website.schedule weekly` |
+| Another AI model | `config set backend.model <id>` (the wiki's AI models page compares them) |
+| A daily spending cap | `config set backend.budget.dailyNeurons <n>` and `security.limits.messagesPerSitePerDay <n>` |
+| Protection from bots | Turnstile: the user creates the widget in Cloudflare; then `config set security.captcha '{"provider":"turnstile","siteKey":"<key>","secret":{"env":"TURNSTILE_SECRET"}}'` and the user runs `secret set TURNSTILE_SECRET` |
+| Talk to a person (live chat) | `live on` / `live off`; Telegram: `telegram connect --token <token>` (see above) |
+| Team members | `users add <email> --role admin\|member`, `users role <email> <role>`, `users remove <email>` |
+| Labels for conversations | `api POST /labels --data '{"name":"Urgent","description":"Needs an answer today"}'` (`"ai": false`: only people add it) |
+| Jobs: another template | `jobs template service-quote\|projects\|support\|sales-demo\|bookings\|custom-orders\|basic` |
+| Jobs: let the AI choose again | `jobs setup` |
+| Jobs: call them Quotes, Tickets… | `api PUT /jobs/pipeline --data '{"itemSingular":"Quote","itemPlural":"Quotes"}'` |
+| Jobs: no "Get a quote" button | `api PUT /jobs/pipeline --data '{"quoteEnabled":false}'` (its label: `"quoteLabel"`; no contact questions: `"quoteContact":false`) |
+| Jobs: different quote questions | `jobs pipeline` for the field names, then `api PUT /jobs/pipeline --data '{"quote":["service","address"]}'` (in order, up to 10) |
+| Jobs: the assistant should not create them | `api PUT /jobs/pipeline --data '{"assistantJobs":false}'` |
+| Jobs: other stages or fields | `api GET /jobs/pipeline`; from its `pipeline`, edit the whole `stages` list or `fields` list (keep each `id`; leave out fields with `"archived": true`), save it as `{"stages":[…]}` or `{"fields":[…]}` and `api PUT /jobs/pipeline --data @pipeline.json`. Keep one open, one won and one lost stage; a removed field keeps its values on old jobs |
+| Send events to another tool | `webhooks add <https url> --events lead.captured,job.created` |
+| Use HelpPuff from their own server | `keys create "<name>" --preset chat` (or `--scopes …`); the key is shown once: give it to the user, never store it in the repository |
+| Remove everything from Cloudflare | Only on an explicit request: `destroy --yes` |
+
+Every command above takes `--json` and runs as `npx -y @knowtific/helppuff …`.
+Confirm the change with the matching read (`config get <path>`,
+`jobs pipeline`, `live status`, `users list`, `webhooks list`) and tell the
+user what changed.
 
 ## Non-negotiable rules
 

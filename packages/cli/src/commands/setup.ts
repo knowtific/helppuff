@@ -326,6 +326,13 @@ function agentOnboarding(ctx: Ctx, project: Project, onboarding: OnboardingMode)
   return 'defaults';
 }
 
+/** What happened to Jobs after the deploy, in a few words. */
+function jobsLine(jobs: NonNullable<DeployResult['jobs']>): string {
+  if (jobs.status === 'waiting') return 'the AI picks its stages and fields from your website when learning finishes';
+  if (jobs.status === 'done') return jobs.chosenBy === 'ai' ? `set up as "${jobs.template}" from your website` : 'set up with the basic template (the website did not say enough)';
+  return `already set up ("${jobs.template}")`;
+}
+
 export function nextSteps(result: DeployResult, onboarding: OnboardingMode = 'defaults'): string[] {
   if (onboarding === 'dashboard') {
     const link = result.setupUrl
@@ -340,6 +347,7 @@ export function nextSteps(result: DeployResult, onboarding: OnboardingMode = 'de
   return [
     ...(result.crawl ? ['helppuff knowledge status --json   (learning runs in the background on Cloudflare; nothing to wait for)'] : []),
     'helppuff ask "<a question a visitor would ask>" --json',
+    ...(result.jobs ? [`helppuff jobs pipeline --json   (${jobsLine(result.jobs)}; tell the user, and change it only if they ask)`] : []),
     result.setupUrl
       ? `Give the user three things: the dashboard link ${result.setupUrl} (one-time, 24h: they create their sign-in there), the script (deploy.embed) and the demo ${result.preview}`
       : `Give the user three things: the dashboard ${result.dashboard ?? result.url}, the script (deploy.embed) and the demo ${result.preview}`,
@@ -368,6 +376,7 @@ function printDeployed(result: DeployResult, wizard = false, unattended = false)
         `Demo       ${c.cyan(result.preview)}`,
         `Script     ${result.embed}`,
         ...(result.crawl ? [c.dim(`Learning ${result.crawl.total} pages in the background on Cloudflare — answers improve as it goes.`)] : []),
+        ...(result.jobs && result.jobs.status !== 'kept' ? [c.dim(`Jobs: ${jobsLine(result.jobs)}.`)] : []),
       ]
     : [result.setupUrl ? `Finish setting up: ${dashboard}` : dashboard ? `Dashboard: ${dashboard}` : `Live: ${c.cyan(result.preview)}`];
   if (wizard) p.outro(lines.join('\n'));

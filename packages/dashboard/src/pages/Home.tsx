@@ -1,9 +1,9 @@
-import { ArrowRight, CheckCircle2, ExternalLink, Loader2, ShieldAlert, ShieldCheck } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { ArrowRight, CheckCircle2, ExternalLink, Loader2, ShieldAlert, ShieldCheck, Sparkles } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { CrawlProgress, useKnowledgeStatus } from '../components/knowledge';
 import { HelpLink } from '../components/Shell';
 import { Button, Card, CardHeader, ErrorNote } from '../components/ui';
-import { api, type Me, type SettingsView, type Site } from '../lib/api';
+import { api, type Me, type PipelineView, type Site } from '../lib/api';
 import { cn, href, pathOf } from '../lib/utils';
 import { CopyBlock } from './Settings';
 
@@ -22,7 +22,6 @@ export function Home({ me }: { me: Me }) {
   const demo = (import.meta.env['VITE_HELPPUFF_DEMO_URL'] as string | undefined) ?? `${window.location.origin}/`;
   const learning = status?.run?.status === 'queued' || status?.run?.status === 'running';
   const notStarted = site.knowledge && status && !status.run;
-  useStarterQuestions(site.knowledge && (status?.chunks ?? 0) > 0);
 
   if (notStarted) {
     return (
@@ -96,9 +95,63 @@ export function Home({ me }: { me: Me }) {
           </ol>
         </Card>
 
+        <JobsChoice />
         {site.production && <GoLiveChecklist production={site.production} />}
       </aside>
     </div>
+  );
+}
+
+const JOBS_SEEN = 'hp-jobs-choice-seen';
+
+/**
+ * What the AI set up for jobs from the website (once it has): the template and
+ * why, with a link to change it. Dismissed for good on this browser.
+ */
+function JobsChoice() {
+  const [view, setView] = useState<PipelineView | null>(null);
+  const [seen, setSeen] = useState(() => {
+    try {
+      return localStorage.getItem(JOBS_SEEN) ?? '';
+    } catch {
+      return '';
+    }
+  });
+  useEffect(() => {
+    api<PipelineView>('/jobs/pipeline').then(setView, () => {});
+  }, []);
+  const p = view?.pipeline;
+  if (!p || p.chosenBy !== 'ai' || seen === p.template) return null;
+  const template = view.templates.find((t) => t.id === p.template);
+  const dismiss = () => {
+    try {
+      localStorage.setItem(JOBS_SEEN, p.template);
+    } catch {
+      // Private window: shown again next time.
+    }
+    setSeen(p.template);
+  };
+  return (
+    <Card className="px-4 py-3 text-[13px]">
+      <div className="flex items-start gap-2.5">
+        <Sparkles className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+        <div className="min-w-0 flex-1 space-y-1">
+          <p className="font-medium">
+            {p.itemPlural} set up as “{template?.name ?? p.template}”
+          </p>
+          <p className="text-xs text-muted-foreground">{p.reason ?? template?.description}</p>
+          <p className="text-xs text-muted-foreground">Stages: {p.stages.map((s) => s.name).join(' → ')}</p>
+          <div className="flex gap-3 pt-1 text-xs">
+            <a href={href({ page: 'settings', id: 'jobs' })} className="font-medium underline-offset-2 hover:underline">
+              Change it
+            </a>
+            <button type="button" onClick={dismiss} className="text-muted-foreground hover:text-foreground">
+              Looks good
+            </button>
+          </div>
+        </div>
+      </div>
+    </Card>
   );
 }
 
@@ -209,17 +262,3 @@ function InstallCheck() {
   );
 }
 
-/** Once the site is learned, give the widget suggested questions written from it — if it has none yet. */
-function useStarterQuestions(ready: boolean) {
-  const done = useRef(false);
-  useEffect(() => {
-    if (!ready || done.current) return;
-    done.current = true;
-    void (async () => {
-      const view = await api<SettingsView>('/settings');
-      if (view.settings.starterQuestions.length) return;
-      const { questions } = await api<{ questions: string[] }>('/knowledge/suggest-questions', { method: 'POST', json: {} });
-      if (questions.length) await api('/settings', { method: 'PUT', json: { settings: { starterQuestions: questions } } });
-    })().catch(() => {});
-  }, [ready]);
-}

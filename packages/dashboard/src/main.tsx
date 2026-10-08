@@ -10,6 +10,7 @@ import { Conversations } from './pages/Conversations';
 import { Leads } from './pages/Leads';
 import { Contact } from './pages/Contact';
 import { Callbacks } from './pages/Callbacks';
+import { Jobs } from './pages/Jobs';
 import { Login } from './pages/Login';
 import { Overview } from './pages/Overview';
 import { Home } from './pages/Home';
@@ -70,6 +71,7 @@ function App() {
       {route.page === 'conversations' && <Conversations id={route.id} me={me} />}
       {route.page === 'leads' && <Leads />}
       {route.page === 'contact' && route.id && <Contact id={route.id} me={me} />}
+      {route.page === 'jobs' && <Jobs id={route.id} me={me} />}
       {route.page === 'callbacks' && <Callbacks />}
       {route.page === 'prompt' && <Prompt me={me} />}
       {route.page === 'settings' && <Settings me={me} section={route.id} />}

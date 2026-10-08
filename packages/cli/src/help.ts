@@ -72,6 +72,7 @@ COMMANDS
     keys list|create|revoke  API keys for the public API (/api/v1): scoped, one site each, shown once
     api <METHOD> <path>  Call any public API endpoint with this project's admin key (--data '{…}')
     callbacks            Visitors waiting to be called back: list them, mark them done
+    jobs                 Requests, quotes and work on the pipeline: list, create, move, set up
     dashboard            A one-time sign-in link to the dashboard (or the setup link, before setup)
     validate             Check helppuff.json and prompt.md without deploying
     schema               Print the JSON Schema of helppuff.json (every field, with descriptions)
@@ -310,7 +311,7 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   users: {
     usage: 'helppuff users list | add <email> [--role admin|member] | role <email> admin|member | remove <email> | reset <email> [--password <p>]',
     summary:
-      'Manage who can sign in to the dashboard. The owner is dashboard.adminEmail; others are stored in the D1 database. Admins (the default) can do everything; members see only conversations, contacts, callbacks and live chat, and their own notifications. A password is generated and shown once when --password is omitted.',
+      'Manage who can sign in to the dashboard. The owner is dashboard.adminEmail; others are stored in the D1 database. Admins (the default) can do everything; members see only conversations, jobs, contacts, callbacks and live chat, and their own notifications. A password is generated and shown once when --password is omitted.',
     examples: ['helppuff users add sam@acme.com --role member', 'helppuff users role sam@acme.com admin', 'helppuff users reset owner@acme.com --json', 'helppuff users list'],
   },
   live: {
@@ -350,6 +351,13 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     summary:
       'Visitors who asked to be called back, the same as the dashboard\'s Callbacks page: waiting ones oldest first, with how to reach them, why, and the conversation. Mark one done (with a note of what happened) or dismissed; each change sends the callback.updated webhook. A conversation has at most one waiting request; asking again updates it.',
     examples: ['helppuff callbacks --json', 'helppuff callbacks done cb_k2x9 --note "Booked a measure for Tuesday"', 'helppuff callbacks list --status done'],
+  },
+  jobs: {
+    usage:
+      "helppuff jobs list [--status open|won|lost|all] [--search …] | show <job> | create [--title …] [--fields '{…}'] [--name …] [--email …] [--phone …] [--details …] [--value N] | move <job> <stage> [--reason …] | update <job> <text> | pipeline | template <id> | setup",
+    summary:
+      'Requests, quotes and work on the site\'s pipeline, the same as the dashboard\'s Jobs page and Settings → Jobs. They come from the assistant (when a visitor asks for a quote or work done), the widget\'s quote questions, the API, and by hand. A job is named by its number (1042) or id; a stage by its name or id. `pipeline` shows the stages, fields and quote questions; `template` starts again from one (service-quote, projects, support, sales-demo, bookings, custom-orders, basic); `setup` lets the AI read the website and choose. Each change sends the job.* webhooks.',
+    examples: ['helppuff jobs --json', 'helppuff jobs create --name "Ada Lovelace" --email ada@example.com --fields \'{"service":"Hot water","address":"Glebe"}\'', 'helppuff jobs move 1042 "Quote sent"', 'helppuff jobs move 1042 Lost --reason "Went with another quote"', 'helppuff jobs setup --json'],
   },
   dashboard: {
     usage: 'helppuff dashboard [--email <e>] [--no-browser]',

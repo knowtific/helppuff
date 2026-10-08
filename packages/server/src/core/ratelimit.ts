@@ -240,9 +240,10 @@ export function resetMemoryLimits(): void {
   memory.clear();
 }
 
-export function rateLimited(verdict: LimitVerdict, detail: string): HelpPuffError {
+export function rateLimited(verdict: LimitVerdict, detail: string, message?: string): HelpPuffError {
   return new HelpPuffError('rate_limited', {
     ...(verdict.retryAfter === undefined ? {} : { retryAfter: verdict.retryAfter }),
+    ...(message ? { message } : {}),
     detail,
   });
 }

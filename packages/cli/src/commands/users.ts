@@ -90,7 +90,7 @@ export async function usersCommand(ctx: Ctx): Promise<number> {
       if (sub === 'add' && exists) throw new CliError('user_exists', `${email} can already sign in.`, { hint: `helppuff users reset ${email}` });
       if (sub === 'reset' && !exists) throw new CliError('no_user', `${email} is not a dashboard user.`, { hint: `helppuff users add ${email}` });
       const role = str(ctx.flags, 'role') ?? 'admin';
-      if (role !== 'admin' && role !== 'member') throw new CliError('usage', '--role is admin (everything) or member (conversations, contacts, callbacks, live chat).', { exitCode: 2 });
+      if (role !== 'admin' && role !== 'member') throw new CliError('usage', '--role is admin (everything) or member (conversations, jobs, contacts, callbacks, live chat).', { exitCode: 2 });
       const { password, generated } = await passwordFor(ctx);
       if (sub === 'add') {
         await query('INSERT INTO admins (email, password_hash, role, created_at) VALUES (?, ?, ?, ?)', [email, hashPassword(password), role, Date.now()]);
