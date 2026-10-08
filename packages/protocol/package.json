@@ -11,7 +11,8 @@
     "./sse": "./src/sse.ts",
     "./text": "./src/text.ts",
     "./forms": "./src/forms.ts",
-    "./live": "./src/handover.ts"
+    "./live": "./src/handover.ts",
+    "./jobs": "./src/jobs.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

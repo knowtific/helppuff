@@ -53,6 +53,17 @@ export type ConnectorContext<Opts> = {
    * `unavailable` or `limited` (the server adds the callback form). Never throws.
    */
   handover?: (reason?: string) => Promise<'started' | 'unavailable' | 'limited'>;
+  /**
+   * The site's Jobs (its pipeline), when the assistant may create jobs: the
+   * fields a job has, and `create`, which saves one from what the visitor
+   * said and answers with its number and the required fields still missing
+   * (the server shows the visitor a short form for those). Never throws.
+   */
+  jobs?: {
+    itemSingular: string;
+    fields: { name: string; label: string; type: string; required: boolean; options: string[]; question: string | null }[];
+    create: (input: { title?: string; summary?: string; fields: Record<string, string> }) => Promise<{ number: number; missing: string[] } | null>;
+  };
   /** Tell the site's webhooks something happened that only the connector knows (its daily budget). Never throws. */
   notify?: (type: 'budget.warning' | 'budget.exhausted', data: Record<string, unknown>) => void;
   /**

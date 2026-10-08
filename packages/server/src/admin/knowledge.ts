@@ -28,6 +28,7 @@ import type { HonoEnv } from '../core/request.js';
 import { aiSettingsFor, requireKnowledgeEnv, websiteFor, type KnowledgeEnv } from '../knowledge/env.js';
 import { cancelCrawl, crawlStatus, discoverSite, startCrawl, userAgentFor, type CrawlTrigger } from '../knowledge/crawl.js';
 import { assertSameOrigin, currentAdmin, jsonBody, siteParam } from './guard.js';
+import { suggestQuestions } from '../home/suggest.js';
 
 /**
  * The knowledge base, under `/admin/api/knowledge`: what the dashboard's
@@ -453,52 +454,9 @@ knowledgeRoutes.post('/knowledge/suggest-questions', async (c) => {
   await currentAdmin(c);
   const body = await jsonBody(c);
   const { siteId, site, env } = await siteOf(c, body['site']);
-  const headings = (
-    await env.db
-      .prepare(
-        `SELECT heading_path AS h, category FROM chunks WHERE site_id = ? AND url NOT LIKE 'helppuff://%'
-         GROUP BY heading_path ORDER BY CASE category WHEN 'service' THEN 0 WHEN 'faq' THEN 1 WHEN 'pricing' THEN 2 WHEN 'location' THEN 3 ELSE 4 END LIMIT 60`,
-      )
-      .bind(siteId)
-      .all<{ h: string; category: string }>()
-  ).results.map((r) => r.h);
   const facts = await readFacts(env.db, siteId);
-  const fallback = ['What services do you offer?', 'How much does it cost?', 'Which areas do you cover?', 'How do I book?'];
-  if (!headings.length) return c.json({ questions: fallback, source: 'default' });
-
-  const options = (site.connector.options ?? {}) as { model?: unknown; gateway?: unknown };
-  const model = typeof options.model === 'string' ? options.model : '@cf/zai-org/glm-4.7-flash';
-  try {
-    const result = (await env.ai.run(
-      model,
-      {
-        messages: [
-          {
-            role: 'system',
-            content:
-              'You write the suggested questions shown on a small business website chat. Reply with a JSON array of exactly 4 strings and nothing else. Each is a question a real customer would ask, at most 8 words, answerable from the sections listed. No numbering.',
-          },
-          {
-            role: 'user',
-            content: `Business: ${facts.find((f) => f.key === 'name')?.value ?? site.widget.brand.name}\nSections of the website:\n${headings.slice(0, 50).join('\n')}`,
-          },
-        ],
-        max_tokens: 200,
-        temperature: 0.4,
-        ...reasoningInputs(model, 'off'),
-      },
-      typeof options.gateway === 'string' ? { gateway: { id: options.gateway } } : undefined,
-    )) as { choices?: { message?: { content?: string } }[]; response?: string };
-    const text = result.choices?.[0]?.message?.content ?? result.response ?? '';
-    const parsed = JSON.parse(/\[[\s\S]*\]/.exec(text)?.[0] ?? '[]') as unknown;
-    const questions = Array.isArray(parsed)
-      ? parsed.filter((q): q is string => typeof q === 'string' && q.trim().length > 3).map((q) => q.trim().slice(0, 80)).slice(0, 4)
-      : [];
-    if (questions.length >= 2) return c.json({ questions, source: 'model' });
-  } catch {
-    // The defaults below are always acceptable.
-  }
-  return c.json({ questions: fallback, source: 'default' });
+  const { chatModel, gateway } = aiSettingsFor(site);
+  return c.json(await suggestQuestions({ db: env.db, ai: env.ai, model: chatModel, gateway }, siteId, facts.find((f) => f.key === 'name')?.value ?? site.widget.brand.name));
 });
 
 /**

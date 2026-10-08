@@ -141,7 +141,7 @@ const passage = (chunk: RetrievedChunk, n: number) =>
  * covers goal, tone, length, language, promises and off-topic questions):
  * how to use the passages, and the callback tool.
  */
-function rules(options: WorkersAiOptions, hasTools: boolean, live = false): string {
+function rules(options: WorkersAiOptions, hasTools: boolean, live = false, jobs = false): string {
   return [
     '## How to answer from the website',
     '- Answer only from the business details and the numbered website passages below. If they do not cover a question about the business, say you are not sure rather than guessing' +
@@ -153,6 +153,9 @@ function rules(options: WorkersAiOptions, hasTools: boolean, live = false): stri
       : hasTools
         ? '- There is no live chat. Use request_callback only when the visitor asks for a person, a quote or a booking, or says yes to your offer of a callback; otherwise offer it in words. Never ask for a phone number or email you already have.'
         : '',
+    jobs
+      ? '- When the visitor wants a quote, a booking, a project or work done, and has said what it is, use create_job with what they told you (once per need), instead of request_callback. Ask one short question first only if you do not yet know what they need.'
+      : '',
   ]
     .filter(Boolean)
     .join('\n');
@@ -428,10 +431,10 @@ async function respond(
   const { business, persona, scope, contact, env } = await promptReady();
   // A callback the form already requested is not requested again.
   const live = Boolean(ctx.handover);
-  const tools = toolDefinitions(options, live).filter((t) => !(callbackSent && t.function.name === 'request_callback'));
+  const tools = toolDefinitions(options, live, ctx.jobs).filter((t) => !(callbackSent && t.function.name === 'request_callback'));
   const head = [
     persona?.trim() || `You are the website assistant${business.name ? ` for ${business.name}` : ''}.`,
-    rules(options, tools.length > 0, live),
+    rules(options, tools.length > 0, live, Boolean(ctx.jobs)),
     options.richMessages ? MARKER_INSTRUCTIONS.split('\n').slice(0, 3).join('\n') : '',
     `## Business details\n${businessBlock(business, options.timezone)}`,
     visitorBlock(contact, scope.lead),
@@ -473,7 +476,7 @@ async function respond(
   let firstToken = false;
   // The system prompt must never be repeated back: once a reply starts to, nothing more is shown.
   // One line of the built-in rules is never a thing to say; the owner's text is, once, by chance.
-  const rulesLeak = promptLeak([ctx.guidance?.before ?? '', ctx.guidance?.after ?? '', rules(options, tools.length > 0, live), MARKER_INSTRUCTIONS].join('\n'), 1);
+  const rulesLeak = promptLeak([ctx.guidance?.before ?? '', ctx.guidance?.after ?? '', rules(options, tools.length > 0, live, Boolean(ctx.jobs)), MARKER_INSTRUCTIONS].join('\n'), 1);
   const personaLeak = promptLeak(persona ?? '', 2);
   const leaks = (text: string) => rulesLeak(text) || personaLeak(text);
   let shown = '';

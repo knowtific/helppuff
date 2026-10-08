@@ -131,7 +131,10 @@ between releases are never published: every release makes deployed
 assistants show "Update available", so each one should be worth upgrading to.
 
 While working, add user-visible changes under `## [Unreleased]` in
-`CHANGELOG.md`. To release:
+`CHANGELOG.md`. A pull request that changes what ships (anything under
+`packages/`) also makes the release, with the steps below; docs, tests and
+CI changes do not. That is safe because nothing reaches users until a
+maintainer approves the staged version (step 6). To release:
 
 1. Bump `version` in `packages/cli/package.json` (semver: a major release
    only for changes that need users to act; `1.2.0-beta.1` publishes a

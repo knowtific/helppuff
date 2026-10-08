@@ -18,7 +18,8 @@ export type LiveEvent =
   | { t: 'missed'; conversationId: string }
   | { t: 'changed'; conversationId: string }
   | { t: 'typing'; conversationId: string; on: boolean }
-  | { t: 'presence'; available: number; agents: { email: string; name: string | null; available: boolean }[] };
+  | { t: 'presence'; available: number; agents: { email: string; name: string | null; available: boolean }[] }
+  | { t: 'job'; jobId: string; number: number; title: string; who: string | null; source: string };
 
 const listeners = new Set<(event: LiveEvent) => void>();
 
@@ -118,14 +119,14 @@ function notify(concern: Concern): void {
   try {
     const n = new Notification(concern.title, {
       body: concern.body.slice(0, 160),
-      tag: `hp-${concern.kind === 'new-chat' ? 'new' : 'msg'}-${concern.conversationId}`,
+      tag: `hp-${concern.kind === 'new-chat' ? 'new' : concern.kind === 'job' ? 'job' : 'msg'}-${concern.conversationId}`,
       requireInteraction: concern.kind === 'new-chat',
       // Replacing one for the same chat still sounds and shows it again.
       ...({ renotify: concern.kind !== 'new-chat' } as NotificationOptions),
     });
     n.onclick = () => {
       window.focus();
-      window.location.hash = `#/conversations/${concern.conversationId}`;
+      window.location.hash = concern.link;
       n.close();
     };
   } catch {
@@ -186,16 +187,18 @@ export function useLiveConnection(enabled: boolean, prefs: Prefs | null, me: str
       if (!p) return;
       const concern = concerns(event, me, p.available);
       if (!concern) return;
-      const wantsNotice = concern.kind === 'message' ? p.notifyNewMessage : p.notifyNewChat;
-      const wantsSound = concern.kind === 'message' ? p.soundNewMessage : p.soundNewChat;
+      // A new job is told like a message: worth knowing, not urgent.
+      const quiet = concern.kind === 'message' || concern.kind === 'job';
+      const wantsNotice = quiet ? p.notifyNewMessage : p.notifyNewChat;
+      const wantsSound = quiet ? p.soundNewMessage : p.soundNewChat;
       if (looking()) {
         toastListeners.forEach((listener) => listener({ ...concern, id: ++toasts }));
       } else {
-        nudge(`${concern.title}${concern.kind === 'message' ? `: ${concern.body}` : ''}`);
+        nudge(`${concern.title}${quiet ? `: ${concern.body}` : ''}`);
         if (wantsNotice) notify(concern);
       }
       if (!wantsSound) return;
-      playSound(p.sound, concern.kind === 'message' ? p.volume * 0.7 : p.volume);
+      playSound(p.sound, quiet ? p.volume * 0.7 : p.volume);
       if (concern.kind === 'new-chat' && p.repeatUntilTaken) {
         let times = 0;
         waiting.set(

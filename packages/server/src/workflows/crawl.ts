@@ -5,6 +5,10 @@ import type { AiRunner } from '../conversations/summary.js';
 import { dbFrom } from '../db/d1.js';
 import { requireKnowledgeEnv } from '../knowledge/env.js';
 import { emitTo, runWebhookRetry, workflowRetry, type WebhookRetryParams } from '../webhooks/deliver.js';
+import { setupAfterLearning } from '../jobs/setup.js';
+import { suggestAfterLearning } from '../home/suggest.js';
+import { DEFAULT_CHAT_MODEL } from '../knowledge/env.js';
+import type { KvStore } from '@helppuff/connector-types';
 
 /**
  * The Worker's background jobs: one Cloudflare Workflow, so each job survives
@@ -51,7 +55,17 @@ export class CrawlWorkflow extends WorkflowEntrypoint<Record<string, unknown>, J
 
     const env = requireKnowledgeEnv(this.env);
     // The site's webhooks hear when learning finishes; a failing endpoint never fails the job.
-    const notify: Notify = (type, data) => emitTo({ db: env.db, fetch: fetcher, retry: workflowRetry(this.env) }, payload.siteId, type, data).catch(() => {});
+    // Learning the site the first time also sets Jobs and the home screen up from it (once; never over the owner's).
+    const notify: Notify = async (type, data) => {
+      await emitTo({ db: env.db, fetch: fetcher, retry: workflowRetry(this.env) }, payload.siteId, type, data).catch(() => {});
+      if (type !== 'knowledge.crawl.finished') return;
+      const ai = this.env['AI'] as Partial<AiRunner> | undefined;
+      const runner = ai && typeof ai.run === 'function' ? (ai as AiRunner) : undefined;
+      const kv = this.env['HELPPUFF_KV'] as KvStore | undefined;
+      await setupAfterLearning({ db: env.db, ai: runner, kv, now: () => Date.now() }, payload.siteId).catch(() => {});
+      // And the widget's home screen: useful pages as links, the questions visitors ask (once; the owner's own win).
+      await suggestAfterLearning({ db: env.db, ai: runner, kv, model: DEFAULT_CHAT_MODEL, now: () => Date.now() }, payload.siteId, '').catch(() => {});
+    };
     if ('kind' in payload && payload.kind === 'file') {
       if (!env.uploads) throw new Error('No KV binding to read the upload from.');
       return runFileJob(steps, { db: env.db, ai: env.ai, vectors: env.vectors, uploads: env.uploads, toMarkdown: env.toMarkdown, notify }, payload);

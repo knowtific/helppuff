@@ -8,6 +8,8 @@ never needs you to change anything. Upgrade with
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-08
+
 ### Added: live chat, roles and a fuller CRM
 
 - **Live chat** (off by default; `helppuff live on` or Settings → Live chat):
@@ -22,8 +24,8 @@ never needs you to change anything. Upgrade with
   `live.closeAfterMinutes` without a message; a visitor who writes again is
   answered by the assistant). Filter by status, label and "waiting for a
   reply"; filters are remembered.
-- **Roles**: admin or member. Members see conversations, contacts, callbacks
-  and live chat only. Invite and change roles in Settings → Team, or
+- **Roles**: admin or member. Members see conversations, jobs, contacts,
+  callbacks and live chat only. Invite and change roles in Settings → Team, or
   `helppuff users add --role member` / `helppuff users role`.
 - **Labels** (Settings → Labels), put on by the team or by the AI when a
   conversation goes quiet; **custom attributes** and **private notes** on
@@ -36,6 +38,57 @@ never needs you to change anything. Upgrade with
   `conversation.closed`; `message.sent` carries `author` for a person.
 - D1 migration 10 (`inbox and live chat`), and the `LiveHub` Durable Object,
   added by `helppuff upgrade`.
+
+### Added: jobs
+
+- **Jobs**: requests, quotes and work from conversations, on a board with
+  the site's own stages (drag, or a menu on each card), a list, and a page
+  per job with its fields, updates, private notes and history. Rename them
+  (Quotes, Tickets…) in Settings → Jobs.
+- **Set up from the website**: the AI picks a template (service quote,
+  projects, support, sales demo, bookings, custom orders; basic when unsure)
+  and fills in the services; Home says what it chose. Stages, fields and
+  names are editable; "Let the AI choose again" or `helppuff jobs setup`.
+- **From the chat**: workers-ai creates a job when a visitor asks for a quote
+  or work (`create_job`), then asks in a short form for required details it
+  lacks. The widget's **Get a quote** button asks the quote questions (chosen
+  in Settings → Jobs) and saves the answers as a job; its contact questions
+  stand in for the lead form.
+- **From elsewhere**: `POST /api/v1/jobs` (scopes `jobs:read`, `jobs:write`),
+  "New job" from a contact, a conversation or a callback request, and
+  `helppuff jobs list|show|create|move|update|pipeline|template|setup`.
+- Webhooks: `job.created`, `job.updated`, `job.stage_changed`, `job.won`,
+  `job.lost`. A new job alerts the team like a message (with live chat on).
+- Set up after every deploy (`deploy.jobs` in `--json`): the pipeline at
+  once, so the assistant records requests from the first visitor, and the
+  AI's choice from the website then (other backends) or when learning
+  finishes (workers-ai). Never over a pipeline already set up.
+- D1 migration 11 (`jobs`), applied by `helppuff upgrade`.
+
+### Added: the home screen
+
+- **Settings → Home screen**: the widget's first screen in the dashboard,
+  with a preview: its heading, up to 8 buttons of every kind (a question, a
+  page, call, email, a form, a few questions) and a list of useful pages.
+  Before, only the suggested questions were in the dashboard.
+- **Suggested from the website**: when the site is first learned, the AI
+  picks the pages worth a link and writes the questions visitors ask; the
+  widget shows them until the owner saves their own (which always win).
+  **Suggest from my site** adds more, with call and email buttons from the
+  business details.
+- API: `home` in `GET/PUT /settings`, `POST /home/suggest`; `config pull`
+  brings `widget.home` (title, subtitle, links) into helppuff.json.
+
+### Changed
+
+- The agent instructions (`instructions.md`) list the command for every
+  change a user may ask for: settings in `helppuff.json`, and what lives on
+  the Worker (jobs, labels, live chat, team, webhooks, keys).
+- Too many sign-in attempts now says so, instead of "Too many messages".
+- Suggested questions moved from Settings → Chat to Settings → Home screen,
+  and are made by the server when the site is learned rather than by the
+  dashboard (which marked the settings as changed and made the next deploy
+  ask for `config pull`).
 
 ### Added: the public API
 

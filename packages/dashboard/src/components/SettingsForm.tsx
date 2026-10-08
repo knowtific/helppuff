@@ -1,6 +1,7 @@
-import { Check, Loader2, Plus, Sparkles, X } from 'lucide-react';
+import { Check, Loader2, Plus, X } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { api, type LeadField, type Settings, type SettingsView } from '../lib/api';
+import { href } from '../lib/utils';
 import { Button, ErrorNote, Input, Select, Skeleton, Textarea } from './ui';
 import { SecurityForm } from './SecurityForm';
 
@@ -161,8 +162,6 @@ export function SettingsForm({ knowledge, section }: { knowledge: boolean; secti
   const [error, setError] = useState<Error | null>(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [newQuestion, setNewQuestion] = useState('');
-  const [suggesting, setSuggesting] = useState(false);
 
   useEffect(() => {
     api<SettingsView>('/settings').then(
@@ -192,8 +191,9 @@ export function SettingsForm({ knowledge, section }: { knowledge: boolean; secti
     setBusy(true);
     setError(null);
     try {
-      // Behaviour belongs to the Instructions page; a stale copy here must not overwrite it.
-      const { behaviour: _behaviour, ...settings } = draft;
+      // Behaviour belongs to the Instructions page, the home screen (and its questions) to
+      // Settings → Home screen: a stale copy here must not overwrite them.
+      const { behaviour: _behaviour, home: _home, starterQuestions: _questions, ...settings } = draft;
       const result = await api<SettingsView>('/settings', {
         method: 'PUT',
         json: { settings },
@@ -205,27 +205,6 @@ export function SettingsForm({ knowledge, section }: { knowledge: boolean; secti
     } finally {
       setBusy(false);
     }
-  };
-
-  const suggest = async () => {
-    setSuggesting(true);
-    try {
-      const { questions } = await api<{ questions: string[] }>('/knowledge/suggest-questions', { method: 'POST', json: {} });
-      set({
-        starterQuestions: [...new Set([...questions, ...draft.starterQuestions])].slice(0, 6),
-      });
-    } catch (thrown) {
-      setError(thrown as Error);
-    } finally {
-      setSuggesting(false);
-    }
-  };
-
-  const addQuestion = () => {
-    const q = newQuestion.trim();
-    if (!q || draft.starterQuestions.length >= 6) return;
-    set({ starterQuestions: [...draft.starterQuestions, q] });
-    setNewQuestion('');
   };
 
   return (
@@ -248,53 +227,13 @@ export function SettingsForm({ knowledge, section }: { knowledge: boolean; secti
           <Field label="Welcome message">
             <Textarea rows={2} value={draft.welcomeMessage} maxLength={2000} onChange={(e) => set({ welcomeMessage: e.target.value })} />
           </Field>
-          <div className="space-y-1.5">
-            <span className="flex items-center justify-between gap-2">
-              <span className="text-xs font-medium" id="starters">
-                Suggested questions
-              </span>
-              {knowledge && (
-                <Button type="button" variant="ghost" size="sm" onClick={() => void suggest()} disabled={suggesting}>
-                  {suggesting ? <Loader2 className="animate-spin" /> : <Sparkles />}
-                  Suggest from my site
-                </Button>
-              )}
-            </span>
-            <ul className="flex flex-wrap gap-1.5" aria-labelledby="starters">
-              {draft.starterQuestions.map((q, i) => (
-                <li key={`${q}-${i}`} className="inline-flex items-center gap-1 rounded-md border bg-subtle py-0.5 pr-0.5 pl-2 text-xs">
-                  {q}
-                  <button
-                    type="button"
-                    className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                    aria-label={`Remove “${q}”`}
-                    onClick={() =>
-                      set({
-                        starterQuestions: draft.starterQuestions.filter((_, j) => j !== i),
-                      })
-                    }
-                  >
-                    <X className="size-3" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-            {draft.starterQuestions.length < 6 && (
-              <div className="flex gap-2">
-                <Input
-                  value={newQuestion}
-                  maxLength={80}
-                  placeholder="e.g. Do you service my suburb?"
-                  aria-label="New suggested question"
-                  onChange={(e) => setNewQuestion(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addQuestion())}
-                />
-                <Button type="button" variant="outline" onClick={addQuestion} disabled={!newQuestion.trim()}>
-                  <Plus /> Add
-                </Button>
-              </div>
-            )}
-          </div>
+          <p className="text-xs text-muted-foreground">
+            Suggested questions, call and email buttons and useful links on the widget’s first screen:{' '}
+            <a href={href({ page: 'settings', id: 'home' })} className="font-medium text-foreground underline-offset-2 hover:underline">
+              Home screen
+            </a>
+            .
+          </p>
         </Section>
       )}
 

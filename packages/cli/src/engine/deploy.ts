@@ -118,6 +118,11 @@ export type DeployResult = {
   crawl: { runId: string; total: number } | null;
   /** workers-ai: local files uploaded as knowledge entries. */
   files: FilesSynced | null;
+  /**
+   * Jobs, set up after the deploy: `waiting` (chosen from the website when the crawl
+   * ends), `done` (chosen now), `kept` (already set up, or the owner's own). Null: no dashboard.
+   */
+  jobs: { status: 'waiting' | 'done' | 'kept'; template: string; chosenBy: string; reason: string | null } | null;
   healthy: boolean;
   warnings: string[];
 };
@@ -225,6 +230,7 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
       setupUrl: null,
       crawl: null,
       files: null,
+      jobs: null,
       warnings: ['dry run: nothing was changed'],
     };
   }
@@ -429,6 +435,23 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
     }
   }
 
+  // Jobs: the pipeline at once (the assistant can make jobs from the first
+  // visitor), and the AI's choice of template from the website, now or when
+  // the crawl ends. Once: never over a pipeline already set up.
+  let jobs: DeployResult['jobs'] = null;
+  if (healthy && dashboardEnabled(loaded.project)) {
+    const api = adminApi(loaded, { url, fetch: doFetch, env });
+    if (!usesHelpPuffKnowledge(loaded.project)) await waitForAdminKey(api, progress);
+    type Setup = { status: 'waiting' | 'done' | 'kept'; pipeline: { template: string; chosenBy: string; reason: string | null } };
+    jobs = await api
+      .send<Setup>('POST', '/admin/api/jobs/setup', { force: false })
+      .then((r) => ({ status: r.status, template: r.pipeline.template, chosenBy: r.pipeline.chosenBy, reason: r.pipeline.reason }))
+      .catch((thrown: unknown) => {
+        warnings.push(`Jobs were not set up: ${(thrown as Error).message}. Run \`helppuff jobs setup\`.`);
+        return null;
+      });
+  }
+
   return {
     url,
     dashboard: dashboardEnabled(loaded.project) ? dashboardUrl(url) : null,
@@ -444,6 +467,7 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
     setupUrl,
     crawl,
     files,
+    jobs,
     warnings,
     prompt: promptMeta ? { version: promptMeta.version, published: Boolean(promptToPublish) } : null,
   };

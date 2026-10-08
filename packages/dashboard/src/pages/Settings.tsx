@@ -11,6 +11,8 @@ import { FactsForm } from '../components/FactsForm';
 import { Webhooks } from '../components/Webhooks';
 import { ApiKeys } from '../components/ApiKeys';
 import { Updates } from '../components/Updates';
+import { JobsSettings } from '../components/JobsSettings';
+import { HomeScreenSettings } from '../components/HomeScreenSettings';
 
 export function CopyBlock({ text, label }: { text: string; label: string }) {
   const [copied, setCopied] = useState(false);
@@ -36,13 +38,15 @@ export function CopyBlock({ text, label }: { text: string; label: string }) {
 }
 
 const DESCRIPTIONS: Record<SettingsSection, string> = {
-  chat: 'The assistant’s name, its greeting and the questions it suggests.',
+  chat: 'The assistant’s name and its greeting.',
+  home: 'What visitors see when they open the chat: the heading, the buttons and useful pages.',
   appearance: 'Taken from your website. Change it if you like.',
   leads: 'A short form before the chat: every conversation becomes a lead, and the assistant knows who it’s talking to.',
   instructions: 'How it talks and what it’s for.',
   business: 'Read from your website. The assistant always has these; your changes are never overwritten.',
   live: 'Let visitors talk to a person on your team, from the dashboard or Telegram.',
   labels: 'Tag conversations, by hand or by the AI, and filter by them.',
+  jobs: 'Requests, quotes and work: the stages they go through, what you need to know, and the quote questions on the widget.',
   notifications: 'Your own alerts for live chats: browser notifications, sound and availability.',
   advanced: 'The model, how often your site is re-read, rate limits, blocked IPs and sign-in protection.',
   webhooks: 'Send chats, messages, leads and callbacks to other tools as they happen.',
@@ -53,12 +57,14 @@ const DESCRIPTIONS: Record<SettingsSection, string> = {
 
 const HELP: Record<SettingsSection, string> = {
   chat: 'Widget#customising',
+  home: 'Widget#the-home-screen',
   appearance: 'Widget#customising',
   leads: 'Leads#the-form-in-helppuffjson',
   instructions: 'Prompts-and-Instructions',
   business: 'Knowledge-Base#business-details',
   live: 'Live-Chat',
   labels: 'Dashboard#labels',
+  jobs: 'Jobs',
   notifications: 'Live-Chat#notifications',
   advanced: 'AI-Models',
   webhooks: 'Webhooks',
@@ -87,7 +93,7 @@ export function Settings({ me, section }: { me: Me; section: string | undefined 
           </a>
         ))}
       </nav>
-      <div className="max-w-3xl p-4 md:p-6">
+      <div className={cn('p-4 md:p-6', current.id === 'home' ? 'max-w-6xl' : 'max-w-3xl')}>
         {(current.id === 'chat' || current.id === 'appearance' || current.id === 'leads' || current.id === 'advanced') && (
           <Card>
             <SettingsForm key={current.id} knowledge={Boolean(site?.knowledge)} section={current.id} />
@@ -106,7 +112,9 @@ export function Settings({ me, section }: { me: Me; section: string | undefined 
         {current.id === 'webhooks' && <Webhooks />}
         {current.id === 'api' && <ApiKeys />}
         {current.id === 'live' && <LiveChatSettings />}
+        {current.id === 'home' && <HomeScreenSettings knowledge={Boolean(site?.knowledge)} />}
         {current.id === 'labels' && <LabelsSettings />}
+        {current.id === 'jobs' && <JobsSettings />}
         {current.id === 'notifications' && <NotificationSettings />}
         {current.id === 'team' && <Team me={me} />}
         {current.id === 'updates' && <Updates />}
@@ -115,7 +123,7 @@ export function Settings({ me, section }: { me: Me; section: string | undefined 
   );
 }
 
-const ROLE_HINT = 'Admins: everything. Members: conversations, contacts, callbacks and live chat, no settings.';
+const ROLE_HINT = 'Admins: everything. Members: conversations, jobs, contacts, callbacks and live chat, no settings.';
 
 function Team({ me }: { me: Me }) {
   const { data, reload } = useData(() => api<TeamList>('/admins'), []);

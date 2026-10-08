@@ -48,7 +48,7 @@ export type Site = {
   /** Live chat is on and can run (the live socket, notifications). Absent from older Workers. */
   live?: boolean;
 };
-/** `member`: the inbox only (conversations, contacts, callbacks, live chat); `admin` and `owner`: everything. */
+/** `member`: the inbox only (conversations, jobs, contacts, callbacks, live chat); `admin` and `owner`: everything. */
 export type Role = 'owner' | 'admin' | 'member';
 export type Me = { admin: { email: string; owner: boolean; role?: Role; name?: string | null }; sites: Site[]; summaries: boolean };
 
@@ -390,7 +390,21 @@ export type Settings = {
   security?: SecuritySettings;
   /** Live chat. Absent from older Workers. */
   live?: LiveSettings;
+  /** The widget's first screen. Absent from older Workers. */
+  home?: HomeSettings;
 };
+export type ShortcutAction =
+  | { id: string; kind: 'reply'; label: string; value: string }
+  | { id: string; kind: 'url'; label: string; url: string; newTab?: boolean }
+  | { id: string; kind: 'tel'; label: string; phone: string }
+  | { id: string; kind: 'email'; label: string; email: string }
+  | { id: string; kind: 'form'; label: string; formId: string }
+  | { id: string; kind: 'flow'; label: string; flowId: string };
+export type Shortcut = { id: string; label: string; description?: string; icon?: string; action: ShortcutAction; paths?: string[] };
+export type HomeLink = { label: string; url: string; description?: string };
+export type HomeLinks = { title: string; items: HomeLink[] };
+export type HomeSettings = { title: string; subtitle: string; shortcuts: Shortcut[]; links: HomeLinks | null };
+export type HomeSuggestion = { questions: string[]; links: HomeLinks | null; contact: Shortcut[]; source: 'model' | 'default' };
 export type Limits = {
   messagesPerIpPerMinute: number;
   messagesPerIpPerDay: number;
@@ -418,7 +432,20 @@ export type SecuritySettings = {
   blockIps: string[];
   sessionTtlHours: number;
 };
-export type SettingsView = { site: string; connector: string; settings: Settings; hash: string; meta: { at: number; by: string | null } | null; /** Turnstile is set up (`security.captcha`). */ captcha?: boolean };
+export type SettingsView = {
+  site: string;
+  connector: string;
+  settings: Settings;
+  hash: string;
+  meta: { at: number; by: string | null } | null;
+  /** Turnstile is set up (`security.captcha`). */
+  captcha?: boolean;
+  /** What the widget's home screen shows until it is set up: suggested from the website. */
+  suggestedHome?: { questions: string[]; links: HomeLinks | null; at: number } | null;
+  /** What a shortcut can open. */
+  forms?: { id: string; title: string }[];
+  flows?: { id: string; title: string }[];
+};
 
 export type CallbackStatus = 'open' | 'done' | 'dismissed';
 export type Callback = {
@@ -437,3 +464,67 @@ export type Callback = {
   pageUrl: string | null;
 };
 export type CallbackList = { items: Callback[]; counts: Record<CallbackStatus, number> };
+
+// ------------------------------------------------------------------ jobs
+
+export type StageKind = 'open' | 'won' | 'lost';
+export type JobStage = { id: string; name: string; color: string; position: number; kind: StageKind; rotDays: number | null };
+export type JobFieldType = 'text' | 'textarea' | 'number' | 'date' | 'select' | 'email' | 'tel';
+export type JobField = {
+  id: string;
+  name: string;
+  label: string;
+  type: JobFieldType;
+  required: boolean;
+  options: string[];
+  question: string | null;
+  position: number;
+  inQuote: boolean;
+  quotePosition: number | null;
+  archived: boolean;
+};
+export type Pipeline = {
+  siteId: string;
+  template: string;
+  itemSingular: string;
+  itemPlural: string;
+  chosenBy: 'ai' | 'owner' | 'default';
+  reason: string | null;
+  assistantJobs: boolean;
+  quote: { enabled: boolean; label: string; askContact: boolean };
+  editedAt: number | null;
+  stages: JobStage[];
+  fields: JobField[];
+  quotePreview: { field: string; ask: string; input: string; choices?: string[] }[];
+};
+export type JobTemplate = { id: string; name: string; description: string; stages: { name: string; kind: StageKind; color: string }[]; fields: { name: string; label: string }[] };
+export type PipelineView = { pipeline: Pipeline; templates: JobTemplate[] };
+
+export type Job = {
+  id: string;
+  number: number;
+  title: string;
+  details: string | null;
+  stage: { id: string; name: string; kind: StageKind } | null;
+  status: StageKind;
+  fields: Record<string, string>;
+  contact: { id: string; name: string | null; email: string | null; phone: string | null } | null;
+  conversationId: string | null;
+  source: 'chat' | 'quote' | 'api' | 'manual' | 'callback';
+  value: number | null;
+  valueCents: number | null;
+  currency: string | null;
+  dueAt: number | null;
+  assignedTo: string | null;
+  assignedName: string | null;
+  position: number;
+  stale: boolean;
+  stageChangedAt: number;
+  closedAt: number | null;
+  lostReason: string | null;
+  createdAt: number;
+  updatedAt: number;
+};
+export type JobList = { items: Job[]; stages: (JobStage & { count: number; valueCents: number })[] };
+export type JobEvent = { id: string; at: number; actor: string; actorName: string | null; kind: string; data: Record<string, unknown> | null };
+export type JobDetail = Job & { history: JobEvent[]; notes: Note[]; conversation: { id: string; firstMessage: string | null; startedAt: number } | null };

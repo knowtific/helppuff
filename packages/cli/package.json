@@ -1,6 +1,6 @@
 {
   "name": "@knowtific/helppuff",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Set up, deploy and manage an AI chat widget on your own Cloudflare account — built to be driven by people and by AI agents.",
   "author": "Knowtific (MYT PTY LTD)",
   "homepage": "https://www.knowtific.com.au",

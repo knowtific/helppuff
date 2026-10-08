@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { PageHeader } from '../components/Shell';
 import { Avatar, Badge, Button, Card, Empty, ErrorNote, Skeleton, Textarea } from '../components/ui';
 import { api, type Callback, type CallbackList, type CallbackStatus } from '../lib/api';
+import { NewJobButton } from './Jobs';
 import { cn, fmtDateTime, fmtRelative, href, useData } from '../lib/utils';
 
 /**
@@ -91,6 +92,7 @@ function Row({ callback, onChanged }: { callback: Callback; onChanged: (next: Ca
               <Button size="sm" variant="outline" disabled={busy} onClick={() => void update('dismissed')} aria-label="Dismiss">
                 <X /> Dismiss
               </Button>
+              <NewJobButton context={{ callbackId: callback.id, label: `Callback request from ${callback.name ?? 'a visitor'}: its contact, chat and reason are linked.` }} />
             </>
           ) : (
             <Button size="sm" variant="outline" disabled={busy} onClick={() => void update('open')}>

@@ -397,8 +397,8 @@ Guided questions asked in the widget (no AI), sent as one message at the end. Ty
 | `widget.flows[].steps[].input` **(required)** | `"text"` \| `"choice"` \| `"phone"` \| `"email"` |  | How the visitor answers. |
 | `widget.flows[].steps[].choices` | string[] |  | The buttons of a `choice` step. · ≤ 12 items |
 | `widget.flows[].steps[].required` | boolean |  | The step cannot be skipped. |
-| `widget.flows[].submit` **(required)** | object |  | What happens with the answers. |
-| `widget.flows[].submit.as` **(required)** | `"message"` |  | Sent as one visitor message. |
+| `widget.flows[].submit` **(required)** | object |  | What happens with the answers: `message` sends them as one message, `job` saves them as a job. |
+| `widget.flows[].submit.as` **(required)** | `"message"` \| `"job"` |  | `"message"` Sent as one visitor message. · `"job"` Saved as a job (the site's Jobs pipeline), with the answers as its fields; the visitor gets its number. |
 | `widget.flows[].submit.template` **(required)** | string |  | The message, with `{{field}}` for each answer, e.g. "Quote for {{service}} in {{suburb}}". · 1–1000 chars |
 
 ### `widget.forms`

@@ -62,7 +62,7 @@ export function extractJson(text: string): Record<string, unknown> | null {
 }
 
 /** Older catalogue models answer `{ response }`, chat models `{ choices: [{ message: { content } }] }`. */
-function replyOf(raw: unknown): { text: string; usage: { in: number; out: number } | null } {
+export function replyOf(raw: unknown): { text: string; usage: { in: number; out: number } | null } {
   const r = raw as { response?: unknown; choices?: { message?: { content?: unknown } }[]; usage?: { prompt_tokens?: number; completion_tokens?: number } };
   const content = r?.choices?.[0]?.message?.content;
   const text = typeof content === 'string' ? content : typeof r?.response === 'string' ? r.response : r?.response ? JSON.stringify(r.response) : '';

@@ -23,6 +23,7 @@ import {
 import type { Ctx } from './commands/context.js';
 import { dashboardCommand, usersCommand } from './commands/users.js';
 import { webhooksCommand } from './commands/webhooks.js';
+import { jobsCommand } from './commands/jobs.js';
 import { apiCommand, keysCommand } from './commands/keys.js';
 import { callbacksCommand } from './commands/callbacks.js';
 import { upgradeCommand } from './commands/upgrade.js';
@@ -54,6 +55,7 @@ const COMMANDS: Record<string, (ctx: Ctx) => Promise<number>> = {
   keys: keysCommand,
   api: apiCommand,
   callbacks: callbacksCommand,
+  jobs: jobsCommand,
   upgrade: upgradeCommand,
   dashboard: dashboardCommand,
   prompt: promptCommand,

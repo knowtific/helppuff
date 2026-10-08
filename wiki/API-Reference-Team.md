@@ -14,7 +14,7 @@ Who can sign in to the dashboard. Part of the [[API reference|API-Reference]]: s
 
 `GET /admins` · scope `team:read`
 
-Each account's `role`: `admin` (everything) or `member` (conversations, contacts, callbacks and live chat only).
+Each account's `role`: `admin` (everything) or `member` (conversations, jobs, contacts, callbacks and live chat only).
 
 **Request**
 
@@ -78,7 +78,7 @@ With a `password` (10+ characters) they can sign in at once; without one, the an
 | `email` | yes | Their email address. |
 | `name` | no | Up to 100 characters. |
 | `password` | no | 10+ characters. Without it, the answer has a sign-in link. |
-| `role` | no | `admin` (default: everything) or `member` (conversations, contacts, callbacks and live chat; no settings). |
+| `role` | no | `admin` (default: everything) or `member` (conversations, jobs, contacts, callbacks and live chat; no settings). |
 
 **Request**
 
@@ -102,7 +102,7 @@ type AddDashboardAccountRequest = {
   /** 10+ characters. Without it, the answer has a sign-in link. */
   password?: string;
   /**
-   * `admin` (default: everything) or `member` (conversations, contacts,
+   * `admin` (default: everything) or `member` (conversations, jobs, contacts,
    * callbacks and live chat; no settings).
    */
   role?: string;

@@ -494,6 +494,95 @@ export const MIGRATIONS: readonly Migration[] = [
       'CREATE INDEX IF NOT EXISTS telegram_threads_conversation ON telegram_threads (conversation_id)',
     ],
   },
+  {
+    id: 11,
+    name: 'jobs',
+    // Jobs: one pipeline per site (from a template the AI chose, or the owner),
+    // its stages (`kind` open, won or lost) and fields (each with the question
+    // the assistant and the widget ask). A job's fields are a JSON object by
+    // field name; removed fields are archived, so old jobs keep their values.
+    // `job_events` is a job's history. Notes reuse `notes` (`job_id`).
+    statements: [
+      `CREATE TABLE IF NOT EXISTS pipelines (
+        site_id TEXT PRIMARY KEY,
+        template TEXT NOT NULL,
+        item_singular TEXT NOT NULL DEFAULT 'Job',
+        item_plural TEXT NOT NULL DEFAULT 'Jobs',
+        chosen_by TEXT NOT NULL,
+        reason TEXT,
+        assistant_jobs INTEGER NOT NULL DEFAULT 1,
+        quote_enabled INTEGER NOT NULL DEFAULT 1,
+        quote_label TEXT,
+        quote_contact INTEGER NOT NULL DEFAULT 1,
+        edited_at INTEGER,
+        updated_at INTEGER NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS pipeline_stages (
+        id TEXT PRIMARY KEY,
+        site_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        color TEXT NOT NULL,
+        position INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        rot_days INTEGER
+      )`,
+      'CREATE INDEX IF NOT EXISTS pipeline_stages_site ON pipeline_stages (site_id, position)',
+      `CREATE TABLE IF NOT EXISTS job_fields (
+        id TEXT PRIMARY KEY,
+        site_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        label TEXT NOT NULL,
+        type TEXT NOT NULL,
+        required INTEGER NOT NULL DEFAULT 0,
+        options TEXT,
+        question TEXT,
+        position INTEGER NOT NULL,
+        in_quote INTEGER NOT NULL DEFAULT 0,
+        quote_position INTEGER,
+        archived INTEGER NOT NULL DEFAULT 0
+      )`,
+      'CREATE UNIQUE INDEX IF NOT EXISTS job_fields_site_name ON job_fields (site_id, name)',
+      `CREATE TABLE IF NOT EXISTS jobs (
+        id TEXT PRIMARY KEY,
+        site_id TEXT NOT NULL,
+        number INTEGER NOT NULL,
+        stage_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        details TEXT,
+        lead_id TEXT,
+        conversation_id TEXT,
+        source TEXT NOT NULL,
+        fields TEXT,
+        value_cents INTEGER,
+        currency TEXT,
+        due_at INTEGER,
+        assigned_to TEXT,
+        assigned_name TEXT,
+        position REAL NOT NULL DEFAULT 0,
+        stage_changed_at INTEGER NOT NULL,
+        closed_at INTEGER,
+        lost_reason TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`,
+      'CREATE UNIQUE INDEX IF NOT EXISTS jobs_site_number ON jobs (site_id, number)',
+      'CREATE INDEX IF NOT EXISTS jobs_site_stage ON jobs (site_id, stage_id, position)',
+      'CREATE INDEX IF NOT EXISTS jobs_lead ON jobs (lead_id)',
+      'CREATE INDEX IF NOT EXISTS jobs_conversation ON jobs (conversation_id)',
+      `CREATE TABLE IF NOT EXISTS job_events (
+        id TEXT PRIMARY KEY,
+        job_id TEXT NOT NULL,
+        at INTEGER NOT NULL,
+        actor TEXT NOT NULL,
+        actor_name TEXT,
+        kind TEXT NOT NULL,
+        data TEXT
+      )`,
+      'CREATE INDEX IF NOT EXISTS job_events_job ON job_events (job_id, at)',
+      'ALTER TABLE notes ADD COLUMN job_id TEXT',
+      'CREATE INDEX IF NOT EXISTS notes_job ON notes (job_id, created_at)',
+    ],
+  },
 ];
 
 export const LATEST_MIGRATION = MIGRATIONS[MIGRATIONS.length - 1]!.id;

@@ -15,8 +15,13 @@ export default defineConfig({
   sites: {
     demo: {
       ...site,
-      // One machine plays every visitor here: the per-visitor live-chat limits would trip after three hand-overs.
-      security: { ...site.security, limits: { ...site.security?.limits, handoversPerIpPerDay: 1000, waitingPerSite: 1000, liveSocketsPerIp: 100 } },
+      // One machine plays every visitor and every teammate here: the per-IP limits (live chat's hand-overs,
+      // the dashboard's sign-ins) would trip after a few tests.
+      security: {
+        ...site.security,
+        limits: { ...site.security?.limits, handoversPerIpPerDay: 1000, waitingPerSite: 1000, liveSocketsPerIp: 100 },
+        signIn: { ...site.security?.signIn, attemptsPerIp: 1000 },
+      },
       origins: [...new Set([...site.origins, 'http://localhost:5173', 'http://127.0.0.1:5173', ...ports.flatMap((p) => [`http://localhost:${p}`, `http://127.0.0.1:${p}`])])],
     },
   },

@@ -271,7 +271,13 @@ export function pullSettings(loaded: LoadedProject, live: Settings): LoadedProje
     Object.assign(obj(widget, 'launcher'), { position: applied.widget.launcher.position, icon: applied.widget.launcher.icon });
     obj(widget, 'chat')['initialMessages'] = applied.widget.chat.initialMessages ?? [];
     raw['assistant'] = { ...applied.assistant };
-    obj(widget, 'home')['shortcuts'] = applied.widget.home.shortcuts ?? [];
+    const home = obj(widget, 'home');
+    home['shortcuts'] = applied.widget.home.shortcuts ?? [];
+    if (live.home) {
+      Object.assign(home, { title: applied.widget.home.title, subtitle: applied.widget.home.subtitle });
+      if (applied.widget.home.links) home['links'] = applied.widget.home.links;
+      else delete home['links'];
+    }
     Object.assign(obj(widget, 'leadForm'), { enabled: applied.widget.leadForm.enabled, fields: applied.widget.leadForm.fields });
 
     const backend = obj(raw, 'backend');

@@ -17,6 +17,7 @@ import type { Action, Message, MessageBody, Option, Shortcut, WidgetConfig } fro
 import { cleanText } from '@helppuff/protocol/text';
 import { localFormId } from '@helppuff/protocol/forms';
 import { HANDOVER_ACTION } from '@helppuff/protocol/live';
+import { JOB_FLOW_PREFIX, QUOTE_CONTACT_FIELDS } from '@helppuff/protocol/jobs';
 import type { connectLive, LiveConnection } from '../live/index.js';
 import { parseMessage } from './validate.js';
 import type { Runtime } from '../loader.js';
@@ -512,6 +513,36 @@ export function App({
     [config, startSession],
   );
 
+  /**
+   * A quote flow's answers (`submit.as: 'job'`): one action the server saves as
+   * a job. Without a chat yet, it starts one (through the lead form if the site
+   * has one) and sends the answers as soon as the chat exists.
+   */
+  const pendingJob = useRef<SendInput | null>(null);
+  const submitJobFlow = useCallback(
+    (flowId: string, answers: Record<string, string>, label: string) => {
+      const input: SendInput = { kind: 'action', actionId: `${JOB_FLOW_PREFIX}${flowId}`, value: JSON.stringify(answers), label: label.slice(0, 200) || 'Request' };
+      if (stateRef.current.session) {
+        void doSend(input);
+        return;
+      }
+      pendingJob.current = input;
+      // The flow's own contact questions answer the lead form's: it is shown only for what is still missing.
+      const lead = { ...(leadRef.current ?? {}) };
+      for (const [answer, field] of Object.entries(QUOTE_CONTACT_FIELDS)) if (answers[answer] && !lead[field]) lead[field] = answers[answer];
+      leadRef.current = lead;
+      if (!config.leadForm.enabled || leadReady(config, lead)) void startSession(lead);
+      else dispatch({ type: 'screen', screen: 'lead_form' });
+    },
+    [config, doSend, startSession],
+  );
+  useEffect(() => {
+    if (!state.session || !pendingJob.current) return;
+    const input = pendingJob.current;
+    pendingJob.current = null;
+    void doSend(input);
+  }, [state.session, doSend]);
+
   /** Append a message the widget produced itself, with no server round trip. */
   const addLocal = useCallback((message: Message) => {
     dispatch({ type: 'message/local', message });
@@ -607,13 +638,14 @@ export function App({
       if (isComplete(flow, nextStep)) {
         dispatch({ type: 'flow/end' });
         const answers = { ...current.answers, [step.field]: value };
-        sendText(renderTemplate(flow.submit.template, answers));
+        if (flow.submit.as === 'job') submitJobFlow(flow.id, answers, renderTemplate(flow.submit.template, answers));
+        else sendText(renderTemplate(flow.submit.template, answers));
       } else {
         askStep(flow.id, nextStep);
       }
       return true;
     },
-    [config, addLocal, askStep, sendText],
+    [config, addLocal, askStep, sendText, submitJobFlow],
   );
 
   startFlowRef.current = startFlow;

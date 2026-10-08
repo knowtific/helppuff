@@ -8,6 +8,8 @@ export const SCOPES = {
   'conversations:write': 'Summarise, label, annotate, take, close and delete conversations, and reply in live chats.',
   'leads:read': 'Read leads (contacts) and export them.',
   'leads:write': 'Create, update and delete leads, and add notes to them.',
+  'jobs:read': 'Read jobs, their history, and the pipeline (stages and fields).',
+  'jobs:write': 'Create, change, move and delete jobs, and add updates and notes to them.',
   'callbacks:read': 'Read callback requests.',
   'callbacks:write': 'Mark callback requests done or dismissed.',
   'knowledge:read': 'Read the knowledge base: pages, files, facts, search.',
@@ -32,7 +34,7 @@ export const ALL_SCOPES = Object.keys(SCOPES) as Scope[];
 /** Ready-made sets for the dashboard and the CLI. */
 export const SCOPE_PRESETS: Record<'chat' | 'crm' | 'read' | 'full', { label: string; scopes: Scope[] }> = {
   chat: { label: 'Chat only', scopes: ['chat'] },
-  crm: { label: 'CRM', scopes: ['conversations:read', 'conversations:write', 'leads:read', 'leads:write', 'callbacks:read', 'callbacks:write'] },
+  crm: { label: 'CRM', scopes: ['conversations:read', 'conversations:write', 'leads:read', 'leads:write', 'jobs:read', 'jobs:write', 'callbacks:read', 'callbacks:write'] },
   read: { label: 'Read-only', scopes: ALL_SCOPES.filter((s) => s.endsWith(':read')) },
   full: { label: 'Full access', scopes: [...ALL_SCOPES] },
 };

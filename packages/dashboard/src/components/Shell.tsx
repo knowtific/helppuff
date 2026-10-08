@@ -1,4 +1,4 @@
-import { ArrowUpCircle, BookOpen, ChartColumn, ChevronDown, CircleHelp, House, LogOut, MessagesSquare, Moon, PhoneCall, Settings, Sun, Users } from 'lucide-react';
+import { ArrowUpCircle, BookOpen, Briefcase, ChartColumn, ChevronDown, CircleHelp, House, LogOut, MessagesSquare, Moon, PhoneCall, Settings, Sun, Users } from 'lucide-react';
 import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import { api, isMember, type CallbackList, type LiveStatus, type Me, type Prefs, type Site } from '../lib/api';
 import { onToast, setAvailable, unlockAudio, useLiveConnection, useLiveEvents, type Toast } from '../lib/live';
@@ -40,6 +40,7 @@ const ALL_NAV: {
 }[] = [
   { page: 'home', label: 'Home', icon: <House />, admin: true },
   { page: 'conversations', label: 'Conversations', icon: <MessagesSquare /> },
+  { page: 'jobs', label: 'Jobs', icon: <Briefcase /> },
   { page: 'leads', label: 'Contacts', icon: <Users /> },
   { page: 'callbacks', label: 'Callbacks', icon: <PhoneCall /> },
   {
@@ -54,7 +55,7 @@ const ALL_NAV: {
 ];
 
 /** Settings, one page per topic; the sidebar opens them as a sub-menu. */
-export type SettingsSection = 'chat' | 'appearance' | 'leads' | 'instructions' | 'business' | 'advanced' | 'live' | 'labels' | 'notifications' | 'webhooks' | 'api' | 'team' | 'updates';
+export type SettingsSection = 'chat' | 'home' | 'appearance' | 'leads' | 'instructions' | 'business' | 'advanced' | 'live' | 'labels' | 'jobs' | 'notifications' | 'webhooks' | 'api' | 'team' | 'updates';
 
 export function settingsSections(site: Site | undefined, me?: Me): { id: SettingsSection; label: string }[] {
   // Notifications are live chat's: with it off (the default) there is no such page.
@@ -63,12 +64,14 @@ export function settingsSections(site: Site | undefined, me?: Me): { id: Setting
   if (me && isMember(me)) return live ? [{ id: 'notifications' as const, label: 'Notifications' }] : [];
   return [
     { id: 'chat' as const, label: 'Chat' },
+    { id: 'home' as const, label: 'Home screen' },
     { id: 'appearance' as const, label: 'Appearance' },
     { id: 'leads' as const, label: 'Lead form' },
     { id: 'instructions' as const, label: 'Instructions' },
     ...(site?.knowledge ? [{ id: 'business' as const, label: 'Business details' }] : []),
     { id: 'live' as const, label: 'Live chat' },
     { id: 'labels' as const, label: 'Labels' },
+    { id: 'jobs' as const, label: 'Jobs' },
     ...(live ? [{ id: 'notifications' as const, label: 'Notifications' }] : []),
     ...(site?.knowledge || site?.connector === 'workers-ai' ? [{ id: 'advanced' as const, label: 'Advanced' }] : []),
     { id: 'webhooks' as const, label: 'Webhooks' },
@@ -145,7 +148,7 @@ function Toasts() {
             <Button
               size="sm"
               onClick={() => {
-                window.location.hash = `#/conversations/${toast.conversationId}`;
+                window.location.hash = toast.link;
                 setItems((current) => current.filter((t) => t.id !== toast.id));
               }}
             >

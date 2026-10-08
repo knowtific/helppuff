@@ -30,8 +30,8 @@ Home → Share a demo).
 
 ## Customising
 
-Most of it is in **Dashboard → Settings**: names, welcome message, suggested
-questions, colour, position, button icon, the lead form. Everything else is
+Most of it is in **Dashboard → Settings**: names, welcome message, the home
+screen (below), colour, position, button icon, the lead form. Everything else is
 under `widget` in `helppuff.json`; see the
 [[Configuration reference|Configuration-Reference#widget]]. Highlights:
 
@@ -76,6 +76,33 @@ under `widget` in `helppuff.json`; see the
   at the top of the chat asks for someone from the team (`strings.talkToPerson`),
   and the header says who is answering (`strings.liveStatus`). Its code is a
   separate small file (`live-*.js`), downloaded only when a chat is handed over.
+
+## The home screen
+
+What visitors see when they open the chat: a heading, up to 8 **buttons** and
+a list of **useful pages**. Edit it in **Settings → Home screen**, with a
+preview:
+
+- **Buttons**, in order. Each one asks a question for the visitor, opens a
+  page, calls, emails, opens one of your forms (`widget.forms`) or asks a few
+  questions (`widget.flows`). Under **More**: a line under the label, and
+  pages it shows on only (`/services/**`). The **Get a quote** button belongs
+  to [[Jobs]] and is set there.
+- **Useful pages**: links under the buttons (prices, services, booking, FAQ),
+  with a line under each. They open in a new tab.
+
+**Suggested from your website.** When HelpPuff first learns your site, the
+AI picks the pages a visitor would most want and words a link for each (only
+pages your site has), and writes four questions visitors ask. The widget
+shows them straight away, until you set the home screen up yourself: your
+own buttons and links always win, and saving the page once makes it yours
+(nothing is suggested again). **Suggest from my site** on the page adds more
+at any time (with call and email buttons from your business details) for you
+to keep or drop.
+
+In `helppuff.json` it is `widget.home` (`title`, `subtitle`, `shortcuts`,
+`links`), and `helppuff config pull` brings dashboard changes into it. Over the
+API: `PUT /settings` with `home`, and `POST /home/suggest` for suggestions.
 
 ## The JavaScript API
 
