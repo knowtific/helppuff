@@ -81,6 +81,9 @@ caps.
 | `limits.retellLookupsPerMinute` | 120 | Knowledge-base lookups by a Retell agent a minute, whole site | KV | 429 |
 | `limits.apiRequestsPerKeyPerMinute` | 120 | Requests a minute for a new API key (each key can have its own) | In memory, per key | 429 |
 | `limits.apiKeysPerSite` | 50 | Active API keys per site | D1 | 400 on create |
+| `limits.handoversPerIpPerDay` | 3 | Times one visitor asks for a person a day ([[Live chat|Live-Chat]]) | D1: the conversations they handed over | The callback form |
+| `limits.waitingPerSite` | 20 | Live chats waiting for someone to take them, at once | D1 | The callback form |
+| `limits.liveSocketsPerIp` | 3 | Live chat connections one visitor holds open (tabs) | The live chat hub | The connection is refused; the widget polls |
 | `sessionTtlHours` | 24 | How long a chat can be continued | The signed token's expiry | A new chat |
 | `allowIps` | none | Addresses or CIDR ranges exempt from the per-visitor limits | — | — |
 | `blockIps` | none | Addresses or CIDR ranges refused by the chat (not the dashboard) | — | 403, the widget hides |
@@ -323,6 +326,33 @@ sign-in limit per IP (`security.signIn.attemptsPerIp`).
 - **Ratings** (`/v1/sessions/feedback`) need the conversation's own session
   token, can only touch that conversation's assistant messages, and are
   rate-limited per IP.
+
+## Live chat
+
+[[Live chat|Live-Chat]] adds three doors, each authenticated before the
+connection reaches the site's hub (a Durable Object with no route of its own):
+
+- **The visitor's socket** (`/v1/live/socket`): the signed session token, sent
+  as a WebSocket subprotocol (never in the URL, which lands in logs); the
+  Origin must be one of the site's; only a chat that was handed over may
+  connect. The socket only receives: the visitor's messages still go through
+  `POST /v1/sessions/messages` and every limit there. Frames over 4 KB are
+  ignored.
+- **The team's socket** (`/admin/api/live/socket`): the dashboard session
+  cookie (`SameSite=Strict`), and the Origin must be the dashboard's own
+  (against cross-site WebSocket hijacking). Signing out or a password change
+  ends access at the next connection.
+- **Telegram's webhook** (`/v1/integrations/telegram/:site`): checked with
+  the secret Telegram echoes back (`X-Telegram-Bot-Api-Secret-Token`,
+  compared in constant time); only the linked chat is read. The bot token is
+  stored in D1 encrypted (AES-GCM, key derived from `HELPPUFF_SECRET` by
+  HKDF): rotating the secret means connecting Telegram again.
+
+A person's replies pass the same cleaning as everything else and render
+through the widget's one Markdown renderer. In the assistant's history they
+are labelled as the team's, never placed in the system prompt. Roles: a
+**member** reaches only the routes the inbox needs (a fixed allowlist; any
+other route, including ones added later, is refused).
 
 ## The public API
 

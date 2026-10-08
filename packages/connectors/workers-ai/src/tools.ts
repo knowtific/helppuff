@@ -8,8 +8,11 @@ import type { WorkersAiOptions } from './options.js';
 /**
  * The assistant's tools, kept to what a small business needs:
  *
- *  - `request_callback` — the default way to a person. There is no live chat,
- *    so "talk to someone" means the team calls or emails back. Details the
+ *  - `request_callback` — the default way to a person: the team calls or
+ *    emails back.
+ *  - `request_person` — only when the site has live chat on: a person on the
+ *    team joins this chat. The server decides whether anyone is free; if not,
+ *    the visitor gets the callback form. Details the
  *    visitor already gave (the pre-chat form, an earlier callback) are reused;
  *    only what is missing is asked for, with a short form.
  *  - `get_business_hours` — the hours, the local time, and whether it is open.
@@ -45,8 +48,22 @@ const callbackArgs = z
 export const EMAIL = /^[^@\s]+@[^@\s.]+\.[^@\s]{2,}$/;
 export const PHONE = /^[+()\-.\s\d]{6,40}$/;
 
-export function toolDefinitions(options: WorkersAiOptions): ToolDef[] {
+export function toolDefinitions(options: WorkersAiOptions, live = false): ToolDef[] {
   const tools: ToolDef[] = [];
+  if (live) {
+    tools.push({
+      type: 'function',
+      function: {
+        name: 'request_person',
+        description:
+          'Bring a person from the team into this chat, live. Use it when the visitor asks to talk to a person, a human or someone from the team, or when they are upset, or need something only the team can do. If nobody is free, a callback form is shown instead.',
+        parameters: {
+          type: 'object',
+          properties: { reason: { type: 'string', description: 'What they need, in one sentence.' } },
+        },
+      },
+    });
+  }
   if (options.tools.callback) {
     tools.push({
       type: 'function',
@@ -127,6 +144,17 @@ export async function runTool(call: ToolCall, env: ToolEnv): Promise<ToolResult>
       await env.remember(contact);
       return {
         content: `Callback requested for ${contact.phone ?? contact.email}. Confirm briefly that the team will be in touch soon; do not ask for details again.`,
+        messages: [],
+      };
+    }
+    case 'request_person': {
+      const reason = (args as { reason?: unknown } | null)?.reason;
+      const outcome = env.ctx.handover ? await env.ctx.handover(typeof reason === 'string' ? reason.slice(0, 500) : undefined) : 'unavailable';
+      if (outcome === 'started') {
+        return { content: 'The team was notified and someone will join this chat shortly. Tell the visitor that in one short sentence; do not ask for contact details.', messages: [] };
+      }
+      return {
+        content: 'Nobody from the team is free right now. A callback form is shown to the visitor. Tell them in one sentence to leave their details there.',
         messages: [],
       };
     }

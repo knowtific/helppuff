@@ -26,6 +26,12 @@ variable, e.g. `{ "env": "OPENAI_API_KEY" }`, whose value lives in `.env` and on
 | `assistant.length` | `"short"` \| `"detailed"` | `"short"` | `short`: a few sentences; `detailed`: complete answers with short lists. |
 | `assistant.prices` | `"share"` \| `"quote"` | `"share"` | `share`: give prices exactly as the site and documents state them; `quote`: never give a price or estimate, offer a quote from the team instead. |
 | `assistant.bookingUrl` | string |  | Where visitors book, for the `bookings` goal. · ≤ 2000 chars, URL |
+| `live` | object | `{}` | Live chat: visitors can talk to a person on your team, who answers from the dashboard or Telegram. Off by default. `helppuff live on` turns it on. |
+| `live.enabled` | boolean | `false` | Let visitors talk to a person on the team. When nobody is available they get the callback form instead. |
+| `live.waitSeconds` | integer | `120` | How long a visitor waits for someone to take the chat before they are offered the callback form (they can keep waiting). · 15–3600 |
+| `live.closeAfterMinutes` | integer | `60` | A conversation with no message for this long is closed. A visitor who writes again is answered by the assistant. · 5–1440 |
+| `live.showAgentName` | boolean | `true` | Show visitors the first name of the person answering ("Sam joined"); off: "Someone from the team". |
+| `live.aiWhileWaiting` | boolean | `false` | Let the assistant keep answering until someone takes the chat. |
 
 ## `backend`
 
@@ -215,6 +221,9 @@ Per-visitor and per-site limits. The daily cap is the cost backstop.
 | `security.limits.retellLookupsPerMinute` | integer | `120` | Knowledge-base lookups a Retell agent may make a minute, for the whole site. · 1–6000 |
 | `security.limits.apiRequestsPerKeyPerMinute` | integer | `120` | Requests a new API key may make a minute (each key can have its own). Chat requests also count against the daily cap. · 1–6000 |
 | `security.limits.apiKeysPerSite` | integer | `50` | Active API keys a site may have. · 1–500 |
+| `security.limits.handoversPerIpPerDay` | integer | `3` | Times one visitor (IP) may ask for a person a day (live chat). · 1–1000 |
+| `security.limits.waitingPerSite` | integer | `20` | Live chats that may wait for a person at once; past it, visitors get the callback form. · 1–1000 |
+| `security.limits.liveSocketsPerIp` | integer | `3` | Live chat connections one visitor (IP) may hold open at once. · 1–100 |
 
 ## `leads`
 
@@ -275,7 +284,7 @@ The button that opens the chat.
 | `widget.launcher.offset.x` **(required)** | number |  | Pixels from the side. · 0–200 |
 | `widget.launcher.offset.y` **(required)** | number |  | Pixels from the bottom. · 0–200 |
 | `widget.launcher.label` | string |  | Text beside the orb, or inside it when `shape` is `pill`. For example "Chat with us". · ≤ 40 chars |
-| `widget.launcher.icon` | `"chat"` \| `"phone"` \| `"mail"` \| `"calendar"` \| `"quote"` \| `"pin"` \| `"clock"` \| `"wrench"` \| `"heart"` \| `"info"` \| `"book"` \| `"arrow-right"` \| `"arrow-left"` \| `"close"` \| `"send"` \| `"menu"` \| `"sound"` \| `"sound-off"` \| `"check"` \| `"external"` | `"chat"` | Which of the built-in icons the launcher shows. |
+| `widget.launcher.icon` | `"chat"` \| `"phone"` \| `"mail"` \| `"calendar"` \| `"quote"` \| `"pin"` \| `"clock"` \| `"wrench"` \| `"heart"` \| `"info"` \| `"book"` \| `"arrow-right"` \| `"arrow-left"` \| `"close"` \| `"send"` \| `"menu"` \| `"sound"` \| `"sound-off"` \| `"check"` \| `"external"` \| `"person"` | `"chat"` | Which of the built-in icons the launcher shows. |
 | `widget.launcher.shape` | `"orb"` \| `"pill"` | `"orb"` | `orb` is the signature circle. `pill` widens it to sit the label inside the button, which reads as a clearer invitation on a busy page. |
 | `widget.launcher.hideOnPaths` | string[] |  | Pages where the widget does not appear, e.g. `/checkout/**`. · ≤ 50 items |
 
@@ -291,7 +300,7 @@ The first screen visitors see.
 | `widget.home.shortcuts[].id` **(required)** | string |  | Unique among the shortcuts. · 1–64 chars |
 | `widget.home.shortcuts[].label` **(required)** | string |  | What the shortcut says. · 1–80 chars |
 | `widget.home.shortcuts[].description` | string |  | A line under the label. · ≤ 160 chars |
-| `widget.home.shortcuts[].icon` | `"chat"` \| `"phone"` \| `"mail"` \| `"calendar"` \| `"quote"` \| `"pin"` \| `"clock"` \| `"wrench"` \| `"heart"` \| `"info"` \| `"book"` \| `"arrow-right"` \| `"arrow-left"` \| `"close"` \| `"send"` \| `"menu"` \| `"sound"` \| `"sound-off"` \| `"check"` \| `"external"` |  | A built-in icon. |
+| `widget.home.shortcuts[].icon` | `"chat"` \| `"phone"` \| `"mail"` \| `"calendar"` \| `"quote"` \| `"pin"` \| `"clock"` \| `"wrench"` \| `"heart"` \| `"info"` \| `"book"` \| `"arrow-right"` \| `"arrow-left"` \| `"close"` \| `"send"` \| `"menu"` \| `"sound"` \| `"sound-off"` \| `"check"` \| `"external"` \| `"person"` |  | A built-in icon. |
 | `widget.home.shortcuts[].action` **(required)** | object |  | What happens when the button is pressed. `kind` picks it. |
 | `widget.home.shortcuts[].action.kind` **(required)** | `"reply"` \| `"url"` \| `"tel"` \| `"email"` \| `"flow"` \| `"form"` |  | `"reply"` Send a message as the visitor. · `"url"` Open a page. · `"tel"` Call a number. · `"email"` Write an email. · `"flow"` Start one of `widget.flows`. · `"form"` Open one of `widget.forms`. |
 | `widget.home.shortcuts[].action.id` **(required)** | string |  | An id, unique within its list. · 1–64 chars |
@@ -346,7 +355,7 @@ The conversation screen.
 | `widget.chat.shortcuts[].id` **(required)** | string |  | Unique among the shortcuts. · 1–64 chars |
 | `widget.chat.shortcuts[].label` **(required)** | string |  | What the shortcut says. · 1–80 chars |
 | `widget.chat.shortcuts[].description` | string |  | A line under the label. · ≤ 160 chars |
-| `widget.chat.shortcuts[].icon` | `"chat"` \| `"phone"` \| `"mail"` \| `"calendar"` \| `"quote"` \| `"pin"` \| `"clock"` \| `"wrench"` \| `"heart"` \| `"info"` \| `"book"` \| `"arrow-right"` \| `"arrow-left"` \| `"close"` \| `"send"` \| `"menu"` \| `"sound"` \| `"sound-off"` \| `"check"` \| `"external"` |  | A built-in icon. |
+| `widget.chat.shortcuts[].icon` | `"chat"` \| `"phone"` \| `"mail"` \| `"calendar"` \| `"quote"` \| `"pin"` \| `"clock"` \| `"wrench"` \| `"heart"` \| `"info"` \| `"book"` \| `"arrow-right"` \| `"arrow-left"` \| `"close"` \| `"send"` \| `"menu"` \| `"sound"` \| `"sound-off"` \| `"check"` \| `"external"` \| `"person"` |  | A built-in icon. |
 | `widget.chat.shortcuts[].action` **(required)** | object |  | What happens when the button is pressed. `kind` picks it. |
 | `widget.chat.shortcuts[].action.kind` **(required)** | `"reply"` \| `"url"` \| `"tel"` \| `"email"` \| `"flow"` \| `"form"` |  | `"reply"` Send a message as the visitor. · `"url"` Open a page. · `"tel"` Call a number. · `"email"` Write an email. · `"flow"` Start one of `widget.flows`. · `"form"` Open one of `widget.forms`. |
 | `widget.chat.shortcuts[].action.id` **(required)** | string |  | An id, unique within its list. · 1–64 chars |

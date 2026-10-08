@@ -78,7 +78,7 @@ async function world(site: Site = {}) {
 }
 
 /** Maps whose keys are data (counts by status, custom fields…), not part of the shape. */
-const MAPS = new Set(['pages', 'counts', 'facts', 'metadata', 'fields', 'ms', 'embedding', 'utm', 'limits', 'contact']);
+const MAPS = new Set(['pages', 'counts', 'facts', 'metadata', 'fields', 'ms', 'embedding', 'utm', 'limits', 'contact', 'attributes']);
 
 /** Top-level fields of `actual` against the documented example (and of the first item of each list). */
 function shapeOf(value: unknown, depth = 0, key = ''): unknown {

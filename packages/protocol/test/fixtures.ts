@@ -34,6 +34,7 @@ export const validMessages: Message[] = [
     fields: [{ name: 'email', label: 'Email', type: 'email', required: true }],
     submitLabel: 'Send',
   },
+  { ...base, role: 'system', type: 'handover', status: 'joined', text: 'Sam joined the chat.', agentName: 'Sam' },
 ];
 
 /** Each entry must be rejected by `messageSchema`. */
@@ -56,6 +57,7 @@ export const invalidMessages: Array<[name: string, value: unknown]> = [
   ['unknown action kind', { ...base, type: 'card', title: 't', actions: [{ id: 'a', kind: 'ussd', label: 'l', value: 'v' }] }],
   ['form with no fields', { ...base, type: 'form', fields: [] }],
   ['field with unknown type', { ...base, type: 'form', fields: [{ name: 'a', label: 'A', type: 'color' }] }],
+  ['handover with unknown status', { ...base, type: 'handover', status: 'busy', text: 'x' }],
   ['null', null],
   ['array', []],
   ['string', 'text'],

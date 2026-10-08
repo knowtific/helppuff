@@ -15,6 +15,7 @@ import { dbFrom } from '../db/d1.js';
 import { emit } from '../webhooks/deliver.js';
 import { endChat, sendChat } from '../core/chat.js';
 import { visitorStanding } from '../core/visitor.js';
+import { liveAvailable, messagesSince, readLiveState } from '../live/service.js';
 
 export const messageRoutes = new Hono<HonoEnv>();
 
@@ -84,8 +85,12 @@ messageRoutes.get('/v1/sessions/messages', async (c) => {
   const ctx = c.get('helppuff');
   const session = await authenticate(ctx, c.req.header('Authorization'));
   const poll = session.prepared.connector.poll;
+  // A live chat whose socket cannot connect (a strict host page, a proxy) polls for the team's replies instead.
+  const db = dbFrom(ctx.env);
+  const live = db && liveAvailable(ctx.env, session.site, session.payload.siteId) ? await readLiveState(db, session.payload.sessionId) : null;
+  const liveChat = Boolean(live?.handover_at);
 
-  if (!poll) {
+  if (!poll && !liveChat) {
     throw new HelpPuffError('bad_request', { detail: 'poll_not_supported' });
   }
 
@@ -93,6 +98,11 @@ messageRoutes.get('/v1/sessions/messages', async (c) => {
   if ((await visitorStanding(ctx, session.site.security)) === 'limited') {
     const perIp = hitMemory('poll', `${session.payload.siteId}:${await ctx.ipKey()}`, session.site.security.limits.pollsPerIpPerMinute, 60, ctx.platform.now());
     if (!perIp.allowed) throw rateLimited(perIp, 'polls_per_ip');
+  }
+
+  if (liveChat || !poll) {
+    const after = Number(c.req.query('after') ?? 0) || 0;
+    return c.json({ messages: await messagesSince(db!, session.payload.sessionId, after) } satisfies PollResponse);
   }
 
   // Forms delivered here are not added to the token (a poll returns none); backends that poll send text.

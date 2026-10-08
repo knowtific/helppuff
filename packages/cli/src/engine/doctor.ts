@@ -165,6 +165,27 @@ export async function doctor(cwd: string, doFetch: typeof fetch = fetch): Promis
     );
   }
 
+  if (url && env['ADMIN_API_KEY']) {
+    checks.push(
+      await attempt('live chat', async () => {
+        const api = adminApi(loaded!, { fetch: doFetch, env });
+        const status = await api.get<{ enabled: boolean; hub: boolean; available: number; telegram: { connected: boolean; linked: boolean } }>('/admin/api/live/status').catch(() => null);
+        if (!status) return { status: 'skip', detail: 'this Worker is older than live chat', fix: 'helppuff upgrade' };
+        if (!status.enabled) return { status: 'skip', detail: 'off', fix: 'helppuff live on (to let visitors talk to a person)' };
+        if (!status.hub) return { status: 'fail', detail: 'on, but this Worker has no live chat hub', fix: 'helppuff upgrade' };
+        if (status.telegram.connected) {
+          const telegram = await api.get<{ linked: boolean; linkCode: string | null; lastError: string | null }>('/admin/api/live/telegram');
+          if (telegram.lastError) return { status: 'warn', detail: `Telegram: ${telegram.lastError}`, fix: 'helppuff telegram status' };
+          if (!telegram.linked) return { status: 'warn', detail: 'Telegram is connected but no chat is linked', fix: `send /link ${telegram.linkCode ?? '<code>'} in the Telegram chat to answer from` };
+        }
+        if (status.available === 0 && !status.telegram.linked) {
+          return { status: 'warn', detail: 'on, but nobody can take chats now: visitors get the callback form', fix: 'open the dashboard and switch to Available, or helppuff telegram connect' };
+        }
+        return { status: 'pass', detail: `on; ${status.available} available in the dashboard${status.telegram.linked ? ', Telegram linked' : ''}` };
+      }),
+    );
+  }
+
   if (url) {
     checks.push(
       await attempt('live', async () => {

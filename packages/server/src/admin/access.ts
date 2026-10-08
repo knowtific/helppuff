@@ -7,7 +7,7 @@ import { requireSecret, type HonoEnv } from '../core/request.js';
 import { createKey, forgetKey, keyScopes, keyView, type ApiKeyRow } from '../api/keys.js';
 import { ALL_SCOPES, hasScope, isScope, SCOPE_PRESETS, SCOPES, type Scope } from '../api/scopes.js';
 import { hashPassword } from './auth.js';
-import { assertSameOrigin, currentAdmin, db, jsonBody, siteParam } from './guard.js';
+import { assertAdmin, assertSameOrigin, currentAdmin, db, jsonBody, ROLES, siteParam } from './guard.js';
 import { mintLink, TTL } from './setup.js';
 
 /**
@@ -44,12 +44,44 @@ accessRoutes.post('/admins', async (c) => {
     throw new HelpPuffError('conflict', { message: `${email} can already sign in.`, detail: 'team_exists' });
   }
   const name = typeof body['name'] === 'string' ? body['name'].trim().slice(0, 100) || null : null;
+  const role = body['role'] === undefined ? 'admin' : body['role'];
+  if (!(ROLES as readonly unknown[]).includes(role)) throw new HelpPuffError('bad_request', { message: 'Role is admin or member.', detail: 'team_bad_role' });
   // Without a password, a hash nothing matches: they sign in with the link, then set one with `helppuff users reset`.
   const hash = password ? await hashPassword(password) : `none$${crypto.randomUUID()}`;
   const now = c.get('helppuff').platform.now();
-  await d.prepare('INSERT INTO admins (email, password_hash, name, created_at) VALUES (?, ?, ?, ?)').bind(email, hash, name, now).run();
+  await d.prepare('INSERT INTO admins (email, password_hash, name, role, created_at) VALUES (?, ?, ?, ?, ?)').bind(email, hash, name, role, now).run();
   const link = password ? null : await mintLink(c, 'login', email, INVITE_TTL);
-  return c.json({ email, name, createdAt: now, signInLink: link?.url ?? null, signInLinkExpiresAt: link?.expiresAt ?? null }, 201);
+  return c.json({ email, name, role, createdAt: now, signInLink: link?.url ?? null, signInLinkExpiresAt: link?.expiresAt ?? null }, 201);
+});
+
+/** Change someone's role or name. Members see the inbox only; admins see everything. The owner stays the owner. */
+accessRoutes.patch('/admins/:email', async (c) => {
+  assertSameOrigin(c);
+  assertAdmin(await currentAdmin(c));
+  const email = decodeURIComponent(c.req.param('email')).toLowerCase();
+  const body = await jsonBody(c);
+  const d = db(c);
+  const owner = String(c.get('helppuff').env['ADMIN_EMAIL'] ?? '').toLowerCase();
+  const first = owner ? null : await d.prepare('SELECT email FROM admins ORDER BY created_at LIMIT 1').first<{ email: string }>();
+  if (email === owner || email === first?.email) {
+    throw new HelpPuffError('bad_request', { message: 'The owner always has full access.', detail: 'team_owner' });
+  }
+  const sets: string[] = [];
+  const params: unknown[] = [];
+  if (body['role'] !== undefined) {
+    if (!(ROLES as readonly unknown[]).includes(body['role'])) throw new HelpPuffError('bad_request', { message: 'Role is admin or member.', detail: 'team_bad_role' });
+    sets.push('role = ?');
+    params.push(body['role']);
+  }
+  if (typeof body['name'] === 'string') {
+    sets.push('name = ?');
+    params.push(body['name'].trim().slice(0, 100) || null);
+  }
+  if (!sets.length) throw new HelpPuffError('bad_request', { message: 'Nothing to update.', detail: 'team_nothing' });
+  const result = (await d.prepare(`UPDATE admins SET ${sets.join(', ')} WHERE email = ?`).bind(...params, email).run()) as { meta?: { changes?: number } } | undefined;
+  if (result?.meta?.changes === 0) throw new HelpPuffError('not_found', { message: `No account for ${email}.`, detail: 'team_unknown' });
+  const row = await d.prepare("SELECT email, name, COALESCE(role, 'admin') AS role, created_at AS createdAt, last_login_at AS lastLoginAt FROM admins WHERE email = ?").bind(email).first();
+  return c.json(row);
 });
 
 /** Remove a dashboard account: signed out at their next request. The owner (in Worker config) cannot be removed here. */

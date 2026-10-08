@@ -88,6 +88,15 @@ Settings → Webhooks → **Recent deliveries** shows each delivery's status and
 error; **Send test** sends one now. Endpoints must be `https://` and answer
 within 8 seconds with a 2xx. See [[Webhooks]].
 
+## Live chat: nobody gets notified, or visitors always get the callback form
+
+Someone must be available: a dashboard tab open with the **Available** switch
+on (bottom of the menu), or [[Telegram]] linked. `helppuff live status` and
+`helppuff doctor` say which is missing. No sound: click anywhere in the
+dashboard once (browsers need a click before playing sound), then
+Settings → Notifications → **Test sound**. No notification: allow them for the
+dashboard's site in the browser. See [[Live chat|Live-Chat#troubleshooting]].
+
 ## Still stuck
 
 Open an issue with the output of `helppuff doctor --json` (it contains no

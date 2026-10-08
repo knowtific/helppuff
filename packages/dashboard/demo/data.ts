@@ -1,4 +1,4 @@
-import type { Callback, ConversationRow, Lead, LeadStatus, StoredMessage, Summary } from '../src/lib/api';
+import type { Callback, ConversationRow, Label, Lead, LeadStatus, Note, StoredMessage, Summary } from '../src/lib/api';
 
 /**
  * Sample data for the dashboard demo: a made-up plumbing business with a few
@@ -16,7 +16,18 @@ export const SITE = {
   knowledge: true,
   website: 'https://harbourplumbing.example',
   production: { turnstile: false, hostnames: ['harbourplumbing.example', 'www.harbourplumbing.example', 'knowtific-helppuff-harbour.example.workers.dev'], dailyCap: 500 },
+  // No live socket in the demo (nothing to connect to); live chats still show and can be answered.
+  live: false,
 };
+
+export const LABELS: Label[] = [
+  { id: 'lbl_urgent', name: 'Urgent', color: '#ef4444', description: 'Water or gas leaking now, or no hot water', ai: true },
+  { id: 'lbl_quote', name: 'Quote', color: '#3b82f6', description: 'Wants a price for a job', ai: true },
+  { id: 'lbl_repeat', name: 'Repeat customer', color: '#22c55e', description: 'Has used us before', ai: true },
+  { id: 'lbl_complaint', name: 'Complaint', color: '#f97316', description: 'Unhappy with a job or a visit', ai: false },
+];
+
+export const notes: Note[] = [];
 
 const DAY = 86_400_000;
 const NOW = Date.now();
@@ -278,6 +289,51 @@ export const callbacks: Callback[] = [];
   for (const c of conversations) {
     const own = callbacks.filter((cb) => cb.conversationId === c.id);
     c.callback = own.find((cb) => cb.status === 'open')?.status ?? own[0]?.status ?? null;
+    // Quiet for an hour: closed. Labels the AI put on, from what the chat was about.
+    c.status = c.lastAt < NOW - 3600_000 ? 'closed' : 'bot';
+    const text = `${c.firstMessage} ${c.summary ?? ''}`.toLowerCase();
+    c.labels = LABELS.filter(
+      (l) =>
+        (l.id === 'lbl_urgent' && /leak|burst|no hot water|emergency|flood/.test(text)) ||
+        (l.id === 'lbl_quote' && /how much|price|cost|quote/.test(text)) ||
+        (l.id === 'lbl_repeat' && leads.find((x) => x.id === c.leadId)?.conversations !== undefined && (leads.find((x) => x.id === c.leadId)?.conversations ?? 1) > 1),
+    ).map(({ id, name, color }) => ({ id, name, color }));
+    c.attributes = {};
+  }
+  // Two live chats: one waiting for someone to take it, one Priya is answering.
+  const [waiting, answering] = conversations;
+  if (waiting) {
+    waiting.status = 'live';
+    waiting.assignedTo = null;
+    waiting.assignedName = null;
+    waiting.waitingSince = NOW - 2 * 60_000;
+    waiting.lastAt = NOW - 2 * 60_000;
+    waiting.messages.push(
+      { id: `${waiting.id}_ask`, role: 'user', type: 'text', text: 'Can I talk to a real person please?', payload: null, ts: NOW - 3 * 60_000, author: null },
+      { id: `${waiting.id}_ho`, role: 'system', type: 'handover', text: 'Connecting you with someone from the team. They’ll reply right here.', payload: { status: 'waiting' }, ts: NOW - 3 * 60_000 + 1, author: null },
+      { id: `${waiting.id}_more`, role: 'user', type: 'text', text: 'It’s leaking under the sink, quite a lot.', payload: null, ts: NOW - 2 * 60_000, author: null },
+    );
+    waiting.messageCount = waiting.messages.length;
+  }
+  if (answering) {
+    answering.status = 'live';
+    answering.assignedTo = 'office@harbourplumbing.example';
+    answering.assignedName = 'Priya';
+    answering.waitingSince = null;
+    answering.lastAt = NOW - 6 * 60_000;
+    answering.messages.push(
+      { id: `${answering.id}_ho`, role: 'system', type: 'handover', text: 'Priya joined the chat.', payload: { status: 'joined' }, ts: NOW - 8 * 60_000, author: null },
+      { id: `${answering.id}_h1`, role: 'agent', type: 'text', text: 'Hi, Priya here from the office. I can book Dan for tomorrow at 8am — does that suit?', payload: { meta: { human: true, agentName: 'Priya' } }, ts: NOW - 7 * 60_000, author: 'office@harbourplumbing.example' },
+      { id: `${answering.id}_u2`, role: 'user', type: 'text', text: 'Perfect, thank you!', payload: null, ts: NOW - 6 * 60_000, author: null },
+    );
+    answering.messageCount = answering.messages.length;
+    answering.attributes = { job: 'HP-2041' };
+  }
+  for (const lead of leads.slice(0, 6)) lead.attributes = { suburb: JSON.parse(lead.fields ?? '{}').suburb ?? 'Balmain', ...(lead.status === 'won' ? { lifetimeValue: '$640' } : {}) };
+  const first = leads[0];
+  if (first) {
+    first.company = 'Rozelle Cafe';
+    notes.push({ id: 'note_1', leadId: first.id, conversationId: null, author: 'owner@harbourplumbing.example', authorName: 'Dan', text: 'Owns the cafe on Darling St: commercial kitchen, so book mornings before 7.', createdAt: NOW - 2 * DAY, updatedAt: NOW - 2 * DAY });
   }
 }
 

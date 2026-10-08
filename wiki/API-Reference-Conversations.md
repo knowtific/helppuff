@@ -6,6 +6,7 @@ Read, summarise and delete conversations, from the widget and the API alike. Par
 
 - [[List conversations|API-Reference-Conversations#list-conversations]]: `GET /conversations`
 - [[Get a conversation|API-Reference-Conversations#get-a-conversation]]: `GET /conversations/:id`
+- [[Label a conversation, or set its attributes|API-Reference-Conversations#label-a-conversation-or-set-its-attributes]]: `PATCH /conversations/:id`
 - [[Summarise a conversation|API-Reference-Conversations#summarise-a-conversation]]: `POST /conversations/:id/summary`
 - [[Delete a conversation|API-Reference-Conversations#delete-a-conversation]]: `DELETE /conversations/:id`
 
@@ -18,7 +19,10 @@ Newest activity first, 30 at a time. Pass `next` from the answer as `before` for
 | Parameter | In | Required | Description |
 | --- | --- | --- | --- |
 | `q` | query | no | Search messages, summaries and lead details (up to 48 characters). |
-| `filter` | query | no | `all`, `leads` (with a lead), `unsummarized` or `callbacks` (with an open callback request). |
+| `filter` | query | no | `all`, `leads` (with a lead), `unsummarized`, `callbacks` (with an open callback request) or `waiting` (a live chat waiting for the team's reply). |
+| `status` | query | no | `all`, `bot` (the assistant has it), `live` (a person has it) or `closed` (closed, or quiet for `live.closeAfterMinutes`). |
+| `label` | query | no | Conversations with this label (its id or name). |
+| `assigned` | query | no | `me`, `none`, or a team member's email. |
 | `externalId` | query | no | Conversations started over the API with this `externalId`. |
 | `before` | query | no | Cursor: the `next` of the previous page. |
 | `limit` | query | no | 1–100, default 30. |
@@ -63,7 +67,21 @@ const data = (await response.json()) as ListConversationsResponse;
       "leadEmail": "ada@example.com",
       "leadPhone": "0400 111 222",
       "leadStatus": "new",
-      "callback": "open"
+      "callback": "open",
+      "status": "live",
+      "assignedTo": "sam@acme.example",
+      "assignedName": "Sam",
+      "waitingSince": 1760000120000,
+      "attributes": {
+        "orderId": "A-1042"
+      },
+      "labels": [
+        {
+          "id": "lbl_3f2a1b0c9d8e",
+          "name": "Urgent",
+          "color": "#ef4444"
+        }
+      ]
     }
   ],
   "next": null
@@ -87,6 +105,18 @@ type ListConversationsResponse = {
     leadPhone: string;
     leadStatus: string;
     callback: string;
+    status: string;
+    assignedTo: string | null;
+    assignedName: string | null;
+    waitingSince: number | null;
+    attributes: {
+      orderId: string;
+    };
+    labels: Array<{
+      id: string;
+      name: string;
+      color: string;
+    }>;
   }>;
   next: string | null;
 };
@@ -97,7 +127,7 @@ type ListConversationsResponse = {
 
 `GET /conversations/:id` · scope `conversations:read`
 
-The conversation, its lead, its callback requests and every message both ways.
+The conversation (with its `status`, who has it, and custom `attributes`), its lead, callback requests, labels, the team's notes and every message both ways (a person's replies carry `author`).
 
 | Parameter | In | Required | Description |
 | --- | --- | --- | --- |
@@ -146,7 +176,16 @@ const data = (await response.json()) as GetConversationResponse;
     "summarized_at": null,
     "completed_at": null,
     "ended_at": null,
-    "channel": "widget"
+    "channel": "widget",
+    "status": "bot",
+    "assigned_to": null,
+    "assigned_name": null,
+    "handover_at": null,
+    "waiting_since": null,
+    "closed_at": null,
+    "attributes": {
+      "orderId": "A-1042"
+    }
   },
   "lead": {
     "id": "lead_5e3f0c8a-1f7b-4f8e-9a51-0e2b7c4d1a90",
@@ -160,7 +199,12 @@ const data = (await response.json()) as GetConversationResponse;
     "status": "new",
     "notes": null,
     "created_at": 1760000000000,
-    "updated_at": 1760000000000
+    "updated_at": 1760000000000,
+    "company": "Analytical Engines",
+    "address": null,
+    "attributes": {
+      "plan": "pro"
+    }
   },
   "callbacks": [
     {
@@ -179,6 +223,25 @@ const data = (await response.json()) as GetConversationResponse;
       "pageUrl": "https://acme.example/pricing"
     }
   ],
+  "labels": [
+    {
+      "id": "lbl_3f2a1b0c9d8e",
+      "name": "Urgent",
+      "color": "#ef4444",
+      "addedBy": "ai",
+      "addedAt": 1760000000000
+    }
+  ],
+  "notes": [
+    {
+      "id": "note_mfx2k1a9b3c4",
+      "author": "sam@acme.example",
+      "authorName": "Sam",
+      "text": "Called her back, booked for Tuesday.",
+      "createdAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  ],
   "messages": [
     {
       "id": "1b0f6a52-3c1e-4c55-9f0e-2d1c7a9e5b10:u1",
@@ -187,7 +250,8 @@ const data = (await response.json()) as GetConversationResponse;
       "text": "How much is a blocked drain?",
       "payload": null,
       "ts": 1760000000000,
-      "feedback": null
+      "feedback": null,
+      "author": null
     },
     {
       "id": "1b0f6a52-3c1e-4c55-9f0e-2d1c7a9e5b10:m_mfx2k1",
@@ -196,7 +260,8 @@ const data = (await response.json()) as GetConversationResponse;
       "text": "Usually $180–$250.",
       "payload": {},
       "ts": 1760000000001,
-      "feedback": 1
+      "feedback": 1,
+      "author": null
     }
   ]
 }
@@ -223,6 +288,15 @@ type GetConversationResponse = {
     completed_at: number | null;
     ended_at: number | null;
     channel: string;
+    status: string;
+    assigned_to: string | null;
+    assigned_name: string | null;
+    handover_at: number | null;
+    waiting_since: string | null;
+    closed_at: number | null;
+    attributes: {
+      orderId: string;
+    };
   };
   lead: {
     id: string;
@@ -237,6 +311,11 @@ type GetConversationResponse = {
     notes: string | null;
     created_at: number;
     updated_at: number;
+    company: string;
+    address: string | null;
+    attributes: {
+      plan: string;
+    };
   };
   callbacks: Array<{
     id: string;
@@ -253,10 +332,144 @@ type GetConversationResponse = {
     closedBy: string | null;
     pageUrl: string;
   }>;
+  labels: Array<{
+    id: string;
+    name: string;
+    color: string;
+    addedBy: string;
+    addedAt: number;
+  }>;
+  notes: Array<{
+    id: string;
+    author: string;
+    authorName: string;
+    text: string;
+    createdAt: number;
+    updatedAt: number;
+  }>;
   messages: Message[];
 };
 ```
 <!-- /tabs -->
+
+## Label a conversation, or set its attributes
+
+`PATCH /conversations/:id` · scope `conversations:write`
+
+Custom `attributes` are key-value strings for your own data (an order number, a plan): sent keys are set, `null` removes one, others stay; up to 50. Labels come from the site's list (`GET /labels`), by id or name: `labels` replaces them, `addLabels` and `removeLabels` change them.
+
+| Parameter | In | Required | Description |
+| --- | --- | --- | --- |
+| `id` | path | yes | The record's id. |
+
+| Body field | Required | Description |
+| --- | --- | --- |
+| `attributes` | no | An object of strings; `null` removes a key. Keys: up to 64 letters, digits, spaces, `_ - .`; values up to 1000 characters. |
+| `labels` | no | The labels it should have (ids or names), replacing the ones it has. |
+| `addLabels` | no | Labels to add. |
+| `removeLabels` | no | Labels to remove. |
+
+**Request**
+
+<!-- tabs -->
+```bash [curl]
+curl -X PATCH "$HELPPUFF_URL/api/v1/conversations/ID" \
+  -H "Authorization: Bearer $HELPPUFF_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "attributes": {
+    "orderId": "A-1042",
+    "coupon": null
+  },
+  "addLabels": [
+    "Urgent"
+  ]
+}'
+```
+```ts [TypeScript]
+type LabelConversationSetItsAttributesRequest = {
+  /**
+   * An object of strings; `null` removes a key. Keys: up to 64 letters,
+   * digits, spaces, `_ - .`; values up to 1000 characters.
+   */
+  attributes?: {
+    orderId?: string;
+    coupon?: string | null;
+  };
+  /** The labels it should have (ids or names), replacing the ones it has. */
+  labels?: string;
+  /** Labels to add. */
+  addLabels?: string[];
+  /** Labels to remove. */
+  removeLabels?: string;
+};
+
+const id = '…';
+const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/conversations/${id}`, {
+  method: 'PATCH',
+  headers: {
+    Authorization: `Bearer ${process.env.HELPPUFF_API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    attributes: {
+      orderId: 'A-1042',
+      coupon: null
+    },
+    addLabels: [
+      'Urgent'
+    ]
+  } satisfies LabelConversationSetItsAttributesRequest),
+});
+if (!response.ok) throw new Error(((await response.json()) as ApiError).error.message);
+const data = (await response.json()) as LabelConversationSetItsAttributesResponse;
+```
+<!-- /tabs -->
+
+**Response** `200`
+
+<!-- tabs -->
+```json [Example]
+{
+  "id": "1b0f6a52-3c1e-4c55-9f0e-2d1c7a9e5b10",
+  "labels": [
+    {
+      "id": "lbl_3f2a1b0c9d8e",
+      "name": "Urgent",
+      "color": "#ef4444",
+      "addedBy": "key:k7m3p9q2r4s8",
+      "addedAt": 1760000000000
+    }
+  ],
+  "attributes": {
+    "orderId": "A-1042"
+  },
+  "notes": []
+}
+```
+```ts [Type]
+type LabelConversationSetItsAttributesResponse = {
+  id: string;
+  labels: Array<{
+    id: string;
+    name: string;
+    color: string;
+    addedBy: string;
+    addedAt: number;
+  }>;
+  attributes: {
+    orderId: string;
+  };
+  notes: string[];
+};
+```
+<!-- /tabs -->
+
+**Errors**
+
+| Status | Code | When |
+| --- | --- | --- |
+| 400 | `bad_request` | An unknown label, a bad attribute key or value, or more than 50 attributes. |
 
 ## Summarise a conversation
 

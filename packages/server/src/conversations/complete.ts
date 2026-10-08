@@ -5,6 +5,7 @@ import type { D1Like } from '../db/d1.js';
 import { aiSettingsFor } from '../knowledge/env.js';
 import { emitTo, type WebhookRetryParams } from '../webhooks/deliver.js';
 import { summarizeConversation, type AiRunner } from './summary.js';
+import { parseJsonObject } from '../admin/inbox.js';
 
 /**
  * The end of a conversation, as a background job (the Worker's Workflow).
@@ -87,7 +88,10 @@ export function startConversationJob(ctx: RequestCtx, siteId: string, conversati
   );
 }
 
-type Row = { started_at: number; last_at: number; completed_at: number | null };
+type Row = { started_at: number; last_at: number; completed_at: number | null; status: string | null };
+
+/** A live chat (a person answering) is not over after five quiet minutes: it waits until it closes. */
+const LIVE_IDLE_MS = 60 * 60_000;
 
 export async function runConversationJob(step: StepLike, deps: ConversationJobDeps, params: ConversationParams): Promise<{ status: 'completed' | 'skipped' }> {
   const now = deps.now ?? Date.now;
@@ -97,12 +101,12 @@ export async function runConversationJob(step: StepLike, deps: ConversationJobDe
   // read inside steps, so a replayed instance makes the same decisions.
   for (let check = 0; ; check++) {
     const wait = await step.do(`check:${check}`, async () => {
-      const row = await deps.db.prepare('SELECT started_at, last_at, completed_at FROM conversations WHERE id = ?').bind(params.conversationId).first<Row>();
+      const row = await deps.db.prepare('SELECT started_at, last_at, completed_at, status FROM conversations WHERE id = ?').bind(params.conversationId).first<Row>();
       // Recording runs after the response, so the row can lag a moment; give up if it never comes.
       if (!row) return check < 3 ? idle : -1;
       if (row.completed_at) return -1;
       const t = now();
-      const due = row.last_at + idle;
+      const due = row.last_at + (row.status === 'live' ? Math.max(idle, LIVE_IDLE_MS) : idle);
       if (due <= t || t - row.started_at > MAX_OPEN_MS || check >= MAX_CHECKS) return 0;
       return due - t;
     });
@@ -143,12 +147,17 @@ export async function runConversationJob(step: StepLike, deps: ConversationJobDe
 /** `conversation.completed`'s data: the conversation, its summary and labels, the lead, the transcript. */
 async function completedEvent(db: D1Like, id: string): Promise<Record<string, unknown>> {
   const row = await db.prepare('SELECT * FROM conversations WHERE id = ?').bind(id).first<Record<string, unknown>>();
-  const [messages, lead] = await Promise.all([
+  const [messages, lead, tags] = await Promise.all([
     db
-      .prepare('SELECT role, type, text, ts FROM messages WHERE conversation_id = ? ORDER BY ts, id')
+      .prepare('SELECT role, type, text, ts, author FROM messages WHERE conversation_id = ? ORDER BY ts, id')
       .bind(id)
-      .all<{ role: string; type: string; text: string | null; ts: number }>(),
-    row?.['lead_id'] ? db.prepare('SELECT name, email, phone, fields, status, source FROM leads WHERE id = ?').bind(row['lead_id']).first<Record<string, unknown>>() : null,
+      .all<{ role: string; type: string; text: string | null; ts: number; author: string | null }>(),
+    row?.['lead_id'] ? db.prepare('SELECT name, email, phone, company, fields, attributes, status, source FROM leads WHERE id = ?').bind(row['lead_id']).first<Record<string, unknown>>() : null,
+    db
+      .prepare('SELECT l.name FROM conversation_labels cl JOIN labels l ON l.id = cl.label_id WHERE cl.conversation_id = ? ORDER BY l.name COLLATE NOCASE')
+      .bind(id)
+      .all<{ name: string }>()
+      .catch(() => ({ results: [] as { name: string }[] })),
   ]);
   let summary: Record<string, unknown> | null = null;
   try {
@@ -182,7 +191,13 @@ async function completedEvent(db: D1Like, id: string): Promise<Record<string, un
       : null,
     unanswered: summary?.['unanswered'] ?? [],
     followUp: summary?.['followUp'] ?? null,
-    lead: lead ? { name: lead['name'] ?? null, email: lead['email'] ?? null, phone: lead['phone'] ?? null, status: lead['status'], source: lead['source'], fields } : null,
-    transcript: transcript.map((m) => ({ role: m.role === 'user' ? 'visitor' : 'assistant', text: m.text, at: new Date(m.ts).toISOString() })),
+    /** The site's own labels on it (Settings → Labels), by the team or the AI. */
+    tags: tags.results.map((t) => t.name),
+    attributes: parseJsonObject(row?.['attributes']),
+    assignedTo: row?.['assigned_to'] ?? null,
+    lead: lead
+      ? { name: lead['name'] ?? null, email: lead['email'] ?? null, phone: lead['phone'] ?? null, company: lead['company'] ?? null, status: lead['status'], source: lead['source'], fields, attributes: parseJsonObject(lead['attributes']) }
+      : null,
+    transcript: transcript.map((m) => ({ role: m.role === 'user' ? 'visitor' : m.author ? 'team' : 'assistant', text: m.text, at: new Date(m.ts).toISOString() })),
   };
 }

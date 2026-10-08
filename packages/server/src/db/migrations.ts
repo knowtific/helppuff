@@ -411,6 +411,89 @@ export const MIGRATIONS: readonly Migration[] = [
       'ALTER TABLE conversations ADD COLUMN channel TEXT',
     ],
   },
+  {
+    id: 10,
+    name: 'inbox and live chat',
+    // Roles: `admin` (everything) or `member` (conversations, contacts,
+    // callbacks, live chat); null reads as `admin`, so existing accounts keep
+    // their access. A conversation's `status`: `bot` (the assistant answers,
+    // null reads as it), `live` (a person does) or `closed`. `waiting_since`:
+    // a visitor in a live chat is waiting for a reply. Custom attributes are a
+    // JSON object of strings. Notes are the team's own, never shown to the
+    // visitor. Labels are defined per site; the AI applies only defined ones.
+    // Telegram's bot token is stored encrypted (core/secretbox.ts).
+    statements: [
+      'ALTER TABLE admins ADD COLUMN role TEXT',
+      'ALTER TABLE conversations ADD COLUMN status TEXT',
+      'ALTER TABLE conversations ADD COLUMN assigned_to TEXT',
+      'ALTER TABLE conversations ADD COLUMN assigned_name TEXT',
+      'ALTER TABLE conversations ADD COLUMN handover_at INTEGER',
+      'ALTER TABLE conversations ADD COLUMN waiting_since INTEGER',
+      'ALTER TABLE conversations ADD COLUMN closed_at INTEGER',
+      'ALTER TABLE conversations ADD COLUMN attributes TEXT',
+      'CREATE INDEX IF NOT EXISTS conversations_site_status ON conversations (site_id, status, last_at DESC)',
+      'ALTER TABLE messages ADD COLUMN author TEXT',
+      'ALTER TABLE leads ADD COLUMN company TEXT',
+      'ALTER TABLE leads ADD COLUMN address TEXT',
+      'ALTER TABLE leads ADD COLUMN attributes TEXT',
+      `CREATE TABLE IF NOT EXISTS notes (
+        id TEXT PRIMARY KEY,
+        site_id TEXT NOT NULL,
+        conversation_id TEXT,
+        lead_id TEXT,
+        author TEXT NOT NULL,
+        author_name TEXT,
+        text TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`,
+      'CREATE INDEX IF NOT EXISTS notes_conversation ON notes (conversation_id, created_at)',
+      'CREATE INDEX IF NOT EXISTS notes_lead ON notes (lead_id, created_at)',
+      `CREATE TABLE IF NOT EXISTS labels (
+        id TEXT PRIMARY KEY,
+        site_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        color TEXT NOT NULL,
+        description TEXT,
+        ai INTEGER NOT NULL DEFAULT 1,
+        created_at INTEGER NOT NULL
+      )`,
+      'CREATE UNIQUE INDEX IF NOT EXISTS labels_site_name ON labels (site_id, name COLLATE NOCASE)',
+      `CREATE TABLE IF NOT EXISTS conversation_labels (
+        conversation_id TEXT NOT NULL,
+        label_id TEXT NOT NULL,
+        site_id TEXT NOT NULL,
+        added_by TEXT NOT NULL,
+        added_at INTEGER NOT NULL,
+        PRIMARY KEY (conversation_id, label_id)
+      )`,
+      'CREATE INDEX IF NOT EXISTS conversation_labels_label ON conversation_labels (label_id)',
+      `CREATE TABLE IF NOT EXISTS admin_prefs (
+        email TEXT PRIMARY KEY,
+        prefs TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS integrations (
+        site_id TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        config TEXT NOT NULL,
+        secret TEXT,
+        status TEXT,
+        last_error TEXT,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (site_id, kind)
+      )`,
+      `CREATE TABLE IF NOT EXISTS telegram_threads (
+        site_id TEXT NOT NULL,
+        chat_id TEXT NOT NULL,
+        thread_id TEXT NOT NULL,
+        conversation_id TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (site_id, chat_id, thread_id)
+      )`,
+      'CREATE INDEX IF NOT EXISTS telegram_threads_conversation ON telegram_threads (conversation_id)',
+    ],
+  },
 ];
 
 export const LATEST_MIGRATION = MIGRATIONS[MIGRATIONS.length - 1]!.id;

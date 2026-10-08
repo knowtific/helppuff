@@ -5,6 +5,7 @@ export type Parsed = { command: string | null; positionals: string[]; flags: Fla
 
 /** Flags that never take a value. */
 const BOOLEAN = new Set([
+  'names',
   'json',
   'help',
   'h',

@@ -12,7 +12,9 @@ when one runs out.
 ## What one assistant uses
 
 Each assistant (one `site`) uses **1 Worker, 1 KV namespace, 1 D1 database,
-1 Vectorize index, 1 Workflow and 1 Cron Trigger** on your account.
+1 Vectorize index, 1 Workflow, 1 Cron Trigger and 1 Durable Object class**
+(live chat's hub, SQLite-backed, the kind the Free plan has; idle, it costs
+nothing) on your account.
 
 ## Per account: how many assistants fit
 
@@ -35,6 +37,7 @@ Each assistant (one `site`) uses **1 Worker, 1 KV namespace, 1 D1 database,
 | [D1 rows written](https://developers.cloudflare.com/d1/platform/pricing/) | 100,000 a day | Recording conversations (which the limits and the history read back), leads, learning pages | Recording stops for the day; chats continue |
 | [D1 rows read](https://developers.cloudflare.com/d1/platform/pricing/) | 5 million a day | Searches, the dashboard | Searches fail and the assistant offers a callback |
 | [Browser Rendering](https://developers.cloudflare.com/browser-run/limits/) | 10 minutes a day | Only pages drawn by JavaScript, while learning the site | Those pages are skipped, with the reason shown; the next crawl retries |
+| [Durable Objects](https://developers.cloudflare.com/durable-objects/platform/pricing/) | 100,000 requests and 13,000 GB-s a day | [[Live chat|Live-Chat]] only: a few requests per live chat (each socket, and one per 20 messages it carries). Hibernating sockets cost no duration. 50 live chats of 40 messages ≈ 250 a day | Live chats stop connecting; the widget polls, and new hand-overs get the callback form |
 | [Vectorize queries](https://developers.cloudflare.com/vectorize/platform/pricing/) | 30 million queried dimensions a month | About 900 searches a day for a 70-page site | Meaning search fails; keyword search still answers |
 
 ## Size

@@ -46,6 +46,13 @@ export type ConnectorContext<Opts> = {
    * destinations. Absent when the server cannot take one; never throws.
    */
   reportLead?: (lead: Record<string, string>) => void;
+  /**
+   * Hand the visitor to a person on the team (live chat). Present only when
+   * the site has live chat on. Resolves `started` (someone is being
+   * notified; the server adds the waiting notice to the reply),
+   * `unavailable` or `limited` (the server adds the callback form). Never throws.
+   */
+  handover?: (reason?: string) => Promise<'started' | 'unavailable' | 'limited'>;
   /** Tell the site's webhooks something happened that only the connector knows (its daily budget). Never throws. */
   notify?: (type: 'budget.warning' | 'budget.exhausted', data: Record<string, unknown>) => void;
   /**

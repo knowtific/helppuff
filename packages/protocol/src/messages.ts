@@ -11,6 +11,8 @@ export const messageMetaSchema = z
   .object({
     agentName: z.string().min(1).max(80).optional(),
     avatar: httpUrl.optional(),
+    /** Written by a person on the team (live chat), not by the assistant. */
+    human: z.boolean().optional(),
   })
   .strict();
 
@@ -66,6 +68,15 @@ export const fieldSchema = z.object({
 });
 export type Field = z.infer<typeof fieldSchema>;
 
+/**
+ * Where a live chat is: `waiting` for someone from the team, `joined` (a person
+ * is answering), `left` (handed back to the assistant), `closed`, or `missed`
+ * (nobody was free in time). The widget opens its live connection on
+ * `waiting` or `joined` and closes it on the others.
+ */
+export const HANDOVER_STATUSES = ['waiting', 'joined', 'left', 'closed', 'missed'] as const;
+export type HandoverStatus = (typeof HANDOVER_STATUSES)[number];
+
 export const messageSchema = z.discriminatedUnion('type', [
   z.object({ ...base, type: z.literal('text'), text: z.string().min(1).max(8000) }),
   z.object({
@@ -102,6 +113,13 @@ export const messageSchema = z.discriminatedUnion('type', [
     title: z.string().max(160).optional(),
     fields: z.array(fieldSchema).min(1).max(12),
     submitLabel: z.string().max(60).optional(),
+  }),
+  z.object({
+    ...base,
+    type: z.literal('handover'),
+    status: z.enum(HANDOVER_STATUSES),
+    text: z.string().min(1).max(600),
+    agentName: z.string().min(1).max(80).optional(),
   }),
 ]);
 

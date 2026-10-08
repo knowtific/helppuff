@@ -72,6 +72,10 @@ under `widget` in `helppuff.json`; see the
   and values cannot inject CSS.
 - **`strings`** overrides any text the widget shows (button labels, error
   messages), for wording or language.
+- **Live chat** ([[Live chat|Live-Chat]]): when it is on, a **person** button
+  at the top of the chat asks for someone from the team (`strings.talkToPerson`),
+  and the header says who is answering (`strings.liveStatus`). Its code is a
+  separate small file (`live-*.js`), downloaded only when a chat is handed over.
 
 ## The JavaScript API
 

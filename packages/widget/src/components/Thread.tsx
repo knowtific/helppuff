@@ -112,7 +112,8 @@ export function Thread({
 export function LiveRegion({ messages }: { messages: Message[] }) {
   const last = messages[messages.length - 1];
   const announce =
-    last && last.role !== 'user' && (last.type === 'text' || last.type === 'notice')
+    // A hand-over ("Sam joined the chat") is announced too: it changes who the visitor is talking to.
+    last && last.role !== 'user' && (last.type === 'text' || last.type === 'notice' || last.type === 'handover')
       ? stripMarkdown(last.text)
       : '';
   return (

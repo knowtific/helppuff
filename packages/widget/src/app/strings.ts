@@ -35,6 +35,10 @@ export const DEFAULT_STRINGS = {
   cancel: 'Cancel',
   helpful: 'Helpful',
   notHelpful: 'Not helpful',
+  // Live chat: a person on the team answers.
+  talkToPerson: 'Talk to a person',
+  liveStatus: 'Someone from the team is here',
+  agentTyping: 'Typing…',
 } as const;
 
 export type StringKey = keyof typeof DEFAULT_STRINGS;

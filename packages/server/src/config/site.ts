@@ -56,6 +56,7 @@ export async function resolveSite(ctx: Ctx, siteId: string): Promise<SiteConfig>
     ...(overrides.security ? { security: overrides.security } : {}),
     ...(overrides.widget ? { widget: overrides.widget } : {}),
     ...(overrides.knowledge ? { knowledge: overrides.knowledge } : {}),
+    ...(overrides.live ? { live: overrides.live } : {}),
     ...(overrides.assistant ? { assistant: overrides.assistant } : legacyAssistant(overrides.profile)),
   };
 }

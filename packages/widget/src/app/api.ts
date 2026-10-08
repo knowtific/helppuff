@@ -11,7 +11,7 @@ export const SEND_TIMEOUT_MS = 30_000;
 
 const TOKEN_HEADER = 'x-helppuff-token';
 
-export type Capabilities = { poll: boolean; end: boolean; stream: boolean; feedback?: boolean };
+export type Capabilities = { poll: boolean; end: boolean; stream: boolean; feedback?: boolean; live?: boolean };
 
 export type ConfigResult = {
   config: WidgetConfig;
@@ -164,11 +164,11 @@ export class Api {
     const widget = parseConfig((body as { widget?: unknown } | null)?.widget);
     if (!widget) throw new ApiError({ code: 'internal', message: 'Bad config', retryable: false });
 
-    const raw = (body as { capabilities?: { poll?: unknown; end?: unknown; stream?: unknown; feedback?: unknown } } | null)
+    const raw = (body as { capabilities?: { poll?: unknown; end?: unknown; stream?: unknown; feedback?: unknown; live?: unknown } } | null)
       ?.capabilities;
     return {
       config: widget,
-      capabilities: { poll: raw?.poll === true, end: raw?.end === true, stream: raw?.stream === true, feedback: raw?.feedback === true },
+      capabilities: { poll: raw?.poll === true, end: raw?.end === true, stream: raw?.stream === true, feedback: raw?.feedback === true, live: raw?.live === true },
     };
   }
 

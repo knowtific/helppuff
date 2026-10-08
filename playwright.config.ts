@@ -36,6 +36,14 @@ export default defineConfig({
       stdout: 'ignore',
     },
     {
+      // Live chat's Worker: a local D1, the live hub and the dashboard (e2e/live).
+      command: 'node e2e/live/serve.mjs',
+      url: 'http://localhost:8788/healthz',
+      reuseExistingServer: !process.env.CI,
+      timeout: 180_000,
+      stdout: 'ignore',
+    },
+    {
       command: 'pnpm --filter @helppuff/widget exec vite --port 5173 --strictPort',
       url: 'http://localhost:5173/',
       reuseExistingServer: !process.env.CI,

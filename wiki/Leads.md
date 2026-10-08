@@ -27,6 +27,24 @@ their email in a second chat, gets the new chat added to the lead they already
 have; new details only fill gaps, never overwrite. A lead with only a phone
 number is merged into the person as soon as their email turns up.
 
+## Contact details, attributes and notes
+
+Besides what the forms and chats collect, each contact has a **company** and
+an **address**, and **custom attributes**: any key-value pairs you want, like
+`plan: pro` or `customerId: 4021` (up to 50; keys up to 64 letters, digits,
+spaces, `_ - .`). Edit them on the contact's page, or over the API:
+
+```bash
+curl -X PATCH "$BASE/leads/$ID" -H "Authorization: Bearer $KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"company":"Acme","attributes":{"plan":"pro","trial":null}}'
+```
+
+`null` removes an attribute; keys you leave out stay. The team's **notes**
+(`POST /leads/:id/notes`) are dated and signed; `GET /leads/:id` returns them
+as `teamNotes`, with every conversation and callback. Conversations have
+attributes and notes of their own too (`PATCH /conversations/:id`).
+
 ## In the dashboard
 
 **Leads** lists people by when they were last active, with:

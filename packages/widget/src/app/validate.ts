@@ -155,7 +155,12 @@ export function parseMessage(input: unknown): Message | null {
   const ts = num(input['ts'], 0, Number.MAX_SAFE_INTEGER);
   if (!id || !role || ts === undefined) return null;
 
-  const base = { id, ts, role } as const;
+  // Who wrote it: a person on the team (live chat) shows their first name.
+  const metaIn = isObject(input['meta']) ? input['meta'] : null;
+  const agentName = metaIn ? str(metaIn['agentName'], 80) : undefined;
+  const human = metaIn ? bool(metaIn['human']) : undefined;
+  const meta = agentName || human ? { ...(agentName ? { agentName } : {}), ...(human ? { human } : {}) } : null;
+  const base = { id, ts, role, ...(meta ? { meta } : {}) } as const;
 
   switch (input['type']) {
     case 'text': {
@@ -207,6 +212,13 @@ export function parseMessage(input: unknown): Message | null {
         ...(title ? { title } : {}),
         ...(submitLabel ? { submitLabel } : {}),
       };
+    }
+    case 'handover': {
+      const text = str(input['text'], 600);
+      const status = oneOf(input['status'], ['waiting', 'joined', 'left', 'closed', 'missed'] as const);
+      if (!text || !status) return null;
+      const name = str(input['agentName'], 80);
+      return { ...base, type: 'handover', status, text, ...(name ? { agentName: name } : {}) };
     }
     default:
       return null;

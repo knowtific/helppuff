@@ -277,6 +277,7 @@ export const WIDGET_CSS = `
   color: var(--hp-text-2);
   font-size: var(--hp-text-sm);
 }
+.hp-agent-name { font-size: var(--hp-text-xs); color: var(--hp-text-3); margin: 0 0 -4px 4px; }
 .hp-notice[data-tone="warn"] {
   background: color-mix(in srgb, var(--hp-danger) 8%, var(--hp-bg));
   color: var(--hp-text);

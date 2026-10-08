@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8" /><title>Live chat</title></head>
+  <body>
+    <h1>A site with live chat</h1>
+    <p>The widget, against the live-chat e2e Worker on :8788 (e2e/live).</p>
+    <script type="module">
+      const script = document.createElement('script');
+      script.src = '/src/loader.ts';
+      script.type = 'module';
+      script.dataset.site = 'demo';
+      script.dataset.api = 'http://localhost:8788';
+      document.body.appendChild(script);
+    </script>
+  </body>
+</html>

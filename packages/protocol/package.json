@@ -10,7 +10,8 @@
     "./url": "./src/url.ts",
     "./sse": "./src/sse.ts",
     "./text": "./src/text.ts",
-    "./forms": "./src/forms.ts"
+    "./forms": "./src/forms.ts",
+    "./live": "./src/handover.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

@@ -34,8 +34,9 @@ as few questions as possible.
 | `packages/server/src/core` | | `registry.ts` (explicit connector/sink registration), `token.ts` (HMAC session tokens), `origin.ts` (CORS allowlist), `ratelimit.ts`, `turnstile.ts`, `stream.ts` (SSE), `sanitize.ts`, `run.ts`, `request.ts` (per-request ctx, the only allowed `console`), `errors.ts` (`HelpPuffError` → JSON envelope), `chat.ts` (the one chat pipeline: widget and API), `visitor.ts` / `ip.ts` (allow/block lists), `forms.ts` (forms bound to the chat) |
 | `packages/server/src/config` | | `schema.ts` (server config), `load.ts` (`defineConfig`, secret refs), `site.ts` (KV `config:<siteId>` overrides) |
 | `packages/server/src/api` | | The public API (`/api/v1`): `registry.ts` (every route: scope, docs, examples; drives the door, OpenAPI and the wiki reference), `auth.ts` (the door: keys, scopes, rate, audit), `keys.ts` (hashed keys), `scopes.ts`, `openapi.ts` (OpenAPI + the `wiki/API-Reference*.md` pages; `test/api-docs.test.ts` typechecks every TypeScript example) |
-| `packages/server/src/admin` | | One router, mounted twice: `/admin/api/*` (dashboard, CLI) and `/api/v1/*` (public; registered routes only). A new route goes in `api/registry.ts` too, or keys cannot reach it: `guard.ts` (cookie session or `Bearer ADMIN_API_KEY`), `auth.ts`, `record.ts` (conversations, leads keyed by email, ratings), `routes.ts`, `knowledge.ts` (pages, files, facts, search), `settings.ts` (the flat settings object ↔ site config), `setup.ts` (one-time setup/sign-in links), `prompts.ts`, `webhooks.ts`, `callbacks.ts` (callback requests as tasks: list, done/dismiss), `overlaps.ts` (prompt lines a setting or rule already covers), `version.ts` (running vs latest release), `chat.ts` (chat over the API), `access.ts` (team, API keys, audit log) |
+| `packages/server/src/admin` | | One router, mounted twice: `/admin/api/*` (dashboard, CLI) and `/api/v1/*` (public; registered routes only). A new route goes in `api/registry.ts` too, or keys cannot reach it: `guard.ts` (cookie session or `Bearer ADMIN_API_KEY`), `auth.ts`, `record.ts` (conversations, leads keyed by email, ratings), `routes.ts`, `knowledge.ts` (pages, files, facts, search), `settings.ts` (the flat settings object ↔ site config), `setup.ts` (one-time setup/sign-in links), `prompts.ts`, `webhooks.ts`, `callbacks.ts` (callback requests as tasks: list, done/dismiss), `overlaps.ts` (prompt lines a setting or rule already covers), `version.ts` (running vs latest release), `chat.ts` (chat over the API), `access.ts` (team and roles, API keys, audit log), `inbox.ts` (conversation status SQL, custom attributes, labels, notes, each person's prefs), `live.ts` (live chat for the team: reply, assign, close, hand back, status, Telegram; the team's socket). `guard.ts` also holds roles: a `member` reaches only the routes in `MEMBER_ROUTES` (fail closed) |
 | `packages/server/src/webhooks` | | `deliver.ts` (signed delivery, retry, delivery log, `emit`/`emitTo`), `events.ts` (conversation → events). Endpoints live in D1 `webhooks`, managed by `admin/webhooks.ts`; event names and envelope in `protocol/src/webhooks.ts` |
+| `packages/server/src/live` | | Live chat: `hub.ts` (pure `HubCore`: sockets, presence, timers, testable without the runtime), `object.ts` (`LiveHub`, the thin Durable Object, one per site; only it and `index.ts`/`runtime.ts` import `cloudflare:workers`), `service.ts` (handover, team replies, assign, close, hand back; writes D1 then publishes to the hub), `telegram.ts` (Bot API, threads, `/link`). Visitor socket and Telegram webhook in `routes/live.ts`, mounted before everything (a 101's headers are immutable) |
 | `packages/server/src/conversations` | | `summary.ts` (AI summary + labels, shared by the dashboard button and the job), `complete.ts` (`runConversationJob`: sleeps until 5 min after the last message, then summarises and sends `conversation.completed`) |
 | `packages/server/src/db` | | `migrations.ts` (numbered, append-only D1 schema; applied by deploy and per isolate), `d1.ts` (binding helpers) |
 | `packages/server/src/knowledge`, `src/workflows/crawl.ts` | | Crawl control (`startCrawl`, cron re-crawls) and the `CrawlWorkflow` class: the Worker's one background-job runner (crawl parts, files, conversation ends, webhook retries — dispatched on `payload.kind`). Only `index.ts`/`runtime.ts` import it (`cloudflare:workers`). New background work becomes a new `kind` with a step function testable on a fake `StepLike`, not a new Workflow |
@@ -43,8 +44,8 @@ as few questions as possible.
 | `packages/connectors/_types` | `@helppuff/connector-types` | `Connector` interface + `defineConnector`, helpers, rich messages, prompt, history, shared `ai-search.ts` |
 | `packages/connectors/*` | `@helppuff/connector-<name>` | `workers-ai` (default: Workers AI + `@helppuff/rag`, tools, budget), `echo` (dev/test, no key), `cloudflare` (AI Search), `openai`, `gemini`, `anthropic` (via AI Search), `http` (own API), `retell` |
 | `packages/sinks/*` | `@helppuff/sink-*` | Lead destinations (`webhook`) |
-| `packages/widget` | `@helppuff/widget` | Preact widget in a shadow root. `src/loader.ts` (tiny loader, no Preact, owns fail-safe) → lazy `src/app/` (store, api, persist, strings, validate) + `components/` + `flows/` + `lib/` (markdown, safe, turnstile…) + `styles/` (CSS in TS template literals). `demo/` = playground (local Worker), options playground (`playground.html` + `preview.html`, an in-page API on the echo connector; published to GitHub Pages by `pnpm build:playground` / `.github/workflows/playground.yml`), gallery, hostile-host fixtures |
-| `packages/dashboard` | `@helppuff/dashboard` | React + Tailwind v4 dashboard served at `/admin/`: Home (test chat), Conversations, Leads, Knowledge, Analytics, Settings (sub-pages, incl. Webhooks and Updates). Look: shadcn / Notion / Twenty, minimal. `demo/` + `demo.html` = the website's dashboard demo: the real app with `/admin/api` answered in the page from seeded sample data (`demo/mock.ts`, `demo/data.ts`; `build:demo`). A new endpoint the pages call needs a route there too |
+| `packages/widget` | `@helppuff/widget` | Preact widget in a shadow root. `src/loader.ts` (tiny loader, no Preact, owns fail-safe) → lazy `src/app/` (store, api, persist, strings, validate) + `components/` + `flows/` + `lib/` (markdown, safe, turnstile…) + `styles/` (CSS in TS template literals). `src/live/` = live chat's client, its own chunk (`live-*.js`, ≤ 6 kb gz, no Preact/Zod), loaded by the app only when a chat is handed over. `demo/` = playground (local Worker), options playground (`playground.html` + `preview.html`, an in-page API on the echo connector; published to GitHub Pages by `pnpm build:playground` / `.github/workflows/playground.yml`), gallery, hostile-host fixtures |
+| `packages/dashboard` | `@helppuff/dashboard` | React + Tailwind v4 dashboard served at `/admin/`: Home (test chat), Conversations, Leads, Knowledge, Analytics, Settings (sub-pages, incl. Webhooks and Updates). Look: shadcn / Notion / Twenty, minimal. `lib/live.ts` = the team's live socket, notifications and Web Audio sounds; `components/inbox.tsx` = status, labels, attributes, notes; `pages/Contact.tsx` = a contact's page. `demo/` + `demo.html` = the website's dashboard demo: the real app with `/admin/api` answered in the page from seeded sample data (`demo/mock.ts`, `demo/data.ts`; `build:demo`). A new endpoint the pages call needs a route there too |
 | `packages/cli` | `@knowtific/helppuff` | The published CLI. `src/cli.ts` (command table), `commands/` (incl. `upgrade.ts`, `webhooks.ts`), `engine/` (init, deploy, compile, admin-api, knowledge, cloudflare, wrangler, doctor, `version.ts`, `reference.ts` (wiki config page)…), `help.ts` (the wiki's CLI page is generated from it by `pnpm sync:docs`) |
 | `website` | `@helppuff/website` | The site on GitHub Pages (VitePress): landing page (`.vitepress/theme/components/Landing.vue`), docs generated from `wiki/` into the gitignored `docs/` (`.vitepress/wiki.ts`, sidebar from `wiki/_Sidebar.md`), the playground copied to `/playground/`. Pictures in `public/shots/` are real screenshots from `scripts/screenshots.mjs` (rerun after a visual widget change) |
 | `instructions.md` | | The cross-agent install, deploy, test and upgrade workflow linked from the README and wiki. No plugin, skill or MCP setup is required. |
@@ -129,6 +130,7 @@ maintainer approves it with 2FA (`wiki/Contributing.md` → Releasing). Never bu
 ```bash
 pnpm install
 pnpm dev            # Worker :8787 + widget vite :5173 (echo connector)
+pnpm dev:live       # live chat locally: Worker :8788 (D1, live hub, dashboard) + widget :5173, accounts made
 pnpm test           # vitest: *.test.ts → node, *.test.tsx → happy-dom
 pnpm vitest run packages/server/test/stream.test.ts   # single file
 pnpm typecheck      # every package
@@ -170,8 +172,9 @@ pnpm check          # lint + typecheck + test + build + e2e (what CI runs)
 - Server errors always leave via `app.onError` as the JSON envelope — throw
   `HelpPuffError`, never return HTML.
 - Accessibility wins over visual design.
-- Bundle guards: `loader.js` ≤ 8 kb gz, app ≤ 35 kb gz. Don't import Preact or
-  Zod into the loader.
+- Bundle guards: `loader.js` ≤ 8 kb gz, app ≤ 35 kb gz, live chunk ≤ 6 kb gz.
+  Don't import Preact or Zod into the loader; the widget imports protocol
+  values only from zod-free subpaths (`@helppuff/protocol/live`, `/text`, `/forms`).
 - For provider APIs (Retell, OpenAI, Gemini, Cloudflare, Anthropic,
   Turnstile), check the current docs; don't invent endpoints or fields.
   `wiki/Providers.md` has the verified references.
@@ -219,6 +222,11 @@ pnpm check          # lint + typecheck + test + build + e2e (what CI runs)
 ## Tests live next to each package
 
 `packages/*/test/` (vitest; server tests use `test/helpers.ts` →
-`testConfig()`, `memoryKv`), `e2e/*.spec.ts` (Playwright; the widget is inside
-the `helppuff-widget` shadow root — see `e2e/helpers.ts`; lead-form fills are
+`testConfig()`, `memoryKv`; live chat and the inbox use
+`test/inbox-helpers.ts`: real SQLite plus an in-memory live hub; the
+dashboard's React tests are their own vitest project, `--project dashboard`,
+with `test/helpers.tsx` answering `/admin/api` in the page), `e2e/*.spec.ts` (Playwright; the widget is inside
+the `helppuff-widget` shadow root — see `e2e/helpers.ts`; `e2e/live.spec.ts`
+runs against a second Worker on :8788 with D1, the live hub and the dashboard,
+started by `e2e/live/serve.mjs`; lead-form fills are
 driven by what renders, not a fixed field list).

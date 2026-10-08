@@ -6,7 +6,7 @@ import { c } from '../output.js';
 import { chat, type ChatTurn } from '../engine/chat.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { applySettings, helppuffConfigSchema, securitySchema, settingsSchema, upgradeSettings, type Settings } from '@helppuff/server';
+import { applySettings, helppuffConfigSchema, liveConfigSchema, securitySchema, settingsSchema, upgradeSettings, type Settings } from '@helppuff/server';
 import { adminApi } from '../engine/admin-api.js';
 import { readState, writeState } from '../engine/state.js';
 import { compile, DEV_PORT, devOrigin, embedSnippet } from '../engine/compile.js';
@@ -300,6 +300,13 @@ export function pullSettings(loaded: LoadedProject, live: Settings): LoadedProje
       if (applied.security.sessionTtlHours !== defaults.sessionTtlHours) security['sessionTtlHours'] = applied.security.sessionTtlHours;
       else delete security['sessionTtlHours'];
       if (!Object.keys(security).length) delete raw['security'];
+    }
+    // Live chat: only what differs from the defaults.
+    if (live.live) {
+      const defaults = liveConfigSchema.parse({});
+      const changed = Object.fromEntries(Object.entries(applied.live).filter(([key, v]) => v !== defaults[key as keyof typeof defaults]));
+      if (Object.keys(changed).length) raw['live'] = changed;
+      else delete raw['live'];
     }
     const knowledge = obj(raw, 'knowledge');
     if (knowledge['website'] !== false || live.crawl.schedule !== 'off') {

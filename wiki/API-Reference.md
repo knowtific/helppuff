@@ -72,12 +72,41 @@ Read, summarise and delete conversations, from the widget and the API alike.
 
 - [[List conversations|API-Reference-Conversations#list-conversations]]: `GET /conversations`
 - [[Get a conversation|API-Reference-Conversations#get-a-conversation]]: `GET /conversations/:id`
+- [[Label a conversation, or set its attributes|API-Reference-Conversations#label-a-conversation-or-set-its-attributes]]: `PATCH /conversations/:id`
 - [[Summarise a conversation|API-Reference-Conversations#summarise-a-conversation]]: `POST /conversations/:id/summary`
 - [[Delete a conversation|API-Reference-Conversations#delete-a-conversation]]: `DELETE /conversations/:id`
 
+### [[Live chat|API-Reference-Live-Chat]]
+
+A person on the team answers instead of the assistant: reply, take, give, close and hand back a live chat, and see who is available.
+
+- [[Live chat now|API-Reference-Live-Chat#live-chat-now]]: `GET /live/status`
+- [[Reply in a live chat|API-Reference-Live-Chat#reply-in-a-live-chat]]: `POST /conversations/:id/reply`
+- [[Take or give a conversation|API-Reference-Live-Chat#take-or-give-a-conversation]]: `POST /conversations/:id/assign`
+- [[Close a conversation|API-Reference-Live-Chat#close-a-conversation]]: `POST /conversations/:id/close`
+- [[Hand back to the assistant|API-Reference-Live-Chat#hand-back-to-the-assistant]]: `POST /conversations/:id/handback`
+- [[Telegram|API-Reference-Live-Chat#telegram]]: `GET /live/telegram`
+- [[Connect Telegram|API-Reference-Live-Chat#connect-telegram]]: `POST /live/telegram`
+- [[Change Telegram options|API-Reference-Live-Chat#change-telegram-options]]: `PATCH /live/telegram`
+- [[Send a Telegram test|API-Reference-Live-Chat#send-a-telegram-test]]: `POST /live/telegram/test`
+- [[Disconnect Telegram|API-Reference-Live-Chat#disconnect-telegram]]: `DELETE /live/telegram`
+
+### [[Labels and notes|API-Reference-Labels-And-Notes]]
+
+Labels a site defines and puts on conversations (the AI can too), and the team's private notes on conversations and contacts.
+
+- [[Add a note to a conversation|API-Reference-Labels-And-Notes#add-a-note-to-a-conversation]]: `POST /conversations/:id/notes`
+- [[Edit a note|API-Reference-Labels-And-Notes#edit-a-note]]: `PATCH /notes/:id`
+- [[Delete a note|API-Reference-Labels-And-Notes#delete-a-note]]: `DELETE /notes/:id`
+- [[List labels|API-Reference-Labels-And-Notes#list-labels]]: `GET /labels`
+- [[Create a label|API-Reference-Labels-And-Notes#create-a-label]]: `POST /labels`
+- [[Change a label|API-Reference-Labels-And-Notes#change-a-label]]: `PATCH /labels/:id`
+- [[Delete a label|API-Reference-Labels-And-Notes#delete-a-label]]: `DELETE /labels/:id`
+- [[Add a note to a contact|API-Reference-Labels-And-Notes#add-a-note-to-a-contact]]: `POST /leads/:id/notes`
+
 ### [[Leads|API-Reference-Leads]]
 
-The people who gave contact details: your CRM. Keyed by email per site.
+The people who gave contact details: your CRM's contacts, with custom attributes. Keyed by email per site.
 
 - [[List leads|API-Reference-Leads#list-leads]]: `GET /leads`
 - [[Create a lead|API-Reference-Leads#create-a-lead]]: `POST /leads`
@@ -157,6 +186,7 @@ Who can sign in to the dashboard.
 
 - [[List dashboard accounts|API-Reference-Team#list-dashboard-accounts]]: `GET /admins`
 - [[Add a dashboard account|API-Reference-Team#add-a-dashboard-account]]: `POST /admins`
+- [[Change a role or name|API-Reference-Team#change-a-role-or-name]]: `PATCH /admins/:email`
 - [[Remove a dashboard account|API-Reference-Team#remove-a-dashboard-account]]: `DELETE /admins/:email`
 - [[Make a one-time sign-in link|API-Reference-Team#make-a-one-time-sign-in-link]]: `POST /admins/:email/sign-in-link`
 

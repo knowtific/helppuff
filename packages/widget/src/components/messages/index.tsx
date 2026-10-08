@@ -45,6 +45,15 @@ export function MessageView({ message, handlers }: { message: Message; handlers:
 
   switch (message.type) {
     case 'text':
+      // A person on the team (live chat): their name over what they wrote, never a rating.
+      if (message.meta?.human) {
+        return (
+          <>
+            {message.meta.agentName ? <div class="hp-agent-name">{message.meta.agentName}</div> : null}
+            <TextMessage text={message.text} />
+          </>
+        );
+      }
       return handlers.rating && message.role === 'agent' && !Number.isNaN(handlers.rating.get(message)) ? (
         <>
           <TextMessage text={message.text} />
@@ -96,6 +105,9 @@ export function MessageView({ message, handlers }: { message: Message; handlers:
         />
       );
 
+    case 'handover':
+      return <NoticeMessage text={message.text} icon="person" />;
+
     default:
       return null;
   }
@@ -108,7 +120,7 @@ export function MessageView({ message, handlers }: { message: Message; handlers:
  * row at all. Emitting an empty wrapper still costs a fade-in animation, a
  * gap and a timestamp, so the visitor sees something flash and disappear.
  */
-const DRAWABLE = new Set(['text', 'notice', 'options', 'card', 'carousel', 'links', 'form']);
+const DRAWABLE = new Set(['text', 'notice', 'options', 'card', 'carousel', 'links', 'form', 'handover']);
 
 export function canRender(message: Message): boolean {
   return DRAWABLE.has(message.type);

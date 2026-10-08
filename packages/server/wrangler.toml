@@ -17,6 +17,10 @@ kv_namespaces = [
   { binding = "HELPPUFF_KV", id = "local-dev", preview_id = "local-dev" }
 ]
 
+# Live chat's hub (a SQLite-backed Durable Object, the Free plan's kind).
+durable_objects = { bindings = [{ name = "LIVE_HUB", class_name = "LiveHub" }] }
+migrations = [{ tag = "live-hub-v1", new_sqlite_classes = ["LiveHub"] }]
+
 [vars]
 HELPPUFF_LOG = "0"
 

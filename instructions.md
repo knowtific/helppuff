@@ -234,6 +234,27 @@ For normal changes:
 - Add documents with `knowledge upload <file...> --wait --json`.
 - Diagnose failures with `doctor --json` and follow each reported fix.
 
+### Live chat and the team
+
+Only when the user asks for it (it is off by default):
+
+```bash
+npx -y @knowtific/helppuff live on --json
+npx -y @knowtific/helppuff users add sam@example.com --role member --json
+```
+
+Members see only conversations, contacts, callbacks and live chat. For
+Telegram, the person must create the bot with @BotFather and give you its
+token; never invent one. Then:
+
+```bash
+npx -y @knowtific/helppuff telegram connect --token <token> --json
+```
+
+and tell the person to send the returned `/link <code>` in the Telegram group
+or chat they will answer from. Check with `live status --json` and
+`telegram status --json`. Guide: https://github.com/knowtific/helppuff/wiki/Live-Chat
+
 ## Non-negotiable rules
 
 - Never expose or commit `.env`, `ADMIN_API_KEY`, Cloudflare tokens or provider

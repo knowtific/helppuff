@@ -38,6 +38,8 @@ const data = (await response.json()) as WhoCallingResponse;
   "admin": {
     "email": "key:k7m3p9q2r4s8",
     "owner": false,
+    "role": "admin",
+    "name": "Website backend",
     "via": "key"
   },
   "key": {
@@ -67,7 +69,8 @@ const data = (await response.json()) as WhoCallingResponse;
           "helppuff.example.workers.dev"
         ],
         "dailyCap": 500
-      }
+      },
+      "live": true
     }
   ],
   "summaries": true
@@ -78,6 +81,8 @@ type WhoCallingResponse = {
   admin: {
     email: string;
     owner: boolean;
+    role: string;
+    name: string;
     via: string;
   };
   key: {
@@ -101,6 +106,7 @@ type WhoCallingResponse = {
       hostnames: string[];
       dailyCap: number;
     };
+    live: boolean;
   }>;
   summaries: boolean;
 };

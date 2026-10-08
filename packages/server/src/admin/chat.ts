@@ -205,6 +205,9 @@ export async function deleteConversations(d: ReturnType<typeof db>, ids: string[
     d.prepare(`DELETE FROM messages WHERE conversation_id IN (${marks})`).bind(...ids),
     d.prepare(`DELETE FROM callbacks WHERE conversation_id IN (${marks})`).bind(...ids),
     d.prepare(`DELETE FROM api_sessions WHERE id IN (${marks})`).bind(...ids),
+    d.prepare(`DELETE FROM notes WHERE conversation_id IN (${marks})`).bind(...ids),
+    d.prepare(`DELETE FROM conversation_labels WHERE conversation_id IN (${marks})`).bind(...ids),
+    d.prepare(`DELETE FROM telegram_threads WHERE conversation_id IN (${marks})`).bind(...ids),
     d.prepare(`UPDATE leads SET conversation_id = NULL WHERE conversation_id IN (${marks})`).bind(...ids),
     d.prepare(`DELETE FROM conversations WHERE id IN (${marks})`).bind(...ids),
   ]);

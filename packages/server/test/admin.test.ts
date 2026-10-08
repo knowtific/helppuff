@@ -234,7 +234,7 @@ describe('the dashboard API', () => {
     });
     expect(((await patched.json()) as { status: string }).status).toBe('contacted');
     const csv = await (await get(w.admin, '/admin/api/leads.csv', w.cookie)).text();
-    expect(csv.split('\n')[0]).toBe('created,name,email,phone,status,source,notes,site,conversation');
+    expect(csv.split('\n')[0]).toBe('created,name,email,phone,company,address,status,source,notes,attributes,site,conversation');
     expect(csv).toContain(`"'=HYPERLINK(""x"")"`);
     const bad = await w.admin.fetch(`/admin/api/leads/${id}`, {
       method: 'PATCH',

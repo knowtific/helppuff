@@ -31,6 +31,7 @@ export const ICON_PATHS: Record<IconName, string> = {
   'sound-off': 'M11 5 6.5 9H4v6h2.5L11 19V5Zm4.5 4.5 4 4m0-4-4 4',
   check: 'm5 12.5 4.5 4.5L19 7',
   external: 'M14 5h5v5M19 5l-8 8M18 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h4',
+  person: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0',
 };
 
 /** An `<svg>` string, for the loader, which has no renderer. */

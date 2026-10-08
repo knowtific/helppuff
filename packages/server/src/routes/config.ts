@@ -4,6 +4,7 @@ import { resolveSite } from '../config/site.js';
 import { getConnector } from '../core/registry.js';
 import { dbFrom } from '../db/d1.js';
 import { capabilitiesOf, prepareConnector } from '../core/run.js';
+import { liveAvailable } from '../live/service.js';
 import type { HonoEnv, RequestCtx } from '../core/request.js';
 import type { SiteConfig } from '../config/schema.js';
 import type { Platform } from '../core/platform.js';
@@ -43,9 +44,9 @@ function captchaFor(
  * Options that do not parse are reported when a session starts, where the
  * visitor can be told; the config itself still loads, just without streaming.
  */
-function capabilitiesFor(ctx: RequestCtx, site: SiteConfig): ConfigResponse['capabilities'] {
+function capabilitiesFor(ctx: RequestCtx, site: SiteConfig, siteId: string): ConfigResponse['capabilities'] {
   try {
-    return capabilitiesOf(prepareConnector(ctx, site), Boolean(dbFrom(ctx.env)));
+    return capabilitiesOf(prepareConnector(ctx, site), Boolean(dbFrom(ctx.env)), liveAvailable(ctx.env, site, siteId));
   } catch {
     return { ...getConnector(site.connector.type).capabilities, stream: false };
   }
@@ -61,7 +62,7 @@ configRoutes.get('/v1/sites/:siteId/config', async (c) => {
   const body: ConfigResponse = {
     siteId,
     widget: { ...site.widget, ...captchaFor(site, ctx.platform.log, siteId) },
-    capabilities: capabilitiesFor(ctx, site),
+    capabilities: capabilitiesFor(ctx, site, siteId),
   };
 
   ctx.platform.log('config.served', { siteId });

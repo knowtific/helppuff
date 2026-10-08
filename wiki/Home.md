@@ -32,6 +32,7 @@ give your agent the shared [instructions.md](https://raw.githubusercontent.com/k
 - **[[Prompt and instructions|Prompts-and-Instructions]]**: how the assistant talks, and the prompt's version history.
 - **[[The widget|Widget]]**: embedding, customising, and its JavaScript API.
 - **[[Leads and callbacks|Leads]]** and **[[Webhooks]]**: where conversations and contact details go.
+- **[[Live chat|Live-Chat]]** and **[[Telegram]]**: let visitors talk to a person on your team.
 
 ## Run it
 

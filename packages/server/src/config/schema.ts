@@ -41,6 +41,9 @@ export const limitsSchema = z.object({
   retellLookupsPerMinute: z.number().int().min(1).max(6000).default(120).describe('Knowledge-base lookups a Retell agent may make a minute, for the whole site.'),
   apiRequestsPerKeyPerMinute: z.number().int().min(1).max(6000).default(120).describe('Requests a new API key may make a minute (each key can have its own). Chat requests also count against the daily cap.'),
   apiKeysPerSite: z.number().int().min(1).max(500).default(50).describe('Active API keys a site may have.'),
+  handoversPerIpPerDay: z.number().int().min(1).max(1000).default(3).describe('Times one visitor (IP) may ask for a person a day (live chat).'),
+  waitingPerSite: z.number().int().min(1).max(1000).default(20).describe('Live chats that may wait for a person at once; past it, visitors get the callback form.'),
+  liveSocketsPerIp: z.number().int().min(1).max(100).default(3).describe('Live chat connections one visitor (IP) may hold open at once.'),
 });
 export type Limits = z.infer<typeof limitsSchema>;
 
@@ -122,6 +125,22 @@ export const assistantConfigSchema = z
   .strict();
 export type AssistantConfig = z.infer<typeof assistantConfigSchema>;
 
+/**
+ * Live chat: a visitor is handed from the assistant to a person on the team,
+ * who answers from the dashboard or Telegram. Off by default; when off,
+ * nothing changes and the widget loads no live-chat code.
+ */
+export const liveConfigSchema = z
+  .object({
+    enabled: z.boolean().default(false).describe('Let visitors talk to a person on the team. When nobody is available they get the callback form instead.'),
+    waitSeconds: z.number().int().min(15).max(3600).default(120).describe('How long a visitor waits for someone to take the chat before they are offered the callback form (they can keep waiting).'),
+    closeAfterMinutes: z.number().int().min(5).max(1440).default(60).describe('A conversation with no message for this long is closed. A visitor who writes again is answered by the assistant.'),
+    showAgentName: z.boolean().default(true).describe('Show visitors the first name of the person answering ("Sam joined"); off: "Someone from the team".'),
+    aiWhileWaiting: z.boolean().default(false).describe('Let the assistant keep answering until someone takes the chat.'),
+  })
+  .strict();
+export type LiveConfig = z.infer<typeof liveConfigSchema>;
+
 export const siteConfigSchema = z.object({
   origins: z.array(z.string().min(1).max(300)).min(1),
   connector: connectorConfigSchema,
@@ -130,6 +149,7 @@ export const siteConfigSchema = z.object({
   widget: widgetConfigSchema.default({}),
   knowledge: knowledgeConfigSchema.default({}),
   assistant: assistantConfigSchema.default({}),
+  live: liveConfigSchema.default({}),
 });
 export type SiteConfig = z.infer<typeof siteConfigSchema>;
 
@@ -171,6 +191,7 @@ export const storedSiteConfigSchema = z
     widget: widgetConfigSchema.optional(),
     knowledge: knowledgeConfigSchema.optional(),
     assistant: assistantConfigSchema.optional(),
+    live: liveConfigSchema.optional(),
     prompt: promptMetaSchema.optional(),
     /** Retired: the instructions form's choices, from when it wrote them into the prompt. Read as `assistant` when that is missing. */
     profile: z.record(z.string(), z.unknown()).optional(),

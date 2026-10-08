@@ -13,6 +13,8 @@
 - [[Prompt and instructions|Prompts-and-Instructions]]
 - [[The widget|Widget]]
 - [[Leads and callbacks|Leads]]
+- [[Live chat|Live-Chat]]
+- [[Telegram]]
 - [[Webhooks]]
 
 **API**
@@ -23,6 +25,8 @@
 - [[Account|API-Reference-Account]]
 - [[Chat|API-Reference-Chat]]
 - [[Conversations|API-Reference-Conversations]]
+- [[Live chat|API-Reference-Live-Chat]]
+- [[Labels and notes|API-Reference-Labels-And-Notes]]
 - [[Leads|API-Reference-Leads]]
 - [[Callbacks|API-Reference-Callbacks]]
 - [[Knowledge|API-Reference-Knowledge]]

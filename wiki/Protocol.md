@@ -209,7 +209,8 @@ type Base = {
   id: string;
   ts: number;
   role: 'user' | 'agent' | 'system';
-  meta?: { agentName?: string; avatar?: string };
+  /** `human`: written by a person on the team (live chat), shown with `agentName`. */
+  meta?: { agentName?: string; avatar?: string; human?: boolean };
 };
 
 type Message =
@@ -219,7 +220,9 @@ type Message =
   | Base & { type: 'card'; title: string; body?: string; image?: Img; actions?: Action[] }
   | Base & { type: 'carousel'; cards: CardItem[] }
   | Base & { type: 'links'; title?: string; links: LinkItem[] }
-  | Base & { type: 'form'; title?: string; fields: Field[]; submitLabel?: string };
+  | Base & { type: 'form'; title?: string; fields: Field[]; submitLabel?: string }
+  // Live chat's progress: waiting for a person, joined, back to the assistant, closed, or nobody in time.
+  | Base & { type: 'handover'; status: 'waiting' | 'joined' | 'left' | 'closed' | 'missed'; text: string; agentName?: string };
 ```
 
 Rules both sides must follow:
@@ -254,6 +257,33 @@ type Action =
 entirely client-side and reach the server only as the message they produce.
 
 ---
+
+## Live chat
+
+When `capabilities.live` is true, a visitor can be handed to a person (see
+[[Live chat|Live-Chat]]). The server decides: the action `{ kind: "action",
+actionId: "handover" }` asks for a person whichever backend runs the chat,
+and the reply is a `handover` message (`waiting`, or `missed` plus the
+callback form when nobody is available).
+
+While the latest `handover` message is `waiting`, `joined` or `missed`, the
+client opens `GET /v1/live/socket` as a WebSocket with the subprotocols
+`helppuff.v1` and `t.<session token>` (never the token in the URL). The
+server sends JSON frames:
+
+```ts
+type LiveFrame =
+  | { t: 'msg'; message: Message }        // a person's reply, or a handover message
+  | { t: 'status'; status: HandoverStatus; agentName?: string }
+  | { t: 'typing'; on: boolean };
+```
+
+The client may send `{ "t": "typing", "on": true }`, and `ping` (answered
+`pong`). The visitor's messages still go over `POST /v1/sessions/messages`,
+which answers `{ messages: [] }` while a person has the chat. A socket the
+server closes with code 1000 and reason `left` or `closed` is over. Clients
+that cannot open a socket poll `GET /v1/sessions/messages?after=<ms>` for
+messages newer than that time.
 
 ## Origin and CORS
 

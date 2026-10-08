@@ -3,10 +3,11 @@ import { StrictMode, useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 import { Shell } from './components/Shell';
-import { api, onUnauthorized, type Me } from './lib/api';
+import { api, isMember, onUnauthorized, type Me } from './lib/api';
 import { useRoute } from './lib/utils';
 import { Conversations } from './pages/Conversations';
 import { Leads } from './pages/Leads';
+import { Contact } from './pages/Contact';
 import { Callbacks } from './pages/Callbacks';
 import { Login } from './pages/Login';
 import { Overview } from './pages/Overview';
@@ -42,6 +43,13 @@ function App() {
   if (route.page === 'signin' && route.id) return <SignIn token={route.id} onDone={load} />;
   if (me === 'signed-out') return <Login onDone={load} />;
 
+  // Members see the inbox: pages for admins send them to it.
+  const adminOnly = ['home', 'analytics', 'prompt', 'knowledge', 'onboarding', 'setup'];
+  if (isMember(me) && adminOnly.includes(route.page)) {
+    window.location.hash = '#/conversations';
+    return null;
+  }
+
   const logout = async () => {
     await api('/logout', { method: 'POST' }).catch(() => {});
     setMe('signed-out');
@@ -53,6 +61,7 @@ function App() {
       {route.page === 'analytics' && <Overview me={me} />}
       {route.page === 'conversations' && <Conversations id={route.id} me={me} />}
       {route.page === 'leads' && <Leads />}
+      {route.page === 'contact' && route.id && <Contact id={route.id} me={me} />}
       {route.page === 'callbacks' && <Callbacks />}
       {route.page === 'prompt' && <Prompt me={me} />}
       {route.page === 'settings' && <Settings me={me} section={route.id} />}

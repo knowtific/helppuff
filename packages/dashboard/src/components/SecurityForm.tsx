@@ -21,7 +21,7 @@ const VISITOR: { key: LimitKey; label: string; hint: string; max: number }[] = [
   { key: 'messagesPerSitePerDay', label: 'Messages a day, whole site', hint: 'The cost backstop: past it, visitors see your contact details instead.', max: 1_000_000 },
   { key: 'maxMessageLength', label: 'Longest message (characters)', hint: 'What a visitor may type in one message.', max: 4000 },
 ];
-const MORE: { key: LimitKey; label: string; hint: string; min?: number; max: number }[] = [
+const MORE: { key: LimitKey; label: string; hint: string; min?: number; max: number; fallback?: number }[] = [
   { key: 'maxLeadFieldLength', label: 'Longest form answer (characters)', hint: 'One field of the lead or callback form.', min: 20, max: 2000 },
   { key: 'maxLeadMessageLength', label: 'Longest form message (characters)', hint: 'A message box in a form.', min: 20, max: 4000 },
   { key: 'feedbackPerIpPerMinute', label: 'Ratings a minute, per visitor', hint: 'Thumbs up or down.', max: 600 },
@@ -30,6 +30,9 @@ const MORE: { key: LimitKey; label: string; hint: string; min?: number; max: num
   { key: 'retellLookupsPerMinute', label: 'Retell knowledge lookups a minute', hint: 'For the whole site.', max: 6000 },
   { key: 'apiRequestsPerKeyPerMinute', label: 'API requests a minute, per new key', hint: 'The default for keys made from now on; each key can have its own.', max: 6000 },
   { key: 'apiKeysPerSite', label: 'Active API keys', hint: 'Revoke one to make room.', max: 500 },
+  { key: 'handoversPerIpPerDay', label: 'Asks for a person a day, per visitor', hint: 'Live chat. Past it, the callback form.', max: 1000, fallback: 3 },
+  { key: 'waitingPerSite', label: 'Live chats waiting at once', hint: 'Not yet taken by anyone. Past it, the callback form.', max: 1000, fallback: 20 },
+  { key: 'liveSocketsPerIp', label: 'Live chat connections, per visitor', hint: 'Open at once (tabs).', max: 100, fallback: 3 },
 ];
 
 function NumberField({ label, hint, value, min = 1, max, onChange }: { label: string; hint: string; value: number; min?: number; max: number; onChange: (value: number) => void }) {
@@ -93,7 +96,7 @@ export function SecurityForm({ value, captcha, onChange }: { value: SecuritySett
         <p className="text-xs text-muted-foreground">They stop one visitor (or a script) from using up your daily budget. Visitors who hit one see a short “try again” message.</p>
         <div className="grid gap-3 sm:grid-cols-2">
           {VISITOR.map((item) => (
-            <NumberField key={item.key} label={item.label} hint={item.hint} max={item.max} value={value.limits[item.key]} onChange={(n) => setLimit(item.key, n)} />
+            <NumberField key={item.key} label={item.label} hint={item.hint} max={item.max} value={value.limits[item.key] ?? 1} onChange={(n) => setLimit(item.key, n)} />
           ))}
           <NumberField
             label="How long a chat lasts (hours)"
@@ -114,7 +117,7 @@ export function SecurityForm({ value, captcha, onChange }: { value: SecuritySett
                 hint={item.hint}
                 {...(item.min ? { min: item.min } : {})}
                 max={item.max}
-                value={value.limits[item.key]}
+                value={value.limits[item.key] ?? item.fallback ?? 1}
                 onChange={(n) => setLimit(item.key, n)}
               />
             ))}
