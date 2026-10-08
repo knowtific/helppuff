@@ -21,6 +21,7 @@ import { knowledgeEnv, ownsKnowledge } from '../knowledge/env.js';
 import { settingsRoutes } from './settings.js';
 import { setupRoutes } from './setup.js';
 import { webhookRoutes } from './webhooks.js';
+import { toolRoutes } from './tools.js';
 import { callbackRoutes, callbackView } from './callbacks.js';
 import { attributesJson, closeCutoff, CONVERSATION_STATUSES, conversationExtras, inboxRoutes, labelsSql, mergeAttributes, parseJsonObject, parseLabels, statusFilter, statusSql, type ConversationStatus } from './inbox.js';
 import { liveRoutes } from './live.js';
@@ -382,9 +383,9 @@ async function loadConversation(d: D1Like, id: string, cutoff = 0) {
     conversationExtras(d, id),
   ]);
   // The salted IP hash the per-visitor limits count by is not for anyone to read.
-  const { visitor: _visitor, attributes: _attributes, ...shown } = conversation;
+  const { visitor: _visitor, attributes: _attributes, data: _data, ...shown } = conversation;
   return {
-    conversation: { ...shown, waiting_since: shown['status'] === 'live' ? (shown['waiting_since'] ?? null) : null, attributes: extras.attributes } as Record<string, unknown>,
+    conversation: { ...shown, waiting_since: shown['status'] === 'live' ? (shown['waiting_since'] ?? null) : null, attributes: extras.attributes, data: extras.data } as Record<string, unknown>,
     lead: lead && leadOut(lead),
     callbacks: callbacks.results.map(callbackView),
     labels: extras.labels,
@@ -810,6 +811,7 @@ adminRoutes.route('/', settingsRoutes);
 adminRoutes.route('/', setupRoutes);
 adminRoutes.route('/', signInRoutes);
 adminRoutes.route('/', webhookRoutes);
+adminRoutes.route('/', toolRoutes);
 adminRoutes.route('/', callbackRoutes);
 adminRoutes.route('/', versionRoutes);
 adminRoutes.route('/', chatRoutes);

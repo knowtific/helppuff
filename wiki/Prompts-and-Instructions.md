@@ -48,6 +48,14 @@ filled in on every answer, so it never goes stale:
 business details; other backends leave it empty (write the details in the
 prompt for those).
 
+### Tools
+
+Your own APIs, and extract tools, appear in the prompt by name: `{{order_status}}`
+lets the assistant call that tool, and `{{crm_lookup.tier}}` puts in what it
+returned. The Prompt page has them in three sections, top to bottom: tools
+called before the chat, the prompt, and tools called after it. Type `{{` in
+the prompt for a list of everything you can use. See [[Tools]].
+
 ### Changes during a conversation
 
 A change applies from the next message, also in conversations already

@@ -8,6 +8,44 @@ never needs you to change anything. Upgrade with
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-09
+
+### Added: tools, your own APIs in the chat
+
+- **Tools** on the dashboard's Prompt page (and `helppuff tools`): HTTP
+  requests to your own APIs, set up by pasting a curl or filling in the
+  method, URL, headers and body, and tested with sample values. The page now
+  reads top to bottom as a chat runs:
+  - **Before the chat**: tools called when a chat starts, with the pre-chat
+    form's answers (`{{prechat.email}}`); the first answer has what they
+    returned.
+  - **The prompt**: `{{order_status}}` lets the assistant call that tool (it
+    fills in `{{args.*}}`, asking the visitor first if needed), and
+    `{{crm_lookup.tier}}` puts in what a tool returned. Typing `{{` lists
+    every tool, key and placeholder; a name that is not one is flagged.
+  - **After the chat**: tools called when the conversation ends, with the
+    transcript, summary, contact, attributes and every tool's data (a POST
+    with no body sends all of it as JSON), retried on a 5xx or a timeout.
+- **Extract tools** save what the visitor says (an order number) on the
+  conversation and as a custom attribute.
+- What tools return or save is kept on the conversation (`data`, by tool
+  name). It shows in the conversation's **Data from tools**, is given to the
+  assistant on every answer (as quoted data, never instructions), goes to
+  after-chat tools, and goes to webhooks: `conversation.started` and
+  `conversation.completed` carry `data`. The conversation API returns it too.
+- Credential headers are stored encrypted and never shown or returned again.
+  In the CLI, `${NAME}` in a header is read from `.env`, so a key is never
+  typed on the command line (a missing one answers `needs_input`).
+- API: `GET/POST /tools`, `PATCH/DELETE /tools/:id`, `POST /tools/test`,
+  under the `prompt:read` and `prompt:write` scopes.
+- Tools work with HelpPuff's assistant, whatever the model. With a backend
+  that runs the whole conversation (Retell, your own API), only after-chat
+  tools run.
+
+### Changed
+
+- D1 migration 12 adds the `tools` table and `conversations.data` (additive).
+
 ## [0.3.0] - 2026-10-08
 
 ### Added: live chat, roles and a fuller CRM

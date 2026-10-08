@@ -54,8 +54,17 @@ export const PHONE = /^[+()\-.\s\d]{6,40}$/;
 
 export type JobsHandle = NonNullable<ConnectorContext<WorkersAiOptions>['jobs']>;
 
-export function toolDefinitions(options: WorkersAiOptions, live = false, jobs?: JobsHandle): ToolDef[] {
+export type OwnTools = NonNullable<ConnectorContext<WorkersAiOptions>['tools']>;
+
+/** Built-in names a site's own tool can never replace. */
+const BUILT_IN = new Set(['create_job', 'request_person', 'request_callback', 'get_business_hours']);
+
+export function toolDefinitions(options: WorkersAiOptions, live = false, jobs?: JobsHandle, own?: OwnTools): ToolDef[] {
   const tools: ToolDef[] = [];
+  for (const tool of own?.offered ?? []) {
+    if (BUILT_IN.has(tool.name)) continue;
+    tools.push({ type: 'function', function: { name: tool.name, description: tool.description, parameters: tool.parameters } });
+  }
   if (jobs) {
     const item = jobs.itemSingular.toLowerCase();
     tools.push({
@@ -215,7 +224,13 @@ export async function runTool(call: ToolCall, env: ToolEnv): Promise<ToolResult>
         messages: [],
       };
     }
-    default:
+    default: {
+      const own = env.ctx.tools;
+      if (own && !BUILT_IN.has(call.name) && own.offered.some((t) => t.name === call.name)) {
+        const given = args && typeof args === 'object' && !Array.isArray(args) ? (args as Record<string, unknown>) : {};
+        return { content: await own.call(call.name, given), messages: [] };
+      }
       return { content: `Unknown tool ${call.name}.`, messages: [] };
+    }
   }
 }

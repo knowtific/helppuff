@@ -12,7 +12,8 @@
     "./text": "./src/text.ts",
     "./forms": "./src/forms.ts",
     "./live": "./src/handover.ts",
-    "./jobs": "./src/jobs.ts"
+    "./jobs": "./src/jobs.ts",
+    "./tools": "./src/tools.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

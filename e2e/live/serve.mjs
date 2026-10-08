@@ -45,6 +45,8 @@ writeFileSync(
 );
 // The `models` site: another model and the site's own knowledge base (config.ts).
 writeFileSync(join(assets, 'models.html'), page('Models', '<main style="padding: 12vh 2rem"><h1>Acme Plumbing</h1></main><script src="/loader.js" data-site="models" data-open async></script>'));
+// The `tools` site: the same model, with the owner's tools (tools.spec.ts).
+writeFileSync(join(assets, 'tools.html'), page('Tools', '<main style="padding: 12vh 2rem"><h1>Acme Plumbing</h1></main><script src="/loader.js" data-site="tools" data-open async></script>'));
 // The dashboard's Home: just the widget, open.
 writeFileSync(join(assets, 'chat.html'), page('Chat', '<script src="/loader.js" data-site="demo" data-open data-fill async></script>'));
 

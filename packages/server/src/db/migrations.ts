@@ -583,6 +583,42 @@ export const MIGRATIONS: readonly Migration[] = [
       'CREATE INDEX IF NOT EXISTS notes_job ON notes (job_id, created_at)',
     ],
   },
+  {
+    id: 12,
+    name: 'tools',
+    statements: [
+      // The owner's tools (Prompt page): HTTP requests the assistant can make
+      // before, during and after a chat, and extract tools that save what it
+      // learns. Secret header values are sealed (core/secretbox.ts).
+      `CREATE TABLE IF NOT EXISTS tools (
+        id TEXT PRIMARY KEY,
+        site_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        description TEXT,
+        method TEXT,
+        url TEXT,
+        headers TEXT,
+        body TEXT,
+        parameters TEXT,
+        fields TEXT,
+        pick TEXT,
+        keys TEXT,
+        timeout_ms INTEGER NOT NULL DEFAULT 5000,
+        run_before INTEGER NOT NULL DEFAULT 0,
+        run_after INTEGER NOT NULL DEFAULT 0,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        last_status INTEGER,
+        last_error TEXT,
+        last_at INTEGER,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`,
+      'CREATE UNIQUE INDEX IF NOT EXISTS tools_site_name ON tools (site_id, name)',
+      // What the tools returned or saved in a conversation: { tool_name: value }.
+      'ALTER TABLE conversations ADD COLUMN data TEXT',
+    ],
+  },
 ];
 
 export const LATEST_MIGRATION = MIGRATIONS[MIGRATIONS.length - 1]!.id;

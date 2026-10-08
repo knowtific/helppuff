@@ -171,6 +171,16 @@ The business-specific instructions, versioned.
 - [[Publish a prompt version|API-Reference-Prompt#publish-a-prompt-version]]: `POST /prompt`
 - [[Restore a prompt version|API-Reference-Prompt#restore-a-prompt-version]]: `POST /prompt/restore`
 
+### [[Tools|API-Reference-Tools]]
+
+Your own APIs, called before, during and after a chat (`{{name}}` in the prompt), and extract tools that save what the assistant learns. What they return is kept on the conversation (`data`) and sent to webhooks.
+
+- [[List tools|API-Reference-Tools#list-tools]]: `GET /tools`
+- [[Add a tool|API-Reference-Tools#add-a-tool]]: `POST /tools`
+- [[Change a tool|API-Reference-Tools#change-a-tool]]: `PATCH /tools/:id`
+- [[Remove a tool|API-Reference-Tools#remove-a-tool]]: `DELETE /tools/:id`
+- [[Test a tool|API-Reference-Tools#test-a-tool]]: `POST /tools/test`
+
 ### [[Settings|API-Reference-Settings]]
 
 The assistant, widget, lead form, limits and IP lists, as one object.

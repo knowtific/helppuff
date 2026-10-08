@@ -127,7 +127,7 @@ type ListConversationsResponse = {
 
 `GET /conversations/:id` · scope `conversations:read`
 
-The conversation (with its `status`, who has it, and custom `attributes`), its lead, callback requests, labels, the team's notes and every message both ways (a person's replies carry `author`).
+The conversation (with its `status`, who has it, custom `attributes`, and `data`: what the site's tools returned or saved, by tool name), its lead, callback requests, labels, the team's notes and every message both ways (a person's replies carry `author`).
 
 | Parameter | In | Required | Description |
 | --- | --- | --- | --- |
@@ -185,6 +185,14 @@ const data = (await response.json()) as GetConversationResponse;
     "closed_at": null,
     "attributes": {
       "orderId": "A-1042"
+    },
+    "data": {
+      "order_status": {
+        "status": "shipped",
+        "delivery": {
+          "date": "2026-10-12"
+        }
+      }
     }
   },
   "lead": {
@@ -296,6 +304,14 @@ type GetConversationResponse = {
     closed_at: number | null;
     attributes: {
       orderId: string;
+    };
+    data: {
+      order_status: {
+        status: string;
+        delivery: {
+          date: string;
+        };
+      };
     };
   };
   lead: {
@@ -444,6 +460,7 @@ const data = (await response.json()) as LabelConversationSetItsAttributesRespons
   "attributes": {
     "orderId": "A-1042"
   },
+  "data": {},
   "notes": []
 }
 ```
@@ -460,6 +477,7 @@ type LabelConversationSetItsAttributesResponse = {
   attributes: {
     orderId: string;
   };
+  data: Record<string, unknown>;
   notes: string[];
 };
 ```

@@ -48,7 +48,13 @@ export class CrawlWorkflow extends WorkflowEntrypoint<Record<string, unknown>, J
       const ai = this.env['AI'] as Partial<AiRunner> | undefined;
       return runConversationJob(
         steps,
-        { db, fetch: fetcher, retry: workflowRetry(this.env), ...(ai && typeof ai.run === 'function' ? { ai: ai as AiRunner } : {}) },
+        {
+          db,
+          fetch: fetcher,
+          retry: workflowRetry(this.env),
+          secret: typeof this.env['HELPPUFF_SECRET'] === 'string' ? this.env['HELPPUFF_SECRET'] : undefined,
+          ...(ai && typeof ai.run === 'function' ? { ai: ai as AiRunner } : {}),
+        },
         payload,
       );
     }

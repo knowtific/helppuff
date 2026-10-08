@@ -122,7 +122,7 @@ Opens as a menu in the sidebar:
 | **Home screen** | What visitors see when they open the chat: the heading, the buttons (questions, a page, call, email, a form) and useful pages, with a preview. Suggested from your website until you save it; **Suggest from my site** adds more. See [[The widget|Widget#the-home-screen]] |
 | **Appearance** | Colour (taken from your site), position, the button's icon |
 | **Lead form** | The form before the chat: on/off, its fields, which are required, your own extra fields |
-| **Instructions** | What it is mainly for, tone and answer length (settings HelpPuff adds around the prompt), and a box for anything specific to your business (the prompt itself). The full prompt, its version history and everything HelpPuff adds are one click away. See [[Prompt and instructions|Prompts-and-Instructions]] |
+| **Instructions** | What it is mainly for, tone and answer length (settings HelpPuff adds around the prompt), and a box for anything specific to your business (the prompt itself). The full prompt page is one click away: the prompt with its version history and everything HelpPuff adds, between the [[tools|Tools]] called before and after the chat, with the tool library on the right. See [[Prompt and instructions|Prompts-and-Instructions]] |
 | **Business details** | Phone, email, address, hours, service areas: read from your site, yours to correct (a crawl never overwrites your changes) |
 | **Live chat** | Let visitors talk to a person; how long they wait before the callback form; when conversations close; [[Telegram]]. See [[Live chat|Live-Chat]] |
 | **Labels** | The labels for conversations, and which the AI may use |

@@ -186,6 +186,8 @@ export function recordStart(
     firstMessage?: string | undefined;
     messages: Message[];
     country: string | null;
+    /** What the tools returned before the chat (and on its first turn). */
+    data?: Record<string, unknown> | undefined;
   },
 ): void {
   conversationStarted(ctx, { ...input, typed: input.firstMessage ? contactIn(input.firstMessage) : {} });
@@ -194,9 +196,23 @@ export function recordStart(
     const statements: D1Statement[] = [
       db
         .prepare(
-          `INSERT OR IGNORE INTO conversations
-           (id, site_id, started_at, last_at, page_url, page_title, referrer, utm, locale, country, first_message, message_count, visitor, channel)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          // A tool may have saved data first (a stub row): the start fills it in.
+          `INSERT INTO conversations
+           (id, site_id, started_at, last_at, page_url, page_title, referrer, utm, locale, country, first_message, message_count, visitor, channel, data)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (id) DO UPDATE SET
+             started_at = min(conversations.started_at, excluded.started_at),
+             page_url = coalesce(conversations.page_url, excluded.page_url),
+             page_title = coalesce(conversations.page_title, excluded.page_title),
+             referrer = coalesce(conversations.referrer, excluded.referrer),
+             utm = coalesce(conversations.utm, excluded.utm),
+             locale = coalesce(conversations.locale, excluded.locale),
+             country = coalesce(conversations.country, excluded.country),
+             first_message = coalesce(conversations.first_message, excluded.first_message),
+             message_count = conversations.message_count + excluded.message_count,
+             visitor = coalesce(conversations.visitor, excluded.visitor),
+             channel = coalesce(conversations.channel, excluded.channel),
+             data = CASE WHEN excluded.data IS NULL THEN conversations.data ELSE json_patch(excluded.data, coalesce(conversations.data, '{}')) END`,
         )
         .bind(
           input.sessionId,
@@ -213,6 +229,7 @@ export function recordStart(
           (input.firstMessage ? 1 : 0) + input.messages.length,
           input.visitor ?? null,
           input.channel ?? 'widget',
+          input.data && Object.keys(input.data).length ? JSON.stringify(input.data) : null,
         ),
     ];
     if (input.firstMessage) statements.push(visitorMessage(input.sessionId, input.firstMessage, now - 1, db), countMessage(db, input.siteId, now));

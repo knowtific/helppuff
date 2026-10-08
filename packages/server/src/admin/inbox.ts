@@ -1,4 +1,5 @@
 import { Hono, type Context } from 'hono';
+import { parseData } from '../tools/run.js';
 import { cleanText } from '@helppuff/protocol';
 import { resolveSite } from '../config/site.js';
 import { HelpPuffError } from '../core/errors.js';
@@ -278,7 +279,7 @@ inboxRoutes.patch('/conversations/:id', async (c) => {
 /** Who did it, as stored: the account's email, or the key. */
 export const actorOf = (admin: Admin) => (admin.via === 'api-key' ? 'cli' : admin.email);
 
-/** A conversation's labels, attributes and notes: what the detail view adds to the transcript. */
+/** A conversation's labels, attributes, tool data and notes: what the detail view adds to the transcript. */
 export async function conversationExtras(d: D1Like, id: string) {
   const [labels, notes, row] = await Promise.all([
     d
@@ -286,9 +287,10 @@ export async function conversationExtras(d: D1Like, id: string) {
       .bind(id)
       .all(),
     d.prepare('SELECT id, author, author_name AS authorName, text, created_at AS createdAt, updated_at AS updatedAt FROM notes WHERE conversation_id = ? ORDER BY created_at').bind(id).all(),
-    d.prepare('SELECT attributes FROM conversations WHERE id = ?').bind(id).first<{ attributes: string | null }>(),
+    d.prepare('SELECT attributes, data FROM conversations WHERE id = ?').bind(id).first<{ attributes: string | null; data: string | null }>(),
   ]);
-  return { id, labels: labels.results, attributes: parseJsonObject(row?.attributes), notes: notes.results };
+  // `data`: what the site's tools returned or saved in it, by tool name.
+  return { id, labels: labels.results, attributes: parseJsonObject(row?.attributes), data: parseData(row?.data), notes: notes.results };
 }
 
 // -------------------------------------------------------------------- notes

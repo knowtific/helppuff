@@ -10,6 +10,8 @@ import { composer, sendButton, thread } from './helpers';
 
 const WORKER = 'http://localhost:8796';
 
+// Both tests read what the one fake model was last sent: one at a time.
+test.describe.configure({ mode: 'serial' });
 test.skip(({ isMobile }) => isMobile, 'one browser is enough');
 
 test('an OpenAI-compatible model answers from the site’s own retriever, streamed and cited', async ({ page, request }) => {

@@ -47,5 +47,24 @@ export default defineConfig({
       // The dashboard's sign-in limit is the strictest of all sites on the Worker: the same as the demo's.
       security,
     },
+    // The owner's tools (tools.spec.ts): the same fake model under its own id, so the two specs never read each other's calls.
+    tools: {
+      origins,
+      connector: {
+        type: 'assistant',
+        options: {
+          instructions: 'You help Acme Plumbing.',
+          provider: { type: 'openai-compatible', baseUrl: { env: 'FAKE_LLM_URL' }, apiKey: { env: 'FAKE_LLM_KEY' }, label: 'fake' },
+          model: 'fake-tools-model',
+          knowledge: { type: 'none' },
+        },
+      },
+      // The pre-chat form: a before-chat tool sends its email.
+      widget: {
+        brand: { name: 'Acme Plumbing', agentName: 'Sam' },
+        leadForm: { enabled: true, fields: [{ name: 'name', label: 'Name', type: 'text', required: true }, { name: 'email', label: 'Email', type: 'email', required: true }] },
+      },
+      security,
+    },
   },
 });

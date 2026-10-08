@@ -2,7 +2,7 @@ import { ArrowLeft, Bot, ExternalLink, Headset, Loader2, Lock, Mail, MessagesSqu
 import { useEffect, useRef, useState } from 'react';
 import { PageHeader } from '../components/Shell';
 import { Avatar, Badge, Button, Card, Empty, ErrorNote, Input, Segmented, Select, Skeleton, StatusBadge, Textarea } from '../components/ui';
-import { AttributesEditor, ConversationStatusBadge, LabelChip, LabelPicker, NotesPanel, SideSection, useLabels, WaitingBadge } from '../components/inbox';
+import { AttributesEditor, ConversationStatusBadge, LabelChip, LabelPicker, NotesPanel, SideSection, ToolData, useLabels, WaitingBadge } from '../components/inbox';
 import { api, isMember, parseSummary, type ConversationDetail, type ConversationRow, type Me, type StoredMessage, type Summary, type Team } from '../lib/api';
 import { sendTyping, useLiveEvents } from '../lib/live';
 import { RelatedJobs } from './Jobs';
@@ -455,6 +455,11 @@ function Detail({ id, me, team, onChanged }: { id: string; me: Me; team: Team | 
           <SideSection title="Attributes">
             <AttributesEditor value={c.attributes ?? {}} onSave={(attributes) => patch({ attributes })} />
           </SideSection>
+          {c.data && Object.keys(c.data).length > 0 && (
+            <SideSection title="Data from tools">
+              <ToolData value={c.data} />
+            </SideSection>
+          )}
           <SideSection title="Notes">
             <NotesPanel notes={data.notes ?? []} me={me.admin.email} isAdmin={!member} addPath={`/conversations/${id}/notes`} onChange={reload} />
           </SideSection>

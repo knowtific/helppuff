@@ -45,6 +45,7 @@ export function conversationStarted(
     messages: Message[];
     country: string | null;
     typed: { email?: string; phone?: string };
+    data?: Record<string, unknown> | undefined;
   },
 ): void {
   emit(ctx, input.siteId, 'conversation.started', {
@@ -54,6 +55,8 @@ export function conversationStarted(
     country: input.country,
     form: Object.keys(input.lead).length ? input.lead : null,
     firstMessage: input.firstMessage ?? null,
+    /** What the site's tools returned before the chat, by tool name. */
+    data: input.data && Object.keys(input.data).length ? input.data : null,
   });
   if (input.firstMessage) {
     emit(ctx, input.siteId, 'message.received', { conversationId: input.sessionId, kind: 'text', text: input.firstMessage });
