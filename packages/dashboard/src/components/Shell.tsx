@@ -1,10 +1,10 @@
-import { ArrowUpCircle, BookOpen, Briefcase, ChartColumn, ChevronDown, CircleHelp, House, LogOut, MessagesSquare, Moon, PhoneCall, Settings, Sun, Users } from 'lucide-react';
+import { ArrowUpCircle, Bot, Briefcase, ChartColumn, ChevronDown, CircleHelp, House, LogOut, MessagesSquare, Moon, PanelsTopLeft, PhoneCall, Server, Settings, Sun, Users } from 'lucide-react';
 import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import { api, isMember, type CallbackList, type LiveStatus, type Me, type Prefs, type Site } from '../lib/api';
 import { onToast, setAvailable, unlockAudio, useLiveConnection, useLiveEvents, type Toast } from '../lib/live';
 import { setAccent, setWaiting } from '../lib/attention';
 import { cn, href, useTheme, type Route } from '../lib/utils';
-import { Avatar, Button } from './ui';
+import { Avatar, Button, InfoTip } from './ui';
 import { useVersion } from './Updates';
 
 const WIKI = 'https://github.com/knowtific/helppuff/wiki';
@@ -43,19 +43,64 @@ const ALL_NAV: {
   { page: 'jobs', label: 'Jobs', icon: <Briefcase /> },
   { page: 'leads', label: 'Contacts', icon: <Users /> },
   { page: 'callbacks', label: 'Callbacks', icon: <PhoneCall /> },
-  {
-    page: 'knowledge',
-    label: 'Knowledge',
-    icon: <BookOpen />,
-    knowledge: true,
-    admin: true,
-  },
   { page: 'analytics', label: 'Analytics', icon: <ChartColumn />, admin: true },
   { page: 'settings', label: 'Settings', icon: <Settings /> },
 ];
 
 /** Settings, one page per topic; the sidebar opens them as a sub-menu. */
 export type SettingsSection = 'chat' | 'home' | 'appearance' | 'leads' | 'instructions' | 'business' | 'advanced' | 'live' | 'labels' | 'jobs' | 'notifications' | 'webhooks' | 'api' | 'team' | 'updates';
+
+/** The Prompt page (the owner's prompt, its versions, and the site's tools) in the Settings menu, after Instructions. */
+export const PROMPT_LABEL = 'Prompt & tools';
+
+export type SettingsLink = { key: string; label: string; href: string; current: (route: Route) => boolean };
+export type SettingsGroup = { label: string; icon: ReactNode; items: SettingsLink[] };
+
+const GROUPS: { label: string; icon: ReactNode; keys: string[] }[] = [
+  { label: 'Assistant', icon: <Bot />, keys: ['instructions', 'prompt', 'knowledge', 'business'] },
+  { label: 'Widget', icon: <PanelsTopLeft />, keys: ['chat', 'home', 'appearance', 'leads'] },
+  { label: 'Team', icon: <Users />, keys: ['live', 'labels', 'jobs', 'notifications'] },
+  { label: 'System', icon: <Server />, keys: ['advanced', 'webhooks', 'api', 'team', 'updates'] },
+];
+
+/**
+ * The Settings menu, grouped: the settings pages, plus two pages of their own
+ * that are set up rather than used every day (Prompt & tools, Knowledge).
+ * The sidebar's sub-menu and the phone tabs both draw it.
+ */
+export function settingsMenu(site: Site | undefined, me?: Me): SettingsGroup[] {
+  const sections = settingsSections(site, me);
+  const admin = sections.some((s) => s.id === 'instructions');
+  const links = new Map<string, SettingsLink>(
+    sections.map((s) => [s.id, { key: s.id, label: s.label, href: href({ page: 'settings', id: s.id }), current: (r: Route) => r.page === 'settings' && r.id === s.id }]),
+  );
+  if (admin) links.set('prompt', { key: 'prompt', label: PROMPT_LABEL, href: href({ page: 'prompt' }), current: (r) => r.page === 'prompt' });
+  if (admin && site?.knowledge) links.set('knowledge', { key: 'knowledge', label: 'Knowledge', href: href({ page: 'knowledge' }), current: (r) => r.page === 'knowledge' });
+  return GROUPS.map((g) => ({ label: g.label, icon: g.icon, items: g.keys.map((k) => links.get(k)).filter((l): l is SettingsLink => Boolean(l)) })).filter((g) => g.items.length);
+}
+
+/** The Settings menu as tabs, on a phone (the sidebar has it otherwise). */
+export function SettingsTabs({ me, route }: { me: Me; route: Route }) {
+  const site = me.sites[0];
+  const first = settingsSections(site, me)[0]?.id;
+  const here = route.page === 'settings' && !route.id && first ? { ...route, id: first } : route;
+  return (
+    <nav className="flex gap-1 overflow-x-auto border-b px-4 py-2 scroll-thin md:hidden" aria-label="Settings">
+      {settingsMenu(site, me)
+        .flatMap((g) => g.items)
+        .map((link) => (
+          <a
+            key={link.key}
+            href={link.href}
+            aria-current={link.current(here) ? 'page' : undefined}
+            className={cn('shrink-0 rounded-md px-2.5 py-1 text-xs', link.current(here) ? 'bg-muted font-medium' : 'text-muted-foreground')}
+          >
+            {link.label}
+          </a>
+        ))}
+    </nav>
+  );
+}
 
 export function settingsSections(site: Site | undefined, me?: Me): { id: SettingsSection; label: string }[] {
   // Notifications are live chat's: with it off (the default) there is no such page.
@@ -192,8 +237,11 @@ export function Shell({ me, route, onLogout, children }: { me: Me; route: Route;
   const member = isMember(me);
   // A member with live chat off has no settings at all: no Settings entry.
   const NAV = ALL_NAV.filter((item) => (!item.knowledge || site?.knowledge) && (!item.admin || !member) && (item.page !== 'settings' || !member || site?.live));
-  const inSettings = route.page === 'settings' || route.page === 'prompt';
-  const sections = settingsSections(site, me);
+  const inSettings = route.page === 'settings' || route.page === 'prompt' || route.page === 'knowledge';
+  const menu = settingsMenu(site, me);
+  // A bare #/settings shows the first settings page.
+  const firstSection = settingsSections(site, me)[0]?.id;
+  const isCurrent = (link: SettingsLink) => link.current(route.page === 'settings' && !route.id && firstSection ? { ...route, id: firstSection } : route);
   const live = useLive(me);
   const version = useVersion();
   // Callbacks waiting, on the menu: refreshed whenever the page changes.
@@ -232,11 +280,7 @@ export function Shell({ me, route, onLogout, children }: { me: Me; route: Route;
                   aria-controls="settings-menu"
                   onClick={() => {
                     // Opening goes to the first page too, unless one is already showing.
-                    if (!settingsOpen && !inSettings)
-                      window.location.hash = href({
-                        page: 'settings',
-                        id: sections[0]!.id,
-                      });
+                    if (!settingsOpen && !inSettings && menu[0]) window.location.hash = menu[0].items[0]!.href;
                     setSettingsOpen(!settingsOpen);
                   }}
                   className={cn(
@@ -249,25 +293,32 @@ export function Shell({ me, route, onLogout, children }: { me: Me; route: Route;
                   <ChevronDown className={cn('text-muted-foreground transition-transform', settingsOpen && 'rotate-180')} aria-hidden />
                 </button>
                 {settingsOpen && (
-                  <ul id="settings-menu" className="mt-0.5 ml-[17px] flex flex-col gap-0.5 border-l pl-2">
-                    {sections.map((section) => {
-                      const current = route.page === 'settings' && (route.id ?? sections[0]!.id) === section.id;
-                      return (
-                        <li key={section.id}>
-                          <a
-                            href={href({ page: 'settings', id: section.id })}
-                            aria-current={current ? 'page' : undefined}
-                            className={cn(
-                              'flex h-7 items-center rounded-md px-2 text-[13px] transition-colors',
-                              current ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
-                            )}
-                          >
-                            {section.label}
-                          </a>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                  <div id="settings-menu" className="mt-0.5 ml-[17px] flex flex-col gap-2 border-l pl-2">
+                    {menu.map((group) => (
+                      <div key={group.label}>
+                        <p className="flex items-center gap-1.5 px-2 pt-1 pb-0.5 text-[11px] font-medium text-muted-foreground [&_svg]:size-3" aria-hidden>
+                          {group.icon}
+                          {group.label}
+                        </p>
+                        <ul className="flex flex-col gap-0.5" aria-label={group.label}>
+                          {group.items.map((link) => (
+                            <li key={link.key}>
+                              <a
+                                href={link.href}
+                                aria-current={isCurrent(link) ? 'page' : undefined}
+                                className={cn(
+                                  'flex h-7 items-center rounded-md px-2 text-[13px] transition-colors',
+                                  isCurrent(link) ? 'bg-muted font-medium text-foreground' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+                                )}
+                              >
+                                {link.label}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             ) : (
@@ -354,17 +405,23 @@ export function Shell({ me, route, onLogout, children }: { me: Me; route: Route;
 }
 
 export function PageHeader({ title, description, actions, help }: { title: string; description?: ReactNode; actions?: ReactNode; help?: string }) {
+  // What the page is for lives in a (?) beside the title, with the guide; the header itself stays one line.
   return (
-    <header className="flex flex-wrap items-end justify-between gap-3 border-b px-4 py-3.5 md:px-6">
-      <div>
-        <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
-        {(description || help) && (
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-            {description && <p className="text-[13px] text-muted-foreground">{description}</p>}
-            {help && <HelpLink page={help} />}
-          </div>
+    <header className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3.5 md:px-6">
+      <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+        {title}
+        {description ? (
+          <InfoTip label={`About ${title}`} href={help ? wikiHref(help) : undefined}>
+            {description}
+          </InfoTip>
+        ) : (
+          help && (
+            <WikiLink page={help} aria-label={`Help: ${title}`} className="text-muted-foreground hover:text-foreground">
+              <CircleHelp className="size-3.5" aria-hidden />
+            </WikiLink>
+          )
         )}
-      </div>
+      </h1>
       {actions && <div className="flex items-center gap-2">{actions}</div>}
     </header>
   );

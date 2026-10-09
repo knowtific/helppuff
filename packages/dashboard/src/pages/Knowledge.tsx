@@ -1,8 +1,9 @@
-import { BookOpen, ChevronDown, ChevronRight, FileText, Loader2, Plus, RefreshCw, Search, Trash2, Upload } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronRight, FileText, Loader2, Plus, RefreshCw, RotateCcw, Search, Trash2, Upload } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { CrawlProgress, PagePicker, PageStatusBadge, categoryLabel, useKnowledgeStatus } from '../components/knowledge';
-import { PageHeader } from '../components/Shell';
-import { Badge, Button, Card, CardHeader, Empty, ErrorNote, Input, Segmented, Skeleton, Textarea } from '../components/ui';
+import { PageHeader, SettingsTabs } from '../components/Shell';
+import { AskAgent, agentRequest } from './Settings';
+import { Badge, Button, Card, CardHeader, Empty, ErrorNote, InfoTip, Input, Segmented, Skeleton, Textarea } from '../components/ui';
 import { api, uploadFile, type FileStatus, type KnowledgeFile, type KnowledgePage, type ManualEntry, type Me, type SearchResult, type Usage } from '../lib/api';
 import { cn, fmtNumber, fmtRelative, pathOf, useData } from '../lib/utils';
 import { Passages } from './Onboarding';
@@ -36,12 +37,13 @@ export function UsageMeter({ usage }: { usage: Usage }) {
       <div className="h-1.5 overflow-hidden rounded-full bg-muted" role="meter" aria-valuemin={0} aria-valuemax={usage.budget} aria-valuenow={usage.neurons} aria-label="Today's free budget used">
         <div className={cn('h-full rounded-full', tone)} style={{ width: `${pct}%` }} />
       </div>
-      <p className="text-xs text-muted-foreground">
+      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
         {usage.state === 'exhausted'
-          ? 'Today’s budget is used: visitors get your contact details and a form until it resets at 00:00 UTC.'
+          ? 'Used up for today: visitors get your contact details and a form.'
           : usage.state === 'tight'
-            ? `Nearly used — answers are kept shorter. About ${fmtNumber(usage.messagesLeft)} left today.`
-            : `About ${fmtNumber(usage.messagesLeft)} more answers fit in today’s free allowance (resets 00:00 UTC).`}
+            ? `Nearly used: answers are kept shorter. About ${fmtNumber(usage.messagesLeft)} left.`
+            : `About ${fmtNumber(usage.messagesLeft)} more answers today.`}
+        <InfoTip label="About the daily allowance">Workers AI’s free allowance, counted in neurons. It resets at 00:00 UTC; the limit is in Settings → Advanced.</InfoTip>
       </p>
     </div>
   );
@@ -80,8 +82,23 @@ export function Knowledge({ me }: { me: Me }) {
       setBusy(false);
     }
   };
+  // Failed pages, by hand: only those, and the ticked pages stay as they are.
+  const retry = async (urls?: string[]) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api('/knowledge/crawl/retry', { method: 'POST', json: urls ? { urls } : {} });
+      crawl.reload();
+      pages.reload();
+    } catch (thrown) {
+      setError(thrown as Error);
+    } finally {
+      setBusy(false);
+    }
+  };
   const running = crawl.status?.run?.status === 'running' || crawl.status?.run?.status === 'queued';
   const list = (pages.data?.pages ?? []).filter((p) => p.source !== 'facts' && p.source !== 'manual' && p.source !== 'file');
+  const failed = list.filter((p) => p.selected && (p.status === 'error' || p.status === 'blocked'));
 
   return (
     <>
@@ -91,6 +108,7 @@ export function Knowledge({ me }: { me: Me }) {
         help="Knowledge-Base"
         actions={
           <>
+            <AskAgent request={agentRequest('knowledge', 'Knowledge')} />
             <Button variant="outline" onClick={() => setChoosing(!choosing)} aria-expanded={choosing}>
               Choose pages
             </Button>
@@ -101,6 +119,7 @@ export function Knowledge({ me }: { me: Me }) {
           </>
         }
       />
+      <SettingsTabs me={me} route={{ page: 'knowledge' }} />
       <div className="space-y-4 p-4 md:p-6">
         {error && <ErrorNote error={error} />}
         {crawl.error && <ErrorNote error={crawl.error} onRetry={crawl.reload} />}
@@ -111,7 +130,7 @@ export function Knowledge({ me }: { me: Me }) {
 
         {choosing && (
           <Card>
-            <CardHeader title="Choose pages" description="Unticked pages are removed from the knowledge base on the next crawl." />
+            <CardHeader title="Choose pages" tip={{ label: 'About choosing pages', text: 'Unticked pages are removed from the knowledge base on the next crawl.' }} />
             <div className="px-4 pb-4">
               <PagePicker busy={busy} startLabel="Crawl these pages" onStart={(urls) => void recrawl(urls)} />
             </div>
@@ -122,8 +141,14 @@ export function Knowledge({ me }: { me: Me }) {
           id="pages"
           title="Website pages"
           summary={pages.data ? `${list.filter((p) => matches(p, 'learned')).length} learned${list.some((p) => matches(p, 'problems')) ? ` · ${list.filter((p) => matches(p, 'problems')).length} with problems` : ''}` : undefined}
-          description={crawl.status ? `Re-learned ${crawl.status.schedule === 'off' ? 'only when you ask' : crawl.status.schedule}. Unchanged pages cost nothing.` : undefined}
+          tip={crawl.status ? `Re-learned ${crawl.status.schedule === 'off' ? 'only when you ask' : crawl.status.schedule} (Settings → Advanced). Unchanged pages cost nothing.` : undefined}
           action={
+            <div className="flex flex-wrap items-center gap-2">
+              {failed.length > 0 && (
+                <Button variant="outline" size="sm" onClick={() => void retry()} disabled={busy || running} title={running ? 'Learning is running now' : undefined}>
+                  <RotateCcw /> Try {failed.length === 1 ? 'the failed page' : `${failed.length} failed pages`} again
+                </Button>
+              )}
               <Segmented
                 label="Filter pages"
                 value={filter}
@@ -135,6 +160,7 @@ export function Knowledge({ me }: { me: Me }) {
                   { value: 'off', label: 'Not used' },
                 ]}
               />
+            </div>
           }
         >
           {pages.loading && !pages.data && <Skeleton className="mx-4 mb-4 h-32" />}
@@ -145,7 +171,11 @@ export function Knowledge({ me }: { me: Me }) {
           )}
           <ul className="divide-y border-t">
             {list.filter((p) => matches(p, filter)).map((page) => (
-              <PageRow key={page.id} page={page} />
+              <PageRow
+                key={page.id}
+                page={page}
+                {...(page.selected && (page.status === 'error' || page.status === 'blocked') ? { onRetry: () => void retry([page.url]), retryDisabled: busy || running } : {})}
+              />
             ))}
           </ul>
         </Collapsible>
@@ -190,7 +220,7 @@ function Collapsible({
   id,
   title,
   summary,
-  description,
+  tip,
   action,
   defaultOpen = false,
   children,
@@ -198,7 +228,8 @@ function Collapsible({
   id: string;
   title: string;
   summary?: string | undefined;
-  description?: string | undefined;
+  /** What the section is for, behind a (?) beside the title. */
+  tip?: string | undefined;
   action?: ReactNode;
   defaultOpen?: boolean;
   children: ReactNode;
@@ -207,16 +238,20 @@ function Collapsible({
   return (
     <Card>
       <div className="flex flex-wrap items-center gap-3 px-4 py-3">
-        <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left" aria-expanded={open} aria-controls={`section-${id}`} onClick={() => setOpen(!open)}>
+        <button type="button" className={cn('flex min-w-0 items-center gap-2 text-left', !tip && 'flex-1')} aria-expanded={open} aria-controls={`section-${id}`} onClick={() => setOpen(!open)}>
           <ChevronDown className={cn('size-4 shrink-0 text-muted-foreground transition-transform', !open && '-rotate-90')} aria-hidden />
           <span className="min-w-0">
             <span className="flex items-baseline gap-2">
               <h3 className="text-[13px] font-medium">{title}</h3>
               {summary && <span className="truncate text-xs text-muted-foreground">{summary}</span>}
             </span>
-            {open && description && <span className="mt-0.5 block text-xs text-muted-foreground">{description}</span>}
           </span>
         </button>
+        {tip && (
+          <span className="-ml-1.5 mr-auto">
+            <InfoTip label={`About ${title.toLowerCase()}`}>{tip}</InfoTip>
+          </span>
+        )}
         {open && action}
       </div>
       {open && <div id={`section-${id}`}>{children}</div>}
@@ -281,7 +316,7 @@ function Files() {
       title="Files"
       defaultOpen
       summary={list.length ? `${learned} learned${busy ? ' · working…' : ''}` : undefined}
-      description="Price lists, brochures, policies: PDF, Word, Markdown or text, up to 10 MB. Read in the background — you can leave this page."
+      tip="Price lists, brochures, policies. Read in the background, so you can leave this page. Scanned PDFs (pictures of text) can’t be read."
     >
       <div className="space-y-3 px-4 pb-4">
         <div
@@ -315,7 +350,7 @@ function Files() {
               e.target.value = '';
             }}
           />
-          <p className="text-[11px] text-muted-foreground">PDF, .docx, .md, .txt · scanned PDFs (images of text) can’t be read</p>
+          <p className="text-[11px] text-muted-foreground">PDF, Word, Markdown or text · up to 10 MB</p>
         </div>
         {error && <ErrorNote error={error} />}
         {files.error && <ErrorNote error={files.error} onRetry={files.reload} />}
@@ -353,24 +388,31 @@ function Files() {
   );
 }
 
-function PageRow({ page }: { page: KnowledgePage }) {
+function PageRow({ page, onRetry, retryDisabled }: { page: KnowledgePage; onRetry?: () => void; retryDisabled?: boolean }) {
   const [open, setOpen] = useState(false);
   const chunks = useData(() => (open ? api<{ chunks: { id: string; headingPath: string; content: string; tokens: number }[] }>(`/knowledge/pages/${page.id}/chunks`) : Promise.resolve(null)), [open]);
   return (
     <li>
-      <button type="button" className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-subtle" aria-expanded={open} onClick={() => setOpen(!open)} disabled={!page.chunks}>
-        <ChevronRight className={cn('size-3.5 shrink-0 text-muted-foreground transition-transform', open && 'rotate-90', !page.chunks && 'invisible')} aria-hidden />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13px]">{page.title || pathOf(page.url)}</span>
-          <span className="block truncate text-xs text-muted-foreground">
-            {pathOf(page.url)} · {categoryLabel(page.category)}
-            {page.error ? ` · ${page.error}` : ''}
+      <div className="flex items-center hover:bg-subtle">
+        <button type="button" className="flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left" aria-expanded={open} onClick={() => setOpen(!open)} disabled={!page.chunks}>
+          <ChevronRight className={cn('size-3.5 shrink-0 text-muted-foreground transition-transform', open && 'rotate-90', !page.chunks && 'invisible')} aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[13px]">{page.title || pathOf(page.url)}</span>
+            <span className="block truncate text-xs text-muted-foreground">
+              {pathOf(page.url)} · {categoryLabel(page.category)}
+              {page.error ? ` · ${page.error}` : ''}
+            </span>
           </span>
-        </span>
-        <span className="hidden text-xs text-muted-foreground tabular-nums sm:block">{page.chunks ? passages(page.chunks) : ''}</span>
-        <span className="hidden text-xs text-muted-foreground sm:block">{page.crawledAt ? fmtRelative(page.crawledAt) : ''}</span>
-        <PageStatusBadge status={page.selected ? page.status : 'discovered'} />
-      </button>
+          <span className="hidden text-xs text-muted-foreground tabular-nums sm:block">{page.chunks ? passages(page.chunks) : ''}</span>
+          <span className="hidden text-xs text-muted-foreground sm:block">{page.crawledAt ? fmtRelative(page.crawledAt) : ''}</span>
+          <PageStatusBadge status={page.selected ? page.status : 'discovered'} />
+        </button>
+        {onRetry && (
+          <Button variant="ghost" size="sm" className="mr-3 shrink-0" onClick={onRetry} disabled={retryDisabled} aria-label={`Try ${pathOf(page.url)} again`}>
+            <RotateCcw /> Try again
+          </Button>
+        )}
+      </div>
       {open && (
         <ol className="space-y-2 bg-subtle/60 px-4 py-3 pl-10">
           {!chunks.data && <Skeleton className="h-12" />}
@@ -412,7 +454,7 @@ function ManualKnowledge() {
   };
   return (
     <Card>
-      <CardHeader title="Your own answers" description="Things that aren’t on the site, or that it should say exactly — live as soon as you add them." />
+      <CardHeader title="Your own answers" tip={{ label: 'About your own answers', text: 'Things that aren’t on the site, or that it should say exactly. Live as soon as you add them.' }} />
       <ul className="divide-y border-t">
         {entries.data?.entries.map((entry) => (
           <li key={entry.id} className="flex items-start gap-3 px-4 py-2.5">
@@ -454,7 +496,7 @@ function TestSearch() {
   const [error, setError] = useState<Error | null>(null);
   return (
     <Card>
-      <CardHeader title="Test a question" description="The passages the assistant would answer from, best first." />
+      <CardHeader title="Test a question" tip={{ label: 'About testing', text: 'Shows the passages the assistant would answer from, best first.' }} />
       <div className="space-y-3 px-4 pb-4">
         <form
           className="flex gap-2"

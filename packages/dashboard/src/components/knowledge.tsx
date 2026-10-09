@@ -267,7 +267,7 @@ export function CrawlProgress({ run, chunks }: { run: CrawlRun | null; chunks: n
       </div>
       <p className="text-xs text-muted-foreground">
         {active
-          ? 'This runs on Cloudflare in the background — you can keep going, or close this page.'
+          ? 'Runs in the background: you can close this page.'
           : `${run.done} learned${run.failed ? `, ${run.failed} skipped or failed` : ''} · ${run.finishedAt ? fmtRelative(run.finishedAt) : ''}`}
       </p>
     </div>

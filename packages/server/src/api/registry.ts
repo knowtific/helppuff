@@ -1132,6 +1132,19 @@ export const ENDPOINTS: Endpoint[] = [
   },
   {
     method: 'POST',
+    path: '/knowledge/crawl/retry',
+    scope: 'knowledge:write',
+    tag: 'Knowledge',
+    summary: 'Try failed pages again',
+    description:
+      'Crawls the pages that failed (or the given ones among them) again, in the background, without changing which pages are selected. Pages that failed for a passing reason are also retried by themselves after a crawl. `409` while a crawl is running.',
+    fields: [{ name: 'urls', description: 'Only these failed pages. Without it, every failed page.' }],
+    body: { urls: ['https://acme.example/industries'] },
+    status: 202,
+    response: { site: 'acme', runId: 'run_3', total: 1 },
+  },
+  {
+    method: 'POST',
     path: '/knowledge/runs/:id/cancel',
     scope: 'knowledge:write',
     tag: 'Knowledge',

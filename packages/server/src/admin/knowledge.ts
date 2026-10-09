@@ -26,7 +26,7 @@ import { resolveSite } from '../config/site.js';
 import { HelpPuffError } from '../core/errors.js';
 import type { HonoEnv } from '../core/request.js';
 import { aiSettingsFor, requireKnowledgeEnv, websiteFor, type KnowledgeEnv } from '../knowledge/env.js';
-import { cancelCrawl, crawlStatus, discoverSite, startCrawl, userAgentFor, type CrawlTrigger } from '../knowledge/crawl.js';
+import { cancelCrawl, crawlStatus, discoverSite, retryFailed, startCrawl, userAgentFor, type CrawlTrigger } from '../knowledge/crawl.js';
 import { assertSameOrigin, currentAdmin, jsonBody, siteParam } from './guard.js';
 import { suggestQuestions } from '../home/suggest.js';
 
@@ -123,6 +123,16 @@ knowledgeRoutes.post('/knowledge/crawl', async (c) => {
     },
     now,
   );
+  return c.json({ site: siteId, ...started }, 202);
+});
+
+knowledgeRoutes.post('/knowledge/crawl/retry', async (c) => {
+  assertSameOrigin(c);
+  const admin = await currentAdmin(c);
+  const body = await jsonBody(c);
+  const { siteId, site, env, now } = await siteOf(c, body['site']);
+  const urls = strings(body['urls']);
+  const started = await retryFailed(env, siteId, site, { ...(urls ? { urls } : {}), trigger: admin.via === 'api-key' ? 'cli' : 'dashboard', workerUrl: workerUrl(c) }, now);
   return c.json({ site: siteId, ...started }, 202);
 });
 

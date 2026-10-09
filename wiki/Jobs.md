@@ -32,7 +32,7 @@ HelpPuff's AI reads your site and picks the template that fits the business,
 then adjusts it: your services become the choices of the *Service* field, and the names of
 a stage or two may change. The dashboard's Home page says what it chose and
 why, with **Change it**. If it isn't sure (or there's no AI), you get the
-**Basic** template: *New → In progress → Won / Lost*.
+**Basic** template: *New → Quote sent → In progress → Done / Cancelled*.
 
 | Template | For | Stages (won · lost) | Fields |
 | --- | --- | --- | --- |
@@ -42,7 +42,7 @@ why, with **Change it**. If it isn't sure (or there's no AI), you get the
 | Sales (demo) | B2B: demo, trial, deal | Demo request, Qualified, Demo booked, Trial · Won · Lost | Company, Company size, Use case, Current tool |
 | Bookings | Appointments and reservations | Request, Confirmed · Completed · Cancelled | Service, Preferred date and time, Number of people, Notes |
 | Custom orders | Made-to-order products | Enquiry, Quoted, Paid · Delivered · Lost | Product, Quantity, Needed by, Description, Delivery address |
-| Basic | Anything | New, In progress · Won · Lost | Description |
+| Basic | Anything | New, Quote sent, In progress · Done · Cancelled | Description |
 
 Once you edit anything, the AI never
 changes your setup again unless you ask: **Let the AI choose again** in

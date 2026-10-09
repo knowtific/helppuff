@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { api } from '../lib/api';
 import { fmtRelative, useData } from '../lib/utils';
 import { CopyBlock } from '../pages/Settings';
-import { HelpLink } from './Shell';
+import { HelpLink, wikiHref } from './Shell';
 import { Badge, Button, Card, CardHeader, Empty, ErrorNote, Input, Select, Skeleton } from './ui';
 
 /**
@@ -50,7 +50,7 @@ export function ApiKeys() {
         <Card>
           <CardHeader
             title="API keys"
-            description="Use HelpPuff from your own servers: chat, leads, callbacks, knowledge, settings. Keys belong on a server, never in a web page."
+            tip={{ label: 'About api keys', text: 'Use HelpPuff from your own servers: chat, leads, callbacks, knowledge, settings. Keys belong on a server, never in a web page.' }}
             action={
               !creating && (
                 <Button size="sm" onClick={() => setCreating(true)}>
@@ -85,7 +85,7 @@ export function ApiKeys() {
       )}
 
       <Card>
-        <CardHeader title="Use it" description="Every request sends the key as a Bearer token." action={<HelpLink page="API" />} />
+        <CardHeader title="Use it" tip={{ label: 'About using a key', text: 'Every request sends the key as a Bearer token.', href: wikiHref('API') }} />
         <div className="space-y-3 border-t px-4 py-3">
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Base URL</p>

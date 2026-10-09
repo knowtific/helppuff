@@ -50,10 +50,23 @@ Shaped for the **Workers Free plan**:
 
 - **One page per step**, so each step's CPU stays small (10 ms per step on
   Free; waiting on the network does not count).
-- **At most 15 pages per Workflow instance**; the last step starts the next
-  instance. Free allows 50 external fetches per invocation and is ambiguous on
-  whether one instance spans several, so a chain of short instances stays well
-  inside it either way.
+- **At most 15 pages per Workflow instance, and fewer when its outside calls
+  run low**: Free allows 50 per instance, and page fetches, Workers AI and
+  Vectorize all count (3–5 a page). The crawl counts them, leaves the rest of
+  the batch queued and starts the next instance before it runs out. The
+  finishing steps (business details, cleanup, webhooks) get an instance of
+  their own.
+- **Pages that fail for a passing reason are tried again by themselves**:
+  unreachable, timed out, a 5xx or a 429. Once the crawl is done, it waits
+  15 minutes (a Workflow sleep, which costs nothing) and queues just those
+  pages, then once more after 2 hours. A 404 or a robots.txt rule is not
+  retried, and starting a new crawl replaces the retry. To try sooner, use
+  **Try again** on a failed page, or **Try N failed pages again**, on the
+  Knowledge page (`POST /knowledge/crawl/retry`): it crawls just those and
+  leaves the ticked pages as they are.
+- A part that fails after its retries marks the crawl **failed** with the
+  reason, instead of leaving it "running". **Start learning** again; pages
+  that have not changed are skipped.
 - At most 1000 steps per instance (Free allows 1024) and `knowledge.maxPages`
   (default 300, at most 1000) per run.
 

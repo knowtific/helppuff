@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEve
 import { parseCurl, promptToolRefs, toolArgs, TOOL_METHODS, TOOL_NAME, isSecretHeader } from '@helppuff/protocol/tools';
 import { api, type ToolHeaderView, type ToolParamView, type ToolsList, type ToolTestResult, type ToolView } from '../lib/api';
 import { cn, fmtRelative } from '../lib/utils';
-import { Badge, Button, Card, CardHeader, Input, Segmented, Select, Textarea } from './ui';
+import { Badge, Button, Card, CardHeader, InfoTip, Input, Segmented, Select, Textarea } from './ui';
 
 /**
  * The Prompt page's tools: the library (right), the dialog that makes one
@@ -36,7 +36,11 @@ export function ToolLibrary({
             <Wrench className="size-3.5 text-muted-foreground" /> Tools
           </span>
         }
-        description="Your APIs, and what the assistant saves."
+        tip={{
+          label: 'About tools',
+          align: 'end',
+          text: 'Your own APIs the assistant can call (paste a curl), and extract tools that save what the visitor says, like an order number. Use them before, during or after a chat.',
+        }}
         action={
           <Button size="sm" variant="outline" onClick={onNew} disabled={list.tools.length >= list.limits.tools} aria-label="New tool">
             <Plus /> New
@@ -44,9 +48,7 @@ export function ToolLibrary({
         }
       />
       {list.tools.length === 0 ? (
-        <p className="px-4 pb-4 text-[13px] text-muted-foreground">
-          None yet. Add an API the assistant can call (paste its curl), or an extract tool that saves what the visitor tells it, like an order number.
-        </p>
+        <p className="px-4 pb-4 text-[13px] text-muted-foreground">No tools yet.</p>
       ) : (
         <ul className="border-t">
           {list.tools.map((tool) => (
@@ -86,20 +88,18 @@ const hostOf = (url: string | undefined) => {
 
 // ----------------------------------------------------------------- sections
 
-const SECTION_COPY: Record<Section, { title: string; number: number; icon: ReactNode; description: string; empty: string }> = {
+const SECTION_COPY: Record<Section, { title: string; number: number; icon: ReactNode; tip: string }> = {
   before: {
     number: 1,
     title: 'Before the chat',
     icon: <ArrowDownToLine className="size-3.5 text-muted-foreground" />,
-    description: 'Called when a chat starts, with the pre-chat form’s answers. What they return is there for the assistant’s first answer, under the tool’s name.',
-    empty: 'Look the visitor up in your CRM or shop by their email before they ask anything.',
+    tip: 'Called when a chat starts, with the pre-chat form’s answers, so the first answer already knows what they returned. For example: look the visitor up in your CRM by their email.',
   },
   after: {
     number: 3,
     title: 'After the chat',
     icon: <ArrowUpFromLine className="size-3.5 text-muted-foreground" />,
-    description: 'Called when the conversation ends (five quiet minutes after the last message), with the transcript, the summary, the contact, the attributes and every tool’s data. Webhooks get the same data in conversation.completed.',
-    empty: 'Send each finished conversation to your CRM, help desk or a sheet.',
+    tip: 'Called five quiet minutes after the last message, with the transcript, summary, contact and every tool’s data. For example: send each finished chat to your CRM or a sheet.',
   },
 };
 
@@ -140,12 +140,10 @@ export function RunSection({
             <SectionNumber n={copy.number} /> {copy.title}
           </span>
         }
-        description={copy.description}
+        tip={{ label: `About ${copy.title.toLowerCase()}`, text: copy.tip }}
       />
       <div className="space-y-2 px-4 pb-4">
-        {inSection.length === 0 ? (
-          <p className="rounded-md border border-dashed px-3 py-3 text-[13px] text-muted-foreground">{copy.empty}</p>
-        ) : (
+        {inSection.length > 0 && (
           <ul className="divide-y rounded-md border">
             {inSection.map((tool) => (
               <li key={tool.id} className="flex items-center gap-2 px-3 py-2">
@@ -165,6 +163,7 @@ export function RunSection({
           </ul>
         )}
         <div className="flex flex-wrap items-center gap-2">
+          {inSection.length === 0 && <span className="mr-1 text-[13px] text-muted-foreground">None</span>}
           {others.length > 0 && (
             <Select
               value=""
@@ -601,11 +600,13 @@ export function ToolDialog({
 function Field({ label, htmlFor, hint, children }: { label: string; htmlFor: string; hint?: string; children: ReactNode }) {
   return (
     <div className="space-y-1">
-      <label htmlFor={htmlFor} className="block text-xs font-medium">
-        {label}
-      </label>
+      <div className="flex items-center gap-1">
+        <label htmlFor={htmlFor} className="text-xs font-medium">
+          {label}
+        </label>
+        {hint && <InfoTip label={`About ${label.toLowerCase()}`}>{hint}</InfoTip>}
+      </div>
       {children}
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
     </div>
   );
 }
@@ -823,7 +824,7 @@ function caretPoint(el: HTMLTextAreaElement, at: number): { top: number; left: n
   return point;
 }
 
-export function PromptEditor({ value, onChange, suggestions, className, label }: { value: string; onChange: (text: string) => void; suggestions: Suggestion[]; className?: string; label: string }) {
+export function PromptEditor({ value, onChange, suggestions, className, label, placeholder }: { value: string; onChange: (text: string) => void; suggestions: Suggestion[]; className?: string; label: string; placeholder?: string }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const [query, setQuery] = useState<{ start: number; text: string } | null>(null);
   const [active, setActive] = useState(0);
@@ -894,6 +895,7 @@ export function PromptEditor({ value, onChange, suggestions, className, label }:
         onClick={(e) => look(e.currentTarget)}
         onBlur={() => setTimeout(() => setQuery(null), 150)}
         aria-label={label}
+        placeholder={placeholder}
         role="combobox"
         aria-autocomplete="list"
         aria-expanded={matches.length > 0}

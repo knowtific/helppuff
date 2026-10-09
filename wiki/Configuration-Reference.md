@@ -62,11 +62,11 @@ variable, e.g. `{ "env": "OPENAI_API_KEY" }`, whose value lives in `.env` and on
 | `model.secrets` | string[] |  | With `provider: "custom"`. The environment variables your file reads (`env.NAME`): uploaded as Worker secrets at deploy. · ≤ 20 items |
 | `prompt` | string | `"prompt.md"` | Path to the system prompt, relative to helppuff.json. |
 | `assistant` | object | `{}` | How the assistant behaves: goal, tone, answer length. HelpPuff writes these around prompt.md on every answer, so prompt.md holds only what is specific to the business. |
-| `assistant.goal` | `"callbacks"` \| `"answers"` \| `"bookings"` | `"callbacks"` | What the assistant is for: `callbacks` (help, then get the team in touch), `answers`, or `bookings`. |
+| `assistant.goal` | `"callbacks"` \| `"answers"` \| `"bookings"` | `"callbacks"` | What the assistant is for: `callbacks` (help, then get the team in touch), `answers`, or `bookings` (help, then send them to `bookingUrl`: a booking, sign-up or quote page). |
 | `assistant.tone` | `"friendly"` \| `"professional"` \| `"casual"` | `"friendly"` | How it sounds. |
 | `assistant.length` | `"short"` \| `"detailed"` | `"short"` | `short`: a few sentences; `detailed`: complete answers with short lists. |
 | `assistant.prices` | `"share"` \| `"quote"` | `"share"` | `share`: give prices exactly as the site and documents state them; `quote`: never give a price or estimate, offer a quote from the team instead. |
-| `assistant.bookingUrl` | string |  | Where visitors book, for the `bookings` goal. · ≤ 2000 chars, URL |
+| `assistant.bookingUrl` | string |  | The page the `bookings` goal sends visitors to: booking, sign-up or a quote form. · ≤ 2000 chars, URL |
 | `live` | object | `{}` | Live chat: visitors can talk to a person on your team, who answers from the dashboard or Telegram. Off by default. `helppuff live on` turns it on. |
 | `live.enabled` | boolean | `false` | Let visitors talk to a person on the team. When nobody is available they get the callback form instead. |
 | `live.waitSeconds` | integer | `120` | How long a visitor waits for someone to take the chat before they are offered the callback form (they can keep waiting). · 15–3600 |

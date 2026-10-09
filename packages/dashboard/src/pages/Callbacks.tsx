@@ -1,7 +1,7 @@
 import { Check, Mail, MessageSquare, Phone, PhoneCall, RotateCcw, X } from 'lucide-react';
 import { useState } from 'react';
 import { PageHeader } from '../components/Shell';
-import { Avatar, Badge, Button, Card, Empty, ErrorNote, Skeleton, Textarea } from '../components/ui';
+import { Avatar, Button, Card, Empty, ErrorNote, Skeleton, Textarea } from '../components/ui';
 import { api, type Callback, type CallbackList, type CallbackStatus } from '../lib/api';
 import { NewJobButton } from './Jobs';
 import { cn, fmtDateTime, fmtRelative, href, useData } from '../lib/utils';
@@ -113,7 +113,7 @@ export function Callbacks() {
 
   return (
     <>
-      <PageHeader title="Callbacks" description="Visitors who asked the team to call or email them back. Mark each one done when you have." help="Leads#callbacks" />
+      <PageHeader title="Callbacks" description="Visitors who asked the team to call or email them back, oldest first so nobody waits longest. Mark each one done when you have; webhooks get callback.requested and callback.updated." help="Leads#callbacks" />
       <div className="space-y-3 p-4 md:p-6">
         <div className="flex flex-wrap gap-1" role="group" aria-label="Filter by status">
           {TABS.map((t) => (
@@ -146,12 +146,7 @@ export function Callbacks() {
             </ul>
           )}
         </Card>
-        {tab === 'open' && data && data.items.length > 0 && (
-          <p className="text-xs text-muted-foreground">
-            <Badge>Oldest first</Badge> so nobody waits longest. Webhooks get <code className="rounded bg-muted px-1">callback.requested</code> and{' '}
-            <code className="rounded bg-muted px-1">callback.updated</code>.
-          </p>
-        )}
+
       </div>
     </>
   );

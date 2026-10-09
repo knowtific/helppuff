@@ -115,7 +115,7 @@ describe('the Prompt page with tools', () => {
     await key(editor, 'Enter');
     await flush();
     expect(editor.value).toBe(`${PROMPT.text} Orders: {{order_status}}`);
-    expect(byText(page, /Tools in this prompt/)).toBeTruthy();
+    expect(byText(page, /^Tools:/)).toBeTruthy();
     expect(button(page, 'order_status')).toBeTruthy();
 
     await type(editor, `${editor.value} {{order_stauts}}`);

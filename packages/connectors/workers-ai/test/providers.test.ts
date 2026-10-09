@@ -90,7 +90,7 @@ describe('an OpenAI-compatible model', () => {
     // Knowledge off: no passages section, and the rules say to answer from the business details.
     const system = api.calls[0]!.body['messages'][0].content as string;
     expect(system).not.toContain('passages');
-    expect(system).toContain('## How to answer\n- Answer questions about the business only from the business details');
+    expect(system).toContain("## How to answer\n- Answer questions about the business only from the business's instructions, the business details");
     expect(system).toContain('- Phone: 03 9876 5432');
   });
 

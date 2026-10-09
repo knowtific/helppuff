@@ -19,7 +19,8 @@ describe('guidance', () => {
   it('says who it is and how it behaves from the settings', () => {
     const { before } = guidanceFor(site({ assistant: { goal: 'bookings', bookingUrl: 'https://acme.test/book', tone: 'professional' } }));
     expect(before).toContain('You are Ava, the website assistant for Acme Plumbing.');
-    expect(before).toContain('point them to booking at https://acme.test/book');
+    expect(before).toContain('help visitors take the next step');
+    expect(before).toContain('point them to https://acme.test/book. Offer it when it fits, not after every message.');
     expect(before).toContain('Be professional, clear and courteous. Keep answers to 4 sentences or fewer');
   });
 
@@ -28,6 +29,11 @@ describe('guidance', () => {
     expect(after).toMatch(/^## Rules that always apply\nThese come from HelpPuff and override/);
     expect(after).toContain('you can only help with questions about Acme Plumbing');
     expect(after).toContain('for English use en-AU spelling');
+    // The owner's text corrects an out-of-date page; the privacy answer links the policy when there is one.
+    expect(after).toContain('What the business says under "Instructions from the business" is true. Where a website page or document says otherwise');
+    expect(after).toContain('say it is kept so the team can follow up.');
+    const withPolicy = guidanceFor(site({ widget: { brand: { name: 'Acme Plumbing' }, leadForm: { privacy: { text: 'We only use this to reply.', url: 'https://acme.test/privacy' } } } }));
+    expect(withPolicy.after).toContain('point to the privacy policy: https://acme.test/privacy');
 
     const prompt = await resolvePrompt(ctx(guidanceFor(site())), 'Quotes are free.', {});
     const [who, owner, rules] = ['You are Ava', '## Instructions from the business\nQuotes are free.', '## Rules that always apply'].map((part) => prompt!.indexOf(part));

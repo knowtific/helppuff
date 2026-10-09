@@ -187,13 +187,13 @@ export function Contact({ id, me }: { id: string; me: Me }) {
 
         <div className="space-y-4">
           <Card>
-            <CardHeader title="Jobs" description="Requests, quotes and work for this person." />
+            <CardHeader title="Jobs" tip={{ label: 'About jobs', text: 'Requests, quotes and work for this person.' }} />
             <div className="border-t px-4 py-3">
               <RelatedJobs filter={{ contact: id }} context={{ contactId: id, label: `For ${data.name ?? data.email ?? 'this contact'}` }} />
             </div>
           </Card>
           <Card>
-            <CardHeader title="Conversations" description="Every chat this person has had, newest first." />
+            <CardHeader title="Conversations" tip={{ label: 'About conversations', text: 'Every chat this person has had, newest first.' }} />
             {data.conversations.length === 0 ? (
               <Empty icon={<MessageSquare />} title="No conversations">
                 Added from elsewhere (the API, a form): chats appear here when they write in.
@@ -227,7 +227,7 @@ export function Contact({ id, me }: { id: string; me: Me }) {
           </Card>
 
           <Card>
-            <CardHeader title="History" description="Chats, callbacks and notes, newest first." />
+            <CardHeader title="History" tip={{ label: 'About history', text: 'Chats, callbacks and notes, newest first.' }} />
             <ol className="space-y-3 border-t px-4 py-3">
               {timeline(data).map((event, index) => {
                 const Icon = event.icon;

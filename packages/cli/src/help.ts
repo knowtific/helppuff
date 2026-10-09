@@ -28,6 +28,9 @@ QUICK START (AI agents: Claude Code, Codex, Cursor…)
   4. Give the user three things: deploy.setupUrl (the dashboard — a one-time link, 24h, where they
      create their sign-in; defaults opens Home, dashboard continues web onboarding), deploy.embed
      (the script) and deploy.preview (the demo). Lost it? \`helppuff dashboard\` mints a new link.
+  5. Settings: everything in the dashboard can be changed from here (config set, prompt, tools, jobs,
+     live, webhooks, or \`helppuff api\` for any route). Asked to go through them with the user? Read
+     them first (config get, prompt pull, tools list --json), ask only what changes the result, apply.
   Rules: never invent a URL, key or account id; ask. Never print or commit .env or ADMIN_API_KEY.
   Secrets: prefer asking the user to run \`helppuff secret set NAME\`; pass --api-key only if they gave it to you.
 

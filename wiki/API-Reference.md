@@ -147,6 +147,7 @@ What the assistant knows: the website it learned, uploaded files, hand-written k
 - [[Knowledge base status|API-Reference-Knowledge#knowledge-base-status]]: `GET /knowledge/status`
 - [[Find the website pages|API-Reference-Knowledge#find-the-website-pages]]: `POST /knowledge/discover`
 - [[Learn the website|API-Reference-Knowledge#learn-the-website]]: `POST /knowledge/crawl`
+- [[Try failed pages again|API-Reference-Knowledge#try-failed-pages-again]]: `POST /knowledge/crawl/retry`
 - [[Cancel a crawl|API-Reference-Knowledge#cancel-a-crawl]]: `POST /knowledge/runs/:id/cancel`
 - [[List learned pages|API-Reference-Knowledge#list-learned-pages]]: `GET /knowledge/pages`
 - [[Chunks of a page|API-Reference-Knowledge#chunks-of-a-page]]: `GET /knowledge/pages/:id/chunks`

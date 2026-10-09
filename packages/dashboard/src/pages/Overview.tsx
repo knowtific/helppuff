@@ -130,7 +130,7 @@ export function Overview({ me }: { me: Me }) {
 
         <div className="grid gap-4 lg:grid-cols-3">
           <Card className="lg:col-span-2">
-            <CardHeader title="Latest questions" description="What visitors opened with" action={<a href={href({ page: 'conversations' })} className="text-xs text-muted-foreground hover:text-foreground">View all</a>} />
+            <CardHeader title="Latest questions" tip={{ label: 'About latest questions', text: 'What visitors opened with' }} action={<a href={href({ page: 'conversations' })} className="text-xs text-muted-foreground hover:text-foreground">View all</a>} />
             {data && data.recentQuestions.length === 0 && (
               <Empty icon={<MessagesSquare />} title="No conversations yet">
                 Once visitors start chatting, their questions appear here.
@@ -176,7 +176,7 @@ export function Overview({ me }: { me: Me }) {
 
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>
-            <CardHeader title="Where chats start" description="Pages visitors were on" />
+            <CardHeader title="Where chats start" tip={{ label: 'About where chats start', text: 'Pages visitors were on' }} />
             {data && <Bars label="Top pages" rows={data.topPages.map((p) => ({ key: p.url, label: pathOf(p.url), count: p.count }))} />}
           </Card>
           <Card>

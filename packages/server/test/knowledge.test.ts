@@ -153,6 +153,36 @@ describe('knowledge', () => {
     expect(runs.find((r) => r.id === first.runId)!.status).toBe('cancelled');
   });
 
+  it('tries failed pages again by hand, without unticking the rest', async () => {
+    const w = world();
+    const healthy = fakeSite(PAGES);
+    vi.stubGlobal('fetch', (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith('/faq')) throw new Error('Too many subrequests.');
+      return healthy(input, init);
+    }) as typeof fetch);
+    await send(w.api, 'POST', '/admin/api/knowledge/discover', {});
+    await send(w.api, 'POST', '/admin/api/knowledge/crawl', {});
+    await w.runWorkflows();
+    const statusOf = (url: string) => w.db.raw.prepare('SELECT status, selected FROM pages WHERE url = ?').get(url) as { status: string; selected: number };
+    expect(statusOf('https://acme.test/faq')).toEqual({ status: 'error', selected: 1 });
+
+    vi.stubGlobal('fetch', healthy);
+    const retried = await send(w.api, 'POST', '/admin/api/knowledge/crawl/retry', {});
+    expect(retried.status).toBe(202);
+    const { runId, total } = (await retried.json()) as { runId: string; total: number };
+    expect(total).toBe(1);
+    // Past the first part: robots.txt and the furniture come from the last run.
+    expect(w.created[0]).toMatchObject({ id: `${runId}-1`, params: { runId, part: 1 } });
+    expect((await send(w.api, 'POST', '/admin/api/knowledge/crawl/retry', {})).status).toBe(409);
+    await w.runWorkflows();
+
+    expect(statusOf('https://acme.test/faq')).toEqual({ status: 'indexed', selected: 1 });
+    expect(statusOf('https://acme.test/')).toEqual({ status: 'indexed', selected: 1 });
+    const search = (await (await send(w.api, 'POST', '/admin/api/knowledge/search', { query: 'Do you service Mooroolbark?' })).json()) as { chunks: { url: string }[] };
+    expect(search.chunks.map((c) => c.url)).toContain('https://acme.test/faq');
+    expect((await send(w.api, 'POST', '/admin/api/knowledge/crawl/retry', {})).status).toBe(400);
+  });
+
   it('refuses addresses from another site', async () => {
     const w = world();
     const response = await send(w.api, 'POST', '/admin/api/knowledge/crawl', { urls: ['https://elsewhere.test/'] });

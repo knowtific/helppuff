@@ -450,7 +450,7 @@ function Detail({ id, me, team, onChanged }: { id: string; me: Me; team: Team | 
             <RelatedJobs filter={{ conversation: id }} context={{ conversationId: id, label: 'From this conversation: its contact is linked.' }} />
           </SideSection>
           <SideSection title="Labels">
-            <LabelPicker value={data.labels ?? []} onChange={(ids) => void patch({ labels: ids })} />
+            <LabelPicker value={data.labels ?? []} onChange={(ids) => void patch({ labels: ids })} canManage={!member} />
           </SideSection>
           <SideSection title="Attributes">
             <AttributesEditor value={c.attributes ?? {}} onSave={(attributes) => patch({ attributes })} />

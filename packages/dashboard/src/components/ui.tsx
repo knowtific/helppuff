@@ -1,5 +1,5 @@
-import { forwardRef, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
-import { UserRound } from 'lucide-react';
+import { forwardRef, useId, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
+import { CircleHelp, UserRound } from 'lucide-react';
 import type { LeadStatus } from '../lib/api';
 import { cn, hueOf, initials } from '../lib/utils';
 
@@ -66,11 +66,18 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return <div className={cn('rounded-lg border bg-card', className)} {...props} />;
 }
 
-export function CardHeader({ title, description, action }: { title: ReactNode; description?: ReactNode; action?: ReactNode }) {
+export function CardHeader({ title, description, action, tip }: { title: ReactNode; description?: ReactNode; action?: ReactNode; tip?: { label: string; text: ReactNode; align?: 'start' | 'end'; href?: string } }) {
   return (
     <div className="flex items-start justify-between gap-3 px-4 pt-3.5 pb-2">
       <div>
-        <h3 className="text-[13px] font-medium">{title}</h3>
+        <h3 className="flex items-center gap-1.5 text-[13px] font-medium">
+          {title}
+          {tip && (
+            <InfoTip label={tip.label} align={tip.align} href={tip.href}>
+              {tip.text}
+            </InfoTip>
+          )}
+        </h3>
         {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}
       </div>
       {action}
@@ -117,6 +124,42 @@ export function Avatar({ name, className }: { name: string | null | undefined; c
       style={{ background: `hsl(${hue} 70% 92%)`, color: `hsl(${hue} 45% 32%)` }}
     >
       {initials(name)}
+    </span>
+  );
+}
+
+/**
+ * A (?) that explains something, so pages carry no paragraphs of help. It
+ * opens on hover, keyboard focus or a tap (never a mouse alone), stays open
+ * while the pointer or focus is inside it, so a "Learn more" link in it can
+ * be reached, and Escape closes it.
+ */
+export function InfoTip({ label, children, align = 'start', href }: { label: string; children: ReactNode; align?: 'start' | 'end' | undefined; href?: string | undefined }) {
+  const id = useId();
+  return (
+    <span
+      className="group relative inline-flex align-middle"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' && document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      }}
+    >
+      {/* "More info", never the field's own name: voice control and label lookups would find two things called "Email". */}
+      <button type="button" aria-label="More info" data-topic={label} aria-describedby={id} className="rounded-full text-muted-foreground hover:text-foreground focus-visible:text-foreground">
+        <CircleHelp className="size-3.5" aria-hidden />
+      </button>
+      {/* Padding, not margin, between the (?) and the box: the pointer never leaves the group on its way in. */}
+      <span className={cn('absolute top-full z-30 hidden pt-1 group-focus-within:block group-hover:block', align === 'end' ? 'right-0' : 'left-0')}>
+        <span className="block w-64 rounded-md border bg-card px-2.5 py-1.5 text-left text-xs leading-relaxed font-normal text-foreground shadow-sm">
+          <span role="tooltip" id={id} className="block">
+            {children}
+          </span>
+          {href && (
+            <a href={href} target="_blank" rel="noreferrer" className="mt-1 inline-block font-medium underline-offset-2 hover:underline">
+              Learn more →
+            </a>
+          )}
+        </span>
+      </span>
     </span>
   );
 }

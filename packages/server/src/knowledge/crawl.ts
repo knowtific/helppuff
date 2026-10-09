@@ -55,6 +55,57 @@ async function selectedPages(env: KnowledgeEnv, siteId: string): Promise<{ url: 
   ).results;
 }
 
+/**
+ * Try the pages that failed again, by hand: a small run of just those (or of
+ * the given ones among them). Unlike `startCrawl` with `urls`, it leaves which
+ * pages are ticked alone, and it starts past the first part: robots.txt and
+ * the site-wide furniture come from the last run, and the business details
+ * read from every page are kept.
+ */
+export async function retryFailed(env: KnowledgeEnv, siteId: string, site: SiteConfig, request: { urls?: string[]; trigger: CrawlTrigger; workerUrl?: string }, now: number): Promise<{ runId: string; total: number }> {
+  if (!env.workflow) {
+    throw new HelpPuffError('internal', { message: 'This deployment has no crawl workflow. Run `helppuff deploy` again.', detail: 'knowledge_no_workflow' });
+  }
+  const busy = await env.db.prepare("SELECT 1 AS x FROM crawl_runs WHERE site_id = ? AND status IN ('queued', 'running') LIMIT 1").bind(siteId).first();
+  if (busy) throw new HelpPuffError('conflict', { message: 'Learning is running now. Try the failed pages again when it finishes.', detail: 'knowledge_crawl_running' });
+  const wanted = request.urls?.length ? new Set(request.urls.map((u) => canonicalUrl(u)).filter(Boolean)) : null;
+  const failed = (
+    await env.db
+      .prepare("SELECT id, url FROM pages WHERE site_id = ? AND selected = 1 AND status IN ('error', 'blocked') AND source NOT IN ('facts', 'manual', 'file') ORDER BY length(url), url")
+      .bind(siteId)
+      .all<{ id: string; url: string }>()
+  ).results.filter((p) => !wanted || wanted.has(p.url));
+  if (!failed.length) throw new HelpPuffError('bad_request', { message: 'No failed pages to try again.', detail: 'knowledge_nothing_failed' });
+
+  const last = await env.db
+    .prepare('SELECT robots, boilerplate FROM crawl_runs WHERE site_id = ? AND boilerplate IS NOT NULL ORDER BY started_at DESC, rowid DESC LIMIT 1')
+    .bind(siteId)
+    .first<{ robots: string | null; boilerplate: string | null }>();
+  const runId = `crawl-${now.toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
+  await env.db
+    .prepare("INSERT INTO crawl_runs (id, site_id, status, total, started_at, trigger, robots, boilerplate) VALUES (?, ?, 'running', ?, ?, ?, ?, ?)")
+    .bind(runId, siteId, failed.length, now, request.trigger, last?.robots ?? null, last?.boilerplate ?? null)
+    .run();
+  const statements = failed.map((p) => env.db.prepare("UPDATE pages SET status = 'queued', error = NULL, run_id = ? WHERE id = ?").bind(runId, p.id));
+  for (let i = 0; i < statements.length; i += 50) await env.db.batch(statements.slice(i, i + 50));
+
+  const ai = aiSettingsFor(site);
+  // Part 1: past the first part's robots.txt, sample and business-details reset.
+  const params: CrawlParams = {
+    siteId,
+    runId,
+    part: 1,
+    options: { embeddingModel: ai.embeddingModel, chatModel: ai.chatModel, gateway: ai.gateway, renderJs: site.knowledge.renderJs, userAgent: userAgentFor(request.workerUrl) },
+  };
+  try {
+    await env.workflow.create({ id: `${runId}-1`, params });
+  } catch (thrown) {
+    await env.db.prepare("UPDATE crawl_runs SET status = 'failed', error = ?, finished_at = ? WHERE id = ?").bind(String((thrown as Error)?.message ?? thrown).slice(0, 300), now, runId).run();
+    throw new HelpPuffError('internal', { message: 'The retry could not start. Try again in a minute.', detail: 'knowledge_workflow_create_failed' });
+  }
+  return { runId, total: failed.length };
+}
+
 export async function startCrawl(env: KnowledgeEnv, siteId: string, site: SiteConfig, request: StartCrawl, now: number): Promise<{ runId: string; total: number }> {
   if (!env.workflow) {
     throw new HelpPuffError('internal', { message: 'This deployment has no crawl workflow. Run `helppuff deploy` again.', detail: 'knowledge_no_workflow' });

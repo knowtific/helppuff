@@ -29,7 +29,7 @@ whole conversation itself (Retell, or your own API), only after-chat tools run.
 
 ## Add a tool
 
-On the Prompt page, use **+ New** in the **Tools** panel on the right, or
+On the **Prompt & tools** page (Settings → Prompt & tools), use **+ New** in the **Tools** panel on the right, or
 **New tool** in a section. Then either:
 
 - **Paste a curl** copied from your API's docs or from Postman

@@ -1,8 +1,8 @@
-import { ArrowRight, CheckCircle2, ExternalLink, Loader2, ShieldAlert, ShieldCheck, Sparkles } from 'lucide-react';
+import { ArrowRight, CheckCircle2, ExternalLink, Loader2, ShieldAlert, Sparkles } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { CrawlProgress, useKnowledgeStatus } from '../components/knowledge';
-import { HelpLink } from '../components/Shell';
-import { Button, Card, CardHeader, ErrorNote } from '../components/ui';
+import { HelpLink, wikiHref } from '../components/Shell';
+import { Button, Card, CardHeader, ErrorNote, InfoTip } from '../components/ui';
 import { api, type Me, type PipelineView, type Site } from '../lib/api';
 import { cn, href, pathOf } from '../lib/utils';
 import { CopyBlock } from './Settings';
@@ -42,8 +42,10 @@ export function Home({ me }: { me: Me }) {
     <div className="mx-auto grid h-full max-w-6xl gap-4 p-4 md:p-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:grid-rows-[minmax(0,1fr)]">
       <Card className="flex h-[75vh] min-h-[480px] flex-col overflow-hidden lg:h-auto lg:min-h-0">
         <div className="flex items-center justify-between gap-3 border-b px-4 py-2.5">
-          <h1 className="text-[13px] font-medium">Try your assistant</h1>
-          <span className="text-xs text-muted-foreground">Exactly what visitors get</span>
+          <h1 className="flex items-center gap-1.5 text-[13px] font-medium">
+            Try your assistant
+            <InfoTip label="About this chat">The live widget, exactly as visitors get it. Your test chats appear in Conversations.</InfoTip>
+          </h1>
         </div>
         {/* Nothing learned yet: a chat would only say "not sure". Show the progress instead. */}
         {learning && status && status.chunks === 0 ? (
@@ -80,7 +82,10 @@ export function Home({ me }: { me: Me }) {
         )}
 
         <Card>
-          <CardHeader title="Go live" description="Two ways to put it in front of people." action={<HelpLink page="Getting-Started#3-add-it-to-your-website" />} />
+          <CardHeader
+            title="Go live"
+            tip={{ label: 'About going live', text: 'Put it on your website, or share a demo page with your team first.', href: wikiHref('Getting-Started#3-add-it-to-your-website') }}
+          />
           <ol className="space-y-5 px-4 pb-4">
             <Step n={1} title="Add it to your website" description="Paste before </body> on every page, or send it to whoever looks after your site.">
               <CopyBlock text={site.embed} label="script" />
@@ -96,7 +101,7 @@ export function Home({ me }: { me: Me }) {
         </Card>
 
         <JobsChoice />
-        {site.production && <GoLiveChecklist production={site.production} />}
+        {site.production && !site.production.turnstile && <GoLiveChecklist production={site.production} />}
       </aside>
     </div>
   );
@@ -136,10 +141,10 @@ function JobsChoice() {
       <div className="flex items-start gap-2.5">
         <Sparkles className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
         <div className="min-w-0 flex-1 space-y-1">
-          <p className="font-medium">
+          <p className="flex items-center gap-1.5 font-medium">
             {p.itemPlural} set up as “{template?.name ?? p.template}”
+            {(p.reason ?? template?.description) && <InfoTip label="Why this template">{p.reason ?? template?.description}</InfoTip>}
           </p>
-          <p className="text-xs text-muted-foreground">{p.reason ?? template?.description}</p>
           <p className="text-xs text-muted-foreground">Stages: {p.stages.map((s) => s.name).join(' → ')}</p>
           <div className="flex gap-3 pt-1 text-xs">
             <a href={href({ page: 'settings', id: 'jobs' })} className="font-medium underline-offset-2 hover:underline">
@@ -156,54 +161,32 @@ function JobsChoice() {
 }
 
 /**
- * What to settle before real visitors arrive. Testing works without any of it
+ * What to settle before real visitors arrive, shown until it is done: only
+ * Turnstile now (the daily cap is an Advanced setting). Testing works without it
  * (and an agent cannot do the Turnstile step: it needs the Cloudflare
  * dashboard), so this warns rather than blocks.
  */
 function GoLiveChecklist({ production }: { production: NonNullable<Site['production']> }) {
   return (
     <Card>
-      <CardHeader title="Before you go live" description="Fine to skip while you test." action={<HelpLink page="Turnstile" />} />
+      <CardHeader title="Before you go live" tip={{ label: 'About going live', text: 'Fine to skip while you test.', href: wikiHref('Turnstile') }} />
       <ul className="space-y-4 px-4 pb-4">
         <li className="flex gap-3">
-          {production.turnstile ? (
-            <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[#16a34a]" aria-hidden />
-          ) : (
-            <ShieldAlert className="mt-0.5 size-4 shrink-0 text-[#d97706]" aria-hidden />
-          )}
+          <ShieldAlert className="mt-0.5 size-4 shrink-0 text-[#d97706]" aria-hidden />
           <div className="min-w-0 flex-1 space-y-2">
             <div>
-              <h2 className="text-[13px] font-medium">{production.turnstile ? 'Turnstile is on' : 'Turn on Turnstile'}</h2>
+              <h2 className="text-[13px] font-medium">Turn on Turnstile</h2>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                {production.turnstile
-                  ? 'New chats and dashboard sign-ins are checked for bots.'
-                  : 'Off now. Without it, a script can start chats and use up your daily cap, and try passwords on this dashboard. Free, about five minutes, in your Cloudflare dashboard.'}
+                Stops bots starting chats and guessing passwords. Free, about five minutes.
               </p>
             </div>
-            {!production.turnstile && (
-              <>
-                {production.hostnames.length > 0 && (
-                  <div className="space-y-1">
-                    <p className="text-[11px] text-muted-foreground">Hostnames to add to the widget:</p>
-                    <CopyBlock text={production.hostnames.join('\n')} label="hostnames" />
-                  </div>
-                )}
-                <HelpLink page="Turnstile" label="How to turn it on" />
-              </>
+            {production.hostnames.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-[11px] text-muted-foreground">Hostnames to add to the widget:</p>
+                <CopyBlock text={production.hostnames.join('\n')} label="hostnames" />
+              </div>
             )}
-          </div>
-        </li>
-        <li className="flex gap-3">
-          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
-          <div className="min-w-0 flex-1">
-            <h2 className="text-[13px] font-medium">Daily cap: {production.dailyCap.toLocaleString()} messages</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              The most the whole site can use in a day. Set it to what you’re happy to pay for in{' '}
-              <a href={href({ page: 'settings', id: 'advanced' })} className="underline underline-offset-2 hover:text-foreground">
-                Settings → Advanced
-              </a>
-              .
-            </p>
+            <HelpLink page="Turnstile" label="How to turn it on" />
           </div>
         </li>
       </ul>
@@ -218,10 +201,10 @@ function Step({ n, title, description, children }: { n: number; title: string; d
         {n}
       </span>
       <div className="min-w-0 flex-1 space-y-2">
-        <div>
-          <h2 className="text-[13px] font-medium">{title}</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
-        </div>
+        <h2 className="flex items-center gap-1.5 text-[13px] font-medium">
+          {title}
+          <InfoTip label={`About “${title}”`}>{description}</InfoTip>
+        </h2>
         {children}
       </div>
     </li>

@@ -182,7 +182,13 @@ npx -y @knowtific/helppuff knowledge add --file faq.md --json
 ```
 
 Use `prompt.md` only for business-specific behaviour that is not already a
-setting or built-in rule. Pull the live prompt before editing it:
+setting or built-in rule: what the website doesn't say, or says wrongly (the
+prompt wins over the website, so it is how an out-of-date page is corrected),
+how to word prices, what is quote-only. Write each point as a situation and
+roughly what to say ("If asked for a price on custom work, say something like
+…"). Leave out who it is, its goal, tone and length, staying on topic and not
+guessing: settings and built-in rules already say those. Pull the live prompt
+before editing it:
 
 ```bash
 npx -y @knowtific/helppuff prompt pull --json
@@ -273,6 +279,29 @@ and tell the person to send the returned `/link <code>` in the Telegram group
 or chat they will answer from. Check with `live status --json` and
 `telegram status --json`. Guide: https://github.com/knowtific/helppuff/wiki/Live-Chat
 
+## Going through the settings with the user
+
+People don't have to click through the dashboard: every setting has a
+command, and every dashboard page has an **Ask your AI agent** button that
+hands you a request like "Go through my HelpPuff Lead form settings with
+me". When the user asks you to check or set things up with them:
+
+1. **Read what is there**, all with `--json`: `status`, `config pull` then
+   `config get`, `prompt pull`, `tools list`, `jobs pipeline`, `live status`,
+   `webhooks list`, `knowledge status` and `knowledge pages --status error`,
+   `knowledge facts`.
+2. **Explain it in plain words**, briefly, and ask only what changes the
+   result, a few questions at a time: what to do when a visitor is interested
+   (offer a callback, just answer, or send them to a page such as booking,
+   sign-up or a quote form), the form before the chat or details only when
+   needed, prices or quote-only work, what is out of date on their website,
+   which of their systems it should check (tools), who on the team answers
+   (live chat). Keep every default they don't want to change.
+3. **Apply** each answer with the matching command below, and the prompt as
+   described in section 6.
+4. **Test** with `ask "<a real visitor question>" --json` for what changed,
+   and tell them what changed, in plain words.
+
 ## Changing what HelpPuff does
 
 When the user asks to turn something on or off, or to change how it behaves,
@@ -294,13 +323,15 @@ else keeps its default. Two kinds of setting:
 | --- | --- |
 | No form before the chat | `config set widget.leadForm.enabled false` |
 | Different form questions | `config set widget.leadForm.fields '[{"name":"name","label":"Name","type":"text","required":true},{"name":"email","label":"Email","type":"email","required":true}]'` |
-| What the assistant is for | `config set assistant.goal callbacks\|answers\|bookings` (`bookings` also needs `assistant.bookingUrl`) |
+| What the assistant is for | `config set assistant.goal callbacks\|answers\|bookings`: offer a callback, just answer, or send them to a page (`bookings`, which also needs `assistant.bookingUrl`: a booking, sign-up or quote page) |
 | Tone, answer length | `config set assistant.tone friendly\|professional\|casual`, `assistant.length short\|detailed` |
 | Never quote prices | `config set assistant.prices quote` |
 | Its name, the business name, colour | `widget.brand.agentName`, `widget.brand.name`, `widget.brand.accent` |
 | The greeting, a teaser, the button | `widget.chat.initialMessages`, `widget.teaser`, `widget.launcher.label` / `.shape` / `.position` / `.hideOnPaths` |
 | The chat's first screen: heading, buttons, useful pages | HelpPuff suggests links and questions from the website by itself; leave them unless the user asks. To change: `api POST /home/suggest` for ideas, then `config set widget.home.title "…"`, `widget.home.links '{"title":"Useful pages","items":[{"label":"Prices","url":"https://…/prices"}]}'` (`null`: none) or `widget.home.shortcuts '[…]'` (the whole list, up to 8: `reply`, `url`, `tel`, `email`, `form` or `flow` buttons) |
 | Re-learn the site regularly | `config set knowledge.website.schedule weekly` |
+| Pages that failed to learn | `knowledge pages --status error --json`, then `api POST /knowledge/crawl/retry --json` (only those pages; the selection stays). Pages that failed for a passing reason are also retried by themselves |
+| Business details (phone, hours, areas) | `knowledge facts set phone="…" hours="Mon–Fri 8–5"` (the owner's values are never overwritten by a crawl) |
 | Another Workers AI model | `model set workers-ai --model <id>` (the wiki's AI models page compares them) |
 | Another provider's model | `model set openai-compatible --preset <deepinfra\|openrouter\|deepseek\|groq\|together\|mistral\|fireworks\|vercel-ai-gateway\|cloudflare-ai-gateway> --model <id>`, or `model set openai\|gemini\|anthropic [--model <id>]`, or `--base-url <url> --key-env <NAME>` for any OpenAI-compatible API. It answers `needs_input` with the `secret set` command for the key: the user runs it |
 | Their own model or knowledge code | `scaffold model --use` / `scaffold rag --use`, edit the file, `secret set` each name in its `secrets`, deploy, then `model test` / `rag test` |

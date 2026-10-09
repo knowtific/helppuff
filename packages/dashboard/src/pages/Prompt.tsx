@@ -1,8 +1,9 @@
-import { ArrowLeft, History, Lock, RotateCcw } from 'lucide-react';
+import { ArrowLeft, ChevronRight, History, Lock, RotateCcw } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { PageHeader } from '../components/Shell';
+import { PageHeader, SettingsTabs } from '../components/Shell';
+import { AskAgent, agentRequest } from './Settings';
 import { PromptEditor, promptSuggestions, RunSection, SectionNumber, ToolDialog, ToolLibrary, unknownRefs, type Section } from '../components/Tools';
-import { Badge, Button, Card, CardHeader, Empty, ErrorNote, Input, Segmented, Select, Skeleton } from '../components/ui';
+import { Badge, Button, Card, CardHeader, Empty, ErrorNote, InfoTip, Input, Segmented, Select, Skeleton } from '../components/ui';
 import { api, ApiError, type Me, type PromptVersion, type PromptView, type PublishResult, type ToolsList, type ToolView } from '../lib/api';
 import { promptToolRefs } from '@helppuff/protocol/tools';
 import { diffLines } from '../lib/diff';
@@ -29,6 +30,17 @@ function sourceLabel(v: Pick<PromptVersion, 'source' | 'restoredFrom'>): string 
 }
 
 type Notice = { tone: 'ok' | 'warn'; text: string } | null;
+
+/** How to write it, shown while the prompt is empty: a situation, then roughly what to say. */
+const PROMPT_PLACEHOLDER = `## Prices
+When you give a plan price, always say "from", "+ GST" and the 12-month minimum term.
+
+## Quotes only
+Custom builds and eCommerce are quoted individually. If asked for a price, say something like:
+"That's scoped to what you need, so I can't give a fixed price here. Start here and the team will quote it: https://example.com/start"
+
+## Out of date on the website
+The free audit is no longer a video. Never call it one.`;
 
 export function Prompt({ me }: { me: Me }) {
   const [site, setSite] = useState(me.sites[0]?.id ?? '');
@@ -96,29 +108,33 @@ export function Prompt({ me }: { me: Me }) {
   return (
     <>
       <PageHeader
-        title="Prompt"
-        description="How the assistant behaves. Every change is kept as a version you can restore."
+        title="Prompt & tools"
+        description="What the assistant is told, and the tools it can call."
         help="Prompts-and-Instructions"
         actions={
-          me.sites.length > 1 && (
-            <Select
-              value={site}
-              onChange={(e) => {
-                setSite(e.target.value);
-                setDraft(null);
-                setSelected(null);
-              }}
-              aria-label="Site"
-            >
-              {me.sites.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </Select>
-          )
+          <>
+            <AskAgent request={agentRequest('prompt', 'Prompt & tools')} />
+            {me.sites.length > 1 && (
+              <Select
+                value={site}
+                onChange={(e) => {
+                  setSite(e.target.value);
+                  setDraft(null);
+                  setSelected(null);
+                }}
+                aria-label="Site"
+              >
+                {me.sites.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </>
         }
       />
+      <SettingsTabs me={me} route={{ page: 'prompt' }} />
       <div className="space-y-3 p-4 md:p-6">
         {error && <ErrorNote error={error} onRetry={reload} />}
         {notice && (
@@ -158,12 +174,22 @@ export function Prompt({ me }: { me: Me }) {
                         {dirty && <Badge dot="var(--series-2)">Unpublished edit</Badge>}
                       </span>
                     }
+                    tip={{
+                      label: 'How to write a prompt',
+                      text: (
+                        <>
+                          Only what is specific to your business, and what your website doesn’t say or says wrongly: this wins over the website. Goal,
+                          tone and length are settings, and HelpPuff adds its own rules. Type <code className="rounded bg-muted px-1">{'{{'}</code> to insert a
+                          tool, a business detail or what the visitor filled in.
+                        </>
+                      ),
+                    }}
                     description={
                       data.meta
                         ? `Published ${fmtRelative(data.meta.at)}${data.meta.by ? ` by ${data.meta.by}` : ''} · ${sourceLabel(
                             data.versions.find((v) => v.version === data.version) ?? { source: data.meta.source, restoredFrom: null },
                           )}`
-                        : 'Not versioned yet — your first publish starts the history.'
+                        : undefined
                     }
                   />
                   <div className="space-y-3 px-4 pb-4">
@@ -174,9 +200,7 @@ export function Prompt({ me }: { me: Me }) {
                       if (!repeats.length) return null;
                       return (
                         <div className="rounded-md border bg-subtle px-3 py-2.5 text-xs" role="note">
-                          <p className="font-medium">
-                            {repeats.length === 1 ? 'One line repeats' : `${repeats.length} lines repeat`} what HelpPuff already adds from your settings and rules
-                          </p>
+                          <p className="font-medium">{repeats.length === 1 ? 'One line is already covered' : `${repeats.length} lines are already covered`} by your settings or HelpPuff’s rules</p>
                           <ul className="mt-1.5 space-y-1 text-muted-foreground">
                             {repeats.map((o) => (
                               <li key={o.line}>
@@ -202,7 +226,6 @@ export function Prompt({ me }: { me: Me }) {
                           >
                             Remove these lines
                           </Button>
-                          <span className="ml-2 text-muted-foreground">Then review and publish; nothing changes until you do.</span>
                         </div>
                       );
                     })()}
@@ -211,20 +234,10 @@ export function Prompt({ me }: { me: Me }) {
                       onChange={setDraft}
                       suggestions={suggestions}
                       label="System prompt"
+                      placeholder={PROMPT_PLACEHOLDER}
                       className="min-h-[24rem] resize-y font-mono text-[12.5px] leading-relaxed"
                     />
-                    <PromptTools text={text} list={tools.data ?? null} onOpen={(tool) => setDialog({ tool })} onNew={() => setDialog({ tool: null, section: 'prompt' })} />
-                    <p className="text-xs text-muted-foreground">
-                      Only what is specific to your business: goal, tone and length are settings, and HelpPuff adds its rules itself. Facts belong in the
-                      knowledge base. Type <code className="rounded bg-muted px-1">{'{{'}</code> for what you can use:{' '}
-                      {tools.data?.assistant ? (
-                        <>
-                          <code className="rounded bg-muted px-1">{'{{order_status}}'}</code> lets the assistant call that tool,{' '}
-                          <code className="rounded bg-muted px-1">{'{{crm_lookup.tier}}'}</code> puts in what it returned,{' '}
-                        </>
-                      ) : null}
-                      <code className="rounded bg-muted px-1">{'{{business.phone}}'}</code>, <code className="rounded bg-muted px-1">{'{{lead.name}}'}</code>…
-                    </p>
+                    <PromptTools text={text} list={tools.data ?? null} onOpen={(tool) => setDialog({ tool })} />
                     <div className="flex flex-wrap items-center gap-2">
                       <Input
                         value={note}
@@ -234,9 +247,13 @@ export function Prompt({ me }: { me: Me }) {
                         aria-label="Change note"
                         className="max-w-sm flex-1"
                       />
-                      <span className={cn('ml-auto text-xs tabular-nums', over ? 'text-danger' : 'text-muted-foreground')}>
-                        {normalize(text).length.toLocaleString()} / {data.limit.toLocaleString()}
-                      </span>
+                      <span className="ml-auto" />
+                      {/* The length matters only near the limit. */}
+                      {normalize(text).length > data.limit * 0.9 && (
+                        <span className={cn('text-xs tabular-nums', over ? 'text-danger' : 'text-muted-foreground')}>
+                          {normalize(text).length.toLocaleString()} / {data.limit.toLocaleString()}
+                        </span>
+                      )}
                       {dirty && (
                         <Button variant="ghost" onClick={() => setDraft(null)} disabled={busy}>
                           Discard
@@ -273,11 +290,12 @@ export function Prompt({ me }: { me: Me }) {
               {data.builtIn && (
                 <Card>
                   <details className="group">
-                    <summary className="cursor-pointer list-none px-4 py-3 text-[13px] font-medium marker:hidden">
-                      HelpPuff also adds these rules to every answer
-                      <span className="block text-xs font-normal text-muted-foreground">
-                        Read-only. They come from your settings; there is no need to repeat them above, and instructions that contradict them confuse the assistant.
-                      </span>
+                    <summary className="flex cursor-pointer list-none items-center gap-1.5 px-4 py-3 text-[13px] font-medium marker:hidden">
+                      <ChevronRight className="size-3.5 text-muted-foreground transition-transform group-open:rotate-90" aria-hidden />
+                      What HelpPuff adds
+                      <InfoTip label="About what HelpPuff adds" align="end">
+                        Added to every answer from your settings and HelpPuff’s rules. Read-only: no need to repeat any of it in your prompt.
+                      </InfoTip>
                     </summary>
                     <pre className="max-h-96 overflow-auto whitespace-pre-wrap border-t px-4 py-3 font-mono text-xs leading-relaxed text-muted-foreground scroll-thin">{data.builtIn}</pre>
                   </details>
@@ -287,9 +305,7 @@ export function Prompt({ me }: { me: Me }) {
               <Card>
                 <CardHeader title="History" description={data.versions.length ? `${data.versions.length} version${data.versions.length === 1 ? '' : 's'}` : undefined} />
                 {data.versions.length === 0 ? (
-                  <p className="px-4 pb-4 text-[13px] text-muted-foreground">
-                    No versions yet. The next publish — here or with <code className="rounded bg-muted px-1">helppuff deploy</code> — starts the history.
-                  </p>
+                  <p className="px-4 pb-4 text-[13px] text-muted-foreground">No versions yet.</p>
                 ) : (
                   <ul className="max-h-[36rem] overflow-auto border-t scroll-thin">
                     {data.versions.map((v) => (
@@ -348,23 +364,21 @@ export function Prompt({ me }: { me: Me }) {
 }
 
 /** The tools this prompt names, and names that are not a tool (typos). */
-function PromptTools({ text, list, onOpen, onNew }: { text: string; list: ToolsList | null; onOpen: (tool: ToolView) => void; onNew: () => void }) {
+function PromptTools({ text, list, onOpen }: { text: string; list: ToolsList | null; onOpen: (tool: ToolView) => void }) {
   if (!list?.assistant) return null;
   const named = new Set(promptToolRefs(text).map((r) => r.name));
   const used = list.tools.filter((t) => named.has(t.name));
   const unknown = unknownRefs(text, list);
+  // Nothing to show until the prompt names a tool (or a name that is not one).
+  if (!used.length && !unknown.length) return null;
   return (
     <div className="flex flex-wrap items-center gap-1.5 text-xs">
-      <span className="text-muted-foreground">Tools in this prompt:</span>
-      {used.length === 0 && <span className="text-muted-foreground">none</span>}
+      {used.length > 0 && <span className="text-muted-foreground">Tools:</span>}
       {used.map((t) => (
         <button key={t.id} type="button" onClick={() => onOpen(t)} className={cn('rounded border px-1.5 py-0.5 font-mono hover:bg-muted', !t.enabled && 'text-muted-foreground line-through')}>
           {t.name}
         </button>
       ))}
-      <button type="button" onClick={onNew} className="rounded border border-dashed px-1.5 py-0.5 text-muted-foreground hover:text-foreground">
-        + New tool
-      </button>
       {unknown.length > 0 && (
         <span className="w-full text-danger" role="note">
           Not a tool or a known value: {unknown.map((u) => `{{${u}}}`).join(', ')}. Check the spelling, or add the tool.

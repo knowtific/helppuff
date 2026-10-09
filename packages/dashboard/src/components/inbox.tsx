@@ -1,7 +1,7 @@
 import { Bot, Check, Headset, Lock, Pencil, Plus, Tag, Trash2, X } from 'lucide-react';
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { api, type ConversationStatus, type Label, type LabelRef, type Note } from '../lib/api';
-import { cn, fmtRelative } from '../lib/utils';
+import { cn, fmtRelative, href } from '../lib/utils';
 import { Badge, Button, Input, Textarea } from './ui';
 
 /**
@@ -92,7 +92,7 @@ export function forgetLabels(): void {
 }
 
 /** The labels on a conversation, and a menu to add or remove any of the site's. */
-export function LabelPicker({ value, onChange, disabled }: { value: LabelRef[]; onChange: (ids: string[]) => void; disabled?: boolean }) {
+export function LabelPicker({ value, onChange, disabled, canManage = true }: { value: LabelRef[]; onChange: (ids: string[]) => void; disabled?: boolean; canManage?: boolean }) {
   const { labels } = useLabels();
   const [open, setOpen] = useState(false);
   const chosen = new Set(value.map((l) => l.id));
@@ -117,7 +117,16 @@ export function LabelPicker({ value, onChange, disabled }: { value: LabelRef[]; 
       {open && (
         <div className="rounded-md border bg-card p-1.5 shadow-sm">
           {labels.length === 0 ? (
-            <p className="px-1.5 py-1 text-xs text-muted-foreground">No labels yet. An admin can add them in Settings → Labels.</p>
+            <p className="px-1.5 py-1 text-xs text-muted-foreground">
+              No labels yet.{' '}
+              {canManage ? (
+                <a href={href({ page: 'settings', id: 'labels' })} className="font-medium text-foreground underline-offset-2 hover:underline">
+                  Add labels
+                </a>
+              ) : (
+                'An admin can add them in Settings → Labels.'
+              )}
+            </p>
           ) : (
             <ul className="max-h-48 overflow-auto scroll-thin">
               {labels.map((label) => (

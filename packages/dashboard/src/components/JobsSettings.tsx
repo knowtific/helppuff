@@ -3,7 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { api, type JobField, type JobFieldType, type Pipeline, type PipelineView, type StageKind } from '../lib/api';
 import { cn, href, useData } from '../lib/utils';
 import { CopyBlock } from '../pages/Settings';
-import { Badge, Button, Card, CardHeader, ErrorNote, Input, Select, Skeleton } from './ui';
+import { Badge, Button, Card, CardHeader, ErrorNote, InfoTip, Input, Select, Skeleton } from './ui';
 
 /**
  * Settings → Jobs: the template (and letting the AI choose again), what a job
@@ -50,13 +50,17 @@ function Order({ index, length, onMove, label }: { index: number; length: number
 
 function Check({ checked, onChange, children, hint }: { checked: boolean; onChange: (on: boolean) => void; children: ReactNode; hint?: string }) {
   return (
-    <label className="flex items-start gap-2.5 text-[13px]">
-      <input type="checkbox" className="mt-0.5 size-4 accent-[var(--primary)]" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      <span>
-        {children}
-        {hint && <span className="block text-xs text-muted-foreground">{hint}</span>}
-      </span>
-    </label>
+    <div className="flex items-start gap-1.5 text-[13px]">
+      <label className="flex items-start gap-2.5">
+        <input type="checkbox" className="mt-0.5 size-4 accent-[var(--primary)]" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+        <span>{children}</span>
+      </label>
+      {hint && (
+        <span className="mt-0.5">
+          <InfoTip label="About this option">{hint}</InfoTip>
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -131,7 +135,7 @@ function TemplateCard({ view, onSaved }: { view: PipelineView; onSaved: (view: P
     <Card role="region" aria-label="Template">
       <CardHeader
         title="Template"
-        description="The starting point for your stages and fields. Change anything below; a template is only where it begins."
+        tip={{ label: 'About template', text: 'The starting point for your stages and fields. Change anything below; a template is only where it begins.' }}
         action={<Badge>{CHOSEN[pipeline.chosenBy]}</Badge>}
       />
       <div className="space-y-3 border-t p-4 text-[13px]">
@@ -187,7 +191,7 @@ function NamesCard({ pipeline, onSaved }: { pipeline: Pipeline; onSaved: (view: 
   const dirty = JSON.stringify(value) !== JSON.stringify(initial);
   return (
     <Card role="region" aria-label="Names and the assistant">
-      <CardHeader title="Names and the assistant" description="What one is called, on the board, in the chat and in emails from your tools." />
+      <CardHeader title="Names and the assistant" tip={{ label: 'About names and the assistant', text: 'What one is called, on the board, in the chat and in emails from your tools.' }} />
       <div className="space-y-3 border-t p-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="space-y-1">
@@ -224,7 +228,7 @@ function StagesCard({ pipeline, onSaved }: { pipeline: Pipeline; onSaved: (view:
     <Card role="region" aria-label="Stages">
       <CardHeader
         title="Stages"
-        description="In order. Open stages are the board’s columns; won and lost are where a job ends. “Stale after” marks a job red when it sits in a stage that long."
+        tip={{ label: 'About stages', text: 'In order. Open stages are the board’s columns; won and lost are where a job ends. “Stale after” marks a job red when it sits in a stage that long. Jobs in a removed stage move to the first stage of the same kind.' }}
       />
       <ul className="divide-y border-t">
         {stages.map((stage, index) => (
@@ -276,7 +280,6 @@ function StagesCard({ pipeline, onSaved }: { pipeline: Pipeline; onSaved: (view:
           <Plus /> Add a stage
         </Button>
         {missing.length > 0 && <p className="text-xs text-danger">Keep at least one {missing.join(', one ')} stage.</p>}
-        <p className="text-xs text-muted-foreground">Jobs in a removed stage move to the first stage of the same kind.</p>
       </div>
       <Foot dirty={dirty} busy={busy} error={error} saved={saved} onReset={() => setStages(stageDrafts(pipeline))} onSave={() => void save({ stages: stages.map(({ key: _key, ...s }) => s) })} />
     </Card>
@@ -298,7 +301,7 @@ function FieldsCard({ pipeline, onSaved }: { pipeline: Pipeline; onSaved: (view:
   const set = (index: number, patch: Partial<FieldDraft>) => setFields(fields.map((f, i) => (i === index ? { ...f, ...patch } : f)));
   return (
     <Card role="region" aria-label="Fields">
-      <CardHeader title="Fields" description="What you need to know about each one. The assistant asks for required fields it doesn’t have yet; removed fields keep their values on old jobs." />
+      <CardHeader title="Fields" tip={{ label: 'About fields', text: 'What you need to know about each one. The assistant asks for required fields it doesn’t have yet; removed fields keep their values on old jobs.' }} />
       <ul className="divide-y border-t">
         {fields.length === 0 && <li className="px-4 py-3 text-[13px] text-muted-foreground">No fields: just a title and the details.</li>}
         {fields.map((field, index) => (
@@ -393,7 +396,7 @@ function QuoteCard({ pipeline, onSaved }: { pipeline: Pipeline; onSaved: (view: 
     <Card role="region" aria-label="Quote questions">
       <CardHeader
         title="Quote questions"
-        description="A button on the widget’s home screen. It asks these one at a time, then saves the answers as a new one here, without the visitor having to explain in a chat."
+        tip={{ label: 'About quote questions', text: 'A button on the widget’s home screen. It asks these one at a time, then saves the answers as a new one here, without the visitor having to explain in a chat.' }}
       />
       <div className="space-y-3 border-t p-4">
         <Check checked={value.enabled} onChange={(on) => setValue({ ...value, enabled: on })}>
@@ -475,7 +478,7 @@ function ElsewhereCard({ pipeline }: { pipeline: Pipeline }) {
   const body = JSON.stringify({ contact: { name: 'Sam Lee', email: 'sam@example.com' }, fields, details: 'From the booking form' }, null, 2);
   return (
     <Card role="region" aria-label="Send them from other tools">
-      <CardHeader title="Send them from other tools" description="Your own forms, Zapier or Make: create one with the API. Webhooks tell other tools when one is created, moves or is won." />
+      <CardHeader title="Send them from other tools" tip={{ label: 'About send them from other tools', text: 'Your own forms, Zapier or Make: create one with the API. Webhooks tell other tools when one is created, moves or is won.' }} />
       <div className="space-y-3 border-t p-4 text-[13px]">
         <CopyBlock label="curl example" text={`curl -X POST "${base}/jobs" \\\n  -H "Authorization: Bearer $HELPPUFF_API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '${body}'`} />
         <p className="text-xs text-muted-foreground">
