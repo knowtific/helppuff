@@ -47,6 +47,8 @@ export type Site = {
   production?: { turnstile: boolean; hostnames: string[]; dailyCap: number };
   /** Live chat is on and can run (the live socket, notifications). Absent from older Workers. */
   live?: boolean;
+  /** HelpPuff writes the backend's prompt, so Instructions and Prompt & tools apply. Absent from older Workers (treated as yes). */
+  prompt?: boolean;
 };
 /** `member`: the inbox only (conversations, jobs, contacts, callbacks, live chat); `admin` and `owner`: everything. */
 export type Role = 'owner' | 'admin' | 'member';

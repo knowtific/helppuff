@@ -35,7 +35,7 @@ import { emit } from '../webhooks/deliver.js';
 import { summarizeConversation, type AiRunner } from '../conversations/summary.js';
 import { summaryModel } from '../conversations/complete.js';
 export { extractJson } from '../conversations/summary.js';
-import { PROMPT_LIMIT, PROMPT_SQL, publishPrompt, readPromptState, type PromptCtx, type PromptVersionRow, type PublishResult } from './prompts.js';
+import { PROMPT_LIMIT, PROMPT_SQL, promptField, publishPrompt, readPromptState, type PromptCtx, type PromptVersionRow, type PublishResult } from './prompts.js';
 import type { KvStore } from '@helppuff/connector-types';
 
 /**
@@ -155,6 +155,8 @@ adminRoutes.get('/me', async (c) => {
         },
         /** Live chat is on and can run here (the Live inbox, notifications). */
         live: liveAvailable(ctx.env, site, id),
+        /** HelpPuff writes this backend's prompt: the Instructions and Prompt & tools pages apply. */
+        prompt: promptField(site.connector).option !== null,
       };
     }),
   );

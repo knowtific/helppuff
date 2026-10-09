@@ -70,11 +70,11 @@ const GROUPS: { label: string; icon: ReactNode; keys: string[] }[] = [
  */
 export function settingsMenu(site: Site | undefined, me?: Me): SettingsGroup[] {
   const sections = settingsSections(site, me);
-  const admin = sections.some((s) => s.id === 'instructions');
+  const admin = !me || !isMember(me);
   const links = new Map<string, SettingsLink>(
     sections.map((s) => [s.id, { key: s.id, label: s.label, href: href({ page: 'settings', id: s.id }), current: (r: Route) => r.page === 'settings' && r.id === s.id }]),
   );
-  if (admin) links.set('prompt', { key: 'prompt', label: PROMPT_LABEL, href: href({ page: 'prompt' }), current: (r) => r.page === 'prompt' });
+  if (admin && site?.prompt !== false) links.set('prompt', { key: 'prompt', label: PROMPT_LABEL, href: href({ page: 'prompt' }), current: (r) => r.page === 'prompt' });
   if (admin && site?.knowledge) links.set('knowledge', { key: 'knowledge', label: 'Knowledge', href: href({ page: 'knowledge' }), current: (r) => r.page === 'knowledge' });
   return GROUPS.map((g) => ({ label: g.label, icon: g.icon, items: g.keys.map((k) => links.get(k)).filter((l): l is SettingsLink => Boolean(l)) })).filter((g) => g.items.length);
 }
@@ -112,7 +112,8 @@ export function settingsSections(site: Site | undefined, me?: Me): { id: Setting
     { id: 'home' as const, label: 'Home screen' },
     { id: 'appearance' as const, label: 'Appearance' },
     { id: 'leads' as const, label: 'Lead form' },
-    { id: 'instructions' as const, label: 'Instructions' },
+    // A backend that keeps its own prompt (Retell, an OpenAI stored prompt, a test backend) has no use for these.
+    ...(site?.prompt !== false ? [{ id: 'instructions' as const, label: 'Instructions' }] : []),
     ...(site?.knowledge ? [{ id: 'business' as const, label: 'Business details' }] : []),
     { id: 'live' as const, label: 'Live chat' },
     { id: 'labels' as const, label: 'Labels' },

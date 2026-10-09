@@ -234,7 +234,7 @@ export const ENDPOINTS: Endpoint[] = [
     response: {
       admin: { email: 'key:k7m3p9q2r4s8', owner: false, role: 'admin', name: 'Website backend', via: 'key' },
       key: { id: 'k7m3p9q2r4s8', name: 'Website backend', scopes: ['chat', 'leads:read'], site: 'acme', expiresAt: null },
-      sites: [{ id: 'acme', name: 'Acme Plumbing', accent: '#5B5BF7', avatar: null, embed: '<script src="https://helppuff.example.workers.dev/loader.js" data-site="acme" async></script>', connector: 'workers-ai', knowledge: true, website: 'https://acme.example', production: { turnstile: true, hostnames: ['acme.example', 'helppuff.example.workers.dev'], dailyCap: 500 }, live: true }],
+      sites: [{ id: 'acme', name: 'Acme Plumbing', accent: '#5B5BF7', avatar: null, embed: '<script src="https://helppuff.example.workers.dev/loader.js" data-site="acme" async></script>', connector: 'workers-ai', knowledge: true, website: 'https://acme.example', production: { turnstile: true, hostnames: ['acme.example', 'helppuff.example.workers.dev'], dailyCap: 500 }, live: true, prompt: true }],
       summaries: true,
     },
   },

@@ -14,6 +14,7 @@ export const SITE = {
   embed: '<script src="https://knowtific-helppuff-harbour.example.workers.dev/loader.js" data-site="harbour" async></script>',
   connector: 'workers-ai',
   knowledge: true,
+  prompt: true,
   website: 'https://harbourplumbing.example',
   production: { turnstile: false, hostnames: ['harbourplumbing.example', 'www.harbourplumbing.example', 'knowtific-helppuff-harbour.example.workers.dev'], dailyCap: 500 },
   // No live socket in the demo (nothing to connect to); live chats still show and can be answered.
