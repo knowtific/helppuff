@@ -182,6 +182,7 @@ export class Api {
       context: VisitorContext;
       firstMessage?: string;
       captchaToken?: string;
+      identity?: string;
     },
     onText?: OnText,
   ): Promise<{ session: Session; messages: Message[] }> {

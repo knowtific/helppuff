@@ -1,7 +1,7 @@
-import { ArrowLeft, Bot, ExternalLink, Headset, Loader2, Lock, Mail, MessagesSquare, Phone, PhoneCall, RotateCcw, Search, Send, Sparkles, ThumbsDown, ThumbsUp, UserRound } from 'lucide-react';
+import { ArrowLeft, Bot, ExternalLink, Headset, Loader2, Lock, Mail, MessagesSquare, Phone, PhoneCall, RotateCcw, Search, Send, ShieldCheck, Sparkles, ThumbsDown, ThumbsUp, UserRound } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { PageHeader } from '../components/Shell';
-import { Avatar, Badge, Button, Card, Empty, ErrorNote, Input, Segmented, Select, Skeleton, StatusBadge, Textarea } from '../components/ui';
+import { Avatar, Badge, Button, Card, Empty, ErrorNote, InfoTip, Input, Segmented, Select, Skeleton, StatusBadge, Textarea } from '../components/ui';
 import { AttributesEditor, ConversationStatusBadge, LabelChip, LabelPicker, NotesPanel, SideSection, ToolData, useLabels, WaitingBadge } from '../components/inbox';
 import { api, isMember, parseSummary, type ConversationDetail, type ConversationRow, type Me, type StoredMessage, type Summary, type Team } from '../lib/api';
 import { sendTyping, useLiveEvents } from '../lib/live';
@@ -410,6 +410,12 @@ function Detail({ id, me, team, onChanged }: { id: string; me: Me; team: Team | 
             </SideSection>
           )}
           <SideSection title="Contact">
+            {c.user && (
+              <p className="mb-2 flex items-center gap-1.5 text-xs text-[#16a34a]">
+                <ShieldCheck className="size-3.5" aria-hidden /> Signed in as {c.user['email'] ?? c.user.id}
+                <InfoTip label="About signed-in visitors">Your website vouched for this visitor with a signed token: their account id is {c.user.id}.</InfoTip>
+              </p>
+            )}
             {lead ? (
               <div className="space-y-1.5">
                 <a href={href({ page: 'contact', id: lead.id })} className="font-medium hover:underline">
@@ -450,7 +456,7 @@ function Detail({ id, me, team, onChanged }: { id: string; me: Me; team: Team | 
             <RelatedJobs filter={{ conversation: id }} context={{ conversationId: id, label: 'From this conversation: its contact is linked.' }} />
           </SideSection>
           <SideSection title="Labels">
-            <LabelPicker value={data.labels ?? []} onChange={(ids) => void patch({ labels: ids })} />
+            <LabelPicker value={data.labels ?? []} onChange={(ids) => void patch({ labels: ids })} canManage={!member} />
           </SideSection>
           <SideSection title="Attributes">
             <AttributesEditor value={c.attributes ?? {}} onSave={(attributes) => patch({ attributes })} />

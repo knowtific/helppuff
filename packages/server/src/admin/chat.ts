@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { utmSchema, type Message, type SendRequest } from '@helppuff/protocol';
 import { resolveSite } from '../config/site.js';
 import { endChat, sendChat, startChat } from '../core/chat.js';
+import { cleanUser } from '../core/identity.js';
 import { HelpPuffError } from '../core/errors.js';
 import type { HonoEnv } from '../core/request.js';
 import { prepareConnector } from '../core/run.js';
@@ -42,6 +43,12 @@ export const startConversationSchema = z
       .strict()
       .optional()
       .describe('Where the visitor is: the assistant may use it.'),
+    user: z
+      .record(z.string().regex(/^[A-Za-z][\w-]{0,63}$/), z.union([z.string().max(500), z.number()]))
+      .refine((value) => String(value['id'] ?? '').trim() !== '', 'needs an id')
+      .refine((value) => Object.keys(value).length <= 20, 'at most 20 fields')
+      .optional()
+      .describe('The signed-in visitor, as your server knows them: `id` (your user id) and any fields (`email`, `plan`). Trusted, since the key is the proof: tools and the prompt read it as `{{user.*}}`, and its email and name become the lead\'s.'),
     externalId: z.string().min(1).max(128).optional().describe('Your own id for this conversation or visitor, to find it again.'),
     metadata: z
       .record(z.string().max(64), z.string().max(500))
@@ -124,6 +131,7 @@ chatRoutes.post('/conversations', async (c) => {
       ...(body.contact ? { lead: body.contact } : {}),
     },
     channel: apiChannel(c, pageUrl),
+    user: body.user ? cleanUser(body.user) : null,
     respond: async (turn) => {
       const now = ctx.platform.now();
       // Awaited: the next message needs this state. (The widget keeps it in its token instead.)

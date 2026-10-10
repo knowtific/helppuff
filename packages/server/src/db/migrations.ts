@@ -619,6 +619,16 @@ export const MIGRATIONS: readonly Migration[] = [
       'ALTER TABLE conversations ADD COLUMN data TEXT',
     ],
   },
+  {
+    id: 13,
+    name: 'signed_in_visitors_and_tool_conditions',
+    statements: [
+      // A signed-in visitor's verified claims (HelpPuff.identify with a token, or the API's user): { id, email, … }.
+      'ALTER TABLE conversations ADD COLUMN user TEXT',
+      // An after-chat tool's condition: { path, in } on the conversation.completed data ("only hot leads").
+      'ALTER TABLE tools ADD COLUMN run_when TEXT',
+    ],
+  },
 ];
 
 export const LATEST_MIGRATION = MIGRATIONS[MIGRATIONS.length - 1]!.id;

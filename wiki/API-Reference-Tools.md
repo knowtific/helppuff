@@ -85,6 +85,7 @@ const data = (await response.json()) as ListToolsResponse;
       ],
       "before": false,
       "after": false,
+      "when": null,
       "enabled": true,
       "lastStatus": 200,
       "lastError": null,
@@ -136,6 +137,7 @@ type ListToolsResponse = {
     keys: string[];
     before: boolean;
     after: boolean;
+    when: string | null;
     enabled: boolean;
     lastStatus: number;
     lastError: string | null;
@@ -174,6 +176,7 @@ An `http` tool calls your API: `{{args.x}}` in its URL, headers or body is fille
 | `timeoutMs` | no | 1000 to 10000 (default 5000). |
 | `before` | no | Run it when the chat starts, with the pre-chat form's answers. |
 | `after` | no | Run it when the conversation ends, with the transcript, the summary, the lead and all the data. |
+| `when` | no | An after-chat tool runs only when this holds: `{ "path": "labels.leadQuality", "in": ["hot"] }` (a path in the conversation.completed data and the values it may have), or `{ "path": "lead.email" }` (has a value). `null` removes it. |
 
 **Request**
 
@@ -261,6 +264,13 @@ type AddToolRequest = {
    * lead and all the data.
    */
   after?: string;
+  /**
+   * An after-chat tool runs only when this holds: `{ "path":
+   * "labels.leadQuality", "in": ["hot"] }` (a path in the
+   * conversation.completed data and the values it may have), or `{ "path":
+   * "lead.email" }` (has a value). `null` removes it.
+   */
+  when?: string;
 };
 
 const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/tools`, {
@@ -344,6 +354,7 @@ const data = (await response.json()) as AddToolResponse;
   ],
   "before": false,
   "after": false,
+  "when": null,
   "enabled": true,
   "lastStatus": 200,
   "lastError": null,
@@ -377,6 +388,7 @@ type AddToolResponse = {
   keys: string[];
   before: boolean;
   after: boolean;
+  when: string | null;
   enabled: boolean;
   lastStatus: number | null;
   lastError: string | null;
@@ -474,6 +486,7 @@ const data = (await response.json()) as ChangeToolResponse;
   ],
   "before": true,
   "after": false,
+  "when": null,
   "enabled": true,
   "lastStatus": 200,
   "lastError": null,
@@ -507,6 +520,7 @@ type ChangeToolResponse = {
   keys: string[];
   before: boolean;
   after: boolean;
+  when: string | null;
   enabled: boolean;
   lastStatus: number | null;
   lastError: string | null;

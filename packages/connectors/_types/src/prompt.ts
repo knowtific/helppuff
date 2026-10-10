@@ -46,6 +46,8 @@ export type PromptSource = z.infer<typeof promptSourceSchema>;
 /** Everything a prompt template may interpolate. */
 export type PromptScope = {
   lead?: Record<string, string> | undefined;
+  /** The signed-in visitor, verified by the server: `{{user.id}}`, `{{user.plan}}`. */
+  user?: Record<string, string> | undefined;
   context?: VisitorContext | undefined;
   site?: { id: string } | undefined;
   /** The business details (`{{business.phone}}`), where the backend has them: always current, never copied into the prompt. */
@@ -111,7 +113,7 @@ export function renderToolRefs(text: string, tools: { names: readonly string[]; 
  * prompt; the business's own details and the site id are cleaned lines.
  */
 function scopeValue(value: unknown, path: string): string {
-  return /^(?:lead|context)\./.test(path) ? quotedValue(value) : promptValue(value, 2000);
+  return /^(?:lead|context|user)\./.test(path) ? quotedValue(value) : promptValue(value, 2000);
 }
 
 async function readSource(
@@ -185,6 +187,11 @@ export function promptVariables(scope: PromptScope): Record<string, string> {
   // Each value is one cleaned line (`promptValue`): the provider puts them into its own prompt.
   for (const [key, value] of Object.entries(scope.lead ?? {})) {
     if (typeof value === 'string' && value && /^[\w-]{1,64}$/.test(key)) out[`lead_${key}`] = promptValue(value, 500);
+  }
+
+  // The signed-in visitor, verified: user_id, user_email, user_plan…
+  for (const [key, value] of Object.entries(scope.user ?? {})) {
+    if (typeof value === 'string' && value && /^[\w-]{1,64}$/.test(key)) out[`user_${key}`] = promptValue(value, 500);
   }
 
   const context = scope.context;

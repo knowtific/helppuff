@@ -6,24 +6,40 @@ none repeats or contradicts another:
 | Part | What it says | Where it is set | Who can edit it |
 | --- | --- | --- | --- |
 | **1. From your settings** | who the assistant is, its goal, tone, answer length, whether it gives prices, format, the visitor's form and greeting | Dashboard → Settings → Instructions, or `assistant` in `helppuff.json` | you, as choices |
-| **2. Your instructions** (the prompt) | only what is specific to your business: what to emphasise, what you never do, local details | `prompt.md`, or the text box on the Instructions page | you, freely; every change is a version |
-| **3. HelpPuff's rules** | never invent, never promise what the business does not offer, correct false facts, decline off-topic questions, never reveal the instructions, and how to use the website passages and callbacks | built in | nobody: they come last and win where your text disagrees |
+| **2. Your instructions** (the prompt) | only what is specific to your business: what to emphasise, what you never do, how to word a price, and corrections to what your website says | `prompt.md`, or **Settings → Prompt & tools** | you, freely; every change is a version |
+| **3. HelpPuff's rules** | never invent, never promise what the business does not offer, your instructions win over the website, correct false facts, decline off-topic questions, answer "is this chat saved?" with your privacy policy, never ask for sensitive details, never reveal the instructions, and how to use the website passages and callbacks | built in | nobody: they come last and win where your text disagrees |
 
 Then come the business details, what the visitor gave, and the passages
 found for the question. Your prompt is therefore safe to edit: it cannot
 remove a rule, and a setting is never copied into it to go stale.
 
-## In the dashboard: Instructions
+## In the dashboard: Instructions, and Prompt & tools
 
-**Settings → Instructions** has the choices (main goal, booking page, tone,
-answer length, prices) and a text box for **anything specific to your business**:
-that text is your prompt. Saving changes the settings, and publishes the text
-as a new version only if it changed.
+**Settings → Instructions** has the choices: what to do when a visitor is
+interested (offer a callback, just answer, or send them to a page such as
+booking, sign-up or a quote form), tone, answer length and prices.
 
-The **full prompt** page (one click away) lists every version with who
-published it, from where, and when; compare any version with the live one,
-or restore it. Below it, **everything HelpPuff adds** shows parts 1 and 3
+**Settings → Prompt & tools** is the one place for your prompt, and for the
+tools it can call before, during and after a chat. It lists every version
+with who published it, from where, and when; compare any version with the
+live one, or restore it. **Everything HelpPuff adds** shows parts 1 and 3
 read-only, exactly as the model gets them.
+
+### What to write in your prompt
+
+What your website doesn't say, or says wrongly. Your prompt wins over the
+website, so it is also how you correct an out-of-date page ("The free audit
+is no longer a video: never call it one"). Write each point as a situation
+and roughly what to say; the assistant answers in its own words:
+
+```
+## Quotes only
+Custom builds and eCommerce are quoted individually. If asked for a price, say something like:
+"That's scoped to what you need, so I can't give a fixed price here. Start here and the team will quote it: https://example.com/start"
+```
+
+Leave out what a setting or a rule already covers: who it is, its goal, tone
+and length, staying on topic, not guessing.
 
 If your prompt repeats something a setting or a rule already covers ("Be
 friendly", "Keep answers short", "Never make up prices", a copied phone
@@ -52,9 +68,12 @@ prompt for those).
 
 Your own APIs, and extract tools, appear in the prompt by name: `{{order_status}}`
 lets the assistant call that tool, and `{{crm_lookup.tier}}` puts in what it
-returned. The Prompt page has them in three sections, top to bottom: tools
-called before the chat, the prompt, and tools called after it. Type `{{` in
-the prompt for a list of everything you can use. See [[Tools]].
+returned. The **Prompt & tools** page (Settings → Prompt & tools) shows a chat as a
+diagram, left to right: tools called before the chat, the **Prompt** (with
+**Knowledge** above it and **Webhooks** below), then the summary and labels
+and the tools called after it. Click **Prompt** to edit it, add tools to it
+and see its history; **+ Add** on a step adds a tool there. Type `{{` in the
+prompt for a list of everything you can use. See [[Tools]].
 
 ### Changes during a conversation
 

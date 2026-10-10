@@ -79,11 +79,11 @@ afterEach(async () => {
 });
 
 describe('the board', () => {
-  it('shows a column per open stage, and moves a job from its menu', async () => {
+  it('shows a column per open stage, then how a job ends, and moves a job from its menu', async () => {
     const calls = fakeApi({ 'GET /jobs/pipeline': VIEW, 'GET /jobs': LIST, 'POST /jobs/j1/move': job('j1', 1001, 's_visit') });
     const page = await mount(<Jobs me={me('owner')} />);
     const columns = [...page.querySelectorAll('section[aria-label]')].map((s) => s.getAttribute('aria-label'));
-    expect(columns).toEqual(['New request', 'Site visit']);
+    expect(columns).toEqual(['New request', 'Site visit', 'Done', 'Lost']);
     expect(page.querySelector('section[aria-label="Site visit"]')!.textContent).toMatch(/\$450/);
     expect(byText(page, 'Stale')).toBeTruthy();
     await select(page.querySelector('select[aria-label="Move Job 1001 to"]'), 's_visit');

@@ -8,6 +8,108 @@ never needs you to change anything. Upgrade with
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-09
+
+### Changed
+
+- The setup page has three steps: your website, business details, and an
+  optional assistant step (**Skip** keeps "offer a callback"). Its choices
+  are worded by what the assistant does: **Offer a callback**, **Just
+  answer**, **Send them to book** (which now asks for the booking page).
+- Home no longer shows the daily cap (it stays in Settings → Advanced), and
+  "Before you go live" disappears once Turnstile is on.
+- The setup page's last step also asks when to collect the visitor's name and
+  phone: before the chat (the lead form) or only when needed.
+- The Jobs board ends with the won and lost stages as its last columns, and
+  the Basic template is *New → Quote sent → In progress → Done / Cancelled*.
+- The Prompt page, with the tools, is in the Settings menu as **Prompt &
+  tools**, the one place to write your prompt: Settings → Instructions keeps
+  only the choices and links to it (its text box edited the same prompt).
+- **Your prompt wins over your website.** The assistant was told to answer
+  only from the business details and the website, so a correction in your
+  prompt ("the free audit is no longer a video") could lose to an
+  out-of-date page. The rules now say the business's instructions win.
+- The **Send them to a page** goal (was "bookings") is for any next step:
+  booking, sign-up or a quote form, offered when the visitor wants to go
+  ahead, not after every message.
+- New rules: asked whether the chat is saved, the assistant says so and
+  links your privacy policy (the lead form's); it never asks for ID numbers
+  or health details either.
+- A job's **Value** explains itself with a (?), and empty states link to the
+  setting that fills them (no labels yet → **Add labels**).
+- The Basic template applies to new sites; a site that already has a
+  pipeline keeps it.
+
+- **A calmer dashboard.** What a page, card or field is for is behind a
+  (?) beside its title (it opens on hover, focus or a tap, with a Learn more
+  link) instead of a grey sentence under each one; empty states are a word
+  and their button.
+- **Prompt & tools is a diagram** of what happens around a chat: tools
+  before it, the prompt (Knowledge above, Webhooks below), then the summary
+  and labels and tools after it. The prompt opens in a window with its
+  tools and history; **+ Add** on a step offers your tools or a new one.
+  No more tools sidebar.
+- **Dark mode is a soft dark grey** instead of near-black, and the Settings
+  menu indents each group's pages under its label.
+- **Signed-in visitors.** A site with accounts signs who is logged in (a
+  JWT with the site's identity secret: Settings → Lead form, or
+  `helppuff identity`) and passes it with `HelpPuff.identify({ token })`. The
+  claims become verified `{{user.*}}` for tools and the prompt, win over what
+  was typed in the form, and show as **Signed in as …** on the conversation
+  (`user` in the API and `conversation.completed`). A tool that uses
+  `{{user.*}}` runs only for a verified visitor. The API takes `user`
+  directly on `POST /conversations`. A bad or expired token is ignored.
+- **Only when, for after-chat tools**: run one only for hot leads, chats with
+  an email, signed-in visitors, or any path in the `conversation.completed`
+  data (`--when labels.leadQuality=hot`).
+- Three more tutorials with templates (logged-in customer support, product
+  and stock, hot leads to Slack), and two guides: knowledge base or tool, and
+  testing and monitoring. The docs now say plainly that what a visitor types
+  is a claim.
+- **Agent files: import and export the whole setup.** The prompt, the tools
+  and the behaviour and lead form settings in one JSON file: Settings →
+  **Import & export**, `helppuff agent export|import`, or
+  `GET /api/v1/agent/export` and `POST /api/v1/agent/import`. Importing checks
+  everything first (a dry run shows what changes), matches tools by name and
+  publishes the prompt as a new version. Secrets are never in the file: they
+  are `${NAME}` placeholders, asked for on import (the CLI reads `.env`).
+- **Four tutorials with templates**: order tracking (your shop, then
+  Shippo), sending chats to HubSpot through n8n or Zapier, the nearest store
+  from the pre-chat postcode (Google Places), and account changes after an
+  SMS code (Twilio Verify). Import any of them from the dashboard or with
+  `helppuff agent import <id>`.
+- `helppuff tools test` takes `--data tool.key=value`, for a tool that reads
+  what another returned.
+- **Knowledge moved into Settings**, and the Settings menu has four groups:
+  Assistant, Widget, Team and System.
+- **Ask your AI agent** on every settings page: a request to copy into
+  Claude Code, Codex or Cursor, which goes through that page with you and
+  changes it from the CLI. The agent instructions and `helppuff --help` now
+  describe that walkthrough, and how to write a prompt.
+
+### Fixed
+
+- **A crawl could stop for good on Workers Free.** Workers AI and Vectorize
+  count towards the 50 outside calls an instance may make, so a 15-page batch
+  ran out: its last pages failed with "Too many subrequests", and starting
+  the next batch failed too, leaving the crawl "running" for ever. Each
+  instance now counts its calls and hands over before it runs out, the
+  finishing steps get an instance of their own, and a part that fails marks
+  the crawl failed with the reason.
+- **Pages that fail for a passing reason are retried by themselves**
+  (unreachable, timed out, 5xx, 429): 15 minutes after the crawl, then 2
+  hours, as a Workflow sleep.
+- The assistant no longer draws buttons in text, like
+  "[Request a callback from the team]": such a line is taken out, and a
+  drawn callback offer becomes a real **Request a callback** button (never
+  right after the callback form was sent).
+- The crawl's cleanup removes the pages you unticked in batches, so a large
+  untick fits the same limit.
+- **Failed pages can be tried again by hand**: **Try again** on a failed
+  page, or **Try N failed pages again**, on the Knowledge page
+  (`POST /api/v1/knowledge/crawl/retry`). It crawls only those and keeps the
+  selection; crawling a list of pages made that list the whole selection.
+
 ## [0.4.0] - 2026-10-09
 
 ### Added: tools, your own APIs in the chat
@@ -45,6 +147,7 @@ never needs you to change anything. Upgrade with
 ### Changed
 
 - D1 migration 12 adds the `tools` table and `conversations.data` (additive).
+- D1 migration 13 adds `conversations.user` and `tools.run_when` (additive).
 
 ## [0.3.0] - 2026-10-08
 

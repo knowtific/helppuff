@@ -4,7 +4,7 @@
 check that tells a person from a script, usually without the visitor noticing.
 HelpPuff uses it in two places once it is on:
 
-- **every new chat**, so a script cannot start chats and use up your daily cap;
+- **every new chat**, so a script cannot start chats and use up your daily cap (Settings → Advanced);
 - **the dashboard's sign-in**, so a script cannot keep trying passwords.
 
 It is **off by default**, so you can try HelpPuff (and an AI agent can set it
@@ -63,7 +63,7 @@ the Secret Key into `helppuff secret set` yourself.
 ## 3. Check it
 
 - `helppuff doctor` shows **turnstile: pass**, and the dashboard's Home page
-  shows **Turnstile is on**.
+  no longer shows **Before you go live**.
 - Open your site (or the preview page from `helppuff deploy`) and start a chat:
   it works as before.
 - Sign out of the dashboard and back in: the sign-in form now shows the

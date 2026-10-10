@@ -1,19 +1,14 @@
 import { Check, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { api, type PromptView, type PublishResult, type SettingsView } from '../lib/api';
+import { api, type PromptView, type SettingsView } from '../lib/api';
 import { cn, href } from '../lib/utils';
-import { Button, ErrorNote, Input, Skeleton, Textarea } from './ui';
+import { Button, ErrorNote, Input, Skeleton } from './ui';
 
 /**
- * How the assistant behaves. Two different things, kept apart so they never
- * repeat or contradict each other:
- *
- *  - choices (goal, tone, length): settings, which HelpPuff writes around the
- *    prompt on every answer, with its built-in rules;
- *  - "Anything specific to your business": the owner's own text, the prompt,
- *    versioned (its history is on the full prompt page).
- *
- * Saving changes the settings, and publishes the text only if it changed.
+ * How the assistant behaves: the choices (goal, tone, length, prices), which
+ * HelpPuff writes around the prompt on every answer, with its built-in rules.
+ * The owner's own text, the prompt, has one place: the Prompt & tools page,
+ * linked from here, so the two never repeat or contradict each other.
  */
 
 export type Behaviour = {
@@ -27,12 +22,12 @@ export type Behaviour = {
 export type Profile = Behaviour;
 
 export const GOALS: { value: Behaviour['goal']; label: string; hint: string }[] = [
-  { value: 'callbacks', label: 'Get enquiries', hint: 'Answer questions, then offer a callback from your team' },
-  { value: 'answers', label: 'Answer questions', hint: 'Help visitors find what they need on your site' },
-  { value: 'bookings', label: 'Get bookings', hint: 'Steer visitors towards booking with you' },
+  { value: 'callbacks', label: 'Offer a callback', hint: 'Answers questions, then offers to have your team call or email them' },
+  { value: 'answers', label: 'Just answer', hint: 'Answers questions from your site; puts them in touch only if they ask' },
+  { value: 'bookings', label: 'Send them to a page', hint: 'Answers questions, then links to your booking, sign-up or quote page' },
 ];
 
-function Choice<T extends string>({ name, value, options, onChange }: { name: string; value: T; options: { value: T; label: string; hint?: string }[]; onChange: (v: T) => void }) {
+export function Choice<T extends string>({ name, value, options, onChange }: { name: string; value: T; options: { value: T; label: string; hint?: string }[]; onChange: (v: T) => void }) {
   return (
     <div role="radiogroup" aria-label={name} className="grid gap-2 sm:grid-cols-3">
       {options.map((o) => (
@@ -51,7 +46,7 @@ function Choice<T extends string>({ name, value, options, onChange }: { name: st
 
 /** Only the main goal: what onboarding asks. */
 export function GoalPicker({ value, onChange }: { value: Behaviour['goal']; onChange: (v: Behaviour['goal']) => void }) {
-  return <Choice name="What should it mainly do?" value={value} options={GOALS} onChange={onChange} />;
+  return <Choice name="When a visitor is interested" value={value} options={GOALS} onChange={onChange} />;
 }
 
 export async function loadBehaviour(): Promise<Behaviour> {
@@ -65,7 +60,6 @@ export async function saveBehaviour(behaviour: Partial<Behaviour>): Promise<void
 export function InstructionsForm() {
   const [prompt, setPrompt] = useState<PromptView | null>(null);
   const [draft, setDraft] = useState<Behaviour | null>(null);
-  const [text, setText] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -75,13 +69,12 @@ export function InstructionsForm() {
       ([behaviour, view]) => {
         setDraft(behaviour);
         setPrompt(view);
-        setText(view.text);
       },
       (thrown: Error) => setError(thrown),
     );
   }, []);
 
-  if (!draft || !prompt || text === null) return error ? <div className="p-4"><ErrorNote error={error} /></div> : <Skeleton className="m-4 h-48" />;
+  if (!draft || !prompt) return error ? <div className="p-4"><ErrorNote error={error} /></div> : <Skeleton className="m-4 h-48" />;
   if (!prompt.editable) {
     return <p className="px-4 py-4 text-[13px] text-muted-foreground md:px-5">This backend keeps its instructions on the provider’s side.</p>;
   }
@@ -89,14 +82,7 @@ export function InstructionsForm() {
     setDraft({ ...draft, ...patch });
     setSaved(false);
   };
-  const save = async () => {
-    await saveBehaviour(draft);
-    // The owner's text is a new prompt version only when it changed.
-    if (text.trim() !== prompt.text.trim()) {
-      const result = await api<PublishResult>('/prompt', { method: 'POST', json: { site: prompt.site, text, note: 'From the instructions page', baseVersion: prompt.version } });
-      setPrompt({ ...prompt, text, version: result.version });
-    }
-  };
+  const save = () => saveBehaviour(draft);
 
   return (
     <form
@@ -111,13 +97,13 @@ export function InstructionsForm() {
     >
       <div className="space-y-4 px-4 py-4 md:px-5">
         <div className="space-y-1.5">
-          <span className="text-xs font-medium">Main goal</span>
+          <span className="text-xs font-medium">When a visitor is interested</span>
           <GoalPicker value={draft.goal} onChange={(goal) => set({ goal })} />
         </div>
         {draft.goal === 'bookings' && (
           <label className="block space-y-1.5">
-            <span className="text-xs font-medium">Booking page</span>
-            <Input type="url" placeholder="https://" value={draft.bookingUrl ?? ''} onChange={(e) => set({ bookingUrl: e.target.value || undefined })} />
+            <span className="text-xs font-medium">Page to send them to</span>
+            <Input type="url" placeholder="https://example.com/book" value={draft.bookingUrl ?? ''} onChange={(e) => set({ bookingUrl: e.target.value || undefined })} />
           </label>
         )}
         <div className="grid gap-4 sm:grid-cols-2">
@@ -159,28 +145,17 @@ export function InstructionsForm() {
             ]}
           />
         </div>
-        <label className="block space-y-1.5">
-          <span className="text-xs font-medium">Anything specific to your business</span>
-          <Textarea
-            rows={6}
-            maxLength={prompt.limit}
-            placeholder={'We only work in the eastern suburbs. Quotes are free.\nNever quote prices: offer a free quote instead.'}
-            value={text}
-            onChange={(e) => {
-              setText(e.target.value);
-              setSaved(false);
-            }}
-          />
-          <span className="block text-[11px] text-muted-foreground">
-            Only what is specific to you: the choices above and HelpPuff’s own rules (never invent, stay on topic, never reveal its instructions) are added for you.
-            Contact details come from the business details; write <code className="rounded bg-muted px-1">{'{{business.phone}}'}</code> to mention them.
+        <a href={href({ page: 'prompt' })} className="flex items-center justify-between gap-3 rounded-md border px-3 py-2.5 hover:bg-subtle">
+          <span className="min-w-0">
+            <span className="block text-[13px] font-medium">Anything specific to your business</span>
+            <span className="block text-xs text-muted-foreground">
+              {prompt.text.trim() ? 'Your prompt, and the tools it can call.' : 'Write what your website doesn’t say, or says wrongly, and add tools.'} In Prompt & tools.
+            </span>
           </span>
-        </label>
+          <span aria-hidden className="text-muted-foreground">→</span>
+        </a>
       </div>
       <div className="flex flex-wrap items-center justify-end gap-3 border-t px-4 py-3 md:px-5">
-        <a href={href({ page: 'prompt' })} className="mr-auto text-xs text-muted-foreground hover:text-foreground">
-          History, and everything HelpPuff adds
-        </a>
         {error && <span className="text-xs text-danger" role="alert">{error.message}</span>}
         {saved && (
           <span className="flex items-center gap-1 text-xs text-muted-foreground" role="status">

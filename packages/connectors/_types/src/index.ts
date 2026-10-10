@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { Capabilities, Message, SendRequest, StartSessionRequest } from '@helppuff/protocol';
+import type { Capabilities, Message, SendRequest, StartSessionRequest, VerifiedUser } from '@helppuff/protocol';
 import type { Turn } from './history.js';
 import type { PromptGuidance } from './prompt.js';
 
@@ -134,7 +134,7 @@ export interface Connector<Opts = unknown, State = unknown> {
 
   start(
     ctx: ConnectorContext<Opts>,
-    input: StartSessionRequest,
+    input: StartSessionRequest & { /** The signed-in visitor, verified by the server (never from the request as sent). */ user?: VerifiedUser | undefined },
   ): Promise<{ state: State; messages: Message[] }>;
 
   /** May return updated state, in which case the server issues a refreshed token. */
@@ -171,7 +171,7 @@ export interface ErasedConnector {
   builtInPrompt(options: unknown): string | null;
   start(
     ctx: ConnectorContext<unknown>,
-    input: StartSessionRequest,
+    input: StartSessionRequest & { user?: VerifiedUser | undefined },
   ): Promise<{ state: unknown; messages: Message[] }>;
   send(
     ctx: ConnectorContext<unknown>,

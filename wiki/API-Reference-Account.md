@@ -70,7 +70,8 @@ const data = (await response.json()) as WhoCallingResponse;
         ],
         "dailyCap": 500
       },
-      "live": true
+      "live": true,
+      "prompt": true
     }
   ],
   "summaries": true
@@ -107,6 +108,7 @@ type WhoCallingResponse = {
       dailyCap: number;
     };
     live: boolean;
+    prompt: boolean;
   }>;
   summaries: boolean;
 };

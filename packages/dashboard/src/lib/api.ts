@@ -47,6 +47,8 @@ export type Site = {
   production?: { turnstile: boolean; hostnames: string[]; dailyCap: number };
   /** Live chat is on and can run (the live socket, notifications). Absent from older Workers. */
   live?: boolean;
+  /** HelpPuff writes the backend's prompt, so Instructions and Prompt & tools apply. Absent from older Workers (treated as yes). */
+  prompt?: boolean;
 };
 /** `member`: the inbox only (conversations, jobs, contacts, callbacks, live chat); `admin` and `owner`: everything. */
 export type Role = 'owner' | 'admin' | 'member';
@@ -165,6 +167,8 @@ export type ConversationDetail = {
     attributes?: Record<string, string>;
     /** What the site's tools returned or saved, by tool name. */
     data?: Record<string, unknown>;
+    /** The signed-in visitor, verified by a signed identity (or the API's user); null when nobody signed in. */
+    user?: (Record<string, string> & { id: string }) | null;
   };
   lead: Lead | null;
   callbacks: Callback[];
@@ -297,11 +301,25 @@ export type ToolView = {
   keys: string[];
   before: boolean;
   after: boolean;
+  /** After the chat, run only when this holds (on the conversation.completed data). */
+  when?: { path: string; in?: string[] } | null;
   enabled: boolean;
   lastStatus: number | null;
   lastError: string | null;
   lastAt: number | null;
 };
+/** What importing an agent file changes (or changed): `POST /agent/import`. */
+export type AgentPlan = {
+  site: string;
+  dryRun: boolean;
+  ready: boolean;
+  name: string;
+  settings: string[];
+  tools: { name: string; action: 'create' | 'replace' }[];
+  prompt: { action: 'replace' | 'unchanged' | 'skipped'; version: number; reason?: string } | null;
+  missingSecrets: { name: string; description: string }[];
+};
+
 export type ToolsList = {
   tools: ToolView[];
   assistant: boolean;

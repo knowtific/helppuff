@@ -1,8 +1,8 @@
 import { Check, Loader2, Plus, X } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { cloneElement, isValidElement, useEffect, useId, useState, type ReactNode } from 'react';
 import { api, type LeadField, type Settings, type SettingsView } from '../lib/api';
 import { href } from '../lib/utils';
-import { Button, ErrorNote, Input, Select, Skeleton, Textarea } from './ui';
+import { Button, ErrorNote, InfoTip, Input, Select, Skeleton, Textarea } from './ui';
 import { SecurityForm } from './SecurityForm';
 
 /**
@@ -147,12 +147,27 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+  const id = useId();
+  if (!hint) {
+    return (
+      <label className="block space-y-1.5">
+        <span className="text-xs font-medium">{label}</span>
+        {children}
+      </label>
+    );
+  }
+  // With a (?): the tip sits beside the label, outside it, so its text is never part of the field's name.
+  const control = isValidElement<{ id?: string }>(children) ? cloneElement(children, { id: children.props.id ?? id }) : children;
   return (
-    <label className="block space-y-1.5">
-      <span className="text-xs font-medium">{label}</span>
-      {children}
-      {hint && <span className="block text-[11px] text-muted-foreground">{hint}</span>}
-    </label>
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-1">
+        <label htmlFor={isValidElement<{ id?: string }>(children) ? (children.props.id ?? id) : undefined} className="text-xs font-medium">
+          {label}
+        </label>
+        <InfoTip label={`About ${label.toLowerCase()}`}>{hint}</InfoTip>
+      </div>
+      {control}
+    </div>
   );
 }
 
@@ -228,11 +243,10 @@ export function SettingsForm({ knowledge, section }: { knowledge: boolean; secti
             <Textarea rows={2} value={draft.welcomeMessage} maxLength={2000} onChange={(e) => set({ welcomeMessage: e.target.value })} />
           </Field>
           <p className="text-xs text-muted-foreground">
-            Suggested questions, call and email buttons and useful links on the widget’s first screen:{' '}
+            Buttons and links on the first screen:{' '}
             <a href={href({ page: 'settings', id: 'home' })} className="font-medium text-foreground underline-offset-2 hover:underline">
-              Home screen
+              Home screen →
             </a>
-            .
           </p>
         </Section>
       )}
@@ -375,9 +389,12 @@ function AiPanel({ assistant, ai }: { assistant: NonNullable<Settings['assistant
           </div>
         ))}
       </dl>
-      <p className="text-[11px] text-muted-foreground">
-        Changed with the CLI, then a deploy: <code className="rounded bg-muted px-1">helppuff model set …</code>, <code className="rounded bg-muted px-1">helppuff rag set …</code> (or
-        your coding agent). See the wiki’s Models and providers page.
+      <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        Changed with the CLI
+        <InfoTip label="About changing the model">
+          <code className="rounded bg-muted px-1">helppuff model set …</code> or <code className="rounded bg-muted px-1">helppuff rag set …</code>, then a deploy (or ask your coding
+          agent). See the wiki’s Models and providers page.
+        </InfoTip>
       </p>
     </div>
   );

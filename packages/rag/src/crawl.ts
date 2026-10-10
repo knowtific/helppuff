@@ -23,9 +23,16 @@ import { canonicalUrl } from './url.js';
  *
  * Shaped for the Workers Free plan:
  *  - one page per step, so each step stays well inside the CPU limit;
- *  - at most `batchSize` pages per Workflow instance, after which the
- *    instance starts the next one — the free plan allows 50 external
- *    fetches per invocation, and a chain of short instances never nears it;
+ *  - at most `batchSize` pages per Workflow instance, and fewer when its
+ *    outside calls run low: the free plan allows 50 per instance, and page
+ *    fetches, Workers AI and Vectorize all count (3–5 a page). The pages left
+ *    stay queued and the instance starts the next one;
+ *  - the finishing steps (facts, cleanup, webhooks, Jobs and home-screen
+ *    setup) get an instance of their own, so they never start short;
+ *  - a part that fails marks the run failed, never "running" for ever;
+ *  - pages that failed for a passing reason (unreachable, timed out, a 5xx,
+ *    a 429) are tried again once the run is done: it sleeps (free in a
+ *    Workflow), then queues just those, twice at most. A newer run wins;
  *  - no step returns more than a few hundred bytes.
  *
  * Written against `StepLike` rather than the Workflows API, so it runs (and
@@ -48,7 +55,14 @@ export type CrawlOptions = {
   batchSize?: number;
 };
 
-export type CrawlParams = { siteId: string; runId: string; part: number; options: CrawlOptions };
+export type CrawlParams = {
+  siteId: string;
+  runId: string;
+  part: number;
+  options: CrawlOptions;
+  /** Rounds of retrying pages that failed for a passing reason, so far. */
+  retry?: number;
+};
 
 export type CrawlDeps = IndexDeps & {
   browser?: BrowserLike | undefined;
@@ -65,6 +79,16 @@ export type CrawlRunStatus = 'queued' | 'running' | 'done' | 'failed' | 'cancell
 
 export const DEFAULT_BATCH = 15;
 const SAMPLE_PAGES = 5;
+/** Outside calls one Workflow instance may make on Workers Free (fetches, Workers AI, Vectorize, starting a Workflow). */
+export const SUBREQUEST_BUDGET = 50;
+/** Kept back: starting the next part, plus redirect hops and calls the count cannot see. */
+const SUBREQUEST_RESERVE = 6;
+/** What a page may cost before one has been measured: fetch, browser, embeddings, upsert, delete. */
+const PAGE_SUBREQUESTS = 6;
+/** How long to wait before each round of retrying failed pages. */
+export const RETRY_DELAYS_MS = [15 * 60_000, 2 * 60 * 60_000];
+/** Failures worth another try later; a 404 or a robots.txt rule is not. */
+const RETRYABLE = "((status = 'error' AND (http_status IS NULL OR http_status = 408 OR http_status >= 500)) OR (status = 'blocked' AND http_status = 429))";
 
 type PageResult = { status: PageStatus; chunks: number; neurons: number };
 
@@ -89,8 +113,57 @@ export async function addUsage(deps: Pick<IndexDeps, 'db' | 'now'>, siteId: stri
     .run();
 }
 
+/** The same bindings, counting every outside call this instance makes. */
+function counted(deps: CrawlDeps): { deps: CrawlDeps; used: () => number } {
+  let used = 0;
+  const count = <T>(result: T): T => {
+    used++;
+    return result;
+  };
+  const { ai, vectors, browser } = deps;
+  const wrapped: CrawlDeps = {
+    ...deps,
+    fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
+      used++;
+      const response = await (deps.fetch ? deps.fetch(input, init) : fetch(input, init));
+      if (response.redirected) used++;
+      return response;
+    }) as typeof fetch,
+    ai: { run: (model, inputs, options) => count(ai.run(model, inputs, options)) },
+    vectors: {
+      upsert: (v) => count(vectors.upsert(v)),
+      deleteByIds: (ids) => count(vectors.deleteByIds(ids)),
+      query: (vector, options) => count(vectors.query(vector, options)),
+    },
+    browser: browser ? { quickAction: (action, options) => count(browser.quickAction(action, options)) } : undefined,
+    startNext: (next) => count(deps.startNext(next)),
+    ...(deps.startFile ? { startFile: (file: FileParams) => count(deps.startFile!(file)) } : {}),
+  };
+  return { deps: wrapped, used: () => used };
+}
+
 /** Run one Workflow instance's share of a crawl. */
 export async function runCrawlPart(step: StepLike, deps: CrawlDeps, params: CrawlParams): Promise<{ finished: boolean }> {
+  const budget = counted(deps);
+  try {
+    return await crawlPart(step, budget.deps, params, budget.used);
+  } catch (thrown) {
+    // A step out of retries ends this instance, and with it the chain: say so, or the run reads "running" for ever.
+    const error = `Stopped: ${String((thrown as Error)?.message ?? thrown)}`.slice(0, 300);
+    await step
+      .do('failed', async () => {
+        await deps.db
+          .prepare("UPDATE crawl_runs SET status = 'failed', error = ?, finished_at = ? WHERE id = ? AND status IN ('queued', 'running')")
+          .bind(error, now(deps), params.runId)
+          .run();
+        return true;
+      })
+      .catch(() => {});
+    throw thrown;
+  }
+}
+
+async function crawlPart(step: StepLike, deps: CrawlDeps, params: CrawlParams, used: () => number): Promise<{ finished: boolean }> {
   const { siteId, runId } = params;
   const userAgent = params.options.userAgent ?? DEFAULT_USER_AGENT;
   const io = { userAgent, ...(deps.fetch ? { fetch: deps.fetch } : {}) };
@@ -140,8 +213,14 @@ export async function runCrawlPart(step: StepLike, deps: CrawlDeps, params: Craw
   const boilerplate = safeJson<string[]>(run.boilerplate, []);
   const delayMs = Math.min(10, robots.crawlDelay ?? 0) * 1000;
 
+  let pageCost = PAGE_SUBREQUESTS;
+  let crawled = 0;
   for (const [i, page] of run.pages.entries()) {
+    // Out of outside calls for this instance: the rest stay queued for the next one.
+    if (used() + pageCost > SUBREQUEST_BUDGET - SUBREQUEST_RESERVE) break;
     if (i > 0 && delayMs >= 1000) await step.sleep(`delay:${page.id}`, delayMs);
+    const before = used();
+    crawled++;
     try {
       await step.do(`page:${page.id}`, async () => {
         const current = await runRow(deps, runId);
@@ -152,14 +231,16 @@ export async function runCrawlPart(step: StepLike, deps: CrawlDeps, params: Craw
       // Retries are spent: record the failure and move on; one bad page must not stop the crawl.
       await updatePage(deps.db, page.id, { status: 'error', error: String((thrown as Error)?.message ?? thrown).slice(0, 300), crawled_at: now(deps) });
     }
+    pageCost = Math.max(pageCost, used() - before);
   }
 
   const remaining = await step.do('remaining', async () => {
     const row = await runRow(deps, runId);
-    if (row?.status === 'cancelled') return 0;
+    if (row?.status === 'cancelled') return -1;
     return (await deps.db.prepare("SELECT count(*) AS n FROM pages WHERE site_id = ? AND run_id = ? AND status = 'queued'").bind(siteId, runId).first<{ n: number }>())?.n ?? 0;
   });
-  if (remaining > 0) {
+  // Pages left, or this instance spent its calls on pages: the finishing steps start fresh in the next.
+  if (remaining > 0 || (remaining === 0 && crawled > 0)) {
     await step.do('next', async () => {
       await deps.startNext({ ...params, part: params.part + 1 });
       return true;
@@ -210,8 +291,8 @@ export async function runCrawlPart(step: StepLike, deps: CrawlDeps, params: Craw
   });
 
   await step.do('files', async () => {
-    // Uploaded files keep their Markdown; one embedded with another model is re-embedded from it.
-    if (!deps.startFile) return 0;
+    // Uploaded files keep their Markdown; one embedded with another model is re-embedded from it (once, not again on a retry round).
+    if (!deps.startFile || params.retry) return 0;
     const stale = (
       await deps.db
         .prepare("SELECT id FROM knowledge_files WHERE site_id = ? AND status = 'indexed' AND (embedding_model IS NULL OR embedding_model != ?)")
@@ -235,9 +316,19 @@ export async function runCrawlPart(step: StepLike, deps: CrawlDeps, params: Craw
         .bind(siteId, siteId)
         .all<{ id: string }>()
     ).results;
-    let removed = 0;
-    for (const page of stale) removed += await deletePageChunks(deps.db, deps.vectors, siteId, page.id);
-    return removed;
+    // All their vectors in batches of 500, not a Vectorize call per page: unticking 60 pages must fit the instance's 50 calls.
+    const ids: string[] = [];
+    for (let i = 0; i < stale.length; i += 90) {
+      const slice = stale.slice(i, i + 90).map((p) => p.id);
+      const rows = await deps.db.prepare(`SELECT id FROM chunks WHERE site_id = ? AND page_id IN (${slice.map(() => '?').join(', ')})`).bind(siteId, ...slice).all<{ id: string }>();
+      ids.push(...rows.results.map((r) => r.id));
+    }
+    for (let i = 0; i < ids.length; i += 500) await deps.vectors.deleteByIds(ids.slice(i, i + 500));
+    for (let i = 0; i < stale.length; i += 90) {
+      const slice = stale.slice(i, i + 90).map((p) => p.id);
+      await deps.db.prepare(`DELETE FROM chunks WHERE site_id = ? AND page_id IN (${slice.map(() => '?').join(', ')})`).bind(siteId, ...slice).run();
+    }
+    return ids.length;
   });
 
   await step.do('finish', async () => {
@@ -257,7 +348,8 @@ export async function runCrawlPart(step: StepLike, deps: CrawlDeps, params: Craw
       .run();
     return { done: counts?.done ?? 0, failed: counts?.failed ?? 0, chunks };
   });
-  if (deps.notify) {
+  // Webhooks and setup hear about the run once, not again after each retry round.
+  if (deps.notify && !params.retry) {
     await step.do('notify', async () => {
       const run = await deps.db.prepare('SELECT status, done, failed, chunks, trigger FROM crawl_runs WHERE id = ?').bind(runId).first<Record<string, unknown>>();
       await deps.notify!('knowledge.crawl.finished', {
@@ -270,7 +362,31 @@ export async function runCrawlPart(step: StepLike, deps: CrawlDeps, params: Craw
       return true;
     });
   }
-  return { finished: true };
+
+  // Pages that failed for a passing reason: wait, then try just those again.
+  const round = params.retry ?? 0;
+  const delay = RETRY_DELAYS_MS[round];
+  if (delay === undefined) return { finished: true };
+  const retryable = await step.do('retryable', async () => {
+    return (await deps.db.prepare(`SELECT count(*) AS n FROM pages WHERE site_id = ? AND run_id = ? AND ${RETRYABLE}`).bind(siteId, runId).first<{ n: number }>())?.n ?? 0;
+  });
+  if (!retryable) return { finished: true };
+  await step.sleep(`retry-wait:${round}`, delay);
+  const queued = await step.do(`retry:${round}`, async () => {
+    // Only the site's latest run, still done: a newer crawl or a cancel wins.
+    const latest = await deps.db.prepare('SELECT id, status FROM crawl_runs WHERE site_id = ? ORDER BY started_at DESC, rowid DESC LIMIT 1').bind(siteId).first<{ id: string; status: string }>();
+    if (latest?.id !== runId || latest.status !== 'done') return 0;
+    const result = await deps.db.prepare(`UPDATE pages SET status = 'queued', error = NULL WHERE site_id = ? AND run_id = ? AND ${RETRYABLE}`).bind(siteId, runId).run();
+    const n = Number((result as { meta?: { changes?: number } }).meta?.changes ?? 0);
+    if (n) await deps.db.prepare("UPDATE crawl_runs SET status = 'running', finished_at = NULL WHERE id = ?").bind(runId).run();
+    return n;
+  });
+  if (!queued) return { finished: true };
+  await step.do(`retry-next:${round}`, async () => {
+    await deps.startNext({ ...params, part: params.part + 1, retry: round + 1 });
+    return true;
+  });
+  return { finished: false };
 }
 
 function safeJson<T>(text: string | null, fallback: T): T {

@@ -79,8 +79,17 @@ export const startSessionRequestSchema = z.object({
   context: visitorContextSchema,
   firstMessage: z.string().min(1).max(2000).optional(),
   captchaToken: z.string().max(4096).optional(),
+  /**
+   * A signed-in visitor: a JWT (HS256) the site's server signed with the
+   * site's identity secret (`HelpPuff.identify({ token })`). The server
+   * checks it; its claims become the verified `user`. Never trusted unchecked.
+   */
+  identity: z.string().max(4096).optional(),
 });
 export type StartSessionRequest = z.infer<typeof startSessionRequestSchema>;
+
+/** A visitor the site vouched for: a signed identity's claims (or the API's `user`). `id` is the site's own user id. */
+export type VerifiedUser = Record<string, string> & { id: string };
 
 export const capabilitiesSchema = z.object({
   poll: z.boolean(),

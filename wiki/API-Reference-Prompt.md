@@ -2,12 +2,14 @@
 
 # Prompt API
 
-The business-specific instructions, versioned. Part of the [[API reference|API-Reference]]: setup, shared types and errors are there.
+The business-specific instructions, versioned, and the agent file: the prompt, tools and behaviour settings as one file to export and import. Part of the [[API reference|API-Reference]]: setup, shared types and errors are there.
 
 - [[The prompt and its versions|API-Reference-Prompt#the-prompt-and-its-versions]]: `GET /prompt`
 - [[One prompt version|API-Reference-Prompt#one-prompt-version]]: `GET /prompt/versions/:version`
 - [[Publish a prompt version|API-Reference-Prompt#publish-a-prompt-version]]: `POST /prompt`
 - [[Restore a prompt version|API-Reference-Prompt#restore-a-prompt-version]]: `POST /prompt/restore`
+- [[Export the agent file|API-Reference-Prompt#export-the-agent-file]]: `GET /agent/export`
+- [[Import an agent file|API-Reference-Prompt#import-an-agent-file]]: `POST /agent/import`
 
 ## The prompt and its versions
 
@@ -300,3 +302,510 @@ type RestorePromptVersionResponse = {
 };
 ```
 <!-- /tabs -->
+
+## Export the agent file
+
+`GET /agent/export` · scope `prompt:read`
+
+The assistant's setup as one file, to keep in a project, share or import elsewhere: the prompt, the tools, and the behaviour and lead form settings. A tool's secret header is a placeholder (`${ORDER_STATUS_AUTHORIZATION}`), listed in `needs`; its value never leaves the Worker.
+
+| Parameter | In | Required | Description |
+| --- | --- | --- | --- |
+| `site` | query | no | The site (a key always uses its own). |
+
+**Request**
+
+<!-- tabs -->
+```bash [curl]
+curl "$HELPPUFF_URL/api/v1/agent/export" \
+  -H "Authorization: Bearer $HELPPUFF_API_KEY"
+```
+```ts [TypeScript]
+const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/agent/export`, {
+  headers: {
+    Authorization: `Bearer ${process.env.HELPPUFF_API_KEY}`,
+  },
+});
+if (!response.ok) throw new Error(((await response.json()) as ApiError).error.message);
+const data = (await response.json()) as ExportAgentFileResponse;
+```
+<!-- /tabs -->
+
+**Response** `200`
+
+<!-- tabs -->
+```json [Example]
+{
+  "helppuff": "agent",
+  "version": 1,
+  "name": "Acme Plumbing assistant",
+  "description": "Exported from acme on 2025-10-09.",
+  "prompt": "If they ask about an order, ask for its number, save it with {{order_number}}, then look it up with {{order_status}}.",
+  "settings": {
+    "behaviour": {
+      "goal": "callbacks",
+      "tone": "friendly",
+      "length": "short",
+      "prices": "share"
+    },
+    "leads": {
+      "enabled": true,
+      "fields": [
+        {
+          "name": "name",
+          "label": "Name",
+          "type": "text",
+          "required": true
+        }
+      ]
+    }
+  },
+  "tools": [
+    {
+      "name": "order_number",
+      "kind": "extract",
+      "description": "Save the order number once the visitor gives it.",
+      "enabled": true,
+      "fields": [
+        {
+          "name": "order_number",
+          "description": "The order number, like A-1042.",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "order_status",
+      "kind": "http",
+      "description": "Look up an order by its number: status, items and delivery date.",
+      "enabled": true,
+      "method": "GET",
+      "url": "https://api.acme.example/orders/{{args.order_number}}",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "${ORDER_STATUS_AUTHORIZATION}",
+          "secret": true
+        }
+      ],
+      "parameters": [
+        {
+          "name": "order_number",
+          "description": "The order number, like A-1042.",
+          "required": true
+        }
+      ],
+      "pick": [
+        "status",
+        "delivery.date"
+      ],
+      "keys": [
+        "status",
+        "delivery.date"
+      ],
+      "timeoutMs": 5000,
+      "before": false,
+      "after": false
+    }
+  ],
+  "needs": [
+    {
+      "name": "ORDER_STATUS_AUTHORIZATION",
+      "description": "The whole Authorization header of the order_status tool"
+    }
+  ]
+}
+```
+```ts [Type]
+type ExportAgentFileResponse = {
+  helppuff: string;
+  version: number;
+  name: string;
+  description: string;
+  prompt: string;
+  settings: {
+    behaviour: {
+      goal: string;
+      tone: string;
+      length: string;
+      prices: string;
+    };
+    leads: {
+      enabled: boolean;
+      fields: Array<{
+        name: string;
+        label: string;
+        type: string;
+        required: boolean;
+      }>;
+    };
+  };
+  tools: Array<{
+    name: string;
+    kind: string;
+    description: string;
+    enabled: boolean;
+    fields?: Array<{
+      name: string;
+      description: string;
+      required: boolean;
+    }>;
+    method?: string;
+    url?: string;
+    headers?: Array<{
+      name: string;
+      value: string;
+      secret: boolean;
+    }>;
+    parameters?: Array<{
+      name: string;
+      description: string;
+      required: boolean;
+    }>;
+    pick?: string[];
+    keys?: string[];
+    timeoutMs?: number;
+    before?: boolean;
+    after?: boolean;
+  }>;
+  needs: Array<{
+    name: string;
+    description: string;
+  }>;
+};
+```
+<!-- /tabs -->
+
+## Import an agent file
+
+`POST /agent/import` · scope `prompt:write`
+
+Applies an agent file (from `GET /agent/export`, a template, or written by hand): its settings, its tools (matched by name: created or replaced) and its prompt, as a new version. Everything is checked before anything changes. With `dryRun`, nothing changes: the answer says what would, and which secrets are still needed. Importing a file with `settings` (not a dry run) needs the `settings:write` scope too.
+
+| Body field | Required | Description |
+| --- | --- | --- |
+| `agent` | yes | The agent file: `{ "helppuff": "agent", "version": 1, name, prompt, settings, tools, needs }`. |
+| `secrets` | no | A value for each `${NAME}` in the tools' headers, as `{ "NAME": "value" }`. Stored encrypted, as a tool saved by hand. A tool that already has the header keeps its value when one is left out. |
+| `dryRun` | no | `true`: change nothing, answer what would change. |
+
+**Request**
+
+<!-- tabs -->
+```bash [curl]
+curl -X POST "$HELPPUFF_URL/api/v1/agent/import" \
+  -H "Authorization: Bearer $HELPPUFF_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "agent": {
+    "helppuff": "agent",
+    "version": 1,
+    "name": "Acme Plumbing assistant",
+    "description": "Exported from acme on 2025-10-09.",
+    "prompt": "If they ask about an order, ask for its number, save it with {{order_number}}, then look it up with {{order_status}}.",
+    "settings": {
+      "behaviour": {
+        "goal": "callbacks",
+        "tone": "friendly",
+        "length": "short",
+        "prices": "share"
+      },
+      "leads": {
+        "enabled": true,
+        "fields": [
+          {
+            "name": "name",
+            "label": "Name",
+            "type": "text",
+            "required": true
+          }
+        ]
+      }
+    },
+    "tools": [
+      {
+        "name": "order_number",
+        "kind": "extract",
+        "description": "Save the order number once the visitor gives it.",
+        "enabled": true,
+        "fields": [
+          {
+            "name": "order_number",
+            "description": "The order number, like A-1042.",
+            "required": true
+          }
+        ]
+      },
+      {
+        "name": "order_status",
+        "kind": "http",
+        "description": "Look up an order by its number: status, items and delivery date.",
+        "enabled": true,
+        "method": "GET",
+        "url": "https://api.acme.example/orders/{{args.order_number}}",
+        "headers": [
+          {
+            "name": "Authorization",
+            "value": "${ORDER_STATUS_AUTHORIZATION}",
+            "secret": true
+          }
+        ],
+        "parameters": [
+          {
+            "name": "order_number",
+            "description": "The order number, like A-1042.",
+            "required": true
+          }
+        ],
+        "pick": [
+          "status",
+          "delivery.date"
+        ],
+        "keys": [
+          "status",
+          "delivery.date"
+        ],
+        "timeoutMs": 5000,
+        "before": false,
+        "after": false
+      }
+    ],
+    "needs": [
+      {
+        "name": "ORDER_STATUS_AUTHORIZATION",
+        "description": "The whole Authorization header of the order_status tool"
+      }
+    ]
+  },
+  "secrets": {
+    "ORDER_STATUS_AUTHORIZATION": "Bearer sk_live_…"
+  },
+  "dryRun": true
+}'
+```
+```ts [TypeScript]
+type ImportAgentFileRequest = {
+  /**
+   * The agent file: `{ "helppuff": "agent", "version": 1, name, prompt,
+   * settings, tools, needs }`.
+   */
+  agent: {
+    helppuff?: string;
+    version?: number;
+    name?: string;
+    description?: string;
+    prompt?: string;
+    settings?: {
+      behaviour?: {
+        goal?: string;
+        tone?: string;
+        length?: string;
+        prices?: string;
+      };
+      leads?: {
+        enabled?: boolean;
+        fields?: Array<{
+          name?: string;
+          label?: string;
+          type?: string;
+          required?: boolean;
+        }>;
+      };
+    };
+    tools?: Array<{
+      name?: string;
+      kind?: string;
+      description?: string;
+      enabled?: boolean;
+      fields?: Array<{
+        name?: string;
+        description?: string;
+        required?: boolean;
+      }>;
+      method?: string;
+      url?: string;
+      headers?: Array<{
+        name?: string;
+        value?: string;
+        secret?: boolean;
+      }>;
+      parameters?: Array<{
+        name?: string;
+        description?: string;
+        required?: boolean;
+      }>;
+      pick?: string[];
+      keys?: string[];
+      timeoutMs?: number;
+      before?: boolean;
+      after?: boolean;
+    }>;
+    needs?: Array<{
+      name?: string;
+      description?: string;
+    }>;
+  };
+  /**
+   * A value for each `${NAME}` in the tools' headers, as `{ "NAME": "value"
+   * }`. Stored encrypted, as a tool saved by hand. A tool that already has the
+   * header keeps its value when one is left out.
+   */
+  secrets?: {
+    ORDER_STATUS_AUTHORIZATION?: string;
+  };
+  /** `true`: change nothing, answer what would change. */
+  dryRun?: boolean;
+};
+
+const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/agent/import`, {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${process.env.HELPPUFF_API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    agent: {
+      helppuff: 'agent',
+      version: 1,
+      name: 'Acme Plumbing assistant',
+      description: 'Exported from acme on 2025-10-09.',
+      prompt: 'If they ask about an order, ask for its number, save it with {{order_number}}, then look it up with {{order_status}}.',
+      settings: {
+        behaviour: {
+          goal: 'callbacks',
+          tone: 'friendly',
+          length: 'short',
+          prices: 'share'
+        },
+        leads: {
+          enabled: true,
+          fields: [
+            {
+              name: 'name',
+              label: 'Name',
+              type: 'text',
+              required: true
+            }
+          ]
+        }
+      },
+      tools: [
+        {
+          name: 'order_number',
+          kind: 'extract',
+          description: 'Save the order number once the visitor gives it.',
+          enabled: true,
+          fields: [
+            {
+              name: 'order_number',
+              description: 'The order number, like A-1042.',
+              required: true
+            }
+          ]
+        },
+        {
+          name: 'order_status',
+          kind: 'http',
+          description: 'Look up an order by its number: status, items and delivery date.',
+          enabled: true,
+          method: 'GET',
+          url: 'https://api.acme.example/orders/{{args.order_number}}',
+          headers: [
+            {
+              name: 'Authorization',
+              value: '${ORDER_STATUS_AUTHORIZATION}',
+              secret: true
+            }
+          ],
+          parameters: [
+            {
+              name: 'order_number',
+              description: 'The order number, like A-1042.',
+              required: true
+            }
+          ],
+          pick: [
+            'status',
+            'delivery.date'
+          ],
+          keys: [
+            'status',
+            'delivery.date'
+          ],
+          timeoutMs: 5000,
+          before: false,
+          after: false
+        }
+      ],
+      needs: [
+        {
+          name: 'ORDER_STATUS_AUTHORIZATION',
+          description: 'The whole Authorization header of the order_status tool'
+        }
+      ]
+    },
+    secrets: {
+      ORDER_STATUS_AUTHORIZATION: 'Bearer sk_live_…'
+    },
+    dryRun: true
+  } satisfies ImportAgentFileRequest),
+});
+if (!response.ok) throw new Error(((await response.json()) as ApiError).error.message);
+const data = (await response.json()) as ImportAgentFileResponse;
+```
+<!-- /tabs -->
+
+**Response** `200`
+
+<!-- tabs -->
+```json [Example]
+{
+  "site": "acme",
+  "dryRun": true,
+  "ready": true,
+  "name": "Acme Plumbing assistant",
+  "settings": [
+    "behaviour",
+    "leads"
+  ],
+  "tools": [
+    {
+      "name": "order_number",
+      "action": "create"
+    },
+    {
+      "name": "order_status",
+      "action": "create"
+    }
+  ],
+  "prompt": {
+    "action": "replace",
+    "version": 4
+  },
+  "missingSecrets": []
+}
+```
+```ts [Type]
+type ImportAgentFileResponse = {
+  site: string;
+  dryRun: boolean;
+  ready: boolean;
+  name: string;
+  settings: string[];
+  tools: Array<{
+    name: string;
+    action: string;
+  }>;
+  prompt: {
+    action: string;
+    version: number;
+  };
+  missingSecrets: string[];
+};
+```
+<!-- /tabs -->
+
+**Errors**
+
+| Status | Code | When |
+| --- | --- | --- |
+| 400 | `bad_request` | The file is not valid (`agent_invalid`), or a secret is missing (`agent_secrets_missing`). |

@@ -629,6 +629,51 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
     }
   }
 
+  // Signed-in visitors: a sample secret (the demo signs nobody in).
+  if (head === 'identity') {
+    return json({ site: SITE.id, version: id === 'rotate' ? 2 : 1, secret: id === 'rotate' ? '9f2c…demo-rotated-secret' : '4be1…demo-identity-secret' });
+  }
+
+  // The agent file: export the demo's setup; importing adds the file's tools and prompt to the page's data.
+  if (head === 'agent') {
+    if (id === 'export') {
+      const view = promptView();
+      return json({
+        helppuff: 'agent',
+        version: 1,
+        name: 'Harbour Plumbing assistant',
+        description: 'Exported from the dashboard demo.',
+        prompt: view.text,
+        settings: { behaviour: { goal: 'callbacks', tone: 'friendly', length: 'short', prices: 'share' } },
+        tools: tools.map(({ id: _id, lastAt: _a, lastStatus: _s, lastError: _e, ...t }) => ({ ...t, headers: (t.headers ?? []).map((h) => (h.secret ? { name: h.name, value: `\${${t.name.toUpperCase()}_KEY}`, secret: true } : h)) })),
+        needs: [],
+      });
+    }
+    const file = (body['agent'] ?? {}) as { name?: string; prompt?: string; settings?: Record<string, unknown>; tools?: Partial<ToolView>[]; needs?: { name: string; description: string }[] };
+    const plan = {
+      site: SITE.id,
+      dryRun: body['dryRun'] === true,
+      ready: true,
+      name: file.name ?? 'Agent',
+      settings: Object.keys(file.settings ?? {}),
+      tools: (file.tools ?? []).map((t) => ({ name: String(t.name), action: tools.some((x) => x.name === t.name) ? 'replace' : 'create' })),
+      prompt: file.prompt ? { action: 'replace', version: promptVersions.at(-1)!.version } : null,
+      missingSecrets: (file.needs ?? []).filter((n) => !(body['secrets'] as Record<string, string> | undefined)?.[n.name]),
+    };
+    if (plan.dryRun) return json(plan);
+    for (const t of file.tools ?? []) {
+      const at = tools.findIndex((x) => x.name === t.name);
+      const tool = { ...toolBase, keys: [], lastAt: null, lastStatus: null, ...t, headers: (t.headers ?? []).map((h) => ({ ...h, value: h.secret ? '' : h.value, set: true })), id: at >= 0 ? tools[at]!.id : `tool_${tools.length + 1}` } as ToolView;
+      if (at >= 0) tools[at] = tool;
+      else tools.push(tool);
+    }
+    if (file.prompt) {
+      const version = promptVersions.at(-1)!.version + 1;
+      promptVersions.push({ version, hash: `v${version}`, source: 'dashboard', author: OWNER, note: `Imported: ${file.name ?? 'agent'}`, restoredFrom: null, createdAt: Date.now(), chars: file.prompt.length, text: file.prompt });
+    }
+    return json({ ...plan, ready: true, missingSecrets: [], prompt: plan.prompt && { action: 'replace', version: promptVersions.at(-1)!.version } });
+  }
+
   if (head === 'tools') {
     if (id === 'test') {
       const draft = (body['tool'] ?? {}) as Partial<ToolView>;

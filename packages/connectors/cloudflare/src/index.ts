@@ -196,7 +196,7 @@ const cloudflare: Connector<CloudflareOptions, CloudflareState> = {
   promptOption: () => 'instructions',
 
   async start(ctx, input) {
-    const scope: PromptScope = { lead: input.lead, context: input.context, site: { id: ctx.siteId } };
+    const scope: PromptScope = { lead: input.lead, context: input.context, site: { id: ctx.siteId }, ...(input.user ? { user: input.user } : {}) };
     saveScope(ctx, scope);
     if (!input.firstMessage) return { state: { turns: 0 }, messages: [] };
     const messages = await respond(ctx, input.firstMessage, scope);

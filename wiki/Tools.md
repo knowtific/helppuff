@@ -23,14 +23,20 @@ goes to [[webhooks|Webhooks]] as `data` (in `conversation.started` and
 `conversation.completed`), and to your after-chat tools. The assistant also
 sees it on every answer, so it can use a value again later in the chat.
 
+**Learn by example:** four [[tutorials|Tutorials]] (order tracking, sending
+chats to a CRM, the nearest store, verified account changes), each with a
+template to import.
+
 Tools work with HelpPuff's assistant, whichever model writes the answers
 ([[Models and providers|Models-and-Providers]]). With a backend that runs the
 whole conversation itself (Retell, or your own API), only after-chat tools run.
 
 ## Add a tool
 
-On the Prompt page, use **+ New** in the **Tools** panel on the right, or
-**New tool** in a section. Then either:
+On the **Prompt & tools** page (Settings → Prompt & tools), use **+ Add** on
+**Before the chat** or **After the chat**, or **+ Add** in the prompt (click
+**Prompt** in the diagram) for a tool the assistant calls during the chat;
+each menu lists the tools you already have, then **New tool**. Then either:
 
 - **Paste a curl** copied from your API's docs or from Postman
   (Code → cURL). The method, URL, headers and body are filled in.
@@ -62,7 +68,8 @@ Use these anywhere in the URL's path and query, a header, or the body:
 | Value | What it is |
 | --- | --- |
 | `{{args.order_number}}` | Filled in by the assistant when it calls the tool. It asks the visitor first if it does not know the value yet. Describe each one in the dialog (or with `--param`) |
-| `{{prechat.email}}` | An answer from the pre-chat form (any field: `{{prechat.name}}`, `{{prechat.company}}`…) |
+| `{{prechat.email}}` | An answer from the pre-chat form (any field: `{{prechat.name}}`, `{{prechat.company}}`…). What the visitor typed: a claim, not proof |
+| `{{user.id}}`, `{{user.email}}`… | The [[signed-in visitor|Signed-In-Visitors]], verified by a token your server signed. A tool using it runs only when there is one |
 | `{{data.crm_lookup.id}}` | What another tool returned in this chat |
 | `{{page.url}}`, `{{page.title}}` | The page the visitor is chatting from |
 | `{{conversation.id}}`, `{{site.id}}` | The conversation and the site |
@@ -76,6 +83,14 @@ after-chat `POST` with no body sends the whole conversation as JSON.
 
 The host is fixed: only the path and query may use `{{…}}`. Tools call
 `https://` addresses only.
+
+**Typed details are claims.** A visitor can type anyone's email into the
+pre-chat form. A tool that returns personal data (an account, orders, an
+address) must not trust `{{prechat.*}}` alone: use `{{user.*}}` from a
+[[signed-in visitor|Signed-In-Visitors]], or have your API check something
+only the customer knows (the order number *and* its email, as in
+[[order tracking|Tutorial-Order-Tracking]], or a code sent by text, as in
+[[verified account changes|Tutorial-Verified-Account-Changes]]).
 
 ### Keys and secrets
 
@@ -122,6 +137,10 @@ then look it up with {{order_status}}.
 Below the prompt, the page lists the tools the prompt uses. It also flags a
 `{{name}}` that is neither a tool nor a known value, which is usually a typo.
 
+Answer **HTTP 200** for outcomes you expect, such as "not found" or "wrong
+code" (`{ "found": false }`), and keep 4xx and 5xx for real failures: the
+assistant treats an error as "could not check" and says so.
+
 The assistant calls tools only when it needs them, at most five calls per
 answer. Their results go to the assistant as data, not instructions: text in
 an API's response cannot change the assistant's rules. When a tool fails, the
@@ -163,6 +182,13 @@ sends the whole conversation as JSON:
 
 A failing call (a 5xx, a 429, a timeout) is tried again, twice. What the API
 answers is kept as data too, before `conversation.completed` is sent.
+
+**Only when.** An after-chat tool can run only for some conversations:
+**Only when** in the tool's window (hot leads only, hot or warm, when there
+is an email, signed-in visitors only), `--when labels.leadQuality=hot` in the
+CLI, or `"when": { "path": "labels.leadQuality", "in": ["hot"] }` in the API.
+The path is anything in the `conversation.completed` data; without `in`, it
+must have a value. See [[hot leads to Slack|Tutorial-Hot-Leads-Slack]].
 
 ## Limits
 

@@ -38,7 +38,7 @@ const TEMPLATES: JobTemplate[] = [
   { id: 'sales-demo', name: 'Sales demos', description: 'B2B: a demo, a trial, a deal.', stages: [], fields: [] },
   { id: 'bookings', name: 'Bookings', description: 'Appointments and reservations.', stages: [], fields: [] },
   { id: 'custom-orders', name: 'Custom orders', description: 'Made-to-order products.', stages: [], fields: [] },
-  { id: 'basic', name: 'Basic', description: 'New, in progress, done.', stages: [], fields: [] },
+  { id: 'basic', name: 'Basic', description: 'New, quote sent, in progress, done.', stages: [], fields: [] },
 ];
 
 const pipeline: Pipeline = {

@@ -1,8 +1,8 @@
 import { ShieldAlert } from 'lucide-react';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { HelpLink } from './Shell';
 import type { Limits, SecuritySettings } from '../lib/api';
-import { Input, Textarea } from './ui';
+import { InfoTip, Input, Textarea } from './ui';
 
 /**
  * The Advanced page's limits: every bound the Worker enforces, the
@@ -36,12 +36,17 @@ const MORE: { key: LimitKey; label: string; hint: string; min?: number; max: num
 ];
 
 function NumberField({ label, hint, value, min = 1, max, onChange }: { label: string; hint: string; value: number; min?: number; max: number; onChange: (value: number) => void }) {
+  const id = useId();
   return (
-    <label className="block space-y-1.5">
-      <span className="text-xs font-medium">{label}</span>
-      <Input type="number" inputMode="numeric" min={min} max={max} step={1} required value={Number.isFinite(value) ? value : ''} onChange={(e) => onChange(e.target.valueAsNumber)} />
-      <span className="block text-[11px] text-muted-foreground">{hint}</span>
-    </label>
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-1">
+        <label htmlFor={id} className="text-xs font-medium">
+          {label}
+        </label>
+        <InfoTip label={`About ${label.toLowerCase()}`}>{hint}</InfoTip>
+      </div>
+      <Input id={id} type="number" inputMode="numeric" min={min} max={max} step={1} required value={Number.isFinite(value) ? value : ''} onChange={(e) => onChange(e.target.valueAsNumber)} />
+    </div>
   );
 }
 
@@ -55,10 +60,17 @@ const lines = (text: string) =>
 function IpList({ label, hint, value, onChange }: { label: string; hint: string; value: string[]; onChange: (value: string[]) => void }) {
   // The text as typed; the list is what it parses to.
   const [text, setText] = useState(value.join('\n'));
+  const id = useId();
   return (
-    <label className="block space-y-1.5">
-      <span className="text-xs font-medium">{label}</span>
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-1">
+        <label htmlFor={id} className="text-xs font-medium">
+          {label}
+        </label>
+        <InfoTip label={`About ${label.toLowerCase()}`}>{hint} One address or range (CIDR) a line, IPv4 or IPv6.</InfoTip>
+      </div>
       <Textarea
+        id={id}
         rows={3}
         spellCheck={false}
         className="font-mono text-xs"
@@ -69,8 +81,7 @@ function IpList({ label, hint, value, onChange }: { label: string; hint: string;
           onChange(lines(e.target.value));
         }}
       />
-      <span className="block text-[11px] text-muted-foreground">{hint}</span>
-    </label>
+    </div>
   );
 }
 
@@ -92,8 +103,10 @@ export function SecurityForm({ value, captcha, onChange }: { value: SecuritySett
         </div>
       )}
       <div className="space-y-3">
-        <h3 className="text-[13px] font-semibold">Limits</h3>
-        <p className="text-xs text-muted-foreground">They stop one visitor (or a script) from using up your daily budget. Visitors who hit one see a short “try again” message.</p>
+        <h3 className="flex items-center gap-1.5 text-[13px] font-semibold">
+          Limits
+          <InfoTip label="About limits">They stop one visitor (or a script) from using up your daily budget. Visitors who hit one see a short “try again” message.</InfoTip>
+        </h3>
         <div className="grid gap-3 sm:grid-cols-2">
           {VISITOR.map((item) => (
             <NumberField key={item.key} label={item.label} hint={item.hint} max={item.max} value={value.limits[item.key] ?? 1} onChange={(n) => setLimit(item.key, n)} />
@@ -136,15 +149,19 @@ export function SecurityForm({ value, captcha, onChange }: { value: SecuritySett
           />
           <IpList label="Block" hint="The chat is not available to these. The dashboard is not affected." value={value.blockIps} onChange={(blockIps) => onChange({ ...value, blockIps })} />
         </div>
-        <p className="text-[11px] text-muted-foreground">One address or range (CIDR) a line, IPv4 or IPv6.</p>
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-[13px] font-semibold">Dashboard sign-in</h3>
+        <h3 className="flex items-center gap-1.5 text-[13px] font-semibold">
+          Dashboard sign-in
+          <InfoTip label="About sign-in limits">
+            Attempts count per IP and per account over the window. Locked out? A one-time link from the CLI still works: npx @knowtific/helppuff dashboard
+          </InfoTip>
+        </h3>
         <div className="grid gap-3 sm:grid-cols-3">
-          <NumberField label="Attempts per IP" hint="Each window." max={1000} value={value.signIn.attemptsPerIp} onChange={(n) => setSignIn({ attemptsPerIp: n })} />
-          <NumberField label="Wrong passwords per account" hint="Each window, from anywhere." max={1000} value={value.signIn.attemptsPerAccount} onChange={(n) => setSignIn({ attemptsPerAccount: n })} />
-          <NumberField label="Window (minutes)" hint="Both count over this." max={1440} value={value.signIn.windowMinutes} onChange={(n) => setSignIn({ windowMinutes: n })} />
+          <NumberField label="Attempts per IP" hint="Sign-in attempts from one IP address, each window." max={1000} value={value.signIn.attemptsPerIp} onChange={(n) => setSignIn({ attemptsPerIp: n })} />
+          <NumberField label="Wrong passwords per account" hint="Wrong passwords for one account from anywhere, each window." max={1000} value={value.signIn.attemptsPerAccount} onChange={(n) => setSignIn({ attemptsPerAccount: n })} />
+          <NumberField label="Window (minutes)" hint="Both limits count over this many minutes." max={1440} value={value.signIn.windowMinutes} onChange={(n) => setSignIn({ windowMinutes: n })} />
         </div>
         <label className="flex items-center gap-2 text-[13px]">
           <input type="checkbox" className="size-4 accent-[var(--primary)]" checked={value.signIn.captcha} onChange={(e) => setSignIn({ captcha: e.target.checked })} aria-describedby="signin-captcha-hint" />
@@ -155,7 +172,6 @@ export function SecurityForm({ value, captcha, onChange }: { value: SecuritySett
             ? 'Uses your chat’s Turnstile widget: add this dashboard’s hostname to it in Cloudflare.'
             : 'Takes effect once Turnstile is set up (see above).'}
         </p>
-        <p className="text-[11px] text-muted-foreground">Locked out? A one-time link from the CLI still works: npx @knowtific/helppuff dashboard</p>
       </div>
     </div>
   );

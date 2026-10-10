@@ -91,10 +91,12 @@ come oldest first, and the menu shows how many. **Done** (with a note) or
 
 ## Knowledge
 
-What the assistant has learned and where from:
+In **Settings → Knowledge** (it is set up once and checked now and then, so
+it is not in the main menu). What the assistant has learned and where from:
 
 - **Website pages** (collapsible): every page with its status and passages.
-  **Choose pages** to change the selection; **Re-learn site** to crawl again.
+  **Choose pages** to change the selection; **Re-learn site** to crawl again;
+  **Try again** on a failed page (or all of them), without changing the selection.
 - **Files**: upload PDF, Word, Markdown or text files (up to 10 MB). They
   are read and learned in the background.
 - **Your own answers**: things that are not on the site, live as soon as you add them.
@@ -114,7 +116,16 @@ from Cloudflare's request metadata; HelpPuff does not store visitor IP addresses
 
 ## Settings
 
-Opens as a menu in the sidebar:
+Opens as a menu in the sidebar, in four groups: **Assistant** (Instructions,
+Prompt & tools, Knowledge, Business details, Import & export), **Widget** (Chat, Home screen,
+Appearance, Lead form), **Team** (Live chat, Labels, Jobs, Notifications) and
+**System** (Advanced, Webhooks, API keys, Team & security, Updates). What each
+page is for is behind the (?) beside its title.
+
+**No need to set them by hand:** every page has **Ask your AI agent**, with a
+request to copy into Claude Code, Codex or Cursor in your project folder. The
+agent goes through that page with you and changes it through the same API
+(see [[AI agents|AI-Agents#let-your-agent-set-it-up-with-you]]).
 
 | Page | What it changes |
 | --- | --- |
@@ -122,7 +133,10 @@ Opens as a menu in the sidebar:
 | **Home screen** | What visitors see when they open the chat: the heading, the buttons (questions, a page, call, email, a form) and useful pages, with a preview. Suggested from your website until you save it; **Suggest from my site** adds more. See [[The widget|Widget#the-home-screen]] |
 | **Appearance** | Colour (taken from your site), position, the button's icon |
 | **Lead form** | The form before the chat: on/off, its fields, which are required, your own extra fields |
-| **Instructions** | What it is mainly for, tone and answer length (settings HelpPuff adds around the prompt), and a box for anything specific to your business (the prompt itself). The full prompt page is one click away: the prompt with its version history and everything HelpPuff adds, between the [[tools|Tools]] called before and after the chat, with the tool library on the right. See [[Prompt and instructions|Prompts-and-Instructions]] |
+| **Instructions** | What to do when a visitor is interested, tone, answer length and prices: settings HelpPuff adds around the prompt |
+| **Prompt & tools** | A chat as a diagram: [[tools|Tools]] before it, the prompt (click it to edit, add tools and see its history and everything HelpPuff adds) with Knowledge above and Webhooks below, then the summary and labels and the tools after it. See [[Prompt and instructions|Prompts-and-Instructions]] |
+| **Knowledge** | What it has learned; see [Knowledge](#knowledge) above |
+| **Import & export** | The whole setup (prompt, tools, behaviour and lead form) as one [[agent file|Agent-Files]]: start from a [[tutorial's template|Tutorials]], import a file, or download this site's |
 | **Business details** | Phone, email, address, hours, service areas: read from your site, yours to correct (a crawl never overwrites your changes) |
 | **Live chat** | Let visitors talk to a person; how long they wait before the callback form; when conversations close; [[Telegram]]. See [[Live chat|Live-Chat]] |
 | **Labels** | The labels for conversations, and which the AI may use |

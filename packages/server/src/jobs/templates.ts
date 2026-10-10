@@ -157,9 +157,10 @@ export const TEMPLATES: Template[] = [
     description: 'Anything else: a simple pipeline to start from.',
     stages: [
       { name: 'New', kind: 'open', color: BLUE, rotDays: 3 },
-      { name: 'In progress', kind: 'open', color: AMBER, rotDays: 14 },
-      { name: 'Won', kind: 'won', color: GREEN },
-      { name: 'Lost', kind: 'lost', color: RED },
+      { name: 'Quote sent', kind: 'open', color: AMBER, rotDays: 7 },
+      { name: 'In progress', kind: 'open', color: TEAL, rotDays: 14 },
+      { name: 'Done', kind: 'won', color: GREEN },
+      { name: 'Cancelled', kind: 'lost', color: RED },
     ],
     fields: [description],
   },

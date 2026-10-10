@@ -143,6 +143,98 @@ describe('crawl', () => {
     expect(steps.names).toEqual(['load']);
   });
 
+  it('keeps every instance inside the free plan’s 50 outside calls', async () => {
+    // 40 pages, the 15-page default batch: once fetch, embed and upsert all counted, 13 pages ran a part dry.
+    const pages: Record<string, string> = { '/robots.txt': 'User-agent: *\nAllow: /' };
+    for (let i = 1; i <= 40; i++) pages[`/p${i}`] = shell(`Page ${i}`, `<h1>Service ${i}</h1><p>${`Details about service number ${i}, what it includes and who it suits. `.repeat(8)}</p>`);
+    const db = sqliteD1();
+    await db.prepare("INSERT INTO crawl_runs (id, site_id, status, started_at) VALUES ('big', 'acme', 'queued', 1)").run();
+    await queueRun(db, 'acme', 'big', Object.keys(pages).filter((p) => p !== '/robots.txt').map((p) => ({ url: `https://acme.test${p}`, category: 'other' })));
+
+    let calls = 0;
+    const ai = fakeAi();
+    const vectors = fakeVectors();
+    const fetch = site(pages);
+    const deps = {
+      db,
+      fetch: ((input: RequestInfo | URL, init?: RequestInit) => (calls++, fetch(input, init))) as typeof globalThis.fetch,
+      ai: { run: (...args: Parameters<typeof ai.run>) => (calls++, ai.run(...args)) },
+      vectors: { ...vectors, upsert: (v: Parameters<typeof vectors.upsert>[0]) => (calls++, vectors.upsert(v)), deleteByIds: (ids: string[]) => (calls++, vectors.deleteByIds(ids)) },
+    };
+    const queue: CrawlParams[] = [{ siteId: 'acme', runId: 'big', part: 0, options: { embeddingModel: DEFAULT_RETRIEVAL.embeddingModel } }];
+    const perPart: number[] = [];
+    while (queue.length) {
+      calls = 0;
+      await runCrawlPart(inlineSteps(), { ...deps, startNext: async (p) => void (calls++, queue.push(p)) }, queue.shift()!);
+      perPart.push(calls);
+    }
+    expect(Math.max(...perPart)).toBeLessThanOrEqual(50);
+    expect(db.raw.prepare("SELECT count(*) AS n FROM pages WHERE run_id = 'big' AND status = 'indexed'").get()).toEqual({ n: 40 });
+    expect(db.raw.prepare("SELECT status FROM crawl_runs WHERE id = 'big'").get()).toEqual({ status: 'done' });
+  });
+
+  it('tries pages that failed for a passing reason again after a wait, and finishes', async () => {
+    const pages = {
+      '/robots.txt': 'User-agent: *\nAllow: /',
+      '/': shell('Home', '<h1>Plumbers in Lilydale</h1><p>Emergency plumbing, gas fitting and hot water across the Yarra Valley.</p>'),
+      '/industries': shell('Industries', '<h1>Who we work for</h1><p>Builders, property managers and homeowners across the Yarra Valley, every week.</p>'),
+      '/gone': 404,
+    };
+    let down = true;
+    const healthy = site(pages);
+    const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (down && String(input).endsWith('/industries')) throw new Error('Too many subrequests.');
+      return healthy(input, init);
+    }) as typeof globalThis.fetch;
+    const db = sqliteD1();
+    await db.prepare("INSERT INTO crawl_runs (id, site_id, status, started_at) VALUES ('flaky', 'acme', 'queued', 1)").run();
+    await queueRun(db, 'acme', 'flaky', ['/', '/industries', '/gone'].map((p) => ({ url: `https://acme.test${p}`, category: 'other' })));
+    const steps = inlineSteps();
+    const waits: number[] = [];
+    const sleepy = { ...steps, sleep: async (_name: string, ms: number) => void (waits.push(ms), (down = false)) };
+    const queue: CrawlParams[] = [{ siteId: 'acme', runId: 'flaky', part: 0, options: { embeddingModel: DEFAULT_RETRIEVAL.embeddingModel } }];
+    const notified: unknown[] = [];
+    const notify = async (_type: string, data: Record<string, unknown>) => void notified.push(data);
+    while (queue.length) await runCrawlPart(sleepy, { db, ai: fakeAi(), vectors: fakeVectors(), fetch, notify, startNext: async (p) => void queue.push(p) }, queue.shift()!);
+
+    expect(waits).toEqual([15 * 60_000]);
+    const status = (path: string) => (db.raw.prepare('SELECT status FROM pages WHERE url = ?').get(`https://acme.test${path}`) as { status: string }).status;
+    expect(status('/industries')).toBe('indexed');
+    // A 404 is not passing: left as it is, and not retried.
+    expect(status('/gone')).toBe('error');
+    expect(db.raw.prepare("SELECT status FROM crawl_runs WHERE id = 'flaky'").get()).toEqual({ status: 'done' });
+    expect(notified).toHaveLength(1);
+  });
+
+  it('leaves the retry to a newer crawl', async () => {
+    const db = sqliteD1();
+    await db.prepare("INSERT INTO crawl_runs (id, site_id, status, started_at) VALUES ('old', 'acme', 'queued', 1)").run();
+    await queueRun(db, 'acme', 'old', [{ url: 'https://acme.test/', category: 'home' }, { url: 'https://acme.test/down', category: 'other' }]);
+    const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith('/down')) throw new Error('unreachable');
+      return site(PAGES)(input, init);
+    }) as typeof globalThis.fetch;
+    const steps = inlineSteps();
+    // While it waits, the owner starts learning again.
+    const sleepy = { ...steps, sleep: async () => void db.raw.prepare("INSERT INTO crawl_runs (id, site_id, status, started_at) VALUES ('new', 'acme', 'running', 2)").run() };
+    const queue: CrawlParams[] = [{ siteId: 'acme', runId: 'old', part: 0, options: { embeddingModel: DEFAULT_RETRIEVAL.embeddingModel } }];
+    while (queue.length) await runCrawlPart(sleepy, { db, ai: fakeAi(), vectors: fakeVectors(), fetch, startNext: async (p) => void queue.push(p) }, queue.shift()!);
+    expect(db.raw.prepare("SELECT status FROM crawl_runs WHERE id = 'old'").get()).toEqual({ status: 'done' });
+    expect(db.raw.prepare("SELECT status FROM pages WHERE url = 'https://acme.test/down'").get()).toEqual({ status: 'error' });
+  });
+
+  it('marks the run failed when a part cannot carry on, instead of leaving it running', async () => {
+    const db = sqliteD1();
+    await db.prepare("INSERT INTO crawl_runs (id, site_id, status, started_at) VALUES ('stuck', 'acme', 'queued', 1)").run();
+    await queueRun(db, 'acme', 'stuck', [{ url: 'https://acme.test/', category: 'home' }, { url: 'https://acme.test/faq', category: 'faq' }]);
+    const params: CrawlParams = { siteId: 'acme', runId: 'stuck', part: 0, options: { embeddingModel: DEFAULT_RETRIEVAL.embeddingModel, batchSize: 1 } };
+    const startNext = async () => {
+      throw new Error('Too many subrequests.');
+    };
+    await expect(runCrawlPart(inlineSteps(), { db, ai: fakeAi(), vectors: fakeVectors(), fetch: site(PAGES), startNext }, params)).rejects.toThrow('Too many subrequests.');
+    expect(db.raw.prepare("SELECT status, error FROM crawl_runs WHERE id = 'stuck'").get()).toEqual({ status: 'failed', error: 'Stopped: Too many subrequests.' });
+  });
+
   it('records the embedding cost against today’s budget', async () => {
     const { db } = await crawled();
     const usage = db.raw.prepare('SELECT day, neurons_est FROM usage_daily').get() as { day: string; neurons_est: number };

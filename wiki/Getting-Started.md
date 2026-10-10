@@ -45,12 +45,17 @@ prefer to choose pages and details yourself, ask it to use
 Open the link:
 
 1. **Create your sign-in** (email and password) for the dashboard.
-2. **Your pages.** It found your site's pages and ticked the useful ones (legal
-   pages and old posts are left out). Click **Start learning**, or **Choose
-   pages** first. Learning runs on Cloudflare in the background, so you can
-   close the page.
-3. **Your details.** Check the business details it read from your site
-   (phone, email, address, hours) and pick what the assistant is mainly for.
+2. **Your website.** It found your site's pages and ticked the useful ones
+   (legal pages and old posts are left out). Click **Start learning**, or
+   **Choose pages** first. Learning runs on Cloudflare in the background, so
+   you can close the page.
+3. **Business details.** Check the details it read from your site (name,
+   phone, email, address, hours, areas you serve). The assistant gives these
+   to visitors.
+4. **Assistant (optional).** What it does when a visitor is interested: offer
+   a callback from your team (the default), just answer, or send them to your
+   booking page. **Skip** keeps the default; it is in Settings → Instructions
+   later.
 
 You land on **Home**: a live test chat, the script for your site, and a demo
 link to share.

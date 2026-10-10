@@ -343,7 +343,7 @@ export function HomeScreenSettings({ knowledge }: { knowledge: boolean }) {
         )}
 
         <Card role="region" aria-label="Heading">
-          <CardHeader title="Heading" description="The first thing visitors read when they open the chat." />
+          <CardHeader title="Heading" tip={{ label: 'About heading', text: 'The first thing visitors read when they open the chat.' }} />
           <div className="grid gap-3 border-t p-4 sm:grid-cols-2">
             <Labeled label="Title">
               <Input value={draft.title} maxLength={120} onChange={(e) => set({ title: e.target.value })} />
@@ -355,7 +355,7 @@ export function HomeScreenSettings({ knowledge }: { knowledge: boolean }) {
         </Card>
 
         <Card role="region" aria-label="Buttons">
-          <CardHeader title="Buttons" description={`Up to ${MAX_SHORTCUTS}, in order: a question to ask, a page, a call, an email, a form, or a few questions.`} />
+          <CardHeader title="Buttons" tip={{ label: 'About buttons', text: `Up to ${MAX_SHORTCUTS}, in order: a question to ask, a page, a call, an email, a form, or a few questions.` }} />
           <ul className="divide-y border-t">
             {quoteLabel && (
               <li className="flex items-center gap-2 bg-subtle px-4 py-2.5 text-[13px]">
@@ -404,7 +404,7 @@ export function HomeScreenSettings({ knowledge }: { knowledge: boolean }) {
         <Card role="region" aria-label="Useful pages">
           <CardHeader
             title="Useful pages"
-            description="Links under the buttons: prices, services, booking. They open your site in a new tab."
+            tip={{ label: 'About useful pages', text: 'Links under the buttons: prices, services, booking. They open your site in a new tab.' }}
             action={
               <label className="flex items-center gap-2 text-xs">
                 <input type="checkbox" className="size-4 accent-[var(--primary)]" checked={draft.links !== null} onChange={(e) => setLinks(e.target.checked ? { title: 'Useful pages', items: draft.links?.items ?? [] } : null)} />

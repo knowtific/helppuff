@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { messageSchema, type Message } from '@helppuff/protocol';
 import { isConnectorError, parseMarkers, type ConnectorContext } from '@helppuff/connector-types';
 import { indexDocument, usageDay, type AiLike } from '@helppuff/rag';
-import connector, { citations, openNow, parseHours, readStream, withoutRepeatedParagraphs } from '../src/index.js';
+import connector, { citations, drawnButtons, openNow, parseHours, readStream, withoutRepeatedParagraphs } from '../src/index.js';
 import { textCalls } from '../src/chat.js';
 import { fakeAi, fakeVectors, sqliteD1 } from '../../../rag/test/helpers.js';
 
@@ -262,6 +262,12 @@ describe('helpers', () => {
     expect(citations('Yes [2]. And this [1, 2][9].', 2)).toEqual({ text: 'Yes. And this.', cited: [2, 1] });
   });
 
+  it('takes out drawn buttons, but not citations, links or brackets in a sentence', () => {
+    expect(drawnButtons('Happy to help.\n\n[Book a visit]\n[Call us]')).toEqual({ text: 'Happy to help.', labels: ['Book a visit', 'Call us'] });
+    const kept = 'See [our prices](https://acme.test/prices) [1].\n[2]\nWe use [brand] tiles.';
+    expect(drawnButtons(kept)).toEqual({ text: kept, labels: [] });
+  });
+
   it('reads tool calls streamed in pieces', async () => {
     const frames = [
       { choices: [{ delta: { tool_calls: [{ index: 0, id: 'c1', function: { name: 'get_business', arguments: '' } }] } }] },
@@ -402,6 +408,20 @@ describe('replies stay safe and clean', () => {
     // The server records it from the form; the connector reports nothing more.
     expect(w.leads).toEqual([]);
     expect(textOf(messages)).toBe('Thanks Sam, the team will be in touch soon.');
+  });
+
+  it('turns a drawn [callback] button into a real one, and never draws it after the form', async () => {
+    const drawn = "I'm not sure about that. I can have the team get back to you if you'd like.\n\n[Request a callback from the team]";
+    const w = await world([{ content: drawn }]);
+    const messages = await w.send('Which LLM version do you use?');
+    expect(textOf(messages)).toBe("I'm not sure about that. I can have the team get back to you if you'd like.");
+    expect(messages.find((m) => m.type === 'options')).toMatchObject({ options: [{ label: 'Request a callback', value: 'Yes, please arrange a callback.' }] });
+    expect((w.chats[0]!['messages'] as { content: string }[])[0]!.content).toContain('Never draw a button, link or form in square brackets');
+
+    const after = await world([{ content: 'Thanks, Ahad. The team will be in touch soon.\n\n[Request a callback from the team]' }]);
+    const confirmed = await after.send('Request callback: name: Ahad, phone: 0400 111 222', false, 'action', 'callback_abc');
+    expect(textOf(confirmed)).toBe('Thanks, Ahad. The team will be in touch soon.');
+    expect(confirmed.some((m) => m.type === 'options')).toBe(false);
   });
 
   it('offers request_person only when the site has live chat, and hands over through the server', async () => {

@@ -1,4 +1,4 @@
-import { cleanText, type Message, type SendRequest, type VisitorContext } from '@helppuff/protocol';
+import { cleanText, type Message, type SendRequest, type VerifiedUser, type VisitorContext } from '@helppuff/protocol';
 import { usageDay } from '@helppuff/rag';
 import type { RequestCtx } from '../core/request.js';
 import { dbFrom, ensureSchema, type D1Like, type D1Statement } from '../db/d1.js';
@@ -188,6 +188,8 @@ export function recordStart(
     country: string | null;
     /** What the tools returned before the chat (and on its first turn). */
     data?: Record<string, unknown> | undefined;
+    /** A signed-in visitor's verified claims. */
+    user?: VerifiedUser | null | undefined;
   },
 ): void {
   conversationStarted(ctx, { ...input, typed: input.firstMessage ? contactIn(input.firstMessage) : {} });
@@ -198,8 +200,8 @@ export function recordStart(
         .prepare(
           // A tool may have saved data first (a stub row): the start fills it in.
           `INSERT INTO conversations
-           (id, site_id, started_at, last_at, page_url, page_title, referrer, utm, locale, country, first_message, message_count, visitor, channel, data)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           (id, site_id, started_at, last_at, page_url, page_title, referrer, utm, locale, country, first_message, message_count, visitor, channel, data, user)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT (id) DO UPDATE SET
              started_at = min(conversations.started_at, excluded.started_at),
              page_url = coalesce(conversations.page_url, excluded.page_url),
@@ -212,6 +214,7 @@ export function recordStart(
              message_count = conversations.message_count + excluded.message_count,
              visitor = coalesce(conversations.visitor, excluded.visitor),
              channel = coalesce(conversations.channel, excluded.channel),
+             user = coalesce(conversations.user, excluded.user),
              data = CASE WHEN excluded.data IS NULL THEN conversations.data ELSE json_patch(excluded.data, coalesce(conversations.data, '{}')) END`,
         )
         .bind(
@@ -230,6 +233,7 @@ export function recordStart(
           input.visitor ?? null,
           input.channel ?? 'widget',
           input.data && Object.keys(input.data).length ? JSON.stringify(input.data) : null,
+          input.user ? JSON.stringify(input.user) : null,
         ),
     ];
     if (input.firstMessage) statements.push(visitorMessage(input.sessionId, input.firstMessage, now - 1, db), countMessage(db, input.siteId, now));

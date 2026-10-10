@@ -2,7 +2,7 @@ import { BellRing, Check, Loader2, Send, Trash2, Volume2 } from 'lucide-react';
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { HelpLink } from './Shell';
 import { forgetLabels, useLabels } from './inbox';
-import { Button, Card, CardHeader, ErrorNote, Input, Select, Skeleton, Textarea } from './ui';
+import { Button, Card, CardHeader, ErrorNote, InfoTip, Input, Select, Skeleton, Textarea } from './ui';
 import { api, type Label, type LiveSettings, type LiveStatus, type Prefs, type SettingsView, type TelegramView } from '../lib/api';
 import { askNotifications, notificationState, playSound, setAvailable, testNotification, unlockAudio } from '../lib/live';
 import { cn, useData } from '../lib/utils';
@@ -14,13 +14,17 @@ import { cn, useData } from '../lib/utils';
 
 function Toggle({ checked, onChange, label, hint, disabled }: { checked: boolean; onChange: (value: boolean) => void; label: string; hint?: ReactNode; disabled?: boolean }) {
   return (
-    <label className={cn('flex items-start gap-2.5 text-[13px]', disabled && 'opacity-60')}>
-      <input type="checkbox" className="mt-0.5 size-4 accent-[var(--primary)]" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
-      <span>
-        <span className="block">{label}</span>
-        {hint && <span className="block text-xs text-muted-foreground">{hint}</span>}
-      </span>
-    </label>
+    <div className={cn('flex items-start gap-1.5 text-[13px]', disabled && 'opacity-60')}>
+      <label className="flex items-start gap-2.5">
+        <input type="checkbox" className="mt-0.5 size-4 accent-[var(--primary)]" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
+        <span>{label}</span>
+      </label>
+      {hint && (
+        <span className="mt-0.5">
+          <InfoTip label={`About “${label}”`}>{hint}</InfoTip>
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -150,7 +154,7 @@ function TelegramCard() {
     <Card>
       <CardHeader
         title="Telegram"
-        description="Answer live chats from your phone: each chat is a thread in your team's Telegram group (or your own chat with the bot)."
+        tip={{ label: 'About telegram', text: 'Answer live chats from your phone: each chat is a thread in your team\'s Telegram group (or your own chat with the bot).' }}
         action={<HelpLink page="Telegram" label="Setup guide" />}
       />
       <div className="space-y-3 border-t px-4 py-3 text-[13px]">
@@ -262,7 +266,7 @@ export function LabelsSettings() {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader title="Labels" description="Tag conversations to find them later. The AI labels conversations when they go quiet, using the labels it may use and what each means." />
+        <CardHeader title="Labels" tip={{ label: 'About labels', text: 'Tag conversations to find them later. The AI labels conversations when they go quiet, using the labels it may use and what each means.' }} />
         <ul className="divide-y border-t">
           {labels.length === 0 && <li className="px-4 py-3 text-[13px] text-muted-foreground">No labels yet.</li>}
           {labels.map((label) => (
@@ -405,7 +409,7 @@ export function NotificationSettings() {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader title="Browser notifications" description="Shown while a dashboard tab is open, even in the background. For alerts with the dashboard closed, connect Telegram (Live chat)." />
+        <CardHeader title="Browser notifications" tip={{ label: 'About browser notifications', text: 'Shown while a dashboard tab is open, even in the background. For alerts with the dashboard closed, connect Telegram (Live chat).' }} />
         <div className="space-y-3 border-t px-4 py-3">
           {permission === 'unsupported' && <p className="text-xs text-muted-foreground">This browser has no notifications.</p>}
           {permission === 'default' && (
@@ -428,7 +432,7 @@ export function NotificationSettings() {
         </div>
       </Card>
       <Card>
-        <CardHeader title="Sound" description="Browsers play sound only after you have clicked on the page once." />
+        <CardHeader title="Sound" tip={{ label: 'About sound', text: 'Browsers play sound only after you have clicked on the page once.' }} />
         <div className="space-y-3 border-t px-4 py-3">
           <Toggle checked={prefs.soundNewChat} onChange={(v) => void save({ soundNewChat: v })} label="A new live chat is waiting" />
           <Toggle checked={prefs.repeatUntilTaken} onChange={(v) => void save({ repeatUntilTaken: v })} label="Repeat it every 15 seconds until someone takes the chat" disabled={!prefs.soundNewChat} />
@@ -460,7 +464,7 @@ export function NotificationSettings() {
         </div>
       </Card>
       <Card>
-        <CardHeader title="Availability" description="Available: you get new live chats while a dashboard tab is open. Away: no alerts. The switch is also at the bottom of the menu." />
+        <CardHeader title="Availability" tip={{ label: 'About availability', text: 'Available: you get new live chats while a dashboard tab is open. Away: no alerts. The switch is also at the bottom of the menu.' }} />
         <div className="border-t px-4 py-3">
           <Toggle checked={prefs.available} onChange={(v) => void save({ available: v })} label="Available for live chats" />
         </div>

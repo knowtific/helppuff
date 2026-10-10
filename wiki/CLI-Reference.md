@@ -392,19 +392,53 @@ helppuff webhooks list --json
 ### `helppuff tools`
 
 ```
-helppuff tools list | show <name> | add <name> (--curl '…' | --url <https://…> [--method POST] [--header "Name: value"] [--body …] | --extract --field name="what it is") --description "…" [--param name="what it is"] [--pick a,b] [--before] [--after] [--timeout ms] | set <name> [the same flags, --no-before, --no-after] | test <name> [--arg name=value] [--prechat field=value] | enable <name> | disable <name> | remove <name>
+helppuff tools list | show <name> | add <name> (--curl '…' | --url <https://…> [--method POST] [--header "Name: value"] [--body …] | --extract --field name="what it is") --description "…" [--param name="what it is"] [--pick a,b] [--before] [--after [--when path=value,…]] [--timeout ms] | set <name> [the same flags, --no-before, --no-after] | test <name> [--arg name=value] [--prechat field=value] [--data tool.key=value] | enable <name> | disable <name> | remove <name>
 ```
 
-The site's own tools, the same as on the dashboard's Prompt page (stored on the Worker). An http tool calls your API: `{{args.x}}` in its URL, headers or body is filled in by the assistant, `{{prechat.email}}` from the pre-chat form, `{{data.other_tool.key}}` from another tool. `--before` runs it when a chat starts, `--after` when the conversation ends (with the transcript, summary, contact and all the data; an empty body sends all of it as JSON). An extract tool (`--extract`) saves what the visitor says, like an order number, as conversation attributes. Name a tool in the prompt as {{name}} to let the assistant use it, and {{name.key}} to put in what it returned. What tools return is kept on the conversation, shown in the dashboard and sent to webhooks. Credential headers (Authorization, X-Api-Key…) are stored encrypted and never read back; write `${NAME}` in a header to take the value from .env (a missing one answers needs_input). Up to 30 per site; https only.
+The site's own tools, the same as on the dashboard's Prompt page (stored on the Worker). An http tool calls your API: `{{args.x}}` in its URL, headers or body is filled in by the assistant, `{{prechat.email}}` from the pre-chat form, `{{data.other_tool.key}}` from another tool. `--before` runs it when a chat starts, `--after` when the conversation ends (with the transcript, summary, contact and all the data; an empty body sends all of it as JSON); `--when labels.leadQuality=hot` runs an after-chat tool only for those conversations (`--when lead.email`: only with an email; `--when none`: always). An extract tool (`--extract`) saves what the visitor says, like an order number, as conversation attributes. Name a tool in the prompt as {{name}} to let the assistant use it, and {{name.key}} to put in what it returned. What tools return is kept on the conversation, shown in the dashboard and sent to webhooks. Credential headers (Authorization, X-Api-Key…) are stored encrypted and never read back; write `${NAME}` in a header to take the value from .env (a missing one answers needs_input). Up to 30 per site; https only.
 
 ```bash
 helppuff tools add order_status --curl 'curl https://api.acme.com/orders/{{args.order_number}} -H "Authorization: Bearer ${ACME_API_KEY}"' --description 'Look up an order by its number' --param order_number='Like A-1042' --json
 helppuff tools add crm_lookup --url https://crm.acme.com/lookup --method POST --body '{"email":"{{prechat.email}}"}' --header 'X-Api-Key: ${CRM_KEY}' --before --description 'The customer in our CRM'
 helppuff tools add order_number --extract --field order_number='Like A-1042' --description 'Save the order number once the visitor gives it'
 helppuff tools test order_status --arg order_number=A-1042 --json
+helppuff tools test track_shipment --data order_lookup.carrier=shippo --data order_lookup.tracking_number=SHIPPO_TRANSIT
 ```
 
 Then reference the tool in prompt.md ({{order_status}}) and `helppuff deploy`, or edit the prompt in the dashboard. Tools apply to HelpPuff's assistant (any model); with a whole backend (Retell, your own API) only after-chat tools run.
+
+### `helppuff agent`
+
+```
+helppuff agent templates | export [file.json] | import <file.json|template> [--dry-run]
+```
+
+The agent file: the assistant's setup in one JSON file, the same as the dashboard's Settings → Import & export. It holds the prompt, the tools, and the behaviour and lead form settings (not the branding, the knowledge or the team). `export` writes the live setup; secret headers become `${NAME}` placeholders, listed in `needs`. `import` takes a file or a template's id, checks it, then applies it: settings, tools (matched by name: created or replaced) and the prompt as a new version. Each `${NAME}` comes from .env (a missing one answers needs_input), and prompt.md and helppuff.json are brought up to date. `--dry-run` shows what would change. `templates` lists the ready-made ones, each with its tutorial.
+
+```bash
+helppuff agent templates
+helppuff agent import order-tracking --dry-run
+helppuff agent import order-tracking --json
+helppuff agent export agent.json
+helppuff agent import agent.json
+```
+
+Keep agent.json in your project to share or restore a setup. Secrets are never in it: set them with `helppuff secret set NAME`, then import.
+
+### `helppuff identity`
+
+```
+helppuff identity [rotate]
+```
+
+The site's identity secret, the same as the dashboard's Settings → Lead form → Signed-in visitors. Your server signs a short JWT (HS256) for whoever is logged in (`sub` = your user id, plus any claims such as email or plan; `exp` at most a week ahead), and the page passes it: `HelpPuff.identify({ name, email, token })`. The Worker checks it when a chat starts: the claims become `{{user.*}}` for tools and the prompt, override the lead's email and name, and are kept on the conversation. A bad or expired token is ignored. `rotate` makes a new secret: tokens signed with the old one stop working at once.
+
+```bash
+helppuff identity
+helppuff identity rotate --json
+```
+
+From your own server, the API takes the user directly instead: POST /conversations with "user": { "id": … }.
 
 ### `helppuff keys`
 

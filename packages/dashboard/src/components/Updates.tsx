@@ -4,7 +4,7 @@ import { api } from '../lib/api';
 import { useData } from '../lib/utils';
 import { CopyBlock } from '../pages/Settings';
 import { WikiLink } from './Shell';
-import { Card, ErrorNote, Skeleton } from './ui';
+import { Card, ErrorNote, InfoTip, Skeleton } from './ui';
 
 /**
  * Settings → Updates. The Worker cannot update itself: a deploy needs the
@@ -75,9 +75,12 @@ export function Updates() {
           </div>
           {v.upgradeAvailable && (
             <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">
-                Run this in the folder you set the assistant up from (or ask your coding agent to). It shows what will change, keeps a restore point for the
-                database, and keeps your conversations, leads, settings and knowledge.
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                Run in your project folder
+                <InfoTip label="About upgrading">
+                  The folder you set the assistant up from (or ask your coding agent to). It shows what will change, keeps a restore point for the database, and
+                  keeps your conversations, leads, settings and knowledge.
+                </InfoTip>
               </p>
               <CopyBlock text={v.command} label="upgrade command" />
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">

@@ -22,6 +22,8 @@ import { settingsRoutes } from './settings.js';
 import { setupRoutes } from './setup.js';
 import { webhookRoutes } from './webhooks.js';
 import { toolRoutes } from './tools.js';
+import { agentRoutes } from './agent.js';
+import { identityRoutes } from './identity.js';
 import { callbackRoutes, callbackView } from './callbacks.js';
 import { attributesJson, closeCutoff, CONVERSATION_STATUSES, conversationExtras, inboxRoutes, labelsSql, mergeAttributes, parseJsonObject, parseLabels, statusFilter, statusSql, type ConversationStatus } from './inbox.js';
 import { liveRoutes } from './live.js';
@@ -35,8 +37,7 @@ import { emit } from '../webhooks/deliver.js';
 import { summarizeConversation, type AiRunner } from '../conversations/summary.js';
 import { summaryModel } from '../conversations/complete.js';
 export { extractJson } from '../conversations/summary.js';
-import { PROMPT_LIMIT, PROMPT_SQL, publishPrompt, readPromptState, type PromptCtx, type PromptVersionRow, type PublishResult } from './prompts.js';
-import type { KvStore } from '@helppuff/connector-types';
+import { PROMPT_LIMIT, PROMPT_SQL, promptCtx, promptField, publishPrompt, readPromptState, type PromptVersionRow, type PublishResult } from './prompts.js';
 
 /**
  * The dashboard API, under `/admin/api`. Everything but sign-in needs a
@@ -155,6 +156,8 @@ adminRoutes.get('/me', async (c) => {
         },
         /** Live chat is on and can run here (the Live inbox, notifications). */
         live: liveAvailable(ctx.env, site, id),
+        /** HelpPuff writes this backend's prompt: the Instructions and Prompt & tools pages apply. */
+        prompt: promptField(site.connector).option !== null,
       };
     }),
   );
@@ -385,7 +388,7 @@ async function loadConversation(d: D1Like, id: string, cutoff = 0) {
   // The salted IP hash the per-visitor limits count by is not for anyone to read.
   const { visitor: _visitor, attributes: _attributes, data: _data, ...shown } = conversation;
   return {
-    conversation: { ...shown, waiting_since: shown['status'] === 'live' ? (shown['waiting_since'] ?? null) : null, attributes: extras.attributes, data: extras.data } as Record<string, unknown>,
+    conversation: { ...shown, waiting_since: shown['status'] === 'live' ? (shown['waiting_since'] ?? null) : null, attributes: extras.attributes, data: extras.data, user: signedIn(shown['user']) } as Record<string, unknown>,
     lead: lead && leadOut(lead),
     callbacks: callbacks.results.map(callbackView),
     labels: extras.labels,
@@ -397,6 +400,12 @@ async function loadConversation(d: D1Like, id: string, cutoff = 0) {
 /** A lead row as answered: attributes parsed. */
 export function leadOut(row: Record<string, unknown>): Record<string, unknown> {
   return { ...row, attributes: parseJsonObject(row['attributes']) };
+}
+
+/** A conversation's signed-in visitor (the column is JSON), or null. */
+function signedIn(value: unknown): Record<string, unknown> | null {
+  const user = parseJsonObject(value);
+  return typeof user['id'] === 'string' ? user : null;
 }
 
 adminRoutes.get('/conversations/:id', async (c) => {
@@ -693,12 +702,6 @@ adminRoutes.get('/admins', async (c) => {
 
 // ------------------------------------------------------------ prompt versions
 
-function promptCtx(c: Context<HonoEnv>): PromptCtx {
-  const ctx = c.get('helppuff');
-  const kv = ctx.env['HELPPUFF_KV'] as KvStore | undefined;
-  if (!kv) throw new HelpPuffError('internal', { message: 'This deployment has no KV namespace.', detail: 'admin_no_kv' });
-  return { config: ctx.config, kv, now: () => ctx.platform.now() };
-}
 
 /** 409 carries the version that won, so the editor can say who moved first and reload. */
 function published(c: Context<HonoEnv>, result: PublishResult) {
@@ -812,6 +815,8 @@ adminRoutes.route('/', setupRoutes);
 adminRoutes.route('/', signInRoutes);
 adminRoutes.route('/', webhookRoutes);
 adminRoutes.route('/', toolRoutes);
+adminRoutes.route('/', agentRoutes);
+adminRoutes.route('/', identityRoutes);
 adminRoutes.route('/', callbackRoutes);
 adminRoutes.route('/', versionRoutes);
 adminRoutes.route('/', chatRoutes);

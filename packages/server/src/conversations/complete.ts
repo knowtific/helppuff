@@ -213,6 +213,11 @@ async function completedEvent(db: D1Like, id: string): Promise<Record<string, un
     attributes: parseJsonObject(row?.['attributes']),
     /** What the site's tools returned or saved, by tool name. */
     data: parseData(row?.['data']),
+    /** The signed-in visitor, verified (a signed identity, or the API's user); null when nobody signed in. */
+    user: (() => {
+      const user = parseData(row?.['user']);
+      return typeof user['id'] === 'string' ? user : null;
+    })(),
     assignedTo: row?.['assigned_to'] ?? null,
     lead: lead
       ? { name: lead['name'] ?? null, email: lead['email'] ?? null, phone: lead['phone'] ?? null, company: lead['company'] ?? null, status: lead['status'], source: lead['source'], fields, attributes: parseJsonObject(lead['attributes']) }

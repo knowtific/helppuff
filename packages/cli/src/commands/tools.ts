@@ -50,7 +50,7 @@ type Listed = { tools: Tool[]; assistant: boolean; prechat: { name: string; labe
 const USAGE =
   'Usage: helppuff tools list | show <name> | add <name> (--curl … | --url … | --extract --field name="…") --description "…" | set <name> … | test <name> [--arg k=v] | enable <name> | disable <name> | remove <name>';
 
-const FLAGS = ['curl', 'url', 'method', 'header', 'body', 'description', 'param', 'field', 'pick', 'before', 'after', 'extract', 'timeout', 'arg', 'prechat'];
+const FLAGS = ['curl', 'url', 'method', 'header', 'body', 'description', 'param', 'field', 'pick', 'before', 'after', 'extract', 'timeout', 'arg', 'prechat', 'data', 'when'];
 
 /** `name=value` pairs from a repeated flag. */
 function pairs(value: unknown, flag: string): [string, string][] {
@@ -98,6 +98,12 @@ function fromFlags(ctx: Ctx, current: Tool | null): { body: Record<string, unkno
   if (typeof f['body'] === 'string') body['body'] = f['body'];
   const description = str(f, 'description');
   if (description) body['description'] = description;
+  // --when labels.leadQuality=hot,warm (one of these), --when lead.email (has a value), --when none (always).
+  const when = str(f, 'when');
+  if (when) {
+    const at = when.indexOf('=');
+    body['when'] = when === 'none' ? null : at < 0 ? { path: when.trim() } : { path: when.slice(0, at).trim(), in: when.slice(at + 1).split(',').map((v) => v.trim()).filter(Boolean) };
+  }
   for (const raw of Array.isArray(f['header']) ? f['header'] : typeof f['header'] === 'string' ? [f['header']] : []) {
     const at = String(raw).indexOf(':');
     if (at < 1) throw new CliError('usage', '--header takes "Name: value".', { exitCode: EXIT.usage });
@@ -206,7 +212,16 @@ export async function toolsCommand(ctx: Ctx): Promise<number> {
     }
     case 'test': {
       const current = await find(need());
-      const sample = { args: Object.fromEntries(pairs(ctx.flags['arg'], 'arg')), prechat: Object.fromEntries(pairs(ctx.flags['prechat'], 'prechat')) };
+      // --data order_lookup.carrier=usps: what another tool returned, by tool name, for a tool that reads {{data.*}}.
+      const data: Record<string, unknown> = {};
+      for (const [path, value] of pairs(ctx.flags['data'], 'data')) {
+        const keys = path.split('.').filter(Boolean);
+        if (keys.length < 2) throw new CliError('usage', '--data takes tool.key=value, like --data order_lookup.carrier=usps.', { exitCode: EXIT.usage });
+        let at = data;
+        for (const key of keys.slice(0, -1)) at = (at[key] && typeof at[key] === 'object' ? at[key] : (at[key] = {})) as Record<string, unknown>;
+        at[keys.at(-1)!] = value;
+      }
+      const sample = { args: Object.fromEntries(pairs(ctx.flags['arg'], 'arg')), prechat: Object.fromEntries(pairs(ctx.flags['prechat'], 'prechat')), ...(Object.keys(data).length ? { data } : {}) };
       const result = await api.send<{ ok: boolean; status: number | null; ms: number; error: string | null; value: unknown; keys: string[] }>('POST', '/admin/api/tools/test', { id: current.id, sample });
       ctx.out.result(result, () => {
         if (result.ok) ctx.out.success(`HTTP ${result.status ?? '—'} in ${result.ms} ms. The chat keeps:`);

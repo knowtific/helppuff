@@ -2,7 +2,7 @@ import { Check, ChevronRight, Copy, Eye, EyeOff, Loader2, Plus, Send, ShieldChec
 import { useState } from 'react';
 import { api } from '../lib/api';
 import { cn, fmtRelative, useData } from '../lib/utils';
-import { Badge, Button, Card, Empty, ErrorNote, Input, Skeleton } from './ui';
+import { Badge, Button, Card, Empty, ErrorNote, InfoTip, Input, Skeleton } from './ui';
 
 /**
  * Settings → Webhooks: endpoints that receive what happens — chats, messages,
@@ -71,8 +71,10 @@ export function Webhooks() {
             <ShieldCheck className="size-4" aria-hidden />
           </span>
           <div className="min-w-0">
-            <h3 id="webhook-signing-title" className="text-[13px] font-medium">Verify webhook signatures</h3>
-            <p className="mt-0.5 text-xs text-muted-foreground">Confirm each delivery came from HelpPuff before processing it.</p>
+            <h3 id="webhook-signing-title" className="flex items-center gap-1.5 text-[13px] font-medium">
+              Verify webhook signatures
+              <InfoTip label="About signatures">Confirm each delivery came from HelpPuff before processing it.</InfoTip>
+            </h3>
           </div>
         </div>
         <div className="space-y-3 px-4 py-3.5 text-xs text-muted-foreground">

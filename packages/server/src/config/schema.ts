@@ -113,14 +113,14 @@ export type KnowledgeConfig = z.infer<typeof knowledgeConfigSchema>;
  */
 export const assistantConfigSchema = z
   .object({
-    goal: z.enum(['callbacks', 'answers', 'bookings']).default('callbacks').describe('What the assistant is for: `callbacks` (help, then get the team in touch), `answers`, or `bookings`.'),
+    goal: z.enum(['callbacks', 'answers', 'bookings']).default('callbacks').describe('What the assistant is for: `callbacks` (help, then get the team in touch), `answers`, or `bookings` (help, then send them to `bookingUrl`: a booking, sign-up or quote page).'),
     tone: z.enum(['friendly', 'professional', 'casual']).default('friendly').describe('How it sounds.'),
     length: z.enum(['short', 'detailed']).default('short').describe('`short`: a few sentences; `detailed`: complete answers with short lists.'),
     prices: z
       .enum(['share', 'quote'])
       .default('share')
       .describe('`share`: give prices exactly as the site and documents state them; `quote`: never give a price or estimate, offer a quote from the team instead.'),
-    bookingUrl: z.string().url().max(2000).optional().describe('Where visitors book, for the `bookings` goal.'),
+    bookingUrl: z.string().url().max(2000).optional().describe('The page the `bookings` goal sends visitors to: booking, sign-up or a quote form.'),
   })
   .strict();
 export type AssistantConfig = z.infer<typeof assistantConfigSchema>;

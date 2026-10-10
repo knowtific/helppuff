@@ -42,6 +42,19 @@ to run `npx wrangler login` (a browser sign-in) or store an API token with
 project folder the agent names. It never asks you to paste credentials into
 the chat.
 
+## Let your agent set it up with you
+
+You don't have to click through the dashboard's settings. Every setting has
+a command, so your agent can go through them with you: it reads what is
+there, explains it in plain words, asks only what changes the result, then
+applies it and shows you what changed. Ask it, in the project folder:
+
+> Go through my HelpPuff settings with me and set them up.
+
+Every page in **Settings** (and **Prompt & tools**, **Knowledge**) has an
+**Ask your AI agent** button with the request for that page to copy, for
+example "Help me write my HelpPuff prompt and set up its tools".
+
 ## The contract
 
 The shared instructions describe the workflow. Command details are also in

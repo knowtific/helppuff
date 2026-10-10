@@ -2,14 +2,14 @@ import { AlertTriangle, ArrowLeft, Briefcase, CalendarDays, ExternalLink, Loader
 import { useEffect, useRef, useState, type DragEvent, type FormEvent, type ReactNode } from 'react';
 import { PageHeader } from '../components/Shell';
 import { NotesPanel, SideSection } from '../components/inbox';
-import { Avatar, Badge, Button, Card, Empty, ErrorNote, Input, Segmented, Select, Skeleton, Textarea } from '../components/ui';
+import { Avatar, Badge, Button, Card, Empty, ErrorNote, InfoTip, Input, Segmented, Select, Skeleton, Textarea } from '../components/ui';
 import { api, isMember, type Job, type JobDetail, type JobEvent, type JobField, type JobList, type JobStage, type Me, type PipelineView, type Team } from '../lib/api';
 import { useLiveEvents } from '../lib/live';
 import { cn, fmtDateTime, fmtRelative, href, useData, useDebounced, usePersisted } from '../lib/utils';
 
 /**
  * Jobs: requests, quotes, projects or tickets on the site's pipeline. A
- * board (one column per open stage, won and lost as drop zones), a list, and
+ * board (one column per open stage, then won and lost as drop zones at the end), a list, and
  * a panel per job with its fields, details, updates, notes and history.
  */
 
@@ -148,19 +148,30 @@ function Board({ list, fields, onMove }: { list: JobList; fields: JobField[]; on
             </section>
           );
         })}
-      </div>
-      {/* Won and lost: outcomes, not columns (closed jobs are in the list). */}
-      <div className={cn('grid gap-3 border-t px-4 py-3 transition-opacity', closed.length > 2 ? 'grid-cols-3' : 'grid-cols-2', active ? 'opacity-100' : 'opacity-60')}>
-        {closed.map((stage) => (
-          <div
-            key={stage.id}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={drop(stage.id, null)}
-            className={cn('rounded-md border-2 border-dashed px-3 py-3 text-center text-[13px]', stage.kind === 'won' ? 'border-[#16a34a]/40 text-[#16a34a]' : 'border-[#dc2626]/40 text-[#dc2626]')}
-          >
-            {stage.kind === 'won' ? '✓' : '✗'} {stage.name} <span className="text-xs opacity-70">({stage.count})</span>
+        {/* The last steps: how a job ends. Drop zones with a count, not lists (closed jobs are in the List view). */}
+        {closed.length > 0 && (
+          <div className="flex w-56 shrink-0 flex-col gap-3">
+            {closed.map((stage) => (
+              <section
+                key={stage.id}
+                aria-label={stage.name}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={drop(stage.id, null)}
+                className={cn(
+                  'flex flex-1 flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed px-3 py-6 text-center transition-colors',
+                  stage.kind === 'won' ? 'border-[#16a34a]/40 text-[#16a34a]' : 'border-[#dc2626]/40 text-[#dc2626]',
+                  active && (stage.kind === 'won' ? 'bg-[#16a34a]/5' : 'bg-[#dc2626]/5'),
+                )}
+              >
+                <h2 className="text-[13px] font-medium">
+                  {stage.kind === 'won' ? '✓' : '✗'} {stage.name}
+                </h2>
+                <p className="text-xs tabular-nums opacity-80">{stage.count}</p>
+                {active && <p className="text-[11px] text-muted-foreground">Drop here</p>}
+              </section>
+            ))}
           </div>
-        ))}
+        )}
       </div>
     </div>
   );
@@ -302,8 +313,8 @@ export function NewJob({ fields, itemSingular, context, onClose, onCreated }: { 
               <Textarea rows={3} value={details} onChange={(e) => setDetails(e.target.value)} />
             </Labeled>
           )}
-          <Labeled label="Value (optional)">
-            <Input type="number" min={0} value={value} onChange={(e) => setValue(e.target.value)} />
+          <Labeled label="Value" htmlFor="new-job-value" tip={VALUE_TIP}>
+            <Input id="new-job-value" type="number" min={0} placeholder="Optional" value={value} onChange={(e) => setValue(e.target.value)} />
           </Labeled>
           {error && (
             <p role="alert" className="text-xs text-danger">
@@ -324,7 +335,23 @@ export function NewJob({ fields, itemSingular, context, onClose, onCreated }: { 
   );
 }
 
-function Labeled({ label, children, htmlFor }: { label: string; children: ReactNode; htmlFor?: string }) {
+const VALUE_TIP = 'What the job is worth to you in money, such as the quote amount. The board adds it up for each stage. Leave it empty if you don’t know yet.';
+
+function Labeled({ label, children, htmlFor, tip }: { label: string; children: ReactNode; htmlFor?: string; tip?: string }) {
+  // The (?) sits beside the label, not inside it, so its text never becomes part of the field's name.
+  if (tip && htmlFor) {
+    return (
+      <div className="space-y-1">
+        <div className="flex items-center gap-1">
+          <label htmlFor={htmlFor} className="text-xs font-medium">
+            {label}
+          </label>
+          <InfoTip label={`About ${label.toLowerCase()}`}>{tip}</InfoTip>
+        </div>
+        {children}
+      </div>
+    );
+  }
   return (
     <label className="block space-y-1" {...(htmlFor ? { htmlFor } : {})}>
       <span className="text-xs font-medium">{label}</span>
@@ -466,8 +493,8 @@ function JobPanel({ id, me, pipeline, team, onChanged }: { id: string; me: Me; p
                 )}
               </Select>
             </Labeled>
-            <Labeled label="Value">
-              <Input key={`v${data.valueCents}`} type="number" min={0} defaultValue={data.value ?? ''} onBlur={(e) => String(data.value ?? '') !== e.target.value && void patch({ value: e.target.value === '' ? null : Number(e.target.value) })} />
+            <Labeled label="Value" htmlFor="job-value" tip={VALUE_TIP}>
+              <Input id="job-value" key={`v${data.valueCents}`} type="number" min={0} defaultValue={data.value ?? ''} onBlur={(e) => String(data.value ?? '') !== e.target.value && void patch({ value: e.target.value === '' ? null : Number(e.target.value) })} />
             </Labeled>
             <Labeled label="Due">
               <Input key={`d${data.dueAt}`} type="date" defaultValue={data.dueAt ? new Date(data.dueAt).toISOString().slice(0, 10) : ''} onChange={(e) => void patch({ dueAt: e.target.value || null })} />

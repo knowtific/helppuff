@@ -54,7 +54,7 @@ export const TAGS: { name: string; description: string }[] = [
   { name: 'Jobs', description: 'Requests, quotes, projects or tickets on the site\'s pipeline: create them from your own forms and systems, move them through the stages, read their history.' },
   { name: 'Callbacks', description: 'Visitors who asked to be called back, as tasks.' },
   { name: 'Knowledge', description: 'What the assistant knows: the website it learned, uploaded files, hand-written knowledge and business details.' },
-  { name: 'Prompt', description: 'The business-specific instructions, versioned.' },
+  { name: 'Prompt', description: 'The business-specific instructions, versioned, and the agent file: the prompt, tools and behaviour settings as one file to export and import.' },
   { name: 'Tools', description: 'Your own APIs, called before, during and after a chat (`{{name}}` in the prompt), and extract tools that save what the assistant learns. What they return is kept on the conversation (`data`) and sent to webhooks.' },
   { name: 'Settings', description: 'The assistant, widget, lead form, limits and IP lists, as one object.' },
   { name: 'Webhooks', description: 'Endpoints that receive events as signed JSON.' },
@@ -114,6 +114,37 @@ const webhook = {
   lastAt: T,
   createdAt: T,
 };
+const agentFile = {
+  helppuff: 'agent',
+  version: 1,
+  name: 'Acme Plumbing assistant',
+  description: 'Exported from acme on 2025-10-09.',
+  prompt: 'If they ask about an order, ask for its number, save it with {{order_number}}, then look it up with {{order_status}}.',
+  settings: {
+    behaviour: { goal: 'callbacks', tone: 'friendly', length: 'short', prices: 'share' },
+    leads: { enabled: true, fields: [{ name: 'name', label: 'Name', type: 'text', required: true }] },
+  },
+  tools: [
+    { name: 'order_number', kind: 'extract', description: 'Save the order number once the visitor gives it.', enabled: true, fields: [{ name: 'order_number', description: 'The order number, like A-1042.', required: true }] },
+    {
+      name: 'order_status',
+      kind: 'http',
+      description: 'Look up an order by its number: status, items and delivery date.',
+      enabled: true,
+      method: 'GET',
+      url: 'https://api.acme.example/orders/{{args.order_number}}',
+      headers: [{ name: 'Authorization', value: '${ORDER_STATUS_AUTHORIZATION}', secret: true }],
+      parameters: [{ name: 'order_number', description: 'The order number, like A-1042.', required: true }],
+      pick: ['status', 'delivery.date'],
+      keys: ['status', 'delivery.date'],
+      timeoutMs: 5000,
+      before: false,
+      after: false,
+    },
+  ],
+  needs: [{ name: 'ORDER_STATUS_AUTHORIZATION', description: 'The whole Authorization header of the order_status tool' }],
+};
+
 const tool = {
   id: 'tool_8d7c6b5a',
   name: 'order_status',
@@ -132,6 +163,7 @@ const tool = {
   keys: ['status', 'delivery', 'delivery.date'],
   before: false,
   after: false,
+  when: null,
   enabled: true,
   lastStatus: 200,
   lastError: null,
@@ -234,7 +266,7 @@ export const ENDPOINTS: Endpoint[] = [
     response: {
       admin: { email: 'key:k7m3p9q2r4s8', owner: false, role: 'admin', name: 'Website backend', via: 'key' },
       key: { id: 'k7m3p9q2r4s8', name: 'Website backend', scopes: ['chat', 'leads:read'], site: 'acme', expiresAt: null },
-      sites: [{ id: 'acme', name: 'Acme Plumbing', accent: '#5B5BF7', avatar: null, embed: '<script src="https://helppuff.example.workers.dev/loader.js" data-site="acme" async></script>', connector: 'workers-ai', knowledge: true, website: 'https://acme.example', production: { turnstile: true, hostnames: ['acme.example', 'helppuff.example.workers.dev'], dailyCap: 500 }, live: true }],
+      sites: [{ id: 'acme', name: 'Acme Plumbing', accent: '#5B5BF7', avatar: null, embed: '<script src="https://helppuff.example.workers.dev/loader.js" data-site="acme" async></script>', connector: 'workers-ai', knowledge: true, website: 'https://acme.example', production: { turnstile: true, hostnames: ['acme.example', 'helppuff.example.workers.dev'], dailyCap: 500 }, live: true, prompt: true }],
       summaries: true,
     },
   },
@@ -250,6 +282,7 @@ export const ENDPOINTS: Endpoint[] = [
     fields: [
       { name: 'message', description: 'The visitor\'s first message (up to 4000 characters). Without one, the answer is the greeting, if any.' },
       { name: 'contact', description: 'What you know about the visitor: `name`, `email`, `phone` and any other fields (up to 20). Becomes, or joins by email, a lead.' },
+      { name: 'user', description: 'A signed-in visitor, as your server knows them: `id` (your user id) and any fields (`email`, `plan`, up to 20). Trusted, since the key is the proof: tools and the prompt read it as `{{user.*}}`, and its email and name become the lead\'s. From a browser, use a signed token instead (`HelpPuff.identify({ token })`).' },
       { name: 'context', description: '`pageUrl`, `pageTitle`, `referrer`, `locale`, `timezone`, `utm`: where the visitor is. The assistant may use it.' },
       { name: 'externalId', description: 'Your own id for this conversation or visitor (up to 128 characters), to find it again.' },
       { name: 'metadata', description: 'Up to 20 string values you want back later. Never shown to the assistant.' },
@@ -359,7 +392,7 @@ export const ENDPOINTS: Endpoint[] = [
     scope: 'conversations:read',
     tag: 'Conversations',
     summary: 'Get a conversation',
-    description: 'The conversation (with its `status`, who has it, custom `attributes`, and `data`: what the site\'s tools returned or saved, by tool name), its lead, callback requests, labels, the team\'s notes and every message both ways (a person\'s replies carry `author`).',
+    description: 'The conversation (with its `status`, who has it, custom `attributes`, `data`: what the site\'s tools returned or saved, by tool name, and `user`: the signed-in visitor, verified, or null), its lead, callback requests, labels, the team\'s notes and every message both ways (a person\'s replies carry `author`).',
     response: {
       conversation: {
         id: conversationId,
@@ -389,6 +422,7 @@ export const ENDPOINTS: Endpoint[] = [
         closed_at: null,
         attributes: { orderId: 'A-1042' },
         data: { order_status: { status: 'shipped', delivery: { date: '2026-10-12' } } },
+        user: { id: 'u_8812', email: 'ada@example.com', plan: 'pro' },
       },
       lead: leadRow,
       callbacks: [callback],
@@ -399,6 +433,7 @@ export const ENDPOINTS: Endpoint[] = [
         { id: `${conversationId}:m_mfx2k1`, role: 'agent', type: 'text', text: 'Usually $180–$250.', payload: {}, ts: T + 1, feedback: 1, author: null },
       ],
     },
+    nullable: ['user'],
   },
   {
     method: 'PATCH',
@@ -1132,6 +1167,19 @@ export const ENDPOINTS: Endpoint[] = [
   },
   {
     method: 'POST',
+    path: '/knowledge/crawl/retry',
+    scope: 'knowledge:write',
+    tag: 'Knowledge',
+    summary: 'Try failed pages again',
+    description:
+      'Crawls the pages that failed (or the given ones among them) again, in the background, without changing which pages are selected. Pages that failed for a passing reason are also retried by themselves after a crawl. `409` while a crawl is running.',
+    fields: [{ name: 'urls', description: 'Only these failed pages. Without it, every failed page.' }],
+    body: { urls: ['https://acme.example/industries'] },
+    status: 202,
+    response: { site: 'acme', runId: 'run_3', total: 1 },
+  },
+  {
+    method: 'POST',
     path: '/knowledge/runs/:id/cancel',
     scope: 'knowledge:write',
     tag: 'Knowledge',
@@ -1360,6 +1408,46 @@ export const ENDPOINTS: Endpoint[] = [
     body: { version: 2, baseVersion: 4 },
     response: { status: 'published', version: 5, hash: 'c3d4…' },
   },
+  {
+    method: 'GET',
+    path: '/agent/export',
+    scope: 'prompt:read',
+    tag: 'Prompt',
+    summary: 'Export the agent file',
+    description:
+      'The assistant\'s setup as one file, to keep in a project, share or import elsewhere: the prompt, the tools, and the behaviour and lead form settings. A tool\'s secret header is a placeholder (`${ORDER_STATUS_AUTHORIZATION}`), listed in `needs`; its value never leaves the Worker.',
+    query: [siteQuery],
+    response: agentFile,
+  },
+  {
+    method: 'POST',
+    path: '/agent/import',
+    scope: 'prompt:write',
+    tag: 'Prompt',
+    summary: 'Import an agent file',
+    description:
+      'Applies an agent file (from `GET /agent/export`, a template, or written by hand): its settings, its tools (matched by name: created or replaced) and its prompt, as a new version. Everything is checked before anything changes. With `dryRun`, nothing changes: the answer says what would, and which secrets are still needed. Importing a file with `settings` (not a dry run) needs the `settings:write` scope too.',
+    fields: [
+      { name: 'agent', description: 'The agent file: `{ "helppuff": "agent", "version": 1, name, prompt, settings, tools, needs }`.', required: true },
+      { name: 'secrets', description: 'A value for each `${NAME}` in the tools\' headers, as `{ "NAME": "value" }`. Stored encrypted, as a tool saved by hand. A tool that already has the header keeps its value when one is left out.' },
+      { name: 'dryRun', description: '`true`: change nothing, answer what would change.' },
+    ],
+    body: { agent: agentFile, secrets: { ORDER_STATUS_AUTHORIZATION: 'Bearer sk_live_…' }, dryRun: true },
+    response: {
+      site: 'acme',
+      dryRun: true,
+      ready: true,
+      name: 'Acme Plumbing assistant',
+      settings: ['behaviour', 'leads'],
+      tools: [
+        { name: 'order_number', action: 'create' },
+        { name: 'order_status', action: 'create' },
+      ],
+      prompt: { action: 'replace', version: 4 },
+      missingSecrets: [],
+    },
+    errors: [{ status: 400, code: 'bad_request', when: 'The file is not valid (`agent_invalid`), or a secret is missing (`agent_secrets_missing`).' }],
+  },
   // -------------------------------------------------------------------- tools
   {
     method: 'GET',
@@ -1394,6 +1482,7 @@ export const ENDPOINTS: Endpoint[] = [
       { name: 'timeoutMs', description: '1000 to 10000 (default 5000).' },
       { name: 'before', description: 'Run it when the chat starts, with the pre-chat form\'s answers.' },
       { name: 'after', description: 'Run it when the conversation ends, with the transcript, the summary, the lead and all the data.' },
+      { name: 'when', description: 'An after-chat tool runs only when this holds: `{ "path": "labels.leadQuality", "in": ["hot"] }` (a path in the conversation.completed data and the values it may have), or `{ "path": "lead.email" }` (has a value). `null` removes it.' },
     ],
     body: {
       name: 'order_status',
@@ -1668,7 +1757,7 @@ export const ENDPOINTS: Endpoint[] = [
     response: { items: [{ id: 'au_1', at: T, actor: 'key:k7m3p9q2r4s8', action: 'PATCH /leads/:id', target: leadId, site: 'acme', status: 200 }], next: null },
   },
   // ---------------------------------------------------- the dashboard's own
-  ...(['GET /prefs', 'PUT /prefs', 'POST /login', 'POST /logout', 'GET /login/options', 'POST /links', 'GET /setup', 'POST /setup', 'POST /login-link', 'GET /setup/state', 'POST /diagnostics/models'] as const).map((route) => {
+  ...(['GET /prefs', 'PUT /prefs', 'POST /login', 'POST /logout', 'GET /login/options', 'POST /links', 'GET /setup', 'POST /setup', 'POST /login-link', 'GET /setup/state', 'POST /diagnostics/models', 'GET /identity', 'POST /identity/rotate'] as const).map((route) => {
     const [method, path] = route.split(' ') as [Method, string];
     return { method, path, scope: null, tag: 'Dashboard', summary: 'The dashboard\'s own (not part of the public API)' } satisfies Endpoint;
   }),

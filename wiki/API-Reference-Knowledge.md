@@ -7,6 +7,7 @@ What the assistant knows: the website it learned, uploaded files, hand-written k
 - [[Knowledge base status|API-Reference-Knowledge#knowledge-base-status]]: `GET /knowledge/status`
 - [[Find the website pages|API-Reference-Knowledge#find-the-website-pages]]: `POST /knowledge/discover`
 - [[Learn the website|API-Reference-Knowledge#learn-the-website]]: `POST /knowledge/crawl`
+- [[Try failed pages again|API-Reference-Knowledge#try-failed-pages-again]]: `POST /knowledge/crawl/retry`
 - [[Cancel a crawl|API-Reference-Knowledge#cancel-a-crawl]]: `POST /knowledge/runs/:id/cancel`
 - [[List learned pages|API-Reference-Knowledge#list-learned-pages]]: `GET /knowledge/pages`
 - [[Chunks of a page|API-Reference-Knowledge#chunks-of-a-page]]: `GET /knowledge/pages/:id/chunks`
@@ -266,6 +267,71 @@ const data = (await response.json()) as LearnWebsiteResponse;
 ```
 ```ts [Type]
 type LearnWebsiteResponse = {
+  site: string;
+  runId: string;
+  total: number;
+};
+```
+<!-- /tabs -->
+
+## Try failed pages again
+
+`POST /knowledge/crawl/retry` · scope `knowledge:write`
+
+Crawls the pages that failed (or the given ones among them) again, in the background, without changing which pages are selected. Pages that failed for a passing reason are also retried by themselves after a crawl. `409` while a crawl is running.
+
+| Body field | Required | Description |
+| --- | --- | --- |
+| `urls` | no | Only these failed pages. Without it, every failed page. |
+
+**Request**
+
+<!-- tabs -->
+```bash [curl]
+curl -X POST "$HELPPUFF_URL/api/v1/knowledge/crawl/retry" \
+  -H "Authorization: Bearer $HELPPUFF_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "urls": [
+    "https://acme.example/industries"
+  ]
+}'
+```
+```ts [TypeScript]
+type TryFailedPagesAgainRequest = {
+  /** Only these failed pages. Without it, every failed page. */
+  urls?: string[];
+};
+
+const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/knowledge/crawl/retry`, {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${process.env.HELPPUFF_API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    urls: [
+      'https://acme.example/industries'
+    ]
+  } satisfies TryFailedPagesAgainRequest),
+});
+if (!response.ok) throw new Error(((await response.json()) as ApiError).error.message);
+const data = (await response.json()) as TryFailedPagesAgainResponse;
+```
+<!-- /tabs -->
+
+**Response** `202`
+
+<!-- tabs -->
+```json [Example]
+{
+  "site": "acme",
+  "runId": "run_3",
+  "total": 1
+}
+```
+```ts [Type]
+type TryFailedPagesAgainResponse = {
   site: string;
   runId: string;
   total: number;

@@ -1,24 +1,75 @@
-import { Check, Copy, Loader2, Trash2 } from 'lucide-react';
-import { useState } from 'react';
-import { PageHeader, settingsSections, type SettingsSection } from '../components/Shell';
+import { Check, Copy, Loader2, Sparkles, Trash2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { PageHeader, settingsSections, SettingsTabs, type SettingsSection } from '../components/Shell';
 import { Avatar, Badge, Button, Card, CardHeader, Input, Select, Skeleton } from '../components/ui';
 import { api, isMember, type Me, type Team as TeamList } from '../lib/api';
 import { LabelsSettings, LiveChatSettings, NotificationSettings } from '../components/LiveChat';
-import { cn, fmtRelative, href, useData } from '../lib/utils';
+import { cn, fmtRelative, useData } from '../lib/utils';
 import { SettingsForm } from '../components/SettingsForm';
 import { InstructionsForm } from '../components/InstructionsForm';
 import { FactsForm } from '../components/FactsForm';
 import { Webhooks } from '../components/Webhooks';
 import { ApiKeys } from '../components/ApiKeys';
+import { AgentFiles } from '../components/AgentFile';
+import { SignedInVisitors } from '../components/SignedIn';
 import { Updates } from '../components/Updates';
 import { JobsSettings } from '../components/JobsSettings';
 import { HomeScreenSettings } from '../components/HomeScreenSettings';
 
-export function CopyBlock({ text, label }: { text: string; label: string }) {
+/** What to ask a coding agent, per page: it reads the settings with the CLI, asks, then changes them. */
+const AGENT_TOPICS: Partial<Record<SettingsSection | 'prompt' | 'knowledge', string>> = {
+  prompt: 'Help me write my HelpPuff prompt and set up its tools. Read my website and the live prompt (helppuff prompt pull), ask me what visitors get wrong, what is quote-only, what is out of date on the site and which of my systems it should check, then publish it and test it with helppuff ask.',
+  knowledge: 'Check what my HelpPuff assistant has learned. Look at failed and missing pages and its business details, ask me what is missing or wrong, then fix it (re-crawl, upload documents, add answers) and test it with helppuff ask.',
+};
+
+export function agentRequest(topic: SettingsSection | 'prompt' | 'knowledge', label: string): string {
+  return (
+    AGENT_TOPICS[topic] ??
+    `Go through my HelpPuff “${label}” settings with me. Read what they are now with the helppuff CLI, explain them in plain words, ask me what to change, then apply it and show me what changed.`
+  );
+}
+
+/**
+ * Nothing here has to be set by hand: a coding agent (Claude Code, Codex,
+ * Cursor) in the project folder can go through it with the owner, through
+ * the same API. This button says so, with the words to ask it.
+ */
+export function AskAgent({ request }: { request: string }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent | KeyboardEvent) => {
+      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', close);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', close);
+    };
+  }, [open]);
+  return (
+    <div ref={box} className="relative">
+      <Button variant="outline" size="sm" onClick={() => setOpen(!open)} aria-expanded={open} aria-haspopup="dialog">
+        <Sparkles /> Ask your AI agent
+      </Button>
+      {open && (
+        <div role="dialog" aria-label="Set this up with your AI agent" className="absolute top-full right-0 z-30 mt-1.5 w-80 space-y-2 rounded-lg border bg-card p-3 shadow-lg">
+          <p className="text-[13px] font-medium">No need to do this by hand</p>
+          <p className="text-xs text-muted-foreground">Ask Claude Code, Codex or Cursor in your project folder. It goes through it with you and changes it for you:</p>
+          <CopyBlock text={request} label="request" wrap />
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function CopyBlock({ text, label, wrap = false }: { text: string; label: string; wrap?: boolean }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="flex items-start gap-2 rounded-md border bg-subtle p-2 pl-3">
-      <code className="min-w-0 flex-1 overflow-x-auto whitespace-pre py-1 text-xs scroll-thin">{text}</code>
+      <code className={cn('min-w-0 flex-1 py-1 text-xs', wrap ? 'whitespace-pre-wrap' : 'overflow-x-auto whitespace-pre scroll-thin')}>{text}</code>
       <Button
         variant="ghost"
         size="icon"
@@ -43,6 +94,7 @@ const DESCRIPTIONS: Record<SettingsSection, string> = {
   appearance: 'Taken from your website. Change it if you like.',
   leads: 'A short form before the chat: every conversation becomes a lead, and the assistant knows who it’s talking to.',
   instructions: 'How it talks and what it’s for.',
+  agent: 'The whole setup in one file: start from a tutorial’s template, import a file, or export this one to keep or share.',
   business: 'Read from your website. The assistant always has these; your changes are never overwritten.',
   live: 'Let visitors talk to a person on your team, from the dashboard or Telegram.',
   labels: 'Tag conversations, by hand or by the AI, and filter by them.',
@@ -61,6 +113,7 @@ const HELP: Record<SettingsSection, string> = {
   appearance: 'Widget#customising',
   leads: 'Leads#the-form-in-helppuffjson',
   instructions: 'Prompts-and-Instructions',
+  agent: 'Agent-Files',
   business: 'Knowledge-Base#business-details',
   live: 'Live-Chat',
   labels: 'Dashboard#labels',
@@ -80,24 +133,19 @@ export function Settings({ me, section }: { me: Me; section: string | undefined 
   const current = sections.find((s) => s.id === section) ?? sections[0]!;
   return (
     <>
-      <PageHeader title={current.label} description={DESCRIPTIONS[current.id]} help={HELP[current.id]} />
-      <nav className="flex gap-1 overflow-x-auto border-b px-4 py-2 scroll-thin md:hidden" aria-label="Settings">
-        {sections.map((s) => (
-          <a
-            key={s.id}
-            href={href({ page: 'settings', id: s.id })}
-            aria-current={s.id === current.id ? 'page' : undefined}
-            className={cn('shrink-0 rounded-md px-2.5 py-1 text-xs', s.id === current.id ? 'bg-muted font-medium' : 'text-muted-foreground')}
-          >
-            {s.label}
-          </a>
-        ))}
-      </nav>
+      <PageHeader title={current.label} description={DESCRIPTIONS[current.id]} help={HELP[current.id]} actions={!isMember(me) && current.id !== 'notifications' && <AskAgent request={agentRequest(current.id, current.label)} />} />
+      <SettingsTabs me={me} route={{ page: 'settings', id: current.id }} />
       <div className={cn('p-4 md:p-6', current.id === 'home' ? 'max-w-6xl' : 'max-w-3xl')}>
         {(current.id === 'chat' || current.id === 'appearance' || current.id === 'leads' || current.id === 'advanced') && (
           <Card>
             <SettingsForm key={current.id} knowledge={Boolean(site?.knowledge)} section={current.id} />
           </Card>
+        )}
+        {current.id === 'agent' && site && <AgentFiles site={site.id} />}
+        {current.id === 'leads' && site && (
+          <div className="mt-4">
+            <SignedInVisitors site={site.id} />
+          </div>
         )}
         {current.id === 'instructions' && (
           <Card>
@@ -151,7 +199,7 @@ function Team({ me }: { me: Me }) {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader title="Team" description={`People who can sign in to this dashboard. ${ROLE_HINT}`} />
+        <CardHeader title="Team" tip={{ label: 'About the team', text: `People who can sign in to this dashboard. ${ROLE_HINT}` }} />
         <ul className="divide-y border-t">
           {!data && <Skeleton className="m-4 h-8" />}
           {data?.owner && (
@@ -243,7 +291,7 @@ function Team({ me }: { me: Me }) {
       </Card>
 
       <Card>
-        <CardHeader title="Security" description="Keys live only in your project’s .env and as Worker secrets on your Cloudflare account." />
+        <CardHeader title="Security" tip={{ label: 'About security', text: 'Keys live only in your project’s .env and as Worker secrets on your Cloudflare account.' }} />
         <div className="space-y-2 border-t px-4 py-3 text-[13px]">
           <p>
             <span className="font-medium">Locked out?</span> <span className="text-muted-foreground">A one-time sign-in link, from the folder you set up in:</span>

@@ -12,7 +12,7 @@ type Check = { test: RegExp; why: string; workersAiOnly?: boolean };
 
 const CHECKS: Check[] = [
   { test: /^\s*you are\b.*\b(assistant|chatbot|bot|agent)\b/i, why: 'Who the assistant is comes from Settings (the assistant and business names).' },
-  { test: /\b(main job|your (main )?goal|your job is)\b/i, why: 'The goal is a setting: Instructions → Main goal.' },
+  { test: /\b(main job|your (main )?goal|your job is)\b/i, why: 'The goal is a setting: Instructions → When a visitor is interested.' },
   { test: /\b(be|sound|stay|keep it) (warm|friendly|professional|casual|polite|courteous|relaxed)\b/i, why: 'Tone is a setting: Instructions → Tone.' },
   {
     test: /\b(keep (answers|replies|it) (short|brief)|be (warm, )?(clear and )?brief|(one|two|three|four|\d+) (to (two|three|four|five|\d+) )?(short )?(sentences|paragraphs))\b/i,
