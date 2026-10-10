@@ -68,9 +68,12 @@ prompt for those).
 
 Your own APIs, and extract tools, appear in the prompt by name: `{{order_status}}`
 lets the assistant call that tool, and `{{crm_lookup.tier}}` puts in what it
-returned. The **Prompt & tools** page (Settings → Prompt & tools) has them in three sections, top to bottom: tools
-called before the chat, the prompt, and tools called after it. Type `{{` in
-the prompt for a list of everything you can use. See [[Tools]].
+returned. The **Prompt & tools** page (Settings → Prompt & tools) shows a chat as a
+diagram, left to right: tools called before the chat, the **Prompt** (with
+**Knowledge** above it and **Webhooks** below), then the summary and labels
+and the tools called after it. Click **Prompt** to edit it, add tools to it
+and see its history; **+ Add** on a step adds a tool there. Type `{{` in the
+prompt for a list of everything you can use. See [[Tools]].
 
 ### Changes during a conversation
 

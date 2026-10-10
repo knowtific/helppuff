@@ -260,7 +260,7 @@ export function Shell({ me, route, onLogout, children }: { me: Me; route: Route;
 
   return (
     <div className="flex h-full">
-      <aside className="hidden w-56 shrink-0 flex-col border-r bg-sidebar md:flex">
+      <aside className="hidden w-60 shrink-0 flex-col border-r bg-sidebar md:flex">
         <div className="flex h-12 items-center gap-2 px-3">
           {site?.avatar ? (
             <img src={site.avatar} alt="" className="size-6 rounded-md object-cover" />
@@ -297,11 +297,12 @@ export function Shell({ me, route, onLogout, children }: { me: Me; route: Route;
                   <div id="settings-menu" className="mt-0.5 ml-[17px] flex flex-col gap-2 border-l pl-2">
                     {menu.map((group) => (
                       <div key={group.label}>
-                        <p className="flex items-center gap-1.5 px-2 pt-1 pb-0.5 text-[11px] font-medium text-muted-foreground [&_svg]:size-3" aria-hidden>
+                        <p className="flex items-center gap-1.5 px-2 pt-1 pb-0.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase [&_svg]:size-3" aria-hidden>
                           {group.icon}
                           {group.label}
                         </p>
-                        <ul className="flex flex-col gap-0.5" aria-label={group.label}>
+                        {/* Indented under their group's label, so it reads as a category. */}
+                        <ul className="flex flex-col gap-0.5 pl-3" aria-label={group.label}>
                           {group.items.map((link) => (
                             <li key={link.key}>
                               <a

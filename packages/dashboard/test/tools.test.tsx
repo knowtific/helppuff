@@ -3,12 +3,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ToolData } from '../src/components/inbox';
 import { Prompt } from '../src/pages/Prompt';
 import type { PromptView, ToolsList, ToolView } from '../src/lib/api';
-import { button, byText, click, fakeApi, flush, me, mount, select, type, unmount } from './helpers';
+import { button, byText, click, fakeApi, flush, me, mount, type, unmount } from './helpers';
 
 /**
- * The Prompt page's tools: the three sections and the library, a tool made
- * from a pasted curl, a tool added to "Before the chat", `{{` completing to a
- * tool in the prompt, and a typo flagged. And a conversation's tool data.
+ * The Prompt page's diagram and tools: the steps of a chat, a tool made from
+ * a pasted curl, a tool added to "Before the chat" from "+ Add", the prompt's
+ * modal with `{{` completing to a tool and a typo flagged. And a
+ * conversation's tool data.
  */
 
 const PROMPT: PromptView = {
@@ -50,6 +51,12 @@ const tool = (extra: Partial<ToolView>): ToolView => ({
 
 const list = (tools: ToolView[]): ToolsList => ({ tools, assistant: true, prechat: [{ name: 'email', label: 'Email' }], limits: { tools: 30, timeoutMs: { default: 5000, min: 1000, max: 10000 } } });
 
+/** "+ Add" on a step: the menu of your tools and "New tool". */
+const openMenu = (page: Element, label: string) => click(page.querySelector(`button[aria-label="${label}"]`));
+/** The prompt's modal, opened from its node. */
+const openPrompt = (page: Element) => click(button(page, /^Prompt/));
+const lastDialog = (page: Element) => [...page.querySelectorAll('[role="dialog"]')].at(-1)!;
+
 afterEach(async () => {
   await unmount();
   vi.unstubAllGlobals();
@@ -61,18 +68,23 @@ const key = async (element: Element, name: string) =>
   });
 
 describe('the Prompt page with tools', () => {
-  it('shows before, prompt and after, with the library on the right', async () => {
+  it('shows a chat as steps: before, the prompt with knowledge and webhooks, then the summary and after', async () => {
     fakeApi({ 'GET /prompt': PROMPT, 'GET /tools': list([tool({ before: true })]) });
     const page = await mount(<Prompt me={me('owner')} />);
-    const headings = [...page.querySelectorAll('h2, h3')].map((h) => h.textContent?.trim());
-    expect(headings).toEqual(expect.arrayContaining([expect.stringContaining('Before the chat'), expect.stringContaining('Prompt'), expect.stringContaining('After the chat'), expect.stringContaining('Tools')]));
-    expect(byText(page, /sends email/)).toBeTruthy();
-    expect(byText(page, 'In prompt')).toBeTruthy();
+    const headings = [...page.querySelectorAll('h2')].map((h) => h.textContent?.trim());
+    expect(headings).toEqual(expect.arrayContaining([expect.stringContaining('Before the chat'), expect.stringContaining('Summary & labels'), expect.stringContaining('After the chat')]));
+    expect(byText(page, 'Chat starts')).toBeTruthy();
+    expect(byText(page, 'Chat ends')).toBeTruthy();
+    expect(button(page, /^Prompt/)?.textContent).toMatch(/v2.*1 tool · published/);
+    expect(byText(page, 'crm_lookup')).toBeTruthy();
+    // No tools sidebar: each step adds its own.
+    expect(page.querySelector('button[aria-label="Add a tool to after the chat"]')).toBeTruthy();
   });
 
   it('makes a tool from a pasted curl, with its key kept secret', async () => {
     const calls = fakeApi({ 'GET /prompt': PROMPT, 'GET /tools': list([]), 'POST /tools': (c: { body: unknown }) => tool({ ...(c.body as object), id: 'tool_2' }) });
     const page = await mount(<Prompt me={me('owner')} />);
+    await openMenu(page, 'Add a tool to before the chat');
     await click(button(page, 'New tool'));
     const dialog = page.querySelector('[role="dialog"]')!;
     await type(dialog.querySelector('#tool-curl'), `curl https://api.acme.test/v1/orders/{{args.order_number}} -H 'Authorization: Bearer sk_9'`);
@@ -97,16 +109,18 @@ describe('the Prompt page with tools', () => {
     expect(page.querySelector('[role="dialog"]')).toBeNull();
   });
 
-  it('adds a tool to Before the chat from the library', async () => {
+  it('adds one of your tools to Before the chat from its menu', async () => {
     const calls = fakeApi({ 'GET /prompt': PROMPT, 'GET /tools': list([tool({})]), 'PATCH /tools/tool_1': tool({ before: true }) });
     const page = await mount(<Prompt me={me('owner')} />);
-    await select(page.querySelector('[aria-label="Add a tool to before the chat"]'), 'tool_1');
+    await openMenu(page, 'Add a tool to before the chat');
+    await click(page.querySelector('[role="menuitem"]'));
     expect(calls.find((c) => c.method === 'PATCH')).toMatchObject({ path: '/tools/tool_1', body: { site: 'acme', before: true } });
   });
 
   it('completes {{ to a tool and what it returns, and flags a name that is not one', async () => {
     fakeApi({ 'GET /prompt': PROMPT, 'GET /tools': list([tool({}), tool({ id: 'tool_2', name: 'order_status', method: 'GET', keys: ['status'] })]) });
     const page = await mount(<Prompt me={me('owner')} />);
+    await openPrompt(page);
     const editor = page.querySelector<HTMLTextAreaElement>('textarea[aria-label="System prompt"]')!;
     await type(editor, `${PROMPT.text} Orders: {{ord`);
     await flush();
@@ -127,8 +141,11 @@ describe('the tool dialog', () => {
   it('makes an extract tool that saves what the visitor says', async () => {
     const calls = fakeApi({ 'GET /prompt': PROMPT, 'GET /tools': list([]), 'POST /tools': (c: { body: unknown }) => tool({ ...(c.body as object), id: 'tool_3' }) });
     const page = await mount(<Prompt me={me('owner')} />);
+    // From the prompt: a tool the assistant uses during the chat, in no step.
+    await openPrompt(page);
+    await openMenu(page, 'Add a tool to the prompt');
     await click(button(page, 'New tool'));
-    const dialog = page.querySelector('[role="dialog"]')!;
+    const dialog = lastDialog(page);
     await click(button(dialog, 'Save what the visitor says'));
     expect(dialog.querySelector('#tool-url')).toBeNull();
     await type(dialog.querySelector('#tool-name'), 'order_number');
@@ -149,7 +166,7 @@ describe('the tool dialog', () => {
   });
 
   it('edits a tool without sending its stored key, and deletes one after asking', async () => {
-    const calls = fakeApi({ 'GET /prompt': PROMPT, 'GET /tools': list([tool({})]), 'PATCH /tools/tool_1': tool({}), 'DELETE /tools/tool_1': { deleted: true } });
+    const calls = fakeApi({ 'GET /prompt': PROMPT, 'GET /tools': list([tool({ before: true })]), 'PATCH /tools/tool_1': tool({ before: true }), 'DELETE /tools/tool_1': { deleted: true } });
     const page = await mount(<Prompt me={me('owner')} />);
     await click(button(page, /^crm_lookup/));
     let dialog = page.querySelector('[role="dialog"]')!;

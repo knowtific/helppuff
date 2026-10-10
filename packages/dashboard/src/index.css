@@ -32,23 +32,24 @@
 }
 
 .dark {
-  --background: #09090b;
-  --foreground: #fafafa;
-  --muted: #1c1c1f;
+  /* A soft dark grey, not black: easier on the eyes, and cards lift off the page. */
+  --background: #1c1d21;
+  --foreground: #f4f4f5;
+  --muted: #2a2b30;
   --muted-foreground: #a1a1aa;
-  --subtle: #111113;
-  --border: #27272a;
-  --ring: #52525b;
-  --primary: #fafafa;
+  --subtle: #222327;
+  --border: #34363c;
+  --ring: #5b5e66;
+  --primary: #f4f4f5;
   --primary-foreground: #18181b;
-  --card: #0f0f11;
-  --popover: #18181b;
-  --sidebar: #0c0c0e;
+  --card: #232428;
+  --popover: #26272b;
+  --sidebar: #18191c;
   --danger: #f87171;
-  /* Stepped for the dark surface, validated against #18181b. */
+  /* Stepped for the dark surface. */
   --series-1: #3987e5;
   --series-2: #d95926;
-  --grid: #1f1f23;
+  --grid: #2a2b30;
   --added: #14532d66;
   --removed: #7f1d1d66;
   color-scheme: dark;

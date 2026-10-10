@@ -29,8 +29,10 @@ whole conversation itself (Retell, or your own API), only after-chat tools run.
 
 ## Add a tool
 
-On the **Prompt & tools** page (Settings → Prompt & tools), use **+ New** in the **Tools** panel on the right, or
-**New tool** in a section. Then either:
+On the **Prompt & tools** page (Settings → Prompt & tools), use **+ Add** on
+**Before the chat** or **After the chat**, or **+ Add** in the prompt (click
+**Prompt** in the diagram) for a tool the assistant calls during the chat;
+each menu lists the tools you already have, then **New tool**. Then either:
 
 - **Paste a curl** copied from your API's docs or from Postman
   (Code → cURL). The method, URL, headers and body are filled in.

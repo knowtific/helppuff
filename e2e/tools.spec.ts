@@ -62,9 +62,11 @@ test('a tool made from a curl answers a visitor’s question about their order',
   await expect(page.getByRole('heading', { name: /Before the chat/ })).toBeVisible();
   await expect(page.getByRole('heading', { name: /After the chat/ })).toBeVisible();
 
-  // Paste a curl: method, URL and the key (kept secret) are read from it. (+ New in the library: a tool for the chat.)
-  await page.getByRole('button', { name: 'New tool' }).last().click();
-  const dialog = page.getByRole('dialog');
+  // The prompt opens from its step; "+ Add" there makes a tool for the chat. Paste a curl: method, URL and the key (kept secret) are read from it.
+  await page.getByRole('button', { name: /^Prompt/ }).click();
+  await page.getByRole('button', { name: 'Add a tool to the prompt' }).click();
+  await page.getByRole('menuitem', { name: 'New tool' }).click();
+  const dialog = page.getByRole('dialog').last();
   await dialog.getByLabel('curl command').fill(`curl https://tools.e2e.test/orders/{{args.order_number}} -H 'Authorization: Bearer e2e-tool-key'`);
   await dialog.getByRole('button', { name: /Read the curl/ }).click();
   await expect(dialog.getByLabel('URL')).toHaveValue('https://tools.e2e.test/orders/{{args.order_number}}');
@@ -80,22 +82,23 @@ test('a tool made from a curl answers a visitor’s question about their order',
   await dialog.getByLabel('status', { exact: true }).check();
   await dialog.getByLabel('eta', { exact: true }).check();
   await dialog.getByRole('button', { name: 'Add tool' }).click();
-  await expect(dialog).toBeHidden();
+  await expect(page.getByRole('dialog')).toHaveCount(1);
   await expect(page.getByRole('button', { name: /order_status/ }).first()).toBeVisible();
 
   // The key is stored, never shown again.
   const listed = (await admin(request, 'GET', '/tools?site=tools')).body['tools'] as Json[];
   expect(listed[0]).toMatchObject({ name: 'order_status', pick: ['status', 'eta'], headers: [{ name: 'Authorization', value: '', secret: true, set: true }] });
 
-  // Name it in the prompt with the autocomplete, and publish.
+  // It went into the prompt as a sentence; reword it with the autocomplete, and publish.
   const editor = page.getByRole('combobox', { name: 'System prompt' });
-  await editor.click();
+  await expect(editor).toHaveValue('You help Acme Plumbing.\nUse {{order_status}} when needed.');
+  await editor.fill('You help Acme Plumbing.');
   await editor.press('End');
   await editor.pressSequentially(' When someone asks about an order, look it up with {{ord');
   await expect(page.getByRole('listbox', { name: 'Values you can use' }).getByRole('option').first()).toContainText('order_status');
   await editor.press('Enter');
   await expect(editor).toHaveValue('You help Acme Plumbing. When someone asks about an order, look it up with {{order_status}}');
-  await page.getByRole('button', { name: 'Publish' }).click();
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('Published as version');
 
   // A visitor asks; the model calls the tool; the Worker calls the API with the stored key.

@@ -134,7 +134,7 @@ agent goes through that page with you and changes it through the same API
 | **Appearance** | Colour (taken from your site), position, the button's icon |
 | **Lead form** | The form before the chat: on/off, its fields, which are required, your own extra fields |
 | **Instructions** | What to do when a visitor is interested, tone, answer length and prices: settings HelpPuff adds around the prompt |
-| **Prompt & tools** | Your prompt with its version history and everything HelpPuff adds, between the [[tools|Tools]] called before and after the chat, with the tool library on the right. See [[Prompt and instructions|Prompts-and-Instructions]] |
+| **Prompt & tools** | A chat as a diagram: [[tools|Tools]] before it, the prompt (click it to edit, add tools and see its history and everything HelpPuff adds) with Knowledge above and Webhooks below, then the summary and labels and the tools after it. See [[Prompt and instructions|Prompts-and-Instructions]] |
 | **Knowledge** | What it has learned; see [Knowledge](#knowledge) above |
 | **Business details** | Phone, email, address, hours, service areas: read from your site, yours to correct (a crawl never overwrites your changes) |
 | **Live chat** | Let visitors talk to a person; how long they wait before the callback form; when conversations close; [[Telegram]]. See [[Live chat|Live-Chat]] |

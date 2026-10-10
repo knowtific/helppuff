@@ -44,6 +44,13 @@ never needs you to change anything. Upgrade with
   (?) beside its title (it opens on hover, focus or a tap, with a Learn more
   link) instead of a grey sentence under each one; empty states are a word
   and their button.
+- **Prompt & tools is a diagram** of what happens around a chat: tools
+  before it, the prompt (Knowledge above, Webhooks below), then the summary
+  and labels and tools after it. The prompt opens in a window with its
+  tools and history; **+ Add** on a step offers your tools or a new one.
+  No more tools sidebar.
+- **Dark mode is a soft dark grey** instead of near-black, and the Settings
+  menu indents each group's pages under its label.
 - **Knowledge moved into Settings**, and the Settings menu has four groups:
   Assistant, Widget, Team and System.
 - **Ask your AI agent** on every settings page: a request to copy into

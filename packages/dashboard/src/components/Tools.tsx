@@ -1,84 +1,21 @@
-import { ArrowDownToLine, ArrowUpFromLine, Braces, Check, KeyRound, Loader2, Play, Plus, Terminal, Trash2, Wrench, X } from 'lucide-react';
+import { Check, Loader2, Play, Plus, Terminal, Trash2, X } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { parseCurl, promptToolRefs, toolArgs, TOOL_METHODS, TOOL_NAME, isSecretHeader } from '@helppuff/protocol/tools';
 import { api, type ToolHeaderView, type ToolParamView, type ToolsList, type ToolTestResult, type ToolView } from '../lib/api';
-import { cn, fmtRelative } from '../lib/utils';
-import { Badge, Button, Card, CardHeader, InfoTip, Input, Segmented, Select, Textarea } from './ui';
+import { cn } from '../lib/utils';
+import { Button, Card, InfoTip, Input, Segmented, Select, Textarea } from './ui';
 
 /**
- * The Prompt page's tools: the library (right), the dialog that makes one
- * (paste a curl, or fill it in), the "Before the chat" and "After the chat"
- * sections, and the prompt editor's `{{` autocomplete. The same API as
+ * The Prompt page's tools: the dialog that makes one (paste a curl, or fill
+ * it in) and the prompt editor's `{{` autocomplete. The diagram around them
+ * (before and after the chat) is the Prompt page's. The same API as
  * `helppuff tools`.
  */
 
 export type Section = 'before' | 'after';
 
-// ----------------------------------------------------------------- library
-
-export function ToolLibrary({
-  list,
-  prompt,
-  onOpen,
-  onNew,
-}: {
-  list: ToolsList;
-  prompt: string;
-  onOpen: (tool: ToolView) => void;
-  onNew: () => void;
-}) {
-  const named = new Set(promptToolRefs(prompt).map((r) => r.name));
-  return (
-    <Card>
-      <CardHeader
-        title={
-          <span className="flex items-center gap-2">
-            <Wrench className="size-3.5 text-muted-foreground" /> Tools
-          </span>
-        }
-        tip={{
-          label: 'About tools',
-          align: 'end',
-          text: 'Your own APIs the assistant can call (paste a curl), and extract tools that save what the visitor says, like an order number. Use them before, during or after a chat.',
-        }}
-        action={
-          <Button size="sm" variant="outline" onClick={onNew} disabled={list.tools.length >= list.limits.tools} aria-label="New tool">
-            <Plus /> New
-          </Button>
-        }
-      />
-      {list.tools.length === 0 ? (
-        <p className="px-4 pb-4 text-[13px] text-muted-foreground">No tools yet.</p>
-      ) : (
-        <ul className="border-t">
-          {list.tools.map((tool) => (
-            <li key={tool.id}>
-              <button onClick={() => onOpen(tool)} className="flex w-full items-start gap-2.5 border-b px-4 py-2.5 text-left transition-colors last:border-b-0 hover:bg-muted/60">
-                <span className="mt-0.5 text-muted-foreground" aria-hidden>
-                  {tool.kind === 'extract' ? <KeyRound className="size-3.5" /> : <Braces className="size-3.5" />}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-1.5 font-mono text-[12.5px]">
-                    <span className={cn('truncate', !tool.enabled && 'text-muted-foreground line-through')}>{tool.name}</span>
-                    {tool.lastStatus !== null && tool.lastStatus >= 400 && <span className="size-1.5 shrink-0 rounded-full bg-danger" title={`Last call: ${tool.lastStatus}`} />}
-                  </span>
-                  <span className="block truncate text-xs text-muted-foreground">{tool.kind === 'extract' ? `Saves ${(tool.fields ?? []).map((f) => f.name).join(', ')}` : `${tool.method} ${hostOf(tool.url)}`}</span>
-                  <span className="mt-1 flex flex-wrap gap-1">
-                    {tool.before && <Badge>Before</Badge>}
-                    {named.has(tool.name) && <Badge>In prompt</Badge>}
-                    {tool.after && <Badge>After</Badge>}
-                  </span>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Card>
-  );
-}
-
-const hostOf = (url: string | undefined) => {
+/** A tool's host, for a one-line description of where it calls. */
+export const hostOf = (url: string | undefined) => {
   try {
     return new URL(String(url).replace(/\{\{[^}]*\}\}/g, 'x')).host;
   } catch {
@@ -86,120 +23,6 @@ const hostOf = (url: string | undefined) => {
   }
 };
 
-// ----------------------------------------------------------------- sections
-
-const SECTION_COPY: Record<Section, { title: string; number: number; icon: ReactNode; tip: string }> = {
-  before: {
-    number: 1,
-    title: 'Before the chat',
-    icon: <ArrowDownToLine className="size-3.5 text-muted-foreground" />,
-    tip: 'Called when a chat starts, with the pre-chat form’s answers, so the first answer already knows what they returned. For example: look the visitor up in your CRM by their email.',
-  },
-  after: {
-    number: 3,
-    title: 'After the chat',
-    icon: <ArrowUpFromLine className="size-3.5 text-muted-foreground" />,
-    tip: 'Called five quiet minutes after the last message, with the transcript, summary, contact and every tool’s data. For example: send each finished chat to your CRM or a sheet.',
-  },
-};
-
-export function RunSection({
-  section,
-  list,
-  onOpen,
-  onNew,
-  onChange,
-}: {
-  section: Section;
-  list: ToolsList;
-  onOpen: (tool: ToolView) => void;
-  onNew: () => void;
-  onChange: (tool: ToolView, on: boolean) => Promise<void>;
-}) {
-  const copy = SECTION_COPY[section];
-  const inSection = list.tools.filter((t) => t[section]);
-  const others = list.tools.filter((t) => t.kind === 'http' && !t[section]);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const toggle = async (tool: ToolView, on: boolean) => {
-    setBusy(tool.id);
-    setError(null);
-    try {
-      await onChange(tool, on);
-    } catch (thrown) {
-      setError((thrown as Error).message);
-    } finally {
-      setBusy(null);
-    }
-  };
-  return (
-    <Card>
-      <CardHeader
-        title={
-          <span className="flex items-center gap-2">
-            <SectionNumber n={copy.number} /> {copy.title}
-          </span>
-        }
-        tip={{ label: `About ${copy.title.toLowerCase()}`, text: copy.tip }}
-      />
-      <div className="space-y-2 px-4 pb-4">
-        {inSection.length > 0 && (
-          <ul className="divide-y rounded-md border">
-            {inSection.map((tool) => (
-              <li key={tool.id} className="flex items-center gap-2 px-3 py-2">
-                <button onClick={() => onOpen(tool)} className="min-w-0 flex-1 text-left">
-                  <span className="block font-mono text-[12.5px]">{tool.name}</span>
-                  <span className="block truncate text-xs text-muted-foreground">
-                    {tool.method} {hostOf(tool.url)}
-                    {section === 'before' && inputsOf(tool).length > 0 && <> · sends {inputsOf(tool).join(', ')}</>}
-                    {tool.lastAt && <> · last {fmtRelative(tool.lastAt)}{tool.lastStatus ? ` (${tool.lastStatus})` : ''}</>}
-                  </span>
-                </button>
-                <Button variant="ghost" size="icon" className="size-7" onClick={() => void toggle(tool, false)} disabled={busy === tool.id} aria-label={`Remove ${tool.name} from ${copy.title.toLowerCase()}`}>
-                  {busy === tool.id ? <Loader2 className="animate-spin" /> : <X />}
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="flex flex-wrap items-center gap-2">
-          {inSection.length === 0 && <span className="mr-1 text-[13px] text-muted-foreground">None</span>}
-          {others.length > 0 && (
-            <Select
-              value=""
-              onChange={(e) => {
-                const tool = others.find((t) => t.id === e.target.value);
-                if (tool) void toggle(tool, true);
-              }}
-              aria-label={`Add a tool to ${copy.title.toLowerCase()}`}
-            >
-              <option value="">Add from your tools…</option>
-              {others.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </Select>
-          )}
-          <Button size="sm" variant="outline" onClick={onNew}>
-            <Plus /> New tool
-          </Button>
-        </div>
-        {error && <p className="text-xs text-danger">{error}</p>}
-      </div>
-    </Card>
-  );
-}
-
-export function SectionNumber({ n }: { n: number }) {
-  return <span className="inline-flex size-5 items-center justify-center rounded-full bg-muted text-[11px] font-semibold tabular-nums text-muted-foreground">{n}</span>;
-}
-
-/** The pre-chat answers a tool sends. */
-const inputsOf = (tool: ToolView) => {
-  const text = [tool.url ?? '', ...(tool.headers ?? []).map((h) => h.value), tool.body ?? ''].join('\n');
-  return [...new Set([...text.matchAll(/\{\{\s*prechat\.([\w-]+)\s*\}\}/g)].map((m) => m[1]!))];
-};
 
 // ------------------------------------------------------------- the dialog
 
