@@ -48,7 +48,7 @@ const ALL_NAV: {
 ];
 
 /** Settings, one page per topic; the sidebar opens them as a sub-menu. */
-export type SettingsSection = 'chat' | 'home' | 'appearance' | 'leads' | 'instructions' | 'business' | 'advanced' | 'live' | 'labels' | 'jobs' | 'notifications' | 'webhooks' | 'api' | 'team' | 'updates';
+export type SettingsSection = 'chat' | 'home' | 'appearance' | 'leads' | 'instructions' | 'agent' | 'business' | 'advanced' | 'live' | 'labels' | 'jobs' | 'notifications' | 'webhooks' | 'api' | 'team' | 'updates';
 
 /** The Prompt page (the owner's prompt, its versions, and the site's tools) in the Settings menu, after Instructions. */
 export const PROMPT_LABEL = 'Prompt & tools';
@@ -57,7 +57,7 @@ export type SettingsLink = { key: string; label: string; href: string; current: 
 export type SettingsGroup = { label: string; icon: ReactNode; items: SettingsLink[] };
 
 const GROUPS: { label: string; icon: ReactNode; keys: string[] }[] = [
-  { label: 'Assistant', icon: <Bot />, keys: ['instructions', 'prompt', 'knowledge', 'business'] },
+  { label: 'Assistant', icon: <Bot />, keys: ['instructions', 'prompt', 'knowledge', 'business', 'agent'] },
   { label: 'Widget', icon: <PanelsTopLeft />, keys: ['chat', 'home', 'appearance', 'leads'] },
   { label: 'Team', icon: <Users />, keys: ['live', 'labels', 'jobs', 'notifications'] },
   { label: 'System', icon: <Server />, keys: ['advanced', 'webhooks', 'api', 'team', 'updates'] },
@@ -115,6 +115,7 @@ export function settingsSections(site: Site | undefined, me?: Me): { id: Setting
     // A backend that keeps its own prompt (Retell, an OpenAI stored prompt, a test backend) has no use for these.
     ...(site?.prompt !== false ? [{ id: 'instructions' as const, label: 'Instructions' }] : []),
     ...(site?.knowledge ? [{ id: 'business' as const, label: 'Business details' }] : []),
+    ...(site?.prompt !== false ? [{ id: 'agent' as const, label: 'Import & export' }] : []),
     { id: 'live' as const, label: 'Live chat' },
     { id: 'labels' as const, label: 'Labels' },
     { id: 'jobs' as const, label: 'Jobs' },

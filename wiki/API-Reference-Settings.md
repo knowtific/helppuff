@@ -170,7 +170,7 @@ type SuggestHomeScreenResponse = {
     items: Array<{
       label: string;
       url: string;
-      description: string;
+      description?: string;
     }>;
   } | null;
   contact: Record<string, string>[];
@@ -430,6 +430,7 @@ type SettingsResponse = {
           label: string;
           value: string;
         };
+        description?: string;
       }>;
       links: {
         title: string;
@@ -451,7 +452,7 @@ type SettingsResponse = {
       items: Array<{
         label: string;
         url: string;
-        description: string;
+        description?: string;
       }>;
     };
     at: number;
@@ -731,6 +732,7 @@ type ChangeSettingsResponse = {
           label: string;
           value: string;
         };
+        description?: string;
       }>;
       links: {
         title: string;

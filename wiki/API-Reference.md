@@ -165,12 +165,14 @@ What the assistant knows: the website it learned, uploaded files, hand-written k
 
 ### [[Prompt|API-Reference-Prompt]]
 
-The business-specific instructions, versioned.
+The business-specific instructions, versioned, and the agent file: the prompt, tools and behaviour settings as one file to export and import.
 
 - [[The prompt and its versions|API-Reference-Prompt#the-prompt-and-its-versions]]: `GET /prompt`
 - [[One prompt version|API-Reference-Prompt#one-prompt-version]]: `GET /prompt/versions/:version`
 - [[Publish a prompt version|API-Reference-Prompt#publish-a-prompt-version]]: `POST /prompt`
 - [[Restore a prompt version|API-Reference-Prompt#restore-a-prompt-version]]: `POST /prompt/restore`
+- [[Export the agent file|API-Reference-Prompt#export-the-agent-file]]: `GET /agent/export`
+- [[Import an agent file|API-Reference-Prompt#import-an-agent-file]]: `POST /agent/import`
 
 ### [[Tools|API-Reference-Tools]]
 

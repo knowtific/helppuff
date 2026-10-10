@@ -23,6 +23,10 @@ goes to [[webhooks|Webhooks]] as `data` (in `conversation.started` and
 `conversation.completed`), and to your after-chat tools. The assistant also
 sees it on every answer, so it can use a value again later in the chat.
 
+**Learn by example:** four [[tutorials|Tutorials]] (order tracking, sending
+chats to a CRM, the nearest store, verified account changes), each with a
+template to import.
+
 Tools work with HelpPuff's assistant, whichever model writes the answers
 ([[Models and providers|Models-and-Providers]]). With a backend that runs the
 whole conversation itself (Retell, or your own API), only after-chat tools run.
@@ -123,6 +127,10 @@ then look it up with {{order_status}}.
 
 Below the prompt, the page lists the tools the prompt uses. It also flags a
 `{{name}}` that is neither a tool nor a known value, which is usually a typo.
+
+Answer **HTTP 200** for outcomes you expect, such as "not found" or "wrong
+code" (`{ "found": false }`), and keep 4xx and 5xx for real failures: the
+assistant treats an error as "could not check" and says so.
 
 The assistant calls tools only when it needs them, at most five calls per
 answer. Their results go to the assistant as data, not instructions: text in

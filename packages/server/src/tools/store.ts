@@ -205,7 +205,7 @@ export function validToolUrl(value: unknown): string {
   return raw;
 }
 
-type Stored = Omit<ToolRow, 'id' | 'site_id' | 'last_status' | 'last_error' | 'last_at' | 'created_at' | 'updated_at'>;
+export type Stored = Omit<ToolRow, 'id' | 'site_id' | 'last_status' | 'last_error' | 'last_at' | 'created_at' | 'updated_at'>;
 
 /**
  * A tool from the dashboard's (or the API's) JSON, over `current` when

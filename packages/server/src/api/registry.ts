@@ -54,7 +54,7 @@ export const TAGS: { name: string; description: string }[] = [
   { name: 'Jobs', description: 'Requests, quotes, projects or tickets on the site\'s pipeline: create them from your own forms and systems, move them through the stages, read their history.' },
   { name: 'Callbacks', description: 'Visitors who asked to be called back, as tasks.' },
   { name: 'Knowledge', description: 'What the assistant knows: the website it learned, uploaded files, hand-written knowledge and business details.' },
-  { name: 'Prompt', description: 'The business-specific instructions, versioned.' },
+  { name: 'Prompt', description: 'The business-specific instructions, versioned, and the agent file: the prompt, tools and behaviour settings as one file to export and import.' },
   { name: 'Tools', description: 'Your own APIs, called before, during and after a chat (`{{name}}` in the prompt), and extract tools that save what the assistant learns. What they return is kept on the conversation (`data`) and sent to webhooks.' },
   { name: 'Settings', description: 'The assistant, widget, lead form, limits and IP lists, as one object.' },
   { name: 'Webhooks', description: 'Endpoints that receive events as signed JSON.' },
@@ -114,6 +114,37 @@ const webhook = {
   lastAt: T,
   createdAt: T,
 };
+const agentFile = {
+  helppuff: 'agent',
+  version: 1,
+  name: 'Acme Plumbing assistant',
+  description: 'Exported from acme on 2025-10-09.',
+  prompt: 'If they ask about an order, ask for its number, save it with {{order_number}}, then look it up with {{order_status}}.',
+  settings: {
+    behaviour: { goal: 'callbacks', tone: 'friendly', length: 'short', prices: 'share' },
+    leads: { enabled: true, fields: [{ name: 'name', label: 'Name', type: 'text', required: true }] },
+  },
+  tools: [
+    { name: 'order_number', kind: 'extract', description: 'Save the order number once the visitor gives it.', enabled: true, fields: [{ name: 'order_number', description: 'The order number, like A-1042.', required: true }] },
+    {
+      name: 'order_status',
+      kind: 'http',
+      description: 'Look up an order by its number: status, items and delivery date.',
+      enabled: true,
+      method: 'GET',
+      url: 'https://api.acme.example/orders/{{args.order_number}}',
+      headers: [{ name: 'Authorization', value: '${ORDER_STATUS_AUTHORIZATION}', secret: true }],
+      parameters: [{ name: 'order_number', description: 'The order number, like A-1042.', required: true }],
+      pick: ['status', 'delivery.date'],
+      keys: ['status', 'delivery.date'],
+      timeoutMs: 5000,
+      before: false,
+      after: false,
+    },
+  ],
+  needs: [{ name: 'ORDER_STATUS_AUTHORIZATION', description: 'The whole Authorization header of the order_status tool' }],
+};
+
 const tool = {
   id: 'tool_8d7c6b5a',
   name: 'order_status',
@@ -1372,6 +1403,46 @@ export const ENDPOINTS: Endpoint[] = [
     description: 'Publishes an old version\'s text as a new version.',
     body: { version: 2, baseVersion: 4 },
     response: { status: 'published', version: 5, hash: 'c3d4…' },
+  },
+  {
+    method: 'GET',
+    path: '/agent/export',
+    scope: 'prompt:read',
+    tag: 'Prompt',
+    summary: 'Export the agent file',
+    description:
+      'The assistant\'s setup as one file, to keep in a project, share or import elsewhere: the prompt, the tools, and the behaviour and lead form settings. A tool\'s secret header is a placeholder (`${ORDER_STATUS_AUTHORIZATION}`), listed in `needs`; its value never leaves the Worker.',
+    query: [siteQuery],
+    response: agentFile,
+  },
+  {
+    method: 'POST',
+    path: '/agent/import',
+    scope: 'prompt:write',
+    tag: 'Prompt',
+    summary: 'Import an agent file',
+    description:
+      'Applies an agent file (from `GET /agent/export`, a template, or written by hand): its settings, its tools (matched by name: created or replaced) and its prompt, as a new version. Everything is checked before anything changes. With `dryRun`, nothing changes: the answer says what would, and which secrets are still needed. Importing a file with `settings` (not a dry run) needs the `settings:write` scope too.',
+    fields: [
+      { name: 'agent', description: 'The agent file: `{ "helppuff": "agent", "version": 1, name, prompt, settings, tools, needs }`.', required: true },
+      { name: 'secrets', description: 'A value for each `${NAME}` in the tools\' headers, as `{ "NAME": "value" }`. Stored encrypted, as a tool saved by hand. A tool that already has the header keeps its value when one is left out.' },
+      { name: 'dryRun', description: '`true`: change nothing, answer what would change.' },
+    ],
+    body: { agent: agentFile, secrets: { ORDER_STATUS_AUTHORIZATION: 'Bearer sk_live_…' }, dryRun: true },
+    response: {
+      site: 'acme',
+      dryRun: true,
+      ready: true,
+      name: 'Acme Plumbing assistant',
+      settings: ['behaviour', 'leads'],
+      tools: [
+        { name: 'order_number', action: 'create' },
+        { name: 'order_status', action: 'create' },
+      ],
+      prompt: { action: 'replace', version: 4 },
+      missingSecrets: [],
+    },
+    errors: [{ status: 400, code: 'bad_request', when: 'The file is not valid (`agent_invalid`), or a secret is missing (`agent_secrets_missing`).' }],
   },
   // -------------------------------------------------------------------- tools
   {

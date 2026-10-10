@@ -5,6 +5,13 @@
 - [[Using with AI agents|AI-Agents]]
 - [[The dashboard|Dashboard]]
 
+**Tutorials**
+- [[All tutorials|Tutorials]]
+- [[Order tracking|Tutorial-Order-Tracking]]
+- [[Send chats to your CRM|Tutorial-CRM-Sync]]
+- [[Nearest store|Tutorial-Nearest-Store]]
+- [[Verified account changes|Tutorial-Verified-Account-Changes]]
+
 **Configure**
 - [[Configuration]]
 - [[Configuration reference|Configuration-Reference]]
@@ -12,6 +19,7 @@
 - [[Knowledge base|Knowledge-Base]]
 - [[Prompt and instructions|Prompts-and-Instructions]]
 - [[Tools: your APIs in the chat|Tools]]
+- [[Agent files: import and export|Agent-Files]]
 - [[The widget|Widget]]
 - [[Leads and callbacks|Leads]]
 - [[Jobs]]

@@ -51,6 +51,20 @@ never needs you to change anything. Upgrade with
   No more tools sidebar.
 - **Dark mode is a soft dark grey** instead of near-black, and the Settings
   menu indents each group's pages under its label.
+- **Agent files: import and export the whole setup.** The prompt, the tools
+  and the behaviour and lead form settings in one JSON file: Settings →
+  **Import & export**, `helppuff agent export|import`, or
+  `GET /api/v1/agent/export` and `POST /api/v1/agent/import`. Importing checks
+  everything first (a dry run shows what changes), matches tools by name and
+  publishes the prompt as a new version. Secrets are never in the file: they
+  are `${NAME}` placeholders, asked for on import (the CLI reads `.env`).
+- **Four tutorials with templates**: order tracking (your shop, then
+  Shippo), sending chats to HubSpot through n8n or Zapier, the nearest store
+  from the pre-chat postcode (Google Places), and account changes after an
+  SMS code (Twilio Verify). Import any of them from the dashboard or with
+  `helppuff agent import <id>`.
+- `helppuff tools test` takes `--data tool.key=value`, for a tool that reads
+  what another returned.
 - **Knowledge moved into Settings**, and the Settings menu has four groups:
   Assistant, Widget, Team and System.
 - **Ask your AI agent** on every settings page: a request to copy into

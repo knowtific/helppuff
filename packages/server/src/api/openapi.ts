@@ -161,6 +161,20 @@ function tsType(value: unknown, key = '', indent = '', options: { optional?: boo
   if (typeof value === 'boolean') return 'boolean';
   if (Array.isArray(value)) {
     if (!value.length) return 'string[]';
+    // A list of objects of different shapes (an extract tool, then an http one): one type with every field, the ones not in all of them optional.
+    const objects = value.every((v) => v && typeof v === 'object' && !Array.isArray(v)) ? (value as Record<string, unknown>[]) : null;
+    if (objects && objects.length > 1) {
+      const keys = [...new Set(objects.flatMap((o) => Object.keys(o)))];
+      const inner = `${indent}  `;
+      const fields = keys.map((k) => {
+        const sample = objects.find((o) => k in o)![k];
+        const everywhere = objects.every((o) => k in o);
+        const type = tsType(sample, k, inner, options);
+        const nullable = options.nullable?.includes(k) && !type.includes('null') ? `${type} | null` : type;
+        return `${inner}${/^[A-Za-z_$][\w$]*$/.test(k) ? k : JSON.stringify(k)}${options.optional || !everywhere ? '?' : ''}: ${nullable};`;
+      });
+      return `Array<{\n${fields.join('\n')}\n${indent}}>`;
+    }
     const item = tsType(value[0], key.replace(/s$/, ''), indent, options);
     return item.includes('\n') || item.includes('|') ? `Array<${item}>` : `${item}[]`;
   }

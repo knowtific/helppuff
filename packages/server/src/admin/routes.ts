@@ -22,6 +22,7 @@ import { settingsRoutes } from './settings.js';
 import { setupRoutes } from './setup.js';
 import { webhookRoutes } from './webhooks.js';
 import { toolRoutes } from './tools.js';
+import { agentRoutes } from './agent.js';
 import { callbackRoutes, callbackView } from './callbacks.js';
 import { attributesJson, closeCutoff, CONVERSATION_STATUSES, conversationExtras, inboxRoutes, labelsSql, mergeAttributes, parseJsonObject, parseLabels, statusFilter, statusSql, type ConversationStatus } from './inbox.js';
 import { liveRoutes } from './live.js';
@@ -35,8 +36,7 @@ import { emit } from '../webhooks/deliver.js';
 import { summarizeConversation, type AiRunner } from '../conversations/summary.js';
 import { summaryModel } from '../conversations/complete.js';
 export { extractJson } from '../conversations/summary.js';
-import { PROMPT_LIMIT, PROMPT_SQL, promptField, publishPrompt, readPromptState, type PromptCtx, type PromptVersionRow, type PublishResult } from './prompts.js';
-import type { KvStore } from '@helppuff/connector-types';
+import { PROMPT_LIMIT, PROMPT_SQL, promptCtx, promptField, publishPrompt, readPromptState, type PromptVersionRow, type PublishResult } from './prompts.js';
 
 /**
  * The dashboard API, under `/admin/api`. Everything but sign-in needs a
@@ -695,12 +695,6 @@ adminRoutes.get('/admins', async (c) => {
 
 // ------------------------------------------------------------ prompt versions
 
-function promptCtx(c: Context<HonoEnv>): PromptCtx {
-  const ctx = c.get('helppuff');
-  const kv = ctx.env['HELPPUFF_KV'] as KvStore | undefined;
-  if (!kv) throw new HelpPuffError('internal', { message: 'This deployment has no KV namespace.', detail: 'admin_no_kv' });
-  return { config: ctx.config, kv, now: () => ctx.platform.now() };
-}
 
 /** 409 carries the version that won, so the editor can say who moved first and reload. */
 function published(c: Context<HonoEnv>, result: PublishResult) {
@@ -814,6 +808,7 @@ adminRoutes.route('/', setupRoutes);
 adminRoutes.route('/', signInRoutes);
 adminRoutes.route('/', webhookRoutes);
 adminRoutes.route('/', toolRoutes);
+adminRoutes.route('/', agentRoutes);
 adminRoutes.route('/', callbackRoutes);
 adminRoutes.route('/', versionRoutes);
 adminRoutes.route('/', chatRoutes);

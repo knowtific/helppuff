@@ -117,7 +117,7 @@ from Cloudflare's request metadata; HelpPuff does not store visitor IP addresses
 ## Settings
 
 Opens as a menu in the sidebar, in four groups: **Assistant** (Instructions,
-Prompt & tools, Knowledge, Business details), **Widget** (Chat, Home screen,
+Prompt & tools, Knowledge, Business details, Import & export), **Widget** (Chat, Home screen,
 Appearance, Lead form), **Team** (Live chat, Labels, Jobs, Notifications) and
 **System** (Advanced, Webhooks, API keys, Team & security, Updates). What each
 page is for is behind the (?) beside its title.
@@ -136,6 +136,7 @@ agent goes through that page with you and changes it through the same API
 | **Instructions** | What to do when a visitor is interested, tone, answer length and prices: settings HelpPuff adds around the prompt |
 | **Prompt & tools** | A chat as a diagram: [[tools|Tools]] before it, the prompt (click it to edit, add tools and see its history and everything HelpPuff adds) with Knowledge above and Webhooks below, then the summary and labels and the tools after it. See [[Prompt and instructions|Prompts-and-Instructions]] |
 | **Knowledge** | What it has learned; see [Knowledge](#knowledge) above |
+| **Import & export** | The whole setup (prompt, tools, behaviour and lead form) as one [[agent file|Agent-Files]]: start from a [[tutorial's template|Tutorials]], import a file, or download this site's |
 | **Business details** | Phone, email, address, hours, service areas: read from your site, yours to correct (a crawl never overwrites your changes) |
 | **Live chat** | Let visitors talk to a person; how long they wait before the callback form; when conversations close; [[Telegram]]. See [[Live chat|Live-Chat]] |
 | **Labels** | The labels for conversations, and which the AI may use |

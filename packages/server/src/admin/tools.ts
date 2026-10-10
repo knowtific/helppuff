@@ -4,9 +4,9 @@ import { resolveSite } from '../config/site.js';
 import { isAssistant } from '../core/assistant.js';
 import { HelpPuffError } from '../core/errors.js';
 import { requireSecret, type HonoEnv } from '../core/request.js';
-import { ensureSchema } from '../db/d1.js';
+import { ensureSchema, type D1Like } from '../db/d1.js';
 import { callHttp, extractFields, responseKeys } from '../tools/run.js';
-import { countTools, forgetTools, openTool, toolView, validTool, type ToolRow } from '../tools/store.js';
+import { countTools, forgetTools, openTool, toolView, validTool, type Stored, type ToolRow } from '../tools/store.js';
 import { capSize, pickPaths, type TemplateScope } from '../tools/template.js';
 import { assertSameOrigin, currentAdmin, db, jsonBody, siteParam } from './guard.js';
 
@@ -28,6 +28,33 @@ async function toolOf(c: Context<HonoEnv>, siteId: string, id: string | undefine
 async function otherNames(c: Context<HonoEnv>, siteId: string, except: string | null): Promise<string[]> {
   const rows = (await db(c).prepare('SELECT id, name FROM tools WHERE site_id = ?').bind(siteId).all<{ id: string; name: string }>()).results;
   return rows.filter((r) => r.id !== except).map((r) => r.name);
+}
+
+/** Store a new, validated tool (the route's work, shared with importing an agent file). */
+export async function insertTool(d: D1Like, siteId: string, stored: Stored, now: number): Promise<ToolRow> {
+  const id = `tool_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`;
+  await d
+    .prepare(
+      `INSERT INTO tools (id, site_id, name, kind, description, method, url, headers, body, parameters, fields, pick, keys, timeout_ms, run_before, run_after, enabled, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(id, siteId, stored.name, stored.kind, stored.description, stored.method, stored.url, stored.headers, stored.body, stored.parameters, stored.fields, stored.pick, stored.keys, stored.timeout_ms, stored.run_before, stored.run_after, stored.enabled, now, now)
+    .run();
+  forgetTools(siteId);
+  return (await d.prepare('SELECT * FROM tools WHERE id = ?').bind(id).first<ToolRow>())!;
+}
+
+/** Save a validated change to a tool. */
+export async function updateTool(d: D1Like, row: ToolRow, stored: Stored, now: number): Promise<ToolRow> {
+  await d
+    .prepare(
+      `UPDATE tools SET name = ?, kind = ?, description = ?, method = ?, url = ?, headers = ?, body = ?, parameters = ?, fields = ?, pick = ?, keys = ?,
+       timeout_ms = ?, run_before = ?, run_after = ?, enabled = ?, updated_at = ? WHERE id = ?`,
+    )
+    .bind(stored.name, stored.kind, stored.description, stored.method, stored.url, stored.headers, stored.body, stored.parameters, stored.fields, stored.pick, stored.keys, stored.timeout_ms, stored.run_before, stored.run_after, stored.enabled, now, row.id)
+    .run();
+  forgetTools(row.site_id);
+  return { ...row, ...stored, updated_at: now };
 }
 
 toolRoutes.get('/tools', async (c) => {
@@ -55,37 +82,9 @@ toolRoutes.post('/tools', async (c) => {
   await ensureSchema(d);
   if ((await countTools(d, siteId)) >= MAX_TOOLS_PER_SITE) throw new HelpPuffError('bad_request', { message: `Up to ${MAX_TOOLS_PER_SITE} tools per site.`, detail: 'tool_limit' });
   const stored = await validTool(body, null, await otherNames(c, siteId, null), requireSecret(c.get('helppuff')));
-  const now = c.get('helppuff').platform.now();
-  const id = `tool_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`;
-  await d
-    .prepare(
-      `INSERT INTO tools (id, site_id, name, kind, description, method, url, headers, body, parameters, fields, pick, keys, timeout_ms, run_before, run_after, enabled, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .bind(
-      id,
-      siteId,
-      stored.name,
-      stored.kind,
-      stored.description,
-      stored.method,
-      stored.url,
-      stored.headers,
-      stored.body,
-      stored.parameters,
-      stored.fields,
-      stored.pick,
-      stored.keys,
-      stored.timeout_ms,
-      stored.run_before,
-      stored.run_after,
-      stored.enabled,
-      now,
-      now,
-    )
-    .run();
-  forgetTools(siteId);
-  return c.json(toolView((await d.prepare('SELECT * FROM tools WHERE id = ?').bind(id).first<ToolRow>())!), 201);
+  const row = await insertTool(d, siteId, stored, c.get('helppuff').platform.now());
+  return c.json(toolView(row), 201);
+
 });
 
 toolRoutes.patch('/tools/:id', async (c) => {
@@ -95,34 +94,8 @@ toolRoutes.patch('/tools/:id', async (c) => {
   const siteId = siteParam(c, body['site'] ?? c.req.query('site'));
   const row = await toolOf(c, siteId, c.req.param('id'));
   const stored = await validTool(body, row, await otherNames(c, siteId, row.id), requireSecret(c.get('helppuff')));
-  const now = c.get('helppuff').platform.now();
-  await db(c)
-    .prepare(
-      `UPDATE tools SET name = ?, kind = ?, description = ?, method = ?, url = ?, headers = ?, body = ?, parameters = ?, fields = ?, pick = ?, keys = ?,
-       timeout_ms = ?, run_before = ?, run_after = ?, enabled = ?, updated_at = ? WHERE id = ?`,
-    )
-    .bind(
-      stored.name,
-      stored.kind,
-      stored.description,
-      stored.method,
-      stored.url,
-      stored.headers,
-      stored.body,
-      stored.parameters,
-      stored.fields,
-      stored.pick,
-      stored.keys,
-      stored.timeout_ms,
-      stored.run_before,
-      stored.run_after,
-      stored.enabled,
-      now,
-      row.id,
-    )
-    .run();
-  forgetTools(siteId);
-  return c.json(toolView({ ...row, ...stored, updated_at: now }));
+  return c.json(toolView(await updateTool(db(c), row, stored, c.get('helppuff').platform.now())));
+
 });
 
 toolRoutes.delete('/tools/:id', async (c) => {

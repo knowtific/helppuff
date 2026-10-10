@@ -1,4 +1,4 @@
-import { ArrowDownToLine, ArrowLeft, ArrowUpFromLine, BookOpen, Bot, ChevronRight, History, Loader2, Lock, MessageSquare, MessageSquareOff, RotateCcw, Sparkles, Webhook, X } from 'lucide-react';
+import { ArrowDownToLine, ArrowLeft, ArrowUpFromLine, BookOpen, Bot, ChevronRight, History, Loader2, Lock, MessageSquare, MessageSquareOff, PackageOpen, RotateCcw, Sparkles, Webhook, X } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { PageHeader, SettingsTabs } from '../components/Shell';
 import { AskAgent, agentRequest } from './Settings';
@@ -138,7 +138,10 @@ export function Prompt({ me }: { me: Me }) {
           help="Prompts-and-Instructions"
           actions={
             <>
-              <AskAgent request={agentRequest('prompt', 'Prompt & tools')} />
+              <a href={href({ page: 'settings', id: 'agent' })} className="inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-[13px] font-medium hover:bg-subtle">
+              <PackageOpen className="size-4" aria-hidden /> Templates
+            </a>
+            <AskAgent request={agentRequest('prompt', 'Prompt & tools')} />
               {me.sites.length > 1 && (
                 <Select
                   value={site}

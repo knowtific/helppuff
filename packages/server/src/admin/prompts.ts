@@ -1,3 +1,5 @@
+import type { Context } from 'hono';
+import type { HonoEnv } from '../core/request.js';
 import type { KvStore } from '@helppuff/connector-types';
 import { storedSiteConfigSchema, type ConnectorConfig, type HelpPuffConfig, type PromptMeta, type StoredSiteConfig } from '../config/schema.js';
 import { siteConfigKey } from '../config/site.js';
@@ -99,6 +101,14 @@ export function promptField(connector: ConnectorConfig): {
  * look like a success.
  */
 export type PromptCtx = { config: HelpPuffConfig; kv: KvStore; now: () => number };
+
+/** The prompt's context for a request: the config and the KV namespace. */
+export function promptCtx(c: Context<HonoEnv>): PromptCtx {
+  const ctx = c.get('helppuff');
+  const kv = ctx.env['HELPPUFF_KV'] as KvStore | undefined;
+  if (!kv) throw new HelpPuffError('internal', { message: 'This deployment has no KV namespace.', detail: 'admin_no_kv' });
+  return { config: ctx.config, kv, now: () => ctx.platform.now() };
+}
 
 export type PromptState = {
   site: string;

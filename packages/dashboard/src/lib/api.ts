@@ -304,6 +304,18 @@ export type ToolView = {
   lastError: string | null;
   lastAt: number | null;
 };
+/** What importing an agent file changes (or changed): `POST /agent/import`. */
+export type AgentPlan = {
+  site: string;
+  dryRun: boolean;
+  ready: boolean;
+  name: string;
+  settings: string[];
+  tools: { name: string; action: 'create' | 'replace' }[];
+  prompt: { action: 'replace' | 'unchanged' | 'skipped'; version: number; reason?: string } | null;
+  missingSecrets: { name: string; description: string }[];
+};
+
 export type ToolsList = {
   tools: ToolView[];
   assistant: boolean;

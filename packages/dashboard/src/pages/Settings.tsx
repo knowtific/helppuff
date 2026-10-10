@@ -10,6 +10,7 @@ import { InstructionsForm } from '../components/InstructionsForm';
 import { FactsForm } from '../components/FactsForm';
 import { Webhooks } from '../components/Webhooks';
 import { ApiKeys } from '../components/ApiKeys';
+import { AgentFiles } from '../components/AgentFile';
 import { Updates } from '../components/Updates';
 import { JobsSettings } from '../components/JobsSettings';
 import { HomeScreenSettings } from '../components/HomeScreenSettings';
@@ -92,6 +93,7 @@ const DESCRIPTIONS: Record<SettingsSection, string> = {
   appearance: 'Taken from your website. Change it if you like.',
   leads: 'A short form before the chat: every conversation becomes a lead, and the assistant knows who it’s talking to.',
   instructions: 'How it talks and what it’s for.',
+  agent: 'The whole setup in one file: start from a tutorial’s template, import a file, or export this one to keep or share.',
   business: 'Read from your website. The assistant always has these; your changes are never overwritten.',
   live: 'Let visitors talk to a person on your team, from the dashboard or Telegram.',
   labels: 'Tag conversations, by hand or by the AI, and filter by them.',
@@ -110,6 +112,7 @@ const HELP: Record<SettingsSection, string> = {
   appearance: 'Widget#customising',
   leads: 'Leads#the-form-in-helppuffjson',
   instructions: 'Prompts-and-Instructions',
+  agent: 'Agent-Files',
   business: 'Knowledge-Base#business-details',
   live: 'Live-Chat',
   labels: 'Dashboard#labels',
@@ -137,6 +140,7 @@ export function Settings({ me, section }: { me: Me; section: string | undefined 
             <SettingsForm key={current.id} knowledge={Boolean(site?.knowledge)} section={current.id} />
           </Card>
         )}
+        {current.id === 'agent' && site && <AgentFiles site={site.id} />}
         {current.id === 'instructions' && (
           <Card>
             <InstructionsForm />

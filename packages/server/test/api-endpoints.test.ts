@@ -440,3 +440,76 @@ describe('knowledge, end to end through /api/v1', () => {
     expectDocumented('DELETE', '/knowledge/manual/holiday-hours', (await call('DELETE', '/knowledge/manual/holiday-hours')).json);
   });
 });
+
+describe('the agent file, end to end through /api/v1', () => {
+  it('imports a file (asking for its secrets first), then exports the same setup without them', async () => {
+    resetSchemaMemo();
+    resetMemoryLimits();
+    const db = sqliteD1();
+    const config = defineConfig({
+      sites: { demo: { origins: ['https://acme.test'], connector: { type: 'workers-ai', options: { instructions: 'You help Acme.' } } } },
+    });
+    const h = harness(config, testEnv({ HELPPUFF_DB: db, HELPPUFF_KV: memoryKv() }), null, () => {});
+    await h.fetch('/admin/api/me');
+    const keyWith = async (scopes: Scope[]) => (await createKey(db, SECRET, { name: 't', siteId: 'demo', scopes, allowIps: [], ratePerMinute: 1000, expiresAt: null, createdBy: 't' }, Date.now())).key;
+    const full = await keyWith(['prompt:write', 'settings:write']);
+    const call = async (method: string, path: string, body?: unknown, key = full) => {
+      const response = await h.fetch(`/api/v1${path}`, {
+        method,
+        headers: { Authorization: `Bearer ${key}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+      return { status: response.status, json: (await response.json()) as Json };
+    };
+    const agent = {
+      helppuff: 'agent',
+      version: 1,
+      name: 'Order tracking',
+      prompt: 'If they ask about an order, ask for its number, save it with {{order_number}}, then look it up with {{order_status}}.',
+      settings: { behaviour: { goal: 'answers' }, leads: { enabled: false } },
+      tools: [
+        {
+          name: 'order_status',
+          description: 'Look up an order by its number.',
+          method: 'GET',
+          url: 'https://shop.acme.test/orders/{{args.order_number}}',
+          headers: [{ name: 'Authorization', value: 'Bearer ${SHOP_API_KEY}', secret: true }],
+          parameters: [{ name: 'order_number', description: 'Like 1042', required: true }],
+          pick: ['status', 'tracking.number'],
+        },
+        { name: 'order_number', kind: 'extract', description: 'Save the order number.', fields: [{ name: 'order_number', description: 'Like 1042', required: true }] },
+      ],
+      needs: [{ name: 'SHOP_API_KEY', description: 'Your shop’s API key' }],
+    };
+
+    // A dry run changes nothing and says what is missing.
+    const plan = await call('POST', '/agent/import', { agent, dryRun: true });
+    expect(plan.status, JSON.stringify(plan.json)).toBe(200);
+    expect(plan.json).toMatchObject({ dryRun: true, ready: false, tools: [{ name: 'order_status', action: 'create' }, { name: 'order_number', action: 'create' }], prompt: { action: 'replace' }, missingSecrets: [{ name: 'SHOP_API_KEY', description: 'Your shop’s API key' }] });
+    expect((await call('POST', '/agent/import', { agent })).json['error']['message']).toMatch(/Give a value for SHOP_API_KEY/);
+    expect(db.raw.prepare('SELECT count(*) AS n FROM tools').get()).toEqual({ n: 0 });
+
+    // A key without settings:write cannot import settings.
+    const promptOnly = await keyWith(['prompt:write']);
+    expect((await call('POST', '/agent/import', { agent, secrets: { SHOP_API_KEY: 'sk_1' } }, promptOnly)).status).toBe(403);
+
+    const done = await call('POST', '/agent/import', { agent, secrets: { SHOP_API_KEY: 'sk_1' } });
+    expect(done.status, JSON.stringify(done.json)).toBe(200);
+    expect(done.json).toMatchObject({ dryRun: false, ready: true, prompt: { action: 'replace' }, settings: ['behaviour', 'leads'] });
+    expect(done.json['prompt']['version']).toBeGreaterThan(plan.json['prompt']['version']);
+    expectDocumented('POST', '/agent/import', done.json);
+    // The key is stored sealed, never as typed.
+    expect(String((db.raw.prepare("SELECT headers FROM tools WHERE name = 'order_status'").get() as { headers: string }).headers)).not.toContain('sk_1');
+
+    // Importing it again replaces the tools and keeps the stored key without asking.
+    expect((await call('POST', '/agent/import', { agent, dryRun: true })).json).toMatchObject({ ready: true, tools: [{ action: 'replace' }, { action: 'replace' }], prompt: { action: 'unchanged' }, missingSecrets: [] });
+
+    const exported = await call('GET', '/agent/export');
+    expectDocumented('GET', '/agent/export', exported.json);
+    expect(exported.json).toMatchObject({ helppuff: 'agent', version: 1, prompt: agent.prompt, settings: { behaviour: { goal: 'answers' }, leads: { enabled: false } } });
+    const status = exported.json['tools'].find((t: Json) => t['name'] === 'order_status');
+    expect(status['headers']).toEqual([{ name: 'Authorization', value: '${ORDER_STATUS_AUTHORIZATION}', secret: true }]);
+    expect(exported.json['needs']).toEqual([{ name: 'ORDER_STATUS_AUTHORIZATION', description: 'The whole Authorization header of the order_status tool' }]);
+    expect(JSON.stringify(exported.json)).not.toContain('sk_1');
+  });
+});

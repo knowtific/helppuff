@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import { iconNames, linkItemSchema, shortcutSchema, type Shortcut, type WidgetConfig } from '@helppuff/protocol';
 import type { KvStore } from '@helppuff/connector-types';
@@ -353,10 +353,18 @@ async function readStored(env: Record<string, unknown>, siteId: string): Promise
 settingsRoutes.put('/settings', async (c) => {
   assertSameOrigin(c);
   const admin = await currentAdmin(c);
-  const ctx = c.get('helppuff');
   const body = await jsonBody(c);
   const siteId = siteParam(c, body['site']);
-  const parsed = settingsPatchSchema.safeParse(body['settings']);
+  return c.json(await saveSettings(c, siteId, body['settings'], admin.via === 'api-key' ? 'cli' : admin.email));
+});
+
+/**
+ * Validate a settings patch and make it live: the route's work, shared with
+ * importing an agent file. `by` is who it is recorded as (an email, `cli`).
+ */
+export async function saveSettings(c: Context<HonoEnv>, siteId: string, patch: unknown, by: string) {
+  const ctx = c.get('helppuff');
+  const parsed = settingsPatchSchema.safeParse(patch);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     throw new HelpPuffError('bad_request', { message: `Check ${issue?.path.join('.') || 'the settings'}: ${issue?.message ?? 'invalid'}.`, detail: 'settings_invalid' });
@@ -395,10 +403,10 @@ settingsRoutes.put('/settings', async (c) => {
     assistant: next.assistant,
     security: next.security,
     live: next.live,
-    settings: { at: ctx.platform.now(), by: admin.via === 'api-key' ? 'cli' : admin.email, hash },
+    settings: { at: ctx.platform.now(), by, hash },
   });
   await kv.put(siteConfigKey(siteId), JSON.stringify(record));
   // The owner set the home screen up: the suggestions from the website stop.
   if (parsed.data.home) await dismissSuggestedHome(kv, siteId, ctx.platform.now());
-  return c.json({ site: siteId, connector: next.connector.type, settings, hash, meta: record.settings, captcha: Boolean(next.security.captcha) });
-});
+  return { site: siteId, connector: next.connector.type, settings, hash, meta: record.settings, captcha: Boolean(next.security.captcha) };
+}
