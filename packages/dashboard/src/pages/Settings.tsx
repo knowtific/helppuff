@@ -11,6 +11,7 @@ import { FactsForm } from '../components/FactsForm';
 import { Webhooks } from '../components/Webhooks';
 import { ApiKeys } from '../components/ApiKeys';
 import { AgentFiles } from '../components/AgentFile';
+import { SignedInVisitors } from '../components/SignedIn';
 import { Updates } from '../components/Updates';
 import { JobsSettings } from '../components/JobsSettings';
 import { HomeScreenSettings } from '../components/HomeScreenSettings';
@@ -141,6 +142,11 @@ export function Settings({ me, section }: { me: Me; section: string | undefined 
           </Card>
         )}
         {current.id === 'agent' && site && <AgentFiles site={site.id} />}
+        {current.id === 'leads' && site && (
+          <div className="mt-4">
+            <SignedInVisitors site={site.id} />
+          </div>
+        )}
         {current.id === 'instructions' && (
           <Card>
             <InstructionsForm />

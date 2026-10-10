@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
-import { cleanText, HANDOVER_ACTION, JOB_FORM_PREFIX, stripChatTokens, type Message, type SendRequest, type StartSessionRequest } from '@helppuff/protocol';
+import { cleanText, HANDOVER_ACTION, JOB_FORM_PREFIX, stripChatTokens, type Message, type SendRequest, type StartSessionRequest, type VerifiedUser } from '@helppuff/protocol';
+import { identitySecret, identityVersion, verifyIdentity } from './identity.js';
 import { isCallbackForm, notice } from '@helppuff/connector-types';
 import type { SiteConfig } from '../config/schema.js';
 import { resolveSecrets } from '../config/load.js';
@@ -65,6 +66,18 @@ export type ChatTurn = { sessionId: string; messages: Message[]; state: unknown;
 export type Respond<T> = (turn: ChatTurn, streaming: boolean) => Promise<{ body: T; headers?: Record<string, string> }>;
 
 /** A new chat's text, cleaned: the first message as typed text, the rest single lines. */
+/** A signed identity's verified user, or null (a bad or expired token is ignored, and logged: the chat goes on without one). */
+async function verifiedUser(ctx: RequestCtx, siteId: string, token: string): Promise<VerifiedUser | null> {
+  if (ctx.secret.length < 32) return null;
+  const secret = await identitySecret(ctx.secret, siteId, await identityVersion(ctx.platform.kv, siteId));
+  const result = await verifyIdentity(token, secret, ctx.platform.now());
+  if ('problem' in result) {
+    ctx.platform.log('identity.rejected', { siteId, problem: result.problem });
+    return null;
+  }
+  return result.user;
+}
+
 export function cleanStart(input: StartSessionRequest): StartSessionRequest {
   const line = (value: string | undefined) => (value === undefined ? undefined : cleanText(value, 'line'));
   const context = input.context;
@@ -120,15 +133,27 @@ async function gated<T>(prepared: PreparedConnector, verdict: Promise<unknown>, 
 
 export async function startChat<T>(
   c: Context<HonoEnv>,
-  options: { siteId: string; site: SiteConfig; prepared: PreparedConnector; input: StartSessionRequest; channel: Channel; respond: Respond<T> },
+  options: {
+    siteId: string;
+    site: SiteConfig;
+    prepared: PreparedConnector;
+    input: StartSessionRequest;
+    channel: Channel;
+    respond: Respond<T>;
+    /** A visitor the caller vouches for (the API's `user`: the key is the proof). The widget's comes from a signed token instead. */
+    user?: VerifiedUser | null;
+  },
 ): Promise<Response> {
   const ctx = c.get('helppuff');
   const { siteId, site, prepared, channel } = options;
   const input = cleanStart(options.input);
   const limits = site.security.limits;
+  // A signed-in visitor: the token is checked while the limits are (one KV read for the secret's version).
+  const userRead = options.user !== undefined ? Promise.resolve(options.user) : input.identity ? verifiedUser(ctx, siteId, input.identity) : Promise.resolve(null);
+  userRead.catch(() => {});
 
   // Lead fields against the site's configured form (the widget's pre-chat form); the API's contact is cleaned the same way.
-  const lead = channel.kind === 'api' ? (input.lead ?? {}) : site.widget.leadForm.enabled ? validateLead(input.lead, site.widget.leadForm.fields, limits) : {};
+  const typedLead = channel.kind === 'api' ? (input.lead ?? {}) : site.widget.leadForm.enabled ? validateLead(input.lead, site.widget.leadForm.fields, limits) : {};
 
   if (input.firstMessage && input.firstMessage.length > limits.maxMessageLength) {
     throw new HelpPuffError('bad_request', { message: 'That message is a little too long.', detail: 'first_message_too_long' });
@@ -190,6 +215,9 @@ export async function startChat<T>(
   const toolsRead = enabledTools(ctx, site, siteId).catch(() => []);
 
   const finish = async (): Promise<ChatTurn> => {
+    const user = await userRead;
+    // What the site vouched for wins over what was typed: the lead's name, email and phone.
+    const lead = user ? { ...typedLead, ...Object.fromEntries((['name', 'email', 'phone'] as const).filter((k) => user[k]).map((k) => [k, user[k]!])) } : typedLead;
     const cctx = connectorContext(ctx, prepared, siteId, sessionId, streaming ? relay.onText : undefined, (found) => {
       recordLead(ctx, { siteId, sessionId, lead: found, source: 'ai' });
       dispatchLead(ctx, site, siteId, { sessionId, lead: found, context: input.context });
@@ -203,12 +231,12 @@ export async function startChat<T>(
       const page = { url: input.context.pageUrl ?? null, title: input.context.pageTitle ?? null };
       if (tools.some((t) => t.before)) {
         await gate;
-        data = await ctx.timing.span('tools', () => runBeforeTools(ctx, { siteId, sessionId, tools, prechat: lead, page }));
+        data = await ctx.timing.span('tools', () => runBeforeTools(ctx, { siteId, sessionId, tools, prechat: lead, page, user }));
       }
-      const handle = toolsHandle(ctx, { siteId, sessionId, prepared, tools, facts: { data, prechat: lead, page } });
+      const handle = toolsHandle(ctx, { siteId, sessionId, prepared, tools, facts: { data, prechat: lead, page, user } });
       if (handle) cctx.tools = handle;
     }
-    const started = await ctx.timing.span('connector', () => runConnector(ctx, 'start', () => prepared.connector.start(cctx, { ...input, lead })));
+    const started = await ctx.timing.span('connector', () => runConnector(ctx, 'start', () => prepared.connector.start(cctx, { ...input, lead, ...(user ? { user } : {}) })));
     // Nothing is recorded for a request the limits refused.
     await verdict;
 
@@ -227,6 +255,7 @@ export async function startChat<T>(
       messages,
       country: c.req.header('CF-IPCountry') ?? null,
       data,
+      user,
     });
     // Lead destinations, after the response is decided and never blocking it.
     dispatchLead(ctx, site, siteId, { sessionId, lead, context: input.context, ...(input.firstMessage ? { firstMessage: input.firstMessage } : {}) });

@@ -10,6 +10,13 @@ need: they also teach the patterns the others build on.
 | [[Send chats to your CRM|Tutorial-CRM-Sync]] | Their enquiry, with a summary, in HubSpot without anyone typing it | Extract tools, an after-chat tool, n8n or Zapier as the glue |
 | [[Nearest store|Tutorial-Nearest-Store]] | Their nearest store in the first answer | A pre-chat form field, a before-chat tool, a tool's result in the prompt |
 | [[Verified account changes|Tutorial-Verified-Account-Changes]] | Change their email or address after an SMS code | Several tools in one task, security your API enforces, answers that are not errors |
+| [[Logged-in customer support|Tutorial-Logged-In-Support]] | Billing answers from their own account, without being asked who they are | [[Signed-in visitors|Signed-In-Visitors]], `{{user.id}}`, requests people decide on |
+| [[Product and stock|Tutorial-Product-And-Stock]] | Live prices, and stock at their nearest store | What goes in the knowledge base and what comes from a tool |
+| [[Hot leads to Slack|Tutorial-Hot-Leads-Slack]] | An alert in your sales channel for hot leads only | An after-chat tool with **Only when**, the AI's labels |
+
+**Guides:** [[Knowledge base or tool?|Knowledge-Or-Tool]] (where each kind of
+information belongs) and [[Testing and monitoring|Testing-And-Monitoring]]
+(keeping a setup working as you change it).
 
 ## Use a template
 

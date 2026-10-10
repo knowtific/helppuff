@@ -127,7 +127,7 @@ type ListConversationsResponse = {
 
 `GET /conversations/:id` · scope `conversations:read`
 
-The conversation (with its `status`, who has it, custom `attributes`, and `data`: what the site's tools returned or saved, by tool name), its lead, callback requests, labels, the team's notes and every message both ways (a person's replies carry `author`).
+The conversation (with its `status`, who has it, custom `attributes`, `data`: what the site's tools returned or saved, by tool name, and `user`: the signed-in visitor, verified, or null), its lead, callback requests, labels, the team's notes and every message both ways (a person's replies carry `author`).
 
 | Parameter | In | Required | Description |
 | --- | --- | --- | --- |
@@ -193,6 +193,11 @@ const data = (await response.json()) as GetConversationResponse;
           "date": "2026-10-12"
         }
       }
+    },
+    "user": {
+      "id": "u_8812",
+      "email": "ada@example.com",
+      "plan": "pro"
     }
   },
   "lead": {
@@ -313,6 +318,11 @@ type GetConversationResponse = {
         };
       };
     };
+    user: {
+      id: string;
+      email: string;
+      plan: string;
+    } | null;
   };
   lead: {
     id: string;

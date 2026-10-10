@@ -50,7 +50,7 @@ type Listed = { tools: Tool[]; assistant: boolean; prechat: { name: string; labe
 const USAGE =
   'Usage: helppuff tools list | show <name> | add <name> (--curl … | --url … | --extract --field name="…") --description "…" | set <name> … | test <name> [--arg k=v] | enable <name> | disable <name> | remove <name>';
 
-const FLAGS = ['curl', 'url', 'method', 'header', 'body', 'description', 'param', 'field', 'pick', 'before', 'after', 'extract', 'timeout', 'arg', 'prechat', 'data'];
+const FLAGS = ['curl', 'url', 'method', 'header', 'body', 'description', 'param', 'field', 'pick', 'before', 'after', 'extract', 'timeout', 'arg', 'prechat', 'data', 'when'];
 
 /** `name=value` pairs from a repeated flag. */
 function pairs(value: unknown, flag: string): [string, string][] {
@@ -98,6 +98,12 @@ function fromFlags(ctx: Ctx, current: Tool | null): { body: Record<string, unkno
   if (typeof f['body'] === 'string') body['body'] = f['body'];
   const description = str(f, 'description');
   if (description) body['description'] = description;
+  // --when labels.leadQuality=hot,warm (one of these), --when lead.email (has a value), --when none (always).
+  const when = str(f, 'when');
+  if (when) {
+    const at = when.indexOf('=');
+    body['when'] = when === 'none' ? null : at < 0 ? { path: when.trim() } : { path: when.slice(0, at).trim(), in: when.slice(at + 1).split(',').map((v) => v.trim()).filter(Boolean) };
+  }
   for (const raw of Array.isArray(f['header']) ? f['header'] : typeof f['header'] === 'string' ? [f['header']] : []) {
     const at = String(raw).indexOf(':');
     if (at < 1) throw new CliError('usage', '--header takes "Name: value".', { exitCode: EXIT.usage });

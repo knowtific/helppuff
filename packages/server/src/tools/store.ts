@@ -39,6 +39,8 @@ export type ToolRow = {
   timeout_ms: number;
   run_before: number;
   run_after: number;
+  /** An after-chat tool's condition, JSON `{ path, in? }`. */
+  run_when?: string | null;
   enabled: number;
   last_status: number | null;
   last_error: string | null;
@@ -64,8 +66,13 @@ export type Tool = {
   timeoutMs: number;
   before: boolean;
   after: boolean;
+  /** After the chat, run only when this holds (`labels.leadQuality` in `["hot"]`; no `in`: has a value). */
+  when: ToolWhen | null;
   enabled: boolean;
 };
+
+/** A condition on the conversation.completed data. */
+export type ToolWhen = { path: string; in?: string[] };
 
 const SECRET_PURPOSE = 'tool-header';
 
@@ -100,8 +107,29 @@ function decode(row: ToolRow): Tool {
     timeoutMs: row.timeout_ms || TOOL_TIMEOUT_MS.default,
     before: Boolean(row.run_before),
     after: Boolean(row.run_after),
+    when: parseWhen(row.run_when ?? null),
     enabled: Boolean(row.enabled),
   };
+}
+
+function parseWhen(raw: string | null): ToolWhen | null {
+  if (!raw) return null;
+  try {
+    const value = JSON.parse(raw) as { path?: unknown; in?: unknown };
+    if (typeof value.path !== 'string') return null;
+    return { path: value.path, ...(Array.isArray(value.in) ? { in: value.in.filter(isString) } : {}) };
+  } catch {
+    return null;
+  }
+}
+
+/** Whether an after-chat tool's condition holds for this conversation (no condition: always). */
+export function whenHolds(when: ToolWhen | null, event: Record<string, unknown>): boolean {
+  if (!when) return true;
+  const value = when.path.split('.').reduce<unknown>((acc, key) => (acc && typeof acc === 'object' ? (acc as Record<string, unknown>)[key] : undefined), event);
+  const text = value === undefined || value === null ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value);
+  if (!when.in?.length) return text !== '' && text !== '[]' && text !== '{}';
+  return when.in.some((option) => option.toLowerCase() === text.toLowerCase());
 }
 
 /** What the dashboard, the API and the CLI see: secret values never leave. */
@@ -127,6 +155,7 @@ export function toolView(row: ToolRow) {
     keys: tool.kind === 'extract' ? tool.fields.map((f) => f.name) : tool.keys,
     before: tool.before,
     after: tool.after,
+    when: tool.when,
     enabled: tool.enabled,
     lastStatus: row.last_status,
     lastError: row.last_error,
@@ -257,6 +286,7 @@ export async function validTool(body: Record<string, unknown>, current: ToolRow 
       // An extract tool calls nothing: it only runs in the chat.
       run_before: 0,
       run_after: 0,
+      run_when: null,
     };
   }
 
@@ -287,6 +317,7 @@ export async function validTool(body: Record<string, unknown>, current: ToolRow 
     }
   }
 
+  const when = pick('when', readWhen, was?.when ?? null);
   const parameters = pick('parameters', (v) => params(v, 'Parameters'), was?.parameters ?? []);
   const pickPaths = pick('pick', (v) => (Array.isArray(v) ? v.filter(isString).map((p) => p.trim()).filter((p) => /^[\w-]+(\.[\w-]+)*$/.test(p)).slice(0, 30) : []), was?.pick ?? []);
   const keys = pick('keys', (v) => (Array.isArray(v) ? v.filter(isString).filter((p) => /^[\w-]+(\.[\w-]+)*$/.test(p)).slice(0, 100) : []), was?.keys ?? []);
@@ -304,7 +335,18 @@ export async function validTool(body: Record<string, unknown>, current: ToolRow 
     keys: keys.length ? JSON.stringify(keys) : null,
     timeout_ms: timeoutMs,
     ...flags,
+    run_when: when && flags.run_after ? JSON.stringify(when) : null,
   };
+}
+
+/** `when` as sent: `{ path, in }`, or null to clear it. */
+function readWhen(value: unknown): ToolWhen | null {
+  if (value === null || value === '') return null;
+  const raw = value && typeof value === 'object' ? (value as Record<string, unknown>) : null;
+  const path = typeof raw?.['path'] === 'string' ? raw['path'].trim() : '';
+  if (!/^[\w-]+(\.[\w-]+){0,5}$/.test(path)) throw bad('A condition is { "path": "labels.leadQuality", "in": ["hot"] }: a path in the conversation.completed data, and the values it may have.', 'tool_when');
+  const options = Array.isArray(raw?.['in']) ? (raw['in'] as unknown[]).filter(isString).map((o) => o.trim()).filter(Boolean).slice(0, 10).map((o) => o.slice(0, 100)) : [];
+  return { path, ...(options.length ? { in: options } : {}) };
 }
 
 export async function countTools(db: D1Like, siteId: string): Promise<number> {

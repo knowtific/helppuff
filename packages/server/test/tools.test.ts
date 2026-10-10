@@ -394,3 +394,24 @@ describe('tools, the edges', () => {
     expect(await json(await w.owner.get('/prompt'))).toMatchObject({ editable: true, text: 'You help Acme.' });
   });
 });
+
+describe('an after-chat tool’s condition', () => {
+  it('runs only when the conversation matches: a value among some, or any value', async () => {
+    const { whenHolds, validTool } = await import('../src/tools/store.js');
+    const event = { labels: { leadQuality: 'hot' }, lead: { email: 'ada@acme.test', phone: null }, tags: [] };
+    expect(whenHolds(null, event)).toBe(true);
+    expect(whenHolds({ path: 'labels.leadQuality', in: ['hot', 'warm'] }, event)).toBe(true);
+    expect(whenHolds({ path: 'labels.leadQuality', in: ['Cold'] }, event)).toBe(false);
+    expect(whenHolds({ path: 'lead.email' }, event)).toBe(true);
+    expect(whenHolds({ path: 'lead.phone' }, event)).toBe(false);
+    expect(whenHolds({ path: 'tags' }, event)).toBe(false);
+    expect(whenHolds({ path: 'labels.leadQuality', in: ['hot'] }, {})).toBe(false);
+
+    const base = { name: 'slack_alert', description: 'Tell the team.', method: 'POST', url: 'https://slack.com/api/chat.postMessage', after: true };
+    const kept = await validTool({ ...base, when: { path: 'labels.leadQuality', in: ['hot'] } }, null, [], SECRET);
+    expect(JSON.parse(kept.run_when!)).toEqual({ path: 'labels.leadQuality', in: ['hot'] });
+    // Only after the chat; anything else is refused.
+    expect((await validTool({ ...base, after: false, when: { path: 'lead.email' } }, null, [], SECRET)).run_when).toBeNull();
+    await expect(validTool({ ...base, when: { path: 'labels.lead quality' } }, null, [], SECRET)).rejects.toThrow(/A condition is/);
+  });
+});

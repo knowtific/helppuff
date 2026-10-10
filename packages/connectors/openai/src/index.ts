@@ -321,6 +321,7 @@ const openai: Connector<OpenAiOptions, OpenAiState> = {
       lead: input.lead,
       context: input.context,
       site: { id: ctx.siteId },
+      ...(input.user ? { user: input.user } : {}),
     });
     ctx.log('openai.started');
     return { state: { responseId: result.id }, messages: result.messages };

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { readSse, type Message, type SendRequest, type StartSessionRequest } from '@helppuff/protocol';
+import { readSse, type Message, type SendRequest, type StartSessionRequest, type VerifiedUser } from '@helppuff/protocol';
 import {
   CONNECTOR_TIMEOUT_MS,
   ConnectorError,
@@ -261,11 +261,12 @@ function inputFor(input: SendRequest): string {
   return input.kind === 'text' ? input.text : input.value;
 }
 
-function startPayload(ctx: ConnectorContext<HttpOptions>, input: StartSessionRequest): object {
+function startPayload(ctx: ConnectorContext<HttpOptions>, input: StartSessionRequest & { user?: VerifiedUser | undefined }): object {
   return {
     siteId: ctx.siteId,
     sessionId: ctx.sessionId,
     ...(input.lead ? { lead: input.lead } : {}),
+    ...(input.user ? { user: input.user } : {}),
     context: input.context,
     ...(input.firstMessage ? { firstMessage: input.firstMessage } : {}),
   };
@@ -281,7 +282,7 @@ const http: Connector<HttpOptions, HttpState> = {
 
   async start(ctx, input) {
     if (ctx.options.mode === 'openai') {
-      const scope: PromptScope = { lead: input.lead, context: input.context, site: { id: ctx.siteId } };
+      const scope: PromptScope = { lead: input.lead, context: input.context, site: { id: ctx.siteId }, ...(input.user ? { user: input.user } : {}) };
       saveScope(ctx, scope);
       const messages = input.firstMessage ? await callOpenAi(ctx, input.firstMessage, scope) : [];
       return { state: {}, messages };

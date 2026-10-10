@@ -416,10 +416,13 @@ export function App({
         }
       }
 
+      // identify({ token }): a signed identity for the server to check, never a lead field.
+      const { token: identity, ...fields } = lead;
       const result = await api
         .startSession(
           {
-            ...(Object.keys(lead).length > 0 ? { lead } : {}),
+            ...(Object.keys(fields).length > 0 ? { lead: fields } : {}),
+            ...(identity ? { identity } : {}),
             context: pageContext(),
             ...(firstMessage ? { firstMessage } : {}),
             ...(captchaToken ? { captchaToken } : {}),

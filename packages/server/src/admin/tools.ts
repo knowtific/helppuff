@@ -35,10 +35,10 @@ export async function insertTool(d: D1Like, siteId: string, stored: Stored, now:
   const id = `tool_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`;
   await d
     .prepare(
-      `INSERT INTO tools (id, site_id, name, kind, description, method, url, headers, body, parameters, fields, pick, keys, timeout_ms, run_before, run_after, enabled, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO tools (id, site_id, name, kind, description, method, url, headers, body, parameters, fields, pick, keys, timeout_ms, run_before, run_after, run_when, enabled, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(id, siteId, stored.name, stored.kind, stored.description, stored.method, stored.url, stored.headers, stored.body, stored.parameters, stored.fields, stored.pick, stored.keys, stored.timeout_ms, stored.run_before, stored.run_after, stored.enabled, now, now)
+    .bind(id, siteId, stored.name, stored.kind, stored.description, stored.method, stored.url, stored.headers, stored.body, stored.parameters, stored.fields, stored.pick, stored.keys, stored.timeout_ms, stored.run_before, stored.run_after, stored.run_when ?? null, stored.enabled, now, now)
     .run();
   forgetTools(siteId);
   return (await d.prepare('SELECT * FROM tools WHERE id = ?').bind(id).first<ToolRow>())!;
@@ -49,9 +49,9 @@ export async function updateTool(d: D1Like, row: ToolRow, stored: Stored, now: n
   await d
     .prepare(
       `UPDATE tools SET name = ?, kind = ?, description = ?, method = ?, url = ?, headers = ?, body = ?, parameters = ?, fields = ?, pick = ?, keys = ?,
-       timeout_ms = ?, run_before = ?, run_after = ?, enabled = ?, updated_at = ? WHERE id = ?`,
+       timeout_ms = ?, run_before = ?, run_after = ?, run_when = ?, enabled = ?, updated_at = ? WHERE id = ?`,
     )
-    .bind(stored.name, stored.kind, stored.description, stored.method, stored.url, stored.headers, stored.body, stored.parameters, stored.fields, stored.pick, stored.keys, stored.timeout_ms, stored.run_before, stored.run_after, stored.enabled, now, row.id)
+    .bind(stored.name, stored.kind, stored.description, stored.method, stored.url, stored.headers, stored.body, stored.parameters, stored.fields, stored.pick, stored.keys, stored.timeout_ms, stored.run_before, stored.run_after, stored.run_when ?? null, stored.enabled, now, row.id)
     .run();
   forgetTools(row.site_id);
   return { ...row, ...stored, updated_at: now };

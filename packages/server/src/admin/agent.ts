@@ -145,6 +145,7 @@ agentRoutes.get('/agent/export', async (c) => {
       timeoutMs: view.timeoutMs,
       before: view.before,
       after: view.after,
+      ...(view.when ? { when: view.when } : {}),
     };
   });
   const file = {

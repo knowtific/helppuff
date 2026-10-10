@@ -163,6 +163,7 @@ const tool = {
   keys: ['status', 'delivery', 'delivery.date'],
   before: false,
   after: false,
+  when: null,
   enabled: true,
   lastStatus: 200,
   lastError: null,
@@ -281,6 +282,7 @@ export const ENDPOINTS: Endpoint[] = [
     fields: [
       { name: 'message', description: 'The visitor\'s first message (up to 4000 characters). Without one, the answer is the greeting, if any.' },
       { name: 'contact', description: 'What you know about the visitor: `name`, `email`, `phone` and any other fields (up to 20). Becomes, or joins by email, a lead.' },
+      { name: 'user', description: 'A signed-in visitor, as your server knows them: `id` (your user id) and any fields (`email`, `plan`, up to 20). Trusted, since the key is the proof: tools and the prompt read it as `{{user.*}}`, and its email and name become the lead\'s. From a browser, use a signed token instead (`HelpPuff.identify({ token })`).' },
       { name: 'context', description: '`pageUrl`, `pageTitle`, `referrer`, `locale`, `timezone`, `utm`: where the visitor is. The assistant may use it.' },
       { name: 'externalId', description: 'Your own id for this conversation or visitor (up to 128 characters), to find it again.' },
       { name: 'metadata', description: 'Up to 20 string values you want back later. Never shown to the assistant.' },
@@ -390,7 +392,7 @@ export const ENDPOINTS: Endpoint[] = [
     scope: 'conversations:read',
     tag: 'Conversations',
     summary: 'Get a conversation',
-    description: 'The conversation (with its `status`, who has it, custom `attributes`, and `data`: what the site\'s tools returned or saved, by tool name), its lead, callback requests, labels, the team\'s notes and every message both ways (a person\'s replies carry `author`).',
+    description: 'The conversation (with its `status`, who has it, custom `attributes`, `data`: what the site\'s tools returned or saved, by tool name, and `user`: the signed-in visitor, verified, or null), its lead, callback requests, labels, the team\'s notes and every message both ways (a person\'s replies carry `author`).',
     response: {
       conversation: {
         id: conversationId,
@@ -420,6 +422,7 @@ export const ENDPOINTS: Endpoint[] = [
         closed_at: null,
         attributes: { orderId: 'A-1042' },
         data: { order_status: { status: 'shipped', delivery: { date: '2026-10-12' } } },
+        user: { id: 'u_8812', email: 'ada@example.com', plan: 'pro' },
       },
       lead: leadRow,
       callbacks: [callback],
@@ -430,6 +433,7 @@ export const ENDPOINTS: Endpoint[] = [
         { id: `${conversationId}:m_mfx2k1`, role: 'agent', type: 'text', text: 'Usually $180–$250.', payload: {}, ts: T + 1, feedback: 1, author: null },
       ],
     },
+    nullable: ['user'],
   },
   {
     method: 'PATCH',
@@ -1478,6 +1482,7 @@ export const ENDPOINTS: Endpoint[] = [
       { name: 'timeoutMs', description: '1000 to 10000 (default 5000).' },
       { name: 'before', description: 'Run it when the chat starts, with the pre-chat form\'s answers.' },
       { name: 'after', description: 'Run it when the conversation ends, with the transcript, the summary, the lead and all the data.' },
+      { name: 'when', description: 'An after-chat tool runs only when this holds: `{ "path": "labels.leadQuality", "in": ["hot"] }` (a path in the conversation.completed data and the values it may have), or `{ "path": "lead.email" }` (has a value). `null` removes it.' },
     ],
     body: {
       name: 'order_status',
@@ -1752,7 +1757,7 @@ export const ENDPOINTS: Endpoint[] = [
     response: { items: [{ id: 'au_1', at: T, actor: 'key:k7m3p9q2r4s8', action: 'PATCH /leads/:id', target: leadId, site: 'acme', status: 200 }], next: null },
   },
   // ---------------------------------------------------- the dashboard's own
-  ...(['GET /prefs', 'PUT /prefs', 'POST /login', 'POST /logout', 'GET /login/options', 'POST /links', 'GET /setup', 'POST /setup', 'POST /login-link', 'GET /setup/state', 'POST /diagnostics/models'] as const).map((route) => {
+  ...(['GET /prefs', 'PUT /prefs', 'POST /login', 'POST /logout', 'GET /login/options', 'POST /links', 'GET /setup', 'POST /setup', 'POST /login-link', 'GET /setup/state', 'POST /diagnostics/models', 'GET /identity', 'POST /identity/rotate'] as const).map((route) => {
     const [method, path] = route.split(' ') as [Method, string];
     return { method, path, scope: null, tag: 'Dashboard', summary: 'The dashboard\'s own (not part of the public API)' } satisfies Endpoint;
   }),

@@ -51,6 +51,21 @@ never needs you to change anything. Upgrade with
   No more tools sidebar.
 - **Dark mode is a soft dark grey** instead of near-black, and the Settings
   menu indents each group's pages under its label.
+- **Signed-in visitors.** A site with accounts signs who is logged in (a
+  JWT with the site's identity secret: Settings → Lead form, or
+  `helppuff identity`) and passes it with `HelpPuff.identify({ token })`. The
+  claims become verified `{{user.*}}` for tools and the prompt, win over what
+  was typed in the form, and show as **Signed in as …** on the conversation
+  (`user` in the API and `conversation.completed`). A tool that uses
+  `{{user.*}}` runs only for a verified visitor. The API takes `user`
+  directly on `POST /conversations`. A bad or expired token is ignored.
+- **Only when, for after-chat tools**: run one only for hot leads, chats with
+  an email, signed-in visitors, or any path in the `conversation.completed`
+  data (`--when labels.leadQuality=hot`).
+- Three more tutorials with templates (logged-in customer support, product
+  and stock, hot leads to Slack), and two guides: knowledge base or tool, and
+  testing and monitoring. The docs now say plainly that what a visitor types
+  is a claim.
 - **Agent files: import and export the whole setup.** The prompt, the tools
   and the behaviour and lead form settings in one JSON file: Settings →
   **Import & export**, `helppuff agent export|import`, or
@@ -132,6 +147,7 @@ never needs you to change anything. Upgrade with
 ### Changed
 
 - D1 migration 12 adds the `tools` table and `conversations.data` (additive).
+- D1 migration 13 adds `conversations.user` and `tools.run_when` (additive).
 
 ## [0.3.0] - 2026-10-08
 

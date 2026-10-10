@@ -290,6 +290,21 @@ describe('the lead form path', () => {
     expect(startSession.mock.calls[0]?.[0]).toMatchObject({ lead: { name: 'Grace' } });
   });
 
+  it('sends identify()’s token as the signed identity, never as a lead field', async () => {
+    const { handle, startSession } = setup();
+    void act(() => {
+      commands(handle).identify({ name: 'Grace', token: 'eyJ.signed.token' });
+    });
+    await openPanel(handle);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /start a conversation/i }));
+    });
+    await waitFor(() => expect(startSession).toHaveBeenCalledOnce());
+    const sent = startSession.mock.calls[0]?.[0] as { lead?: Record<string, string>; identity?: string };
+    expect(sent.identity).toBe('eyJ.signed.token');
+    expect(sent.lead).toEqual({ name: 'Grace' });
+  });
+
   it('still shows the form when identify() was partial', async () => {
     const { handle } = setup({
       config: {

@@ -167,6 +167,8 @@ export type ConversationDetail = {
     attributes?: Record<string, string>;
     /** What the site's tools returned or saved, by tool name. */
     data?: Record<string, unknown>;
+    /** The signed-in visitor, verified by a signed identity (or the API's user); null when nobody signed in. */
+    user?: (Record<string, string> & { id: string }) | null;
   };
   lead: Lead | null;
   callbacks: Callback[];
@@ -299,6 +301,8 @@ export type ToolView = {
   keys: string[];
   before: boolean;
   after: boolean;
+  /** After the chat, run only when this holds (on the conversation.completed data). */
+  when?: { path: string; in?: string[] } | null;
   enabled: boolean;
   lastStatus: number | null;
   lastError: string | null;

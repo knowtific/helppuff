@@ -112,6 +112,7 @@ HelpPuff.close();
 HelpPuff.toggle();
 HelpPuff.send('Do you work on Sundays?');   // send a message as the visitor (opens the chat)
 HelpPuff.identify({ name: 'Ada', email: 'ada@example.com' });  // skip the lead form; details go to the lead
+HelpPuff.identify({ name, email, token });  // a signed-in visitor: your server signed the token (see Signed-in visitors)
 HelpPuff.reset();                      // forget the conversation (e.g. on sign-out)
 HelpPuff.destroy();                    // remove the widget from the page
 
@@ -121,6 +122,12 @@ HelpPuff.on('lead', (lead) => …);      // the visitor submitted their details
 HelpPuff.on('message', ({ role, count }) => …);   // a reply arrived
 HelpPuff.off('lead', handler);
 ```
+
+`identify({ name, email })` is what the page *says*: anyone can call it from
+the browser's console with someone else's email, so treat it as a claim. For
+a site with accounts, add a `token` your server signed: the Worker checks it,
+and the visitor's account becomes trusted `{{user.*}}`
+([[Signed-in visitors|Signed-In-Visitors]]).
 
 Calls made before the script has loaded are queued if you add this stub
 first:

@@ -414,6 +414,7 @@ const gemini: Connector<GeminiOptions, GeminiState> = {
       lead: input.lead,
       context: input.context,
       site: { id: ctx.siteId },
+      ...(input.user ? { user: input.user } : {}),
     });
     ctx.log('gemini.started');
     return { state: { interactionId: result.id }, messages: result.messages };

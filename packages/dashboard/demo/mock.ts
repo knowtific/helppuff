@@ -629,6 +629,11 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
     }
   }
 
+  // Signed-in visitors: a sample secret (the demo signs nobody in).
+  if (head === 'identity') {
+    return json({ site: SITE.id, version: id === 'rotate' ? 2 : 1, secret: id === 'rotate' ? '9f2c…demo-rotated-secret' : '4be1…demo-identity-secret' });
+  }
+
   // The agent file: export the demo's setup; importing adds the file's tools and prompt to the page's data.
   if (head === 'agent') {
     if (id === 'export') {

@@ -750,7 +750,7 @@ const workersAi: Connector<WorkersAiOptions, WorkersAiState> = {
       .join('\n\n'),
 
   async start(ctx, input) {
-    const scope: PromptScope = { lead: input.lead, context: input.context, site: { id: ctx.siteId } };
+    const scope: PromptScope = { lead: input.lead, context: input.context, site: { id: ctx.siteId }, ...(input.user ? { user: input.user } : {}) };
     saveScope(ctx, scope);
     if (!input.firstMessage) return { state: { turns: 0 }, messages: [] };
     return { state: { turns: 1 }, messages: await respond(ctx, input.firstMessage, scope, true) };

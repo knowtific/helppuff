@@ -127,7 +127,7 @@ export function mapRetellMessages(raw: unknown, inlineMarkers: boolean): Message
 /** `{{lead.name}}` and friends, rendered to the strings Retell expects. */
 function dynamicVariables(
   options: RetellOptions,
-  scope: { lead?: Record<string, string>; context?: unknown },
+  scope: { lead?: Record<string, string>; context?: unknown; user?: Record<string, string> },
 ): Record<string, string> | undefined {
   const template = options.dynamicVariables;
   if (!template) return undefined;
@@ -169,7 +169,7 @@ const retell: Connector<RetellOptions, RetellState> = {
         agent_id: ctx.options.agentId,
         ...(ctx.options.agentVersion === undefined ? {} : { agent_version: ctx.options.agentVersion }),
         ...(() => {
-          const vars = dynamicVariables(ctx.options, { lead: input.lead, context: input.context });
+          const vars = dynamicVariables(ctx.options, { lead: input.lead, context: input.context, ...(input.user ? { user: input.user } : {}) });
           return vars ? { retell_llm_dynamic_variables: vars } : {};
         })(),
         metadata: { helppuff_session: ctx.sessionId, helppuff_site: ctx.siteId },

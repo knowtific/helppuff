@@ -18,6 +18,7 @@ Starts a conversation as a visitor would, with the same assistant, knowledge, li
 | --- | --- | --- |
 | `message` | no | The visitor's first message (up to 4000 characters). Without one, the answer is the greeting, if any. |
 | `contact` | no | What you know about the visitor: `name`, `email`, `phone` and any other fields (up to 20). Becomes, or joins by email, a lead. |
+| `user` | no | A signed-in visitor, as your server knows them: `id` (your user id) and any fields (`email`, `plan`, up to 20). Trusted, since the key is the proof: tools and the prompt read it as `{{user.*}}`, and its email and name become the lead's. From a browser, use a signed token instead (`HelpPuff.identify({ token })`). |
 | `context` | no | `pageUrl`, `pageTitle`, `referrer`, `locale`, `timezone`, `utm`: where the visitor is. The assistant may use it. |
 | `externalId` | no | Your own id for this conversation or visitor (up to 128 characters), to find it again. |
 | `metadata` | no | Up to 20 string values you want back later. Never shown to the assistant. |
@@ -58,6 +59,14 @@ type StartConversationRequest = {
    * fields (up to 20). Becomes, or joins by email, a lead.
    */
   contact?: Record<string, string>;
+  /**
+   * A signed-in visitor, as your server knows them: `id` (your user id) and
+   * any fields (`email`, `plan`, up to 20). Trusted, since the key is the
+   * proof: tools and the prompt read it as `{{user.*}}`, and its email and
+   * name become the lead's. From a browser, use a signed token instead
+   * (`HelpPuff.identify({ token })`).
+   */
+  user?: string;
   /**
    * `pageUrl`, `pageTitle`, `referrer`, `locale`, `timezone`, `utm`: where the
    * visitor is. The assistant may use it.

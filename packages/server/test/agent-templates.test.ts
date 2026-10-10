@@ -21,7 +21,7 @@ describe('the agent templates', () => {
         await expect(validTool({ ...tool, ...(tool['headers'] ? { headers } : {}) }, null, names.filter((n) => n !== tool.name), SECRET)).resolves.toBeTruthy();
       }
       const named = new Set(promptToolRefs(template.agent.prompt ?? '').map((r) => r.name));
-      for (const name of named) if (!['lead', 'business', 'context', 'page'].includes(name)) expect(names, `{{${name}}} in the prompt`).toContain(name);
+      for (const name of named) if (!['lead', 'business', 'context', 'page', 'user'].includes(name)) expect(names, `{{${name}}} in the prompt`).toContain(name);
       // Each tool used during the chat is named in the prompt (a tool is offered only then); before/after tools run by themselves.
       for (const tool of template.agent.tools) if (!tool['before'] && !tool['after']) expect([...named], `${tool.name} in the prompt`).toContain(tool.name);
       const secrets = [...JSON.stringify(template.agent.tools).matchAll(/\$\{([A-Z0-9_]+)\}/g)].map((m) => m[1]);

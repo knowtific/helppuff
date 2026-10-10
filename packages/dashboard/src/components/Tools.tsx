@@ -42,8 +42,20 @@ type Draft = {
   timeoutMs: number;
   before: boolean;
   after: boolean;
+  when: string;
   enabled: boolean;
 };
+
+/** The conditions an after-chat tool offers, as one choice each (the API takes any path; these cover what owners ask for). */
+const WHEN_CHOICES: { value: string; label: string; when: { path: string; in?: string[] } | null }[] = [
+  { value: '', label: 'Every conversation', when: null },
+  { value: 'hot', label: 'Hot leads only', when: { path: 'labels.leadQuality', in: ['hot'] } },
+  { value: 'hot-warm', label: 'Hot or warm leads', when: { path: 'labels.leadQuality', in: ['hot', 'warm'] } },
+  { value: 'email', label: 'When there is an email', when: { path: 'lead.email' } },
+  { value: 'signed-in', label: 'Signed-in visitors only', when: { path: 'user.id' } },
+];
+const whenChoice = (when: ToolView['when']): string =>
+  WHEN_CHOICES.find((c) => JSON.stringify(c.when) === JSON.stringify(when ?? null))?.value ?? (when ? 'custom' : '');
 
 const blank = (section?: Section | 'prompt'): Draft => ({
   name: '',
@@ -60,6 +72,7 @@ const blank = (section?: Section | 'prompt'): Draft => ({
   timeoutMs: 5000,
   before: section === 'before',
   after: section === 'after',
+  when: '',
   enabled: true,
 });
 
@@ -79,6 +92,7 @@ const draftOf = (tool: ToolView): Draft => ({
   timeoutMs: tool.timeoutMs ?? 5000,
   before: tool.before,
   after: tool.after,
+  when: whenChoice(tool.when),
   enabled: tool.enabled,
 });
 
@@ -96,6 +110,8 @@ function payload(draft: Draft, args: string[]) {
     pick: draft.pick,
     keys: draft.keys,
     timeoutMs: draft.timeoutMs,
+    // A condition the dialog cannot show (set by the API) is left as it is.
+    ...(draft.when === 'custom' ? {} : { when: draft.after ? (WHEN_CHOICES.find((c) => c.value === draft.when)?.when ?? null) : null }),
   };
 }
 
@@ -202,6 +218,7 @@ export function ToolDialog({
     ...(draft.before || draft.after ? [] : ['{{args.order_number}}']),
     '{{page.url}}',
     '{{conversation.id}}',
+    '{{user.id}}',
     ...others.flatMap((t) => (t.keys.length ? t.keys.slice(0, 3).map((k) => `{{data.${t.name}.${k}}}`) : [`{{data.${t.name}}}`])).slice(0, 6),
   ];
 
@@ -289,6 +306,18 @@ export function ToolDialog({
                         <input type="checkbox" checked={draft.after} onChange={(e) => set({ after: e.target.checked })} /> After the chat
                       </label>
                     </div>
+                  </Field>
+                )}
+                {draft.kind === 'http' && draft.after && (
+                  <Field label="Only when" htmlFor="tool-when" hint="Checked when the conversation ends, on its summary, labels and contact.">
+                    <Select id="tool-when" value={draft.when} onChange={(e) => set({ when: e.target.value })}>
+                      {WHEN_CHOICES.map((c) => (
+                        <option key={c.value} value={c.value}>
+                          {c.label}
+                        </option>
+                      ))}
+                      {draft.when === 'custom' && <option value="custom">A condition set with the API</option>}
+                    </Select>
                   </Field>
                 )}
               </div>
@@ -612,10 +641,11 @@ export function promptSuggestions(list: ToolsList | null): Suggestion[] {
     ...['name', 'phone', 'email', 'address', 'hours', 'areas'].map((k) => ({ value: `business.${k}`, detail: 'Business details' })),
     { value: 'context.pageUrl', detail: 'The page the visitor is on' },
     { value: 'context.pageTitle', detail: 'The page’s title' },
+    ...['id', 'name', 'email'].map((k) => ({ value: `user.${k}`, detail: 'The signed-in visitor (verified)' })),
   ];
 }
 
-const KNOWN_ROOTS = new Set(['lead', 'context', 'site', 'business']);
+const KNOWN_ROOTS = new Set(['lead', 'context', 'site', 'business', 'user']);
 
 /** `{{name}}` that is neither a tool nor one of HelpPuff's values: probably a typo. */
 export function unknownRefs(text: string, list: ToolsList | null): string[] {

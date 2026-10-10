@@ -101,6 +101,16 @@ export function missingPrechat(tool: Tool, prechat: Record<string, string>): str
   return used.filter((key) => !prechat[key]?.trim());
 }
 
+/**
+ * Whether a tool reads the signed-in visitor (`{{user.id}}`). Such a tool
+ * runs only for a verified user: without one it is skipped (before the chat)
+ * or refused (during it), never called with an empty id.
+ */
+export function needsUser(tool: Pick<Tool, 'url' | 'headers' | 'body'>): boolean {
+  const text = [tool.url, ...(tool.headers ?? []).map((h) => h.value), tool.body].join('\n');
+  return /\{\{\s*user\.[\w-]+/.test(text);
+}
+
 /** The keys a response had, kept on the tool for the prompt's autocomplete. */
 export function responseKeys(value: unknown): string[] {
   return keyPaths(value);

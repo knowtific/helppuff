@@ -1,12 +1,13 @@
 import { promptToolRefs } from '@helppuff/protocol';
 import type { ToolsHandle } from '@helppuff/connector-types';
+import type { VerifiedUser } from '@helppuff/protocol';
 import type { SiteConfig } from '../config/schema.js';
 import { isAssistant } from '../core/assistant.js';
 import type { RequestCtx } from '../core/request.js';
 import type { PreparedConnector } from '../core/run.js';
 import { dbFrom, type D1Like } from '../db/d1.js';
-import { callHttp, extractFields, MAX_VALUE, missingPrechat, parseData, saveDataStatement, type ToolOutcome } from './run.js';
-import { openTool, siteTools, withArgs, type Tool, type ToolRow } from './store.js';
+import { callHttp, extractFields, MAX_VALUE, missingPrechat, needsUser, parseData, saveDataStatement, type ToolOutcome } from './run.js';
+import { openTool, siteTools, whenHolds, withArgs, type Tool, type ToolRow } from './store.js';
 import { capSize, type TemplateScope } from './template.js';
 
 /**
@@ -43,17 +44,24 @@ function promptText(prepared: PreparedConnector): string {
 }
 
 /** What the conversation knows that a tool's template can use, read once per turn. */
-export type ConversationFacts = { data: Record<string, unknown>; prechat: Record<string, string>; page: { url: string | null; title: string | null } };
+export type ConversationFacts = {
+  data: Record<string, unknown>;
+  prechat: Record<string, string>;
+  page: { url: string | null; title: string | null };
+  /** The signed-in visitor, verified (`{{user.*}}`); null when nobody signed in. */
+  user?: VerifiedUser | null | undefined;
+};
 
 export async function conversationFacts(db: D1Like, conversationId: string): Promise<ConversationFacts> {
   const row = await db
-    .prepare('SELECT c.data, c.page_url, c.page_title, l.name, l.email, l.phone, l.fields FROM conversations c LEFT JOIN leads l ON l.id = c.lead_id WHERE c.id = ?')
+    .prepare('SELECT c.data, c.user, c.page_url, c.page_title, l.name, l.email, l.phone, l.fields FROM conversations c LEFT JOIN leads l ON l.id = c.lead_id WHERE c.id = ?')
     .bind(conversationId)
-    .first<{ data: string | null; page_url: string | null; page_title: string | null; name: string | null; email: string | null; phone: string | null; fields: string | null }>();
+    .first<{ data: string | null; user: string | null; page_url: string | null; page_title: string | null; name: string | null; email: string | null; phone: string | null; fields: string | null }>();
   const prechat: Record<string, string> = {};
   for (const [key, value] of Object.entries(parseData(row?.fields))) if (typeof value === 'string') prechat[key] = value;
   for (const key of ['name', 'email', 'phone'] as const) if (row?.[key]) prechat[key] = row[key]!;
-  return { data: parseData(row?.data), prechat, page: { url: row?.page_url ?? null, title: row?.page_title ?? null } };
+  const user = parseData(row?.user);
+  return { data: parseData(row?.data), prechat, page: { url: row?.page_url ?? null, title: row?.page_title ?? null }, user: typeof user['id'] === 'string' ? (user as VerifiedUser) : null };
 }
 
 const schemaOf = (tool: Tool): Record<string, unknown> => {
@@ -132,6 +140,10 @@ export function toolsHandle(
         ctx.platform.log('tools.extracted', { siteId, tool: name, fields: Object.keys(values).length });
         return JSON.stringify({ saved: true, ...(missing.length ? { stillMissing: missing } : {}), note: 'Saved. Do not ask for it again.' });
       }
+      // A tool that reads {{user.*}} runs only for a signed-in visitor: the assistant cannot supply one.
+      if (needsUser(tool) && !facts.user) {
+        return JSON.stringify({ error: 'not_signed_in', note: 'This needs the visitor to be signed in on the website. Tell them to sign in to their account on the site and open the chat again; do not ask them for an account id.' });
+      }
       const scope: TemplateScope = {
         args,
         prechat: facts.prechat,
@@ -139,6 +151,7 @@ export function toolsHandle(
         page: facts.page,
         conversation: { id: sessionId },
         site: { id: siteId },
+        user: facts.user ?? {},
       };
       const outcome = await callHttp(tool, scope, globalThis.fetch.bind(globalThis), () => ctx.platform.now());
       ctx.platform.log('tools.called', { siteId, tool: name, ok: outcome.ok, status: outcome.status, ms: outcome.ms });
@@ -157,12 +170,13 @@ export function toolsHandle(
  */
 export async function runBeforeTools(
   ctx: RequestCtx,
-  options: { siteId: string; sessionId: string; tools: Tool[]; prechat: Record<string, string>; page: { url: string | null; title: string | null } },
+  options: { siteId: string; sessionId: string; tools: Tool[]; prechat: Record<string, string>; page: { url: string | null; title: string | null }; user?: VerifiedUser | null },
 ): Promise<Record<string, unknown>> {
   const db = dbFrom(ctx.env);
-  const before = options.tools.filter((t) => t.kind === 'http' && t.before && !missingPrechat(t, options.prechat).length);
+  // Skipped: a tool missing a form answer it uses, or one for signed-in visitors when nobody signed in.
+  const before = options.tools.filter((t) => t.kind === 'http' && t.before && !missingPrechat(t, options.prechat).length && (!needsUser(t) || options.user));
   if (!db || !before.length) return {};
-  const scope: TemplateScope = { prechat: options.prechat, args: {}, data: {}, page: options.page, conversation: { id: options.sessionId }, site: { id: options.siteId } };
+  const scope: TemplateScope = { prechat: options.prechat, args: {}, data: {}, page: options.page, conversation: { id: options.sessionId }, site: { id: options.siteId }, user: options.user ?? {} };
   const results = await Promise.all(
     before.map(async (tool) => {
       const outcome = await callHttp(tool, scope, globalThis.fetch.bind(globalThis), () => ctx.platform.now());
@@ -196,6 +210,8 @@ export async function runAfterTool(deps: AfterDeps, siteId: string, toolId: stri
   const opened = await openTool(row, deps.secret);
   const json = opened.headers.some((h) => h.name.toLowerCase() === 'content-type') ? [] : [{ name: 'Content-Type', value: 'application/json', secret: false }];
   const tool: Tool = opened.body || opened.method === 'GET' ? opened : { ...opened, body: '{{conversation}}', headers: [...opened.headers, ...json] };
+  // A tool for signed-in visitors does nothing for a chat nobody signed in to; one with a condition, only when it holds.
+  if ((needsUser(opened) && !event['user']) || !whenHolds(opened.when, event)) return { ok: true, status: null };
   const lead = (event['lead'] ?? null) as Record<string, unknown> | null;
   const prechat: Record<string, string> = {};
   for (const [key, value] of Object.entries({ ...((lead?.['fields'] as Record<string, unknown> | null) ?? {}), name: lead?.['name'], email: lead?.['email'], phone: lead?.['phone'] })) {
@@ -211,6 +227,7 @@ export async function runAfterTool(deps: AfterDeps, siteId: string, toolId: stri
     attributes: event['attributes'] ?? {},
     page: event['page'] ?? {},
     site: { id: siteId },
+    user: event['user'] ?? {},
     args: {},
   };
   const outcome = await callHttp(tool, scope, deps.fetch, deps.now);
