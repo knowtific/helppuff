@@ -132,7 +132,11 @@ Releases are a version bump plus a dated `CHANGELOG.md` section in a PR;
 maintainer approves it with 2FA (`wiki/Contributing.md` → Releasing).
 **Every change to what ships in `@knowtific/helppuff` bumps the version in
 the same PR**: anything under `packages/` (the widget, dashboard, server,
-protocol, connectors, rag and CLI are all bundled into it). Bump
+protocol, connectors, rag and CLI are all bundled into it). This includes
+every widget change, however small: the website and wiki publish on merge
+to `main` (`website.yml` also rebuilds on `packages/widget/**`), so a widget
+change without a bump puts docs and a playground live for a version that
+was never published. Bump
 `packages/cli/package.json` (patch for fixes, minor for features, major only
 when users must act), rename `## [Unreleased]` in `CHANGELOG.md` to
 `## [x.y.z] - YYYY-MM-DD` above a new empty `## [Unreleased]`, then

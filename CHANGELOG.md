@@ -8,7 +8,7 @@ never needs you to change anything. Upgrade with
 
 ## [Unreleased]
 
-## [0.4.1] - 2026-10-11
+## [0.5.0] - 2026-10-12
 
 ### Added: booking in the chat
 
@@ -55,6 +55,10 @@ never needs you to change anything. Upgrade with
 - The Worker's cron runs every 15 minutes (it was daily): re-crawls still
   start only when due, and synced calendars are read on their schedule.
   `helppuff upgrade` (a deploy) updates the trigger.
+
+## [0.4.1] - 2026-10-09
+
+### Changed
 
 - The setup page has three steps: your website, business details, and an
   optional assistant step (**Skip** keeps "offer a callback"). Its choices
