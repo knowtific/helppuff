@@ -1,3 +1,5 @@
+import { foundAfterLearning } from '../bookings/found.js';
+import type { KvStore } from '@helppuff/connector-types';
 import { Hono, type Context } from 'hono';
 import {
   addUsage,
@@ -387,6 +389,8 @@ knowledgeRoutes.post('/knowledge/facts/detect', async (c) => {
     { siteId, website, model: ai.chatModel, gateway: ai.gateway, userAgent: userAgentFor(new URL(c.req.url).origin), contactUrl },
   );
   await addUsage({ db: env.db, now: () => now }, siteId, detected.neurons);
+  // A booking link on those pages is offered at once, not only when the crawl ends.
+  await foundAfterLearning({ db: env.db, kv: c.get('helppuff').env['HELPPUFF_KV'] as KvStore | undefined, now: () => now }, siteId).catch(() => {});
   const facts = await readFacts(env.db, siteId);
   return c.json({ found: detected.found, facts: facts.map((f) => ({ key: f.key, value: f.value, source: f.source_url === 'owner' ? 'owner' : 'site' })) });
 });

@@ -12,7 +12,7 @@ import { canonicalUrl } from './url.js';
  */
 
 export type Fact = { key: FactKey; value: string };
-export type FactKey = 'name' | 'phone' | 'email' | 'address' | 'hours' | 'serviceAreas' | 'priceRange' | 'description';
+export type FactKey = 'name' | 'phone' | 'email' | 'address' | 'hours' | 'serviceAreas' | 'priceRange' | 'description' | 'booking' | 'bookingPage';
 
 export type ExtractedPage = {
   url: string;
@@ -85,7 +85,7 @@ function absolute(href: string | undefined, base: string): string | null {
 export function extractPage(html: string, url: string): ExtractedPage {
   const root = parse(html, { comment: false, blockTextElements: { script: true, style: false, noscript: false, pre: true } });
 
-  const facts = [...jsonLdFacts(root), ...linkFacts(root)];
+  const facts = [...jsonLdFacts(root), ...linkFacts(root), ...bookingFacts(root, url)];
   const faqs = jsonLdFaqs(root);
   const description = meta(root, 'description') ?? meta(root, 'og:description');
   if (description) facts.push({ key: 'description', value: description.slice(0, 500) });
@@ -373,6 +373,82 @@ function linkFacts(root: HTMLElement): Fact[] {
     }
   }
   return facts;
+}
+
+/**
+ * Where visitors book, from the page's links, embeds and iframes (before
+ * they are dropped): a known booking provider is `booking`; a booking page
+ * on the site itself ("Book a call", /book) is the weaker `bookingPage`.
+ * Settings → Bookings offers the link when the owner has not chosen.
+ */
+export const BOOKING_PROVIDERS: { name: string; host: RegExp; path?: RegExp }[] = [
+  { name: 'Calendly', host: /(^|\.)calendly\.com$/, path: /^\/[^/]+/ },
+  { name: 'Cal.com', host: /(^|\.)cal\.com$/, path: /^\/(?!(pricing|blog|docs|signup|login|enterprise|about)\b)[^/]+/ },
+  { name: 'SavvyCal', host: /(^|\.)savvycal\.com$/, path: /^\/[^/]+/ },
+  { name: 'TidyCal', host: /(^|\.)tidycal\.com$/, path: /^\/[^/]+/ },
+  { name: 'zcal', host: /(^|\.)zcal\.co$/, path: /^\/[^/]+/ },
+  { name: 'YouCanBook.me', host: /\.youcanbook\.me$/ },
+  { name: 'Acuity Scheduling', host: /(\.acuityscheduling\.com|(^|\.)as\.me)$/ },
+  { name: 'Square Appointments', host: /(^|\.)(squareup\.com|square\.site)$/, path: /appointments|book/ },
+  { name: 'Setmore', host: /(^|\.)setmore\.com$/ },
+  { name: 'SimplyBook.me', host: /\.simplybook\.(me|it|asia)$/ },
+  { name: 'HubSpot Meetings', host: /^meetings(-[a-z0-9]+)?\.hubspot\.com$/ },
+  { name: 'Google Calendar', host: /^calendar\.(google|app\.google)\.com$/, path: /appointments|schedules|^\/[A-Za-z0-9]+$/ },
+  { name: 'Microsoft Bookings', host: /^(outlook\.office365\.com|outlook\.office\.com|book\.ms)$/, path: /bookings|^\/[^/]+/ },
+  { name: 'Zoho Bookings', host: /(^|\.)(zohobookings\.[a-z.]+|bookings\.zoho\.[a-z.]+)$/ },
+  { name: 'Fresha', host: /(^|\.)fresha\.com$/, path: /^\/(a|book|lvp)\b/ },
+  { name: 'Booksy', host: /(^|\.)booksy\.com$/ },
+  { name: 'Mindbody', host: /(^|\.)(mindbodyonline\.com|mindbody\.io)$/ },
+  { name: 'OpenTable', host: /(^|\.)opentable\.[a-z.]+$/, path: /^\/(r|restref|restaurant)\b/ },
+  { name: 'Resy', host: /(^|\.)resy\.com$/, path: /^\/cities\// },
+];
+
+/** The booking provider a URL is on, if any. */
+export function bookingProvider(href: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(href);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:') return null;
+  const found = BOOKING_PROVIDERS.find((p) => p.host.test(url.hostname.toLowerCase()) && (!p.path || p.path.test(url.pathname)));
+  return found?.name ?? null;
+}
+
+const BOOK_TEXT = /\b(book|schedule|reserve)\b.{0,24}\b(call|appointment|consult(ation)?|meeting|demo|session|visit|time|online|now|table)\b|^\s*book( now| online)?\s*$/i;
+const BOOK_PATH = /^\/(book(ing|ings)?|appointments?|schedule|reserve|reservations?)(\/|$)/i;
+
+function bookingFacts(root: HTMLElement, url: string): Fact[] {
+  const candidates: string[] = [];
+  for (const node of root.querySelectorAll('a[href],iframe[src],[data-url],[data-cal-link]')) {
+    const calLink = node.getAttribute('data-cal-link');
+    if (calLink && /^[\w-]+(\/[\w-]+)?$/.test(calLink.trim())) {
+      // A Cal.com embed: its own origin when self-hosted, else cal.com.
+      const origin = node.getAttribute('data-cal-origin')?.trim();
+      candidates.push(`${origin && /^https:\/\//.test(origin) ? origin.replace(/\/+$/, '') : 'https://cal.com'}/${calLink.trim()}`);
+      continue;
+    }
+    const raw = node.getAttribute('href') ?? node.getAttribute('src') ?? node.getAttribute('data-url');
+    const href = absolute(raw ?? undefined, url);
+    if (href) candidates.push(href);
+  }
+  const provider = candidates.find((href) => bookingProvider(href));
+  if (provider) return [{ key: 'booking', value: provider.split('#')[0]!.slice(0, 500) }];
+  // A booking page on the site itself, by what the link says or where it goes.
+  let origin: string;
+  try {
+    origin = new URL(url).origin;
+  } catch {
+    return [];
+  }
+  for (const a of root.querySelectorAll('a[href]')) {
+    const href = absolute(a.getAttribute('href'), url);
+    if (!href || !href.startsWith(origin)) continue;
+    const path = new URL(href).pathname;
+    if (BOOK_PATH.test(path) || BOOK_TEXT.test(clean(a.text))) return [{ key: 'bookingPage', value: href.split('#')[0]!.slice(0, 500) }];
+  }
+  return [];
 }
 
 function decodeSafe(value: string): string {

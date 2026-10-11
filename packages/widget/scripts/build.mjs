@@ -28,7 +28,7 @@ const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).ver
  * The app's 35 kb is the number that reflects real payload, since that
  * bundle carries Preact and every component. Keep that one honest.
  */
-export const BUDGETS = { 'loader.js': 8 * 1024, app: 35 * 1024, live: 6 * 1024 };
+export const BUDGETS = { 'loader.js': 8 * 1024, app: 35 * 1024, live: 6 * 1024, booking: 8 * 1024 };
 
 rmSync(dist, { recursive: true, force: true });
 mkdirSync(dist, { recursive: true });
@@ -86,6 +86,26 @@ await build({
 const liveFile = readdirSync(dist).find((name) => /^live-.*\.js$/.test(name));
 if (!liveFile) throw new Error('live chunk was not emitted');
 
+// 0b. Booking's chunk: the date picker and the appointment card, loaded by the
+// app only when a booking message is shown. No Preact, no Zod.
+await build({
+  ...shared,
+  build: {
+    outDir: dist,
+    emptyOutDir: false,
+    target: 'es2019',
+    minify: 'esbuild',
+    rollupOptions: {
+      input: join(root, 'src/booking/index.ts'),
+      preserveEntrySignatures: 'exports-only',
+      output: { format: 'es', entryFileNames: 'booking-[hash].js', inlineDynamicImports: true },
+    },
+  },
+});
+
+const bookingFile = readdirSync(dist).find((name) => /^booking-.*\.js$/.test(name));
+if (!bookingFile) throw new Error('booking chunk was not emitted');
+
 // 1. The app chunk: an ES module, content-hashed, with Preact bundled privately.
 await build({
   ...shared,
@@ -103,7 +123,7 @@ await build({
     },
   },
   // The app resolves the live chunk against its own URL.
-  define: { ...shared.define, __HELPPUFF_APP_FILE__: '""', __HELPPUFF_LIVE_FILE__: JSON.stringify(`./${liveFile}`) },
+  define: { ...shared.define, __HELPPUFF_APP_FILE__: '""', __HELPPUFF_LIVE_FILE__: JSON.stringify(`./${liveFile}`), __HELPPUFF_BOOKING_FILE__: JSON.stringify(`./${bookingFile}`) },
 });
 
 const appFile = readdirSync(dist).find((name) => /^app-.*\.js$/.test(name));
@@ -136,13 +156,13 @@ let failed = false;
 for (const name of readdirSync(dist).filter((f) => f.endsWith('.js'))) {
   const raw = readFileSync(join(dist, name));
   const gz = gzipSync(raw, { level: 9 }).length;
-  const budget = name === 'loader.js' ? BUDGETS['loader.js'] : name.startsWith('live-') ? BUDGETS.live : BUDGETS.app;
+  const budget = name === 'loader.js' ? BUDGETS['loader.js'] : name.startsWith('live-') ? BUDGETS.live : name.startsWith('booking-') ? BUDGETS.booking : BUDGETS.app;
   const over = gz > budget;
   if (over) failed = true;
   report.push({ name, raw: raw.length, gz, budget, ok: !over });
 }
 
-writeFileSync(join(dist, 'manifest.json'), JSON.stringify({ version, app: appFile, live: liveFile }, null, 2));
+writeFileSync(join(dist, 'manifest.json'), JSON.stringify({ version, app: appFile, live: liveFile, booking: bookingFile }, null, 2));
 
 /*
  * Headers for the Worker's static assets.
@@ -166,6 +186,10 @@ writeFileSync(
     '  Access-Control-Allow-Origin: *',
     '',
     '/live-*.js',
+    '  Cache-Control: public, max-age=31536000, immutable',
+    '  Access-Control-Allow-Origin: *',
+    '',
+    '/booking-*.js',
     '  Cache-Control: public, max-age=31536000, immutable',
     '  Access-Control-Allow-Origin: *',
     '',

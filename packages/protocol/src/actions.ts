@@ -11,6 +11,7 @@ export const actionSchema = z.discriminatedUnion('kind', [
   z.object({ id, kind: z.literal('email').describe('Write an email.'), label, email: z.string().min(3).max(200).describe('The address to write to.') }),
   z.object({ id, kind: z.literal('flow').describe('Start one of `widget.flows`.'), label, flowId: id.describe('The flow\'s id.') }),
   z.object({ id, kind: z.literal('form').describe('Open one of `widget.forms`.'), label, formId: id.describe('The form\'s id.') }),
+  z.object({ id, kind: z.literal('booking').describe('Open the booking calendar in the chat (Settings → Bookings: date picker in the chat).'), label }),
 ]).describe('What happens when the button is pressed. `kind` picks it.');
 
 export type Action = z.infer<typeof actionSchema>;

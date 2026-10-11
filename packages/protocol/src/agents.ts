@@ -16,7 +16,7 @@ export type AgentFile = {
   name: string;
   description?: string;
   prompt?: string;
-  settings?: { behaviour?: Record<string, unknown>; leads?: { enabled?: boolean; fields?: Record<string, unknown>[] } };
+  settings?: { behaviour?: Record<string, unknown>; leads?: { enabled?: boolean; fields?: Record<string, unknown>[] }; bookings?: Record<string, unknown> };
   tools: AgentTool[];
   needs: { name: string; description: string }[];
 };

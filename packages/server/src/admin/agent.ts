@@ -18,7 +18,9 @@ import { insertTool, updateTool } from './tools.js';
  * share, keep in a project and import again (the dashboard's Import &
  * export page, `helppuff agent`, the tutorials' templates). It holds what
  * makes the assistant do a job: the prompt, the tools, and the behaviour and
- * lead form settings. Not the branding, the knowledge, the team or the keys.
+ * lead form settings, and how visitors book (without the calendar's own
+ * ids: those belong to the account it is imported into). Not the branding,
+ * the knowledge, the team or the keys.
  *
  * Secrets never travel in it. A tool's credential header holds a placeholder,
  * `"Bearer ${SHIPPO_TOKEN}"`, named in `needs`; importing asks for each
@@ -28,6 +30,13 @@ import { insertTool, updateTool } from './tools.js';
  * tools (matched by name: created or replaced), and the prompt as a new
  * version.
  */
+
+/** Bookings, when a mode was chosen: which calendar it syncs with, never the account's own ids or keys. */
+function bookingsOf(bookings: ReturnType<typeof readSettings>['bookings']) {
+  if (!bookings?.mode) return {};
+  const { account: _account, calendar: _calendar, eventType: _eventType, ...portable } = bookings;
+  return { bookings: portable };
+}
 
 export const agentRoutes = new Hono<HonoEnv>();
 
@@ -42,7 +51,7 @@ export const agentFileSchema = z.object({
   name: z.string().min(1).max(120),
   description: z.string().max(2000).optional(),
   prompt: z.string().max(PROMPT_LIMIT).optional(),
-  settings: settingsPatchSchema.pick({ behaviour: true, leads: true }).optional(),
+  settings: settingsPatchSchema.pick({ behaviour: true, leads: true, bookings: true }).optional(),
   tools: z.array(z.record(z.unknown())).max(MAX_TOOLS_PER_SITE).default([]),
   needs: z.array(needSchema).max(30).default([]),
 });
@@ -154,7 +163,7 @@ agentRoutes.get('/agent/export', async (c) => {
     name: site.widget.brand.name && site.widget.brand.name !== 'Chat' ? `${site.widget.brand.name} assistant` : `${siteId} assistant`,
     description: `Exported from ${siteId} on ${new Date(c.get('helppuff').platform.now()).toISOString().slice(0, 10)}.`,
     ...(state.editable && state.text ? { prompt: state.text } : {}),
-    settings: { behaviour: settings.behaviour, leads: settings.leads },
+    settings: { behaviour: settings.behaviour, leads: settings.leads, ...bookingsOf(settings.bookings) },
     tools,
     needs,
   };

@@ -629,6 +629,60 @@ export const MIGRATIONS: readonly Migration[] = [
       'ALTER TABLE tools ADD COLUMN run_when TEXT',
     ],
   },
+  {
+    id: 14,
+    name: 'appointments_and_integrations',
+    // Appointments (Settings → Bookings: the date picker): part of a job, kept
+    // here whichever calendar is synced. `slot_lock` holds a booked start time
+    // (NULL once cancelled), so two visitors cannot book the same time.
+    // `status` `busy` is an event found in the synced calendar that matched
+    // no contact: shown as busy time, with no job. `meta` keeps a provider's
+    // extras (a Calendly invitee's reschedule link).
+    // Integrations (Composio, Cal.com, Calendly): rows in the existing
+    // `integrations` table, the key sealed with HELPPUFF_SECRET.
+    statements: [
+      `CREATE TABLE IF NOT EXISTS appointments (
+        id TEXT PRIMARY KEY,
+        site_id TEXT NOT NULL,
+        job_id TEXT,
+        lead_id TEXT,
+        conversation_id TEXT,
+        title TEXT NOT NULL,
+        starts_at INTEGER NOT NULL,
+        ends_at INTEGER NOT NULL,
+        timezone TEXT NOT NULL,
+        location TEXT,
+        status TEXT NOT NULL,
+        source TEXT NOT NULL,
+        provider TEXT NOT NULL DEFAULT 'none',
+        external_id TEXT,
+        attendee_name TEXT,
+        attendee_email TEXT,
+        attendee_phone TEXT,
+        notes TEXT,
+        meta TEXT,
+        idem_key TEXT,
+        slot_lock TEXT,
+        reminded_at INTEGER,
+        created_by TEXT,
+        created_by_name TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        synced_at INTEGER
+      )`,
+      'CREATE INDEX IF NOT EXISTS appointments_site_start ON appointments (site_id, starts_at)',
+      'CREATE INDEX IF NOT EXISTS appointments_job ON appointments (job_id)',
+      'CREATE INDEX IF NOT EXISTS appointments_lead ON appointments (lead_id)',
+      'CREATE INDEX IF NOT EXISTS appointments_conversation ON appointments (conversation_id)',
+      'CREATE UNIQUE INDEX IF NOT EXISTS appointments_idem ON appointments (site_id, idem_key)',
+      'CREATE UNIQUE INDEX IF NOT EXISTS appointments_slot ON appointments (site_id, slot_lock)',
+      'CREATE UNIQUE INDEX IF NOT EXISTS appointments_external ON appointments (site_id, provider, external_id)',
+      // Integrations share live chat's table (one row per site and kind; Telegram's is there):
+      // what was learned about the account, and when it was last used.
+      'ALTER TABLE integrations ADD COLUMN meta TEXT',
+      'ALTER TABLE integrations ADD COLUMN last_at INTEGER',
+    ],
+  },
 ];
 
 export const LATEST_MIGRATION = MIGRATIONS[MIGRATIONS.length - 1]!.id;

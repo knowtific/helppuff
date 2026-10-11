@@ -76,6 +76,8 @@ caps.
 | `limits.maxLeadFieldLength` | 200 | Characters in one form answer | Each request | 400 (pre-chat form); cut to length (inline forms) |
 | `limits.maxLeadMessageLength` | 2000 | Characters in a form's message box | Each request | As above |
 | `limits.feedbackPerIpPerMinute` | 30 | Thumbs up or down from one visitor a minute | In the Worker's memory, per isolate (best effort, no KV write) | 429 |
+| `limits.slotLookupsPerIpPerMinute` | 30 | Times one visitor loads free times in the booking calendar a minute | In the Worker's memory, per isolate (best effort, no KV write) | 429 |
+| `limits.bookingsPerIpPerHour` | 5 | Appointments one visitor books, moves or cancels from the chat an hour | In the Worker's memory, per isolate (best effort, no KV write) | 429 |
 | `limits.pollsPerIpPerMinute` | 120 | Checks for new messages from one visitor a minute (Retell) | In memory | 429 |
 | `limits.endsPerIpPerMinute` | 10 | Chats one visitor closes a minute. A chat's `conversation.ended` webhook fires once, whatever is replayed | In memory; once-only in D1 | 429 |
 | `limits.retellLookupsPerMinute` | 120 | Knowledge-base lookups by a Retell agent a minute, whole site | KV | 429 |

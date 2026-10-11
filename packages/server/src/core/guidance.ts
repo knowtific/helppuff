@@ -1,6 +1,9 @@
 import { UNTRUSTED_RULES, type PromptGuidance } from '@helppuff/connector-types';
 import type { SiteConfig } from '../config/schema.js';
 import { isAssistant } from './assistant.js';
+import { effectiveBooking } from '../bookings/found.js';
+import { bookingsOf } from '../bookings/service.js';
+import { longNow } from '../bookings/time.js';
 
 /**
  * What HelpPuff tells the model around the owner's prompt, built from settings
@@ -31,7 +34,25 @@ const TONE: Record<SiteConfig['assistant']['tone'], string> = {
   casual: 'Keep it relaxed and conversational.',
 };
 
-export function guidanceFor(site: SiteConfig): PromptGuidance {
+/**
+ * How visitors book, for the model: the link, or the calendar in the chat
+ * (which books; the model never does: wiki AI-Booking-Tests).
+ */
+function bookingLines(site: SiteConfig): string[] {
+  const booking = effectiveBooking(site, site.bookingFound ?? null);
+  if (booking.mode === 'link' && booking.link) {
+    return [`- To book an appointment, visitors use ${booking.link} (a "${booking.label}" button for it is shown in the chat). Offer it when they want to book; never say a time is free or booked.`];
+  }
+  if (booking.mode !== 'picker') return [];
+  return isAssistant(site)
+    ? [
+        '- When the visitor wants to book an appointment, use show_booking: it shows a calendar of the real free times in the chat, where they pick a time and book it themselves. You may narrow it to the days or part of the day they asked for.',
+        '- Never book, hold or confirm a time yourself, never say a time is free or taken, and never ask for a time to book it: the calendar does that.',
+      ]
+    : [`- When the visitor wants to book an appointment, tell them to use the "${booking.label}" button: it shows the free times and books one. Never book, confirm or promise a time yourself.`];
+}
+
+export function guidanceFor(site: SiteConfig, now = Date.now()): PromptGuidance {
   const options = (site.connector.options ?? {}) as { maxAnswerSentences?: unknown; locale?: unknown; business?: { name?: unknown } };
   const business = businessName(site, options.business?.name);
   const agent = site.widget.brand.agentName && site.widget.brand.agentName !== 'Assistant' ? `${site.widget.brand.agentName}, ` : '';
@@ -43,8 +64,10 @@ export function guidanceFor(site: SiteConfig): PromptGuidance {
   // HelpPuff's assistant is handed the visitor's details on every answer; other backends only through the prompt.
   const fields = isAssistant(site) || !site.widget.leadForm.enabled ? [] : site.widget.leadForm.fields.map((f) => f.name).filter((f) => f !== 'message');
 
+  const zone = bookingsOf(site).timezone;
   const before = [
     `You are ${agent}the website assistant for ${business}${website ? ` (${website})` : ''}. Speak as part of the ${business} team: "we" and "our".`,
+    `Now: ${longNow(now, zone)} (${zone}).`,
     GOAL[goal](bookingUrl),
     `${TONE[tone]} ${length === 'short' ? `Keep answers to ${sentences} sentences or fewer unless the visitor asks for steps or a list.` : 'Give complete answers; use short lists for steps or options.'}`,
     'Use plain Markdown only: paragraphs, **bold**, lists and links. No headings or tables.',
@@ -70,6 +93,7 @@ export function guidanceFor(site: SiteConfig): PromptGuidance {
           '- When the visitor wants a person, a quote or a booking, give them the contact details and ask for the best way to reach them, unless they gave it already.',
         ]),
     // The owner's text is how they correct an out-of-date page: it has to outrank the site.
+    ...bookingLines(site),
     '- What the business says under "Instructions from the business" is true. Where a website page or document says otherwise, the business\'s instructions win: the page may be out of date.',
     '- If the visitor states something about the business that you were not told, or that contradicts what you were told, say so politely and give what you know.',
     `- If asked whether this chat is saved or who sees it, say it is kept so the team can follow up${privacy ? `, and point to the privacy policy: ${privacy}` : ''}.`,

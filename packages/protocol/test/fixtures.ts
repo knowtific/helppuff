@@ -35,6 +35,10 @@ export const validMessages: Message[] = [
     submitLabel: 'Send',
   },
   { ...base, role: 'system', type: 'handover', status: 'joined', text: 'Sam joined the chat.', agentName: 'Sam' },
+  { ...base, type: 'booking', text: 'Pick a time', from: '2026-10-15', to: '2026-10-16', part: 'morning', prefill: { name: 'Ada', email: 'ada@example.com' } },
+  { ...base, type: 'booking', reschedule: 'apt_1' },
+  { ...base, type: 'booking', booked: { id: 'apt_1', title: 'Consultation', start: 1760500800000, end: 1760502600000, timezone: 'Australia/Perth', status: 'confirmed', location: 'Our office', cancel: true, change: false } },
+  { ...base, type: 'card', title: 'Pick a time', actions: [{ id: 'booking', kind: 'booking', label: 'Book a time' }] },
 ];
 
 /** Each entry must be rejected by `messageSchema`. */
@@ -58,6 +62,8 @@ export const invalidMessages: Array<[name: string, value: unknown]> = [
   ['form with no fields', { ...base, type: 'form', fields: [] }],
   ['field with unknown type', { ...base, type: 'form', fields: [{ name: 'a', label: 'A', type: 'color' }] }],
   ['handover with unknown status', { ...base, type: 'handover', status: 'busy', text: 'x' }],
+  ['booked without a title', { ...base, type: 'booking', booked: { id: 'apt_1', start: 1, end: 2, timezone: 'UTC', status: 'confirmed' } }],
+  ['booked with an unknown status', { ...base, type: 'booking', booked: { id: 'apt_1', title: 'x', start: 1, end: 2, timezone: 'UTC', status: 'maybe' } }],
   ['null', null],
   ['array', []],
   ['string', 'text'],

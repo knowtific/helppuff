@@ -1,4 +1,4 @@
-import { ArrowUpCircle, Bot, Briefcase, ChartColumn, ChevronDown, CircleHelp, House, LogOut, MessagesSquare, Moon, PanelsTopLeft, PhoneCall, Server, Settings, Sun, Users } from 'lucide-react';
+import { ArrowUpCircle, Bot, Briefcase, CalendarDays, ChartColumn, ChevronDown, CircleHelp, House, LogOut, MessagesSquare, Moon, PanelsTopLeft, PhoneCall, Server, Settings, Sun, Users } from 'lucide-react';
 import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import { api, isMember, type CallbackList, type LiveStatus, type Me, type Prefs, type Site } from '../lib/api';
 import { onToast, setAvailable, unlockAudio, useLiveConnection, useLiveEvents, type Toast } from '../lib/live';
@@ -37,10 +37,13 @@ const ALL_NAV: {
   knowledge?: boolean;
   /** Admins only (members see the inbox). */
   admin?: boolean;
+  /** Only with the date picker on (Settings → Bookings). */
+  picker?: boolean;
 }[] = [
   { page: 'home', label: 'Home', icon: <House />, admin: true },
   { page: 'conversations', label: 'Conversations', icon: <MessagesSquare /> },
   { page: 'jobs', label: 'Jobs', icon: <Briefcase /> },
+  { page: 'calendar', label: 'Calendar', icon: <CalendarDays />, picker: true },
   { page: 'leads', label: 'Contacts', icon: <Users /> },
   { page: 'callbacks', label: 'Callbacks', icon: <PhoneCall /> },
   { page: 'analytics', label: 'Analytics', icon: <ChartColumn />, admin: true },
@@ -48,7 +51,7 @@ const ALL_NAV: {
 ];
 
 /** Settings, one page per topic; the sidebar opens them as a sub-menu. */
-export type SettingsSection = 'chat' | 'home' | 'appearance' | 'leads' | 'instructions' | 'agent' | 'business' | 'advanced' | 'live' | 'labels' | 'jobs' | 'notifications' | 'webhooks' | 'api' | 'team' | 'updates';
+export type SettingsSection = 'chat' | 'home' | 'appearance' | 'leads' | 'instructions' | 'agent' | 'business' | 'bookings' | 'advanced' | 'live' | 'labels' | 'jobs' | 'notifications' | 'webhooks' | 'integrations' | 'api' | 'team' | 'updates';
 
 /** The Prompt page (the owner's prompt, its versions, and the site's tools) in the Settings menu, after Instructions. */
 export const PROMPT_LABEL = 'Prompt & tools';
@@ -57,10 +60,10 @@ export type SettingsLink = { key: string; label: string; href: string; current: 
 export type SettingsGroup = { label: string; icon: ReactNode; items: SettingsLink[] };
 
 const GROUPS: { label: string; icon: ReactNode; keys: string[] }[] = [
-  { label: 'Assistant', icon: <Bot />, keys: ['instructions', 'prompt', 'knowledge', 'business', 'agent'] },
+  { label: 'Assistant', icon: <Bot />, keys: ['instructions', 'prompt', 'knowledge', 'business', 'bookings', 'agent'] },
   { label: 'Widget', icon: <PanelsTopLeft />, keys: ['chat', 'home', 'appearance', 'leads'] },
   { label: 'Team', icon: <Users />, keys: ['live', 'labels', 'jobs', 'notifications'] },
-  { label: 'System', icon: <Server />, keys: ['advanced', 'webhooks', 'api', 'team', 'updates'] },
+  { label: 'System', icon: <Server />, keys: ['advanced', 'webhooks', 'integrations', 'api', 'team', 'updates'] },
 ];
 
 /**
@@ -115,6 +118,7 @@ export function settingsSections(site: Site | undefined, me?: Me): { id: Setting
     // A backend that keeps its own prompt (Retell, an OpenAI stored prompt, a test backend) has no use for these.
     ...(site?.prompt !== false ? [{ id: 'instructions' as const, label: 'Instructions' }] : []),
     ...(site?.knowledge ? [{ id: 'business' as const, label: 'Business details' }] : []),
+    { id: 'bookings' as const, label: 'Bookings' },
     ...(site?.prompt !== false ? [{ id: 'agent' as const, label: 'Import & export' }] : []),
     { id: 'live' as const, label: 'Live chat' },
     { id: 'labels' as const, label: 'Labels' },
@@ -122,6 +126,8 @@ export function settingsSections(site: Site | undefined, me?: Me): { id: Setting
     ...(live ? [{ id: 'notifications' as const, label: 'Notifications' }] : []),
     ...(site?.knowledge || site?.connector === 'workers-ai' ? [{ id: 'advanced' as const, label: 'Advanced' }] : []),
     { id: 'webhooks' as const, label: 'Webhooks' },
+    // Keys for other services: shown while a feature can use one (bookings' calendar sync, for now).
+    ...(site?.bookings === 'picker' ? [{ id: 'integrations' as const, label: 'Integrations' }] : []),
     { id: 'api' as const, label: 'API keys' },
     { id: 'team' as const, label: 'Team & security' },
     { id: 'updates' as const, label: 'Updates' },
@@ -238,7 +244,7 @@ export function Shell({ me, route, onLogout, children }: { me: Me; route: Route;
   const site = me.sites[0];
   const member = isMember(me);
   // A member with live chat off has no settings at all: no Settings entry.
-  const NAV = ALL_NAV.filter((item) => (!item.knowledge || site?.knowledge) && (!item.admin || !member) && (item.page !== 'settings' || !member || site?.live));
+  const NAV = ALL_NAV.filter((item) => (!item.knowledge || site?.knowledge) && (!item.admin || !member) && (!item.picker || site?.bookings === 'picker') && (item.page !== 'settings' || !member || site?.live));
   const inSettings = route.page === 'settings' || route.page === 'prompt' || route.page === 'knowledge';
   const menu = settingsMenu(site, me);
   // A bare #/settings shows the first settings page.

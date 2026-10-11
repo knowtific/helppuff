@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { PageHeader } from '../components/Shell';
 import { Avatar, Badge, Button, Card, Empty, ErrorNote, InfoTip, Input, Segmented, Select, Skeleton, StatusBadge, Textarea } from '../components/ui';
 import { AttributesEditor, ConversationStatusBadge, LabelChip, LabelPicker, NotesPanel, SideSection, ToolData, useLabels, WaitingBadge } from '../components/inbox';
+import { RelatedAppointments } from '../components/Appointments';
 import { api, isMember, parseSummary, type ConversationDetail, type ConversationRow, type Me, type StoredMessage, type Summary, type Team } from '../lib/api';
 import { sendTyping, useLiveEvents } from '../lib/live';
 import { RelatedJobs } from './Jobs';
@@ -455,6 +456,11 @@ function Detail({ id, me, team, onChanged }: { id: string; me: Me; team: Team | 
           <SideSection title="Jobs">
             <RelatedJobs filter={{ conversation: id }} context={{ conversationId: id, label: 'From this conversation: its contact is linked.' }} />
           </SideSection>
+          {me.sites[0]?.bookings === 'picker' && (
+            <SideSection title="Appointments">
+              <RelatedAppointments filter={{ conversation: id }} context={{ label: 'Booked by hand: the conversation stays as it is.' }} admin={!member} />
+            </SideSection>
+          )}
           <SideSection title="Labels">
             <LabelPicker value={data.labels ?? []} onChange={(ids) => void patch({ labels: ids })} canManage={!member} />
           </SideSection>

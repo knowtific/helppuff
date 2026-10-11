@@ -47,6 +47,10 @@ const MEMBER_ROUTES: [method: string | '*', path: RegExp][] = [
   ['GET', /^\/jobs(\/pipeline)?$/],
   ['POST', /^\/jobs$/],
   ['*', /^\/jobs\/(?!pipeline|setup)[^/]+(\/(move|updates|notes))?$/],
+  ['GET', /^\/bookings$/],
+  ['GET', /^\/appointments$/],
+  ['POST', /^\/appointments(\/sync)?$/],
+  ['*', /^\/appointments\/(?!sync)[^/]+$/],
 ];
 
 export function memberMay(method: string, path: string): boolean {

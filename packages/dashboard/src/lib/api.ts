@@ -49,6 +49,8 @@ export type Site = {
   live?: boolean;
   /** HelpPuff writes the backend's prompt, so Instructions and Prompt & tools apply. Absent from older Workers (treated as yes). */
   prompt?: boolean;
+  /** How visitors book: `picker` turns on the Calendar page and appointments on jobs. Absent from older Workers. */
+  bookings?: 'none' | 'link' | 'picker';
 };
 /** `member`: the inbox only (conversations, jobs, contacts, callbacks, live chat); `admin` and `owner`: everything. */
 export type Role = 'owner' | 'admin' | 'member';
@@ -446,7 +448,84 @@ export type Settings = {
   live?: LiveSettings;
   /** The widget's first screen. Absent from older Workers. */
   home?: HomeSettings;
+  /** Appointments: how visitors book, the date picker's calendar. Absent from older Workers. */
+  bookings?: BookingsSettings;
 };
+
+export type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+export type CalendarSync = 'none' | 'calcom' | 'calendly' | 'google' | 'outlook';
+export type BookingsSettings = {
+  /** Absent: the website decides (a booking link found on it). */
+  mode?: 'none' | 'link' | 'picker';
+  link?: string;
+  label: string;
+  sync: CalendarSync;
+  account?: string;
+  calendar?: string;
+  eventType?: string;
+  title: string;
+  duration: number;
+  hours: Record<Weekday, string[]>;
+  buffer: number;
+  notice: number;
+  daysAhead: number;
+  timezone?: string;
+  phone: 'off' | 'optional' | 'required';
+  location?: string;
+  syncMinutes: number;
+};
+/** A patch: null clears a field (`mode: null`: the website decides again). */
+export type BookingsPatch = { [K in keyof BookingsSettings]?: BookingsSettings[K] | null };
+export type IntegrationView = {
+  kind: 'composio' | 'calcom' | 'calendly';
+  name: string;
+  connected: boolean;
+  baseUrl: string | null;
+  status: string;
+  lastError: string | null;
+  lastAt: number | null;
+  account: string | null;
+  plan: string | null;
+  createdAt: number | null;
+  updatedAt: number | null;
+};
+export type BookingsStatus = {
+  site: string;
+  effective: { mode: 'none' | 'link' | 'picker'; link: string | null; label: string; chosen: boolean };
+  found: { url: string; provider: string | null; page: string | null; at: number } | null;
+  timezone: string;
+  calendar: { sync: CalendarSync; integration: IntegrationView | null; ready: boolean };
+  syncedAt: number | null;
+  upcoming: number;
+};
+export type BookingSlots = { timezone: string; days: { date: string; slots: { start: number; end: number }[] }[]; next: string; title: string; duration: number; phone: 'off' | 'optional' | 'required' };
+export type EventType = { id: string; name: string; duration: number | null };
+export type AppointmentStatus = 'confirmed' | 'pending' | 'cancelled' | 'completed' | 'no_show' | 'busy';
+export type Appointment = {
+  id: string;
+  title: string;
+  start: number;
+  end: number;
+  startIso: string;
+  endIso: string;
+  timezone: string;
+  status: AppointmentStatus;
+  source: 'chat' | 'dashboard' | 'api' | 'provider';
+  provider: CalendarSync;
+  externalId: string | null;
+  location: string | null;
+  notes: string | null;
+  attendee: { name: string | null; email: string | null; phone: string | null } | null;
+  job: { id: string; number: number | null; title: string | null } | null;
+  contact: { id: string; name: string | null; email: string | null } | null;
+  conversationId: string | null;
+  rescheduleUrl: string | null;
+  createdBy: string | null;
+  createdAt: number;
+  updatedAt: number;
+  syncedAt: number | null;
+};
+export type SyncResult = { synced: boolean; reason?: string; added: number; updated: number; cancelled: number; busy: number; at: number | null };
 export type ShortcutAction =
   | { id: string; kind: 'reply'; label: string; value: string }
   | { id: string; kind: 'url'; label: string; url: string; newTab?: boolean }
@@ -470,6 +549,8 @@ export type Limits = {
   maxLeadFieldLength: number;
   maxLeadMessageLength: number;
   feedbackPerIpPerMinute: number;
+  slotLookupsPerIpPerMinute: number;
+  bookingsPerIpPerHour: number;
   pollsPerIpPerMinute: number;
   endsPerIpPerMinute: number;
   retellLookupsPerMinute: number;
@@ -566,7 +647,7 @@ export type Job = {
   fields: Record<string, string>;
   contact: { id: string; name: string | null; email: string | null; phone: string | null } | null;
   conversationId: string | null;
-  source: 'chat' | 'quote' | 'api' | 'manual' | 'callback';
+  source: 'chat' | 'quote' | 'api' | 'manual' | 'callback' | 'booking';
   value: number | null;
   valueCents: number | null;
   currency: string | null;

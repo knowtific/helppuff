@@ -342,6 +342,7 @@ else keeps its default. Two kinds of setting:
 | Team members | `users add <email> --role admin\|member`, `users role <email> <role>`, `users remove <email>` |
 | Labels for conversations | `api POST /labels --data '{"name":"Urgent","description":"Needs an answer today"}'` (`"ai": false`: only people add it) |
 | Jobs: another template | `jobs template service-quote\|projects\|support\|sales-demo\|bookings\|custom-orders\|basic` |
+| Visitors should book appointments | `bookings` shows what is in force (a booking link found on the site may already be offered). Ask: a link (`bookings mode link --link <url>`) or the date picker in the chat (`bookings mode picker`; HelpPuff books, the assistant never does). With the picker, ask their hours and calendar: `bookings set --hours "mon=09:00-17:00;…" --duration 30 --timezone <Area/City>`, or a calendar: the user stores its key (`secret set CALCOM_API_KEY`), then `integrations add calcom --key-env CALCOM_API_KEY` and `bookings sync calcom --event-type <id from bookings test>` (Composio for Google Calendar / Outlook: `integrations connect google` gives the user a sign-in link). Check with `bookings slots`; then `config pull` |
 | Jobs: let the AI choose again | `jobs setup` |
 | Jobs: call them Quotes, Tickets… | `api PUT /jobs/pipeline --data '{"itemSingular":"Quote","itemPlural":"Quotes"}'` |
 | Jobs: no "Get a quote" button | `api PUT /jobs/pipeline --data '{"quoteEnabled":false}'` (its label: `"quoteLabel"`; no contact questions: `"quoteContact":false`) |

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { iconNames, linkItemSchema, shortcutSchema, type Shortcut, type WidgetConfig } from '@helppuff/protocol';
 import type { KvStore } from '@helppuff/connector-types';
 import { ANSWER_REASONING, answerReasoning } from '@helppuff/rag';
-import { assistantConfigSchema, liveConfigSchema, securitySchema, storedSiteConfigSchema, type SiteConfig, type StoredSiteConfig } from '../config/schema.js';
+import { assistantConfigSchema, bookingsConfigSchema, liveConfigSchema, securitySchema, storedSiteConfigSchema, type SiteConfig, type StoredSiteConfig } from '../config/schema.js';
 import { resolveSite, siteConfigKey } from '../config/site.js';
 import { HelpPuffError } from '../core/errors.js';
 import type { HonoEnv } from '../core/request.js';
@@ -11,6 +11,7 @@ import { assertSameOrigin, currentAdmin, jsonBody, siteParam } from './guard.js'
 import { QUOTE_FLOW_ID } from '../jobs/widget.js';
 import { isAssistant, knowledgeOf, providerOf } from '../core/assistant.js';
 import { dismissSuggestedHome, readSuggestedHome } from '../home/suggest.js';
+import { forgetFoundBooking } from '../bookings/found.js';
 
 /**
  * The assistant's settings as one flat object — what the onboarding
@@ -143,6 +144,8 @@ export const settingsSchema = z
     live: liveConfigSchema.optional(),
     /** The home screen (`widget.home`). `starterQuestions` are its question shortcuts. Absent from older Workers. */
     home: homeSettingsSchema.optional(),
+    /** Appointments (the `bookings` site section): how visitors book, and the date picker's calendar. Absent from older Workers. */
+    bookings: bookingsConfigSchema.optional(),
   })
   .strict();
 export type Settings = z.infer<typeof settingsSchema>;
@@ -177,6 +180,12 @@ export const settingsPatchSchema = settingsSchema.partial().extend({
     .optional(),
   live: liveConfigSchema.partial().optional(),
   home: homeSettingsSchema.partial().optional(),
+  /** Merged one level deep; `hours` is replaced whole. `mode: null` hands the choice back to the website (its booking link, if any). */
+  bookings: bookingsConfigSchema
+    .partial()
+    .extend({ mode: bookingsConfigSchema.shape.mode.unwrap().nullable().optional(), link: z.string().url().max(2000).nullable().optional(), eventType: z.string().max(500).nullable().optional(), account: z.string().max(200).nullable().optional(), calendar: z.string().max(300).nullable().optional(), timezone: z.string().max(64).nullable().optional(), location: z.string().trim().max(300).nullable().optional() })
+    .strict()
+    .optional(),
 });
 export type SettingsPatch = z.infer<typeof settingsPatchSchema>;
 
@@ -218,6 +227,7 @@ export function readSettings(site: SiteConfig): Settings {
       shortcuts: (w.home.shortcuts ?? []).filter((x) => x.id !== QUOTE_FLOW_ID),
       links: w.home.links ? { title: w.home.links.title || 'Useful pages', items: w.home.links.items } : null,
     },
+    bookings: site.bookings,
   };
 }
 
@@ -242,7 +252,7 @@ const compact = (value: Record<string, unknown>) =>
   Object.fromEntries(Object.entries(value).filter(([, v]) => v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)));
 
 /** The site config sections that carry these settings, rewritten. */
-export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<SiteConfig, 'widget' | 'connector' | 'knowledge' | 'assistant' | 'security' | 'live'> {
+export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<SiteConfig, 'widget' | 'connector' | 'knowledge' | 'assistant' | 'security' | 'live' | 'bookings'> {
   const current = readSettings(site);
   const s: Settings = {
     ...current,
@@ -253,6 +263,7 @@ export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<Site
     crawl: { ...current.crawl, ...patch.crawl },
     security: current.security,
     home: { ...current.home!, ...patch.home },
+    bookings: current.bookings,
   } as Settings;
 
   const widget: WidgetConfig = structuredClone(site.widget);
@@ -304,7 +315,18 @@ export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<Site
   }
   const knowledge = { ...site.knowledge, ...s.crawl };
   const live = liveConfigSchema.parse({ ...site.live, ...(patch.live ?? {}) });
-  return { widget, connector, knowledge, assistant: s.behaviour, security: mergeSecurity(site, patch.security), live };
+  return { widget, connector, knowledge, assistant: s.behaviour, security: mergeSecurity(site, patch.security), live, bookings: mergeBookings(site.bookings, patch.bookings) };
+}
+
+/** The bookings section with a patch applied: a null clears a field (`mode: null`: the website decides again). Throws a ZodError for a bad value. */
+export function mergeBookings(current: SiteConfig['bookings'], patch: SettingsPatch['bookings']): SiteConfig['bookings'] {
+  if (!patch) return current;
+  const next: Record<string, unknown> = { ...current };
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === null) delete next[key];
+    else if (value !== undefined) next[key] = value;
+  }
+  return bookingsConfigSchema.parse(next);
 }
 
 export async function settingsHash(settings: Settings): Promise<string> {
@@ -386,6 +408,12 @@ export async function saveSettings(c: Context<HonoEnv>, siteId: string, patch: u
     }
   }
   try {
+    mergeBookings(site.bookings, parsed.data.bookings);
+  } catch (thrown) {
+    const issue = thrown instanceof z.ZodError ? thrown.issues[0] : undefined;
+    throw new HelpPuffError('bad_request', { message: `Check bookings.${issue?.path.join('.') || 'settings'}: ${issue?.message ?? 'invalid'}.`, detail: 'settings_invalid' });
+  }
+  try {
     mergeSecurity(site, parsed.data.security);
   } catch (thrown) {
     const issue = thrown instanceof z.ZodError ? thrown.issues[0] : undefined;
@@ -403,10 +431,12 @@ export async function saveSettings(c: Context<HonoEnv>, siteId: string, patch: u
     assistant: next.assistant,
     security: next.security,
     live: next.live,
+    bookings: next.bookings,
     settings: { at: ctx.platform.now(), by, hash },
   });
   await kv.put(siteConfigKey(siteId), JSON.stringify(record));
   // The owner set the home screen up: the suggestions from the website stop.
   if (parsed.data.home) await dismissSuggestedHome(kv, siteId, ctx.platform.now());
+  if (parsed.data.bookings) forgetFoundBooking(siteId);
   return { site: siteId, connector: next.connector.type, settings, hash, meta: record.settings, captcha: Boolean(next.security.captcha) };
 }

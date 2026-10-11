@@ -18,6 +18,7 @@ says "jobs".
 | **The API** | `POST /api/v1/jobs` from your own forms, Zapier or Make. See [[the API reference|API-Reference-Jobs]]. |
 | **The dashboard** | **New job** on the Jobs page, or **New job** / **Make a job** from a contact, a conversation or a callback request. Any job made this way is linked to its contact and chat. |
 | **The CLI** | `helppuff jobs create --title … --email …` |
+| **A booking** | With the [[date picker|Bookings]] on, a visitor who books in the chat (or an appointment made by hand, or found in your synced calendar) joins their open job, or makes a new one. The job shows its **Appointments**, and each booking, move and cancellation is in its history. |
 
 Each job gets a number, starting at 1001. A job that came from a chat links to
 the conversation, and to the contact, who is matched by email (then phone) or

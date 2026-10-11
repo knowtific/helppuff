@@ -73,6 +73,7 @@ variable, e.g. `{ "env": "OPENAI_API_KEY" }`, whose value lives in `.env` and on
 | `live.closeAfterMinutes` | integer | `60` | A conversation with no message for this long is closed. A visitor who writes again is answered by the assistant. · 5–1440 |
 | `live.showAgentName` | boolean | `true` | Show visitors the first name of the person answering ("Sam joined"); off: "Someone from the team". |
 | `live.aiWhileWaiting` | boolean | `false` | Let the assistant keep answering until someone takes the chat. |
+| `bookings` | object | `{}` | Appointments: `mode` `none`, `link` (offer a booking page) or `picker` (a date picker in the chat; HelpPuff books, the assistant never does). Left out, a booking link found on the website is offered. With the picker, `sync` picks the calendar (keys in Settings → Integrations, `helppuff integrations`). `helppuff bookings` changes them. |
 
 ## `backend`
 
@@ -291,6 +292,8 @@ Per-visitor and per-site limits. The daily cap is the cost backstop.
 | `security.limits.handoversPerIpPerDay` | integer | `3` | Times one visitor (IP) may ask for a person a day (live chat). · 1–1000 |
 | `security.limits.waitingPerSite` | integer | `20` | Live chats that may wait for a person at once; past it, visitors get the callback form. · 1–1000 |
 | `security.limits.liveSocketsPerIp` | integer | `3` | Live chat connections one visitor (IP) may hold open at once. · 1–100 |
+| `security.limits.slotLookupsPerIpPerMinute` | integer | `30` | Times one visitor (IP) may load free times in the booking calendar a minute. · 1–600 |
+| `security.limits.bookingsPerIpPerHour` | integer | `5` | Appointments one visitor (IP) may book, move or cancel an hour, from the chat. · 1–100 |
 
 ## `leads`
 
@@ -369,7 +372,7 @@ The first screen visitors see.
 | `widget.home.shortcuts[].description` | string |  | A line under the label. · ≤ 160 chars |
 | `widget.home.shortcuts[].icon` | `"chat"` \| `"phone"` \| `"mail"` \| `"calendar"` \| `"quote"` \| `"pin"` \| `"clock"` \| `"wrench"` \| `"heart"` \| `"info"` \| `"book"` \| `"arrow-right"` \| `"arrow-left"` \| `"close"` \| `"send"` \| `"menu"` \| `"sound"` \| `"sound-off"` \| `"check"` \| `"external"` \| `"person"` |  | A built-in icon. |
 | `widget.home.shortcuts[].action` **(required)** | object |  | What happens when the button is pressed. `kind` picks it. |
-| `widget.home.shortcuts[].action.kind` **(required)** | `"reply"` \| `"url"` \| `"tel"` \| `"email"` \| `"flow"` \| `"form"` |  | `"reply"` Send a message as the visitor. · `"url"` Open a page. · `"tel"` Call a number. · `"email"` Write an email. · `"flow"` Start one of `widget.flows`. · `"form"` Open one of `widget.forms`. |
+| `widget.home.shortcuts[].action.kind` **(required)** | `"reply"` \| `"url"` \| `"tel"` \| `"email"` \| `"flow"` \| `"form"` \| `"booking"` |  | `"reply"` Send a message as the visitor. · `"url"` Open a page. · `"tel"` Call a number. · `"email"` Write an email. · `"flow"` Start one of `widget.flows`. · `"form"` Open one of `widget.forms`. · `"booking"` Open the booking calendar in the chat (Settings → Bookings: date picker in the chat). |
 | `widget.home.shortcuts[].action.id` **(required)** | string |  | An id, unique within its list. · 1–64 chars |
 | `widget.home.shortcuts[].action.label` **(required)** | string |  | What the button says. · 1–120 chars |
 | `widget.home.shortcuts[].action.value` **(required)** | string |  | With `kind: "reply"`. The message sent. · 1–500 chars |
@@ -424,7 +427,7 @@ The conversation screen.
 | `widget.chat.shortcuts[].description` | string |  | A line under the label. · ≤ 160 chars |
 | `widget.chat.shortcuts[].icon` | `"chat"` \| `"phone"` \| `"mail"` \| `"calendar"` \| `"quote"` \| `"pin"` \| `"clock"` \| `"wrench"` \| `"heart"` \| `"info"` \| `"book"` \| `"arrow-right"` \| `"arrow-left"` \| `"close"` \| `"send"` \| `"menu"` \| `"sound"` \| `"sound-off"` \| `"check"` \| `"external"` \| `"person"` |  | A built-in icon. |
 | `widget.chat.shortcuts[].action` **(required)** | object |  | What happens when the button is pressed. `kind` picks it. |
-| `widget.chat.shortcuts[].action.kind` **(required)** | `"reply"` \| `"url"` \| `"tel"` \| `"email"` \| `"flow"` \| `"form"` |  | `"reply"` Send a message as the visitor. · `"url"` Open a page. · `"tel"` Call a number. · `"email"` Write an email. · `"flow"` Start one of `widget.flows`. · `"form"` Open one of `widget.forms`. |
+| `widget.chat.shortcuts[].action.kind` **(required)** | `"reply"` \| `"url"` \| `"tel"` \| `"email"` \| `"flow"` \| `"form"` \| `"booking"` |  | `"reply"` Send a message as the visitor. · `"url"` Open a page. · `"tel"` Call a number. · `"email"` Write an email. · `"flow"` Start one of `widget.flows`. · `"form"` Open one of `widget.forms`. · `"booking"` Open the booking calendar in the chat (Settings → Bookings: date picker in the chat). |
 | `widget.chat.shortcuts[].action.id` **(required)** | string |  | An id, unique within its list. · 1–64 chars |
 | `widget.chat.shortcuts[].action.label` **(required)** | string |  | What the button says. · 1–120 chars |
 | `widget.chat.shortcuts[].action.value` **(required)** | string |  | With `kind: "reply"`. The message sent. · 1–500 chars |

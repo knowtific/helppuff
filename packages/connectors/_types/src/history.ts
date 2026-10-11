@@ -154,6 +154,16 @@ export function summarizeReply(messages: Message[]): string {
       case 'links':
         parts.push(`[Shared links: ${message.links.map((link) => `${link.label} (${link.url})`).join(' | ')}]`);
         break;
+      case 'booking': {
+        // What the visitor booked is told to the model as a fact: the calendar booked it, not the model.
+        const b = message.booked;
+        if (!b) parts.push('[Showed the booking calendar: the visitor picks a free time there and books it themselves]');
+        else {
+          const when = new Date(b.start).toISOString().slice(0, 16).replace('T', ' ');
+          parts.push(`[The calendar ${b.status === 'cancelled' ? 'cancelled' : 'booked'}: ${b.title}, ${when} UTC (${b.timezone}), reference ${b.id}${b.location ? `, ${b.location}` : ''}]`);
+        }
+        break;
+      }
       default:
         break;
     }

@@ -23,6 +23,8 @@ export default tseslint.config(
       'test-results/**',
       'playwright-report/**',
       'private/**',
+      // The booking eval (wiki: AI-Booking-Tests): a research harness run by hand on its own Worker.
+      'scripts/booking-eval/**',
       // Plain browser scripts copied as-is (the dashboard's theme, before first paint).
       'packages/dashboard/public/**',
       // The live-chat e2e Worker's built dashboard and local state (e2e/live/serve.mjs).

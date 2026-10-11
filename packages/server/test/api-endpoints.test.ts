@@ -243,6 +243,48 @@ describe('every area, end to end through /api/v1', () => {
     expect((await w.call('GET', `/jobs/${id}`, tool)).status).toBe(404);
   });
 
+  it('appointments: the settings in force, free times, booked from another tool, moved, completed, deleted; integrations', async () => {
+    const all = { mon: ['00:00-24:00'], tue: ['00:00-24:00'], wed: ['00:00-24:00'], thu: ['00:00-24:00'], fri: ['00:00-24:00'], sat: ['00:00-24:00'], sun: ['00:00-24:00'] };
+    const w = await world({ bookings: { mode: 'picker', hours: all, title: 'Consultation', timezone: 'Australia/Melbourne', location: 'Our office' } });
+    const settings = await w.key(['settings:write']);
+    const tool = await w.key(['jobs:write']);
+    const status = await w.call('GET', '/bookings', settings);
+    expect(status.json).toMatchObject({ effective: { mode: 'picker', chosen: true }, calendar: { sync: 'none', ready: true } });
+    expectDocumented('GET', '/bookings', { ...status.json, found: { url: 'https://x.example', provider: null, page: null, at: 1 }, calendar: { ...status.json['calendar'], integration: { kind: 'calcom' } } });
+    const slots = await w.call('GET', '/bookings/slots?tz=Australia/Perth', settings);
+    expect(slots.json['days'][0]['slots'].length).toBeGreaterThan(0);
+    expectDocumented('GET', '/bookings/slots', slots.json);
+    expectDocumented('POST', '/bookings/test', (await w.call('POST', '/bookings/test', settings, { sync: 'calcom' })).json);
+
+    const start = new Date(Date.now() + 2 * 86_400_000).toISOString();
+    const made = await w.call('POST', '/appointments', tool, { start, duration: 30, contact: { name: 'Ada Lovelace', email: 'ada@example.com', phone: '0400 111 222' }, title: 'Consultation' });
+    expect(made.status, JSON.stringify(made.json)).toBe(201);
+    expect(made.json).toMatchObject({ source: 'api', location: 'Our office', job: { number: 1001 }, contact: { name: 'Ada Lovelace' } });
+    expectDocumented('POST', '/appointments', made.json);
+    const id = made.json['id'] as string;
+    expectDocumented('GET', '/appointments', (await w.call('GET', '/appointments', tool)).json);
+    expectDocumented('GET', `/appointments/${id}`, (await w.call('GET', `/appointments/${id}`, tool)).json);
+    const done = await w.call('PATCH', `/appointments/${id}`, tool, { status: 'completed', notes: 'Went well.' });
+    expect(done.json).toMatchObject({ status: 'completed', notes: 'Went well.' });
+    expectDocumented('PATCH', `/appointments/${id}`, done.json);
+    // With nothing synced there is nothing to read: the answer says why (a real read has no reason).
+    const { reason, ...sync } = (await w.call('POST', '/appointments/sync', tool, { force: true })).json;
+    expect(reason).toMatch(/no calendar/);
+    expectDocumented('POST', '/appointments/sync', { ...sync, synced: true });
+    expectDocumented('DELETE', `/appointments/${id}`, (await w.call('DELETE', `/appointments/${id}`, tool)).json);
+
+    const listed = await w.call('GET', '/integrations', settings);
+    expect(listed.json['items'].map((i: Json) => i['kind'])).toEqual(['composio', 'calcom', 'calendly']);
+    expectDocumented('GET', '/integrations', listed.json);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ status: 'success', data: [] }));
+    const connected = await w.call('PUT', '/integrations/calcom', settings, { key: 'cal_live_0123456789abcdef' });
+    expect(connected.json).toMatchObject({ connected: true, check: { ok: true } });
+    expectDocumented('PUT', '/integrations/calcom', connected.json);
+    expectDocumented('POST', '/integrations/calcom/test', (await w.call('POST', '/integrations/calcom/test', settings, {})).json);
+    expectDocumented('GET', '/integrations/calcom/webhook', (await w.call('GET', '/integrations/calcom/webhook', settings)).json);
+    expectDocumented('DELETE', '/integrations/calcom', (await w.call('DELETE', '/integrations/calcom', settings)).json);
+  });
+
   it('callbacks: lists the waiting requests and closes one', async () => {
     const w = await world();
     const now = Date.now();

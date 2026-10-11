@@ -16,6 +16,7 @@
 - [[Hot leads to Slack|Tutorial-Hot-Leads-Slack]]
 - [[Knowledge base or tool?|Knowledge-Or-Tool]]
 - [[Testing and monitoring|Testing-And-Monitoring]]
+- [[Why the AI never books|AI-Booking-Tests]]
 
 **Configure**
 - [[Configuration]]
@@ -29,6 +30,8 @@
 - [[The widget|Widget]]
 - [[Leads and callbacks|Leads]]
 - [[Jobs]]
+- [[Bookings and the calendar|Bookings]]
+- [[Integrations]]
 - [[Live chat|Live-Chat]]
 - [[Telegram]]
 - [[Webhooks]]
@@ -46,6 +49,8 @@
 - [[Leads|API-Reference-Leads]]
 - [[Callbacks|API-Reference-Callbacks]]
 - [[Jobs|API-Reference-Jobs]]
+- [[Appointments|API-Reference-Appointments]]
+- [[Integrations|API-Reference-Integrations]]
 - [[Knowledge|API-Reference-Knowledge]]
 - [[Prompt|API-Reference-Prompt]]
 - [[Tools|API-Reference-Tools]]

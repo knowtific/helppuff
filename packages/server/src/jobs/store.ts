@@ -340,7 +340,7 @@ export type JobRow = {
   updated_at: number;
 };
 
-export const JOB_SOURCES = ['chat', 'quote', 'api', 'manual', 'callback'] as const;
+export const JOB_SOURCES = ['chat', 'quote', 'api', 'manual', 'callback', 'booking'] as const;
 export type JobSource = (typeof JOB_SOURCES)[number];
 
 /**

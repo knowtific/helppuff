@@ -15,6 +15,8 @@ import { SignedInVisitors } from '../components/SignedIn';
 import { Updates } from '../components/Updates';
 import { JobsSettings } from '../components/JobsSettings';
 import { HomeScreenSettings } from '../components/HomeScreenSettings';
+import { BookingsSettings } from '../components/BookingsSettings';
+import { Integrations } from '../components/Integrations';
 
 /** What to ask a coding agent, per page: it reads the settings with the CLI, asks, then changes them. */
 const AGENT_TOPICS: Partial<Record<SettingsSection | 'prompt' | 'knowledge', string>> = {
@@ -96,6 +98,8 @@ const DESCRIPTIONS: Record<SettingsSection, string> = {
   instructions: 'How it talks and what it’s for.',
   agent: 'The whole setup in one file: start from a tutorial’s template, import a file, or export this one to keep or share.',
   business: 'Read from your website. The assistant always has these; your changes are never overwritten.',
+  bookings: 'How visitors book from the chat: not at all, through your booking page, or in a calendar in the chat that HelpPuff books.',
+  integrations: 'Keys for other services, used by any feature: Composio for Google Calendar and Outlook, Cal.com and Calendly.',
   live: 'Let visitors talk to a person on your team, from the dashboard or Telegram.',
   labels: 'Tag conversations, by hand or by the AI, and filter by them.',
   jobs: 'Requests, quotes and work: the stages they go through, what you need to know, and the quote questions on the widget.',
@@ -115,6 +119,8 @@ const HELP: Record<SettingsSection, string> = {
   instructions: 'Prompts-and-Instructions',
   agent: 'Agent-Files',
   business: 'Knowledge-Base#business-details',
+  bookings: 'Bookings',
+  integrations: 'Integrations',
   live: 'Live-Chat',
   labels: 'Dashboard#labels',
   jobs: 'Jobs',
@@ -135,7 +141,7 @@ export function Settings({ me, section }: { me: Me; section: string | undefined 
     <>
       <PageHeader title={current.label} description={DESCRIPTIONS[current.id]} help={HELP[current.id]} actions={!isMember(me) && current.id !== 'notifications' && <AskAgent request={agentRequest(current.id, current.label)} />} />
       <SettingsTabs me={me} route={{ page: 'settings', id: current.id }} />
-      <div className={cn('p-4 md:p-6', current.id === 'home' ? 'max-w-6xl' : 'max-w-3xl')}>
+      <div className={cn('p-4 md:p-6', current.id === 'home' || current.id === 'bookings' ? 'max-w-6xl' : 'max-w-3xl')}>
         {(current.id === 'chat' || current.id === 'appearance' || current.id === 'leads' || current.id === 'advanced') && (
           <Card>
             <SettingsForm key={current.id} knowledge={Boolean(site?.knowledge)} section={current.id} />
@@ -161,6 +167,8 @@ export function Settings({ me, section }: { me: Me; section: string | undefined 
         {current.id === 'api' && <ApiKeys />}
         {current.id === 'live' && <LiveChatSettings />}
         {current.id === 'home' && <HomeScreenSettings knowledge={Boolean(site?.knowledge)} />}
+        {current.id === 'bookings' && <BookingsSettings />}
+        {current.id === 'integrations' && <Integrations />}
         {current.id === 'labels' && <LabelsSettings />}
         {current.id === 'jobs' && <JobsSettings />}
         {current.id === 'notifications' && <NotificationSettings />}

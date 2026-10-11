@@ -48,6 +48,8 @@ const FACT_LABELS: Record<string, string> = {
   serviceAreas: 'Service areas',
   priceRange: 'Price range',
   description: 'About',
+  booking: 'Book online',
+  bookingPage: 'Booking page',
   footer: 'Shown on every page',
 };
 

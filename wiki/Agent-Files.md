@@ -1,7 +1,8 @@
 # Agent files
 
 An agent file is your assistant's setup in one JSON file: the **prompt**,
-the **tools**, and the **behaviour** and **lead form** settings. Export one
+the **tools**, the **behaviour** and **lead form** settings, and how visitors
+**book** ([[Bookings]]). Export one
 to keep in your project or share, import one to set an assistant up the same
 way, or start from a [[tutorial's template|Tutorials]].
 
@@ -18,8 +19,10 @@ webhooks or keys.
 
 Importing **checks everything first**, then applies it in this order:
 
-1. **Settings**: the behaviour (goal, tone, length, prices) and the lead form,
-   merged into yours.
+1. **Settings**: the behaviour (goal, tone, length, prices), the lead form and
+   the bookings (the mode, hours, and which calendar it syncs with: never the
+   calendar's own event type or account, and never its key; connect those in
+   [[Settings → Integrations|Integrations]]), merged into yours.
 2. **Tools**, matched by name: a new name is created, an existing one is
    replaced. Your other tools stay.
 3. **The prompt**, published as a new version. Yours stays in the history,
@@ -74,7 +77,7 @@ header (`${ORDER_LOOKUP_AUTHORIZATION}`), standing for the whole header value.
 - `prompt`, `settings` and `tools` are each optional: a file with only tools
   adds tools.
 - A tool has the same fields as `POST /tools` ([[Tools API|API-Reference-Tools]]).
-- `settings` takes the same `behaviour` and `leads` as `PUT /settings`.
+- `settings` takes the same `behaviour`, `leads` and `bookings` as `PUT /settings`.
 
 Through the API, a key needs `prompt:write`, and `settings:write` too when the
 file has settings.

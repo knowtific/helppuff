@@ -24,6 +24,9 @@ import { webhookRoutes } from './webhooks.js';
 import { toolRoutes } from './tools.js';
 import { agentRoutes } from './agent.js';
 import { identityRoutes } from './identity.js';
+import { bookingRoutes } from './bookings.js';
+import { effectiveBooking } from '../bookings/found.js';
+import { integrationRoutes } from './integrations.js';
 import { callbackRoutes, callbackView } from './callbacks.js';
 import { attributesJson, closeCutoff, CONVERSATION_STATUSES, conversationExtras, inboxRoutes, labelsSql, mergeAttributes, parseJsonObject, parseLabels, statusFilter, statusSql, type ConversationStatus } from './inbox.js';
 import { liveRoutes } from './live.js';
@@ -158,6 +161,8 @@ adminRoutes.get('/me', async (c) => {
         live: liveAvailable(ctx.env, site, id),
         /** HelpPuff writes this backend's prompt: the Instructions and Prompt & tools pages apply. */
         prompt: promptField(site.connector).option !== null,
+        /** How visitors book (Settings → Bookings): `picker` shows the Calendar page and appointments on jobs. */
+        bookings: effectiveBooking(site, site.bookingFound ?? null).mode,
       };
     }),
   );
@@ -817,6 +822,8 @@ adminRoutes.route('/', webhookRoutes);
 adminRoutes.route('/', toolRoutes);
 adminRoutes.route('/', agentRoutes);
 adminRoutes.route('/', identityRoutes);
+adminRoutes.route('/', bookingRoutes);
+adminRoutes.route('/', integrationRoutes);
 adminRoutes.route('/', callbackRoutes);
 adminRoutes.route('/', versionRoutes);
 adminRoutes.route('/', chatRoutes);

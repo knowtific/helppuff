@@ -87,7 +87,8 @@ preview:
   page, calls, emails, opens one of your forms (`widget.forms`) or asks a few
   questions (`widget.flows`). Under **More**: a line under the label, and
   pages it shows on only (`/services/**`). The **Get a quote** button belongs
-  to [[Jobs]] and is set there.
+  to [[Jobs]] and is set there, and the **Book a time** button to
+  [[Bookings]] (a booking link, or the date picker in the chat).
 - **Useful pages**: links under the buttons (prices, services, booking, FAQ),
   with a line under each. They open in a new tab.
 

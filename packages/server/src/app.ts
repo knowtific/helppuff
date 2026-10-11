@@ -6,6 +6,7 @@ import { corsHeaders } from './core/origin.js';
 import { allConfiguredOrigins, buildRequestCtx, type HonoEnv } from './core/request.js';
 import { configRoutes } from './routes/config.js';
 import { messageRoutes } from './routes/messages.js';
+import { bookingRoutes } from './routes/booking.js';
 import { sessionRoutes } from './routes/sessions.js';
 import { adminRoutes } from './admin/routes.js';
 import { retellRoutes } from './routes/retell.js';
@@ -47,6 +48,7 @@ export function createApp(config: HelpPuffConfig): Hono<HonoEnv> {
   app.route('/', configRoutes);
   app.route('/', sessionRoutes);
   app.route('/', messageRoutes);
+  app.route('/', bookingRoutes);
   // One API, two doors: the dashboard (and the CLI, with the admin key) at
   // /admin/api, and the public, versioned API at /api/v1 (API keys only; see
   // api/auth.ts). Same handlers, so the two can never drift apart.

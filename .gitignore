@@ -36,3 +36,6 @@ private/
 # The live-chat e2e Worker's state and assets (e2e/live/serve.mjs).
 e2e/live/.state/
 e2e/live/.assets/
+
+# The booking eval's output (wiki: AI-Booking-Tests)
+scripts/booking-eval/results-*

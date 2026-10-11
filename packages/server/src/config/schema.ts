@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { widgetConfigSchema } from '@helppuff/protocol';
+import { BOOKING_MODES, CALENDAR_SYNCS, widgetConfigSchema } from '@helppuff/protocol';
 import { isIpOrRange } from '../core/ip.js';
 
 /**
@@ -44,6 +44,8 @@ export const limitsSchema = z.object({
   handoversPerIpPerDay: z.number().int().min(1).max(1000).default(3).describe('Times one visitor (IP) may ask for a person a day (live chat).'),
   waitingPerSite: z.number().int().min(1).max(1000).default(20).describe('Live chats that may wait for a person at once; past it, visitors get the callback form.'),
   liveSocketsPerIp: z.number().int().min(1).max(100).default(3).describe('Live chat connections one visitor (IP) may hold open at once.'),
+  slotLookupsPerIpPerMinute: z.number().int().min(1).max(600).default(30).describe('Times one visitor (IP) may load free times in the booking calendar a minute.'),
+  bookingsPerIpPerHour: z.number().int().min(1).max(100).default(5).describe('Appointments one visitor (IP) may book, move or cancel an hour, from the chat.'),
 });
 export type Limits = z.infer<typeof limitsSchema>;
 
@@ -141,6 +143,50 @@ export const liveConfigSchema = z
   .strict();
 export type LiveConfig = z.infer<typeof liveConfigSchema>;
 
+/** `HH:MM-HH:MM`, 24-hour, local to the bookings time zone. */
+const hoursRange = z
+  .string()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-4]):[0-5]\d$/, 'a range like 09:00-17:00')
+  .refine((range) => range.slice(0, 5) < range.slice(6), 'the end comes after the start');
+const dayHours = z.array(hoursRange).max(4);
+export const DEFAULT_BOOKING_HOURS = { mon: ['09:00-17:00'], tue: ['09:00-17:00'], wed: ['09:00-17:00'], thu: ['09:00-17:00'], fri: ['09:00-17:00'], sat: [], sun: [] };
+
+/**
+ * Appointments (Settings → Bookings). How visitors book: nothing, a link to
+ * another site, or a date picker in the chat that HelpPuff books (the
+ * assistant never books: wiki AI-Booking-Tests). With the picker, which
+ * calendar it syncs with, what is booked and when.
+ */
+export const bookingsConfigSchema = z
+  .object({
+    mode: z
+      .enum(BOOKING_MODES)
+      .optional()
+      .describe('`none`, `link` (offer `link`: the booking happens on another site) or `picker` (a date picker in the chat; HelpPuff books and keeps the appointment). Left out, the website decides: a booking link found on it is offered, else nothing.'),
+    link: z.string().url().max(2000).optional().describe('The booking page `link` offers (Calendly, Cal.com, your own). Left out: the one found on the website.'),
+    label: z.string().trim().min(1).max(40).default('Book a time').describe('The button on the home screen and after an answer about booking.'),
+    sync: z.enum(CALENDAR_SYNCS).default('none').describe('The calendar the picker syncs with: `none` (HelpPuff keeps the appointments, free time from `hours`), `calcom`, `calendly`, `google` or `outlook` (the last two through Composio). Keys live in Settings → Integrations (`helppuff integrations`).'),
+    account: z.string().max(200).optional().describe('`google` / `outlook`: the Composio connected account to use. Left out: the site\'s only one.'),
+    calendar: z.string().max(300).optional().describe('`google` / `outlook`: the calendar id. Left out: the primary calendar.'),
+    eventType: z.string().max(500).optional().describe('`calcom`: the event type id; `calendly`: the event type URI. Their slots, length and rules are used.'),
+    title: z.string().trim().min(1).max(120).default('Appointment').describe('What is booked, as the visitor and the calendar see it.'),
+    duration: z.number().int().min(5).max(480).default(30).describe('Minutes (`none`, `google`, `outlook`; the event type decides for Cal.com and Calendly).'),
+    hours: z
+      .object({ mon: dayHours, tue: dayHours, wed: dayHours, thu: dayHours, fri: dayHours, sat: dayHours, sun: dayHours })
+      .strict()
+      .default(DEFAULT_BOOKING_HOURS)
+      .describe('When appointments can start and end, per weekday: up to four ranges like `09:00-12:00`. An empty list: closed that day.'),
+    buffer: z.number().int().min(0).max(240).default(0).describe('Minutes kept free after each appointment.'),
+    notice: z.number().int().min(0).max(43_200).default(120).describe('Minutes ahead the earliest time must be (120: nothing in the next two hours).'),
+    daysAhead: z.number().int().min(1).max(365).default(30).describe('How many days ahead visitors can book.'),
+    timezone: z.string().max(64).optional().describe('The business\'s time zone for `hours` (IANA, e.g. `Australia/Melbourne`). Left out: the assistant\'s, else UTC.'),
+    phone: z.enum(['off', 'optional', 'required']).default('optional').describe('Ask for a phone number when booking.'),
+    location: z.string().trim().max(300).optional().describe('Where it happens, or the meeting link, shown on the confirmation (`none`; the calendar sets its own).'),
+    syncMinutes: z.number().int().min(5).max(1440).default(15).describe('How often the synced calendar is read for changes (the cron); also on opening the Calendar and after each change.'),
+  })
+  .strict();
+export type BookingsConfig = z.infer<typeof bookingsConfigSchema>;
+
 export const siteConfigSchema = z.object({
   origins: z.array(z.string().min(1).max(300)).min(1),
   connector: connectorConfigSchema,
@@ -150,6 +196,9 @@ export const siteConfigSchema = z.object({
   knowledge: knowledgeConfigSchema.default({}),
   assistant: assistantConfigSchema.default({}),
   live: liveConfigSchema.default({}),
+  bookings: bookingsConfigSchema.default({}),
+  /** Runtime only: the booking link learned from the website (`bookings/found.ts`), while `bookings.mode` is unset. Never configured. */
+  bookingFound: z.object({ url: z.string().url(), provider: z.string().nullable(), page: z.string().nullable(), at: z.number() }).optional(),
 });
 export type SiteConfig = z.infer<typeof siteConfigSchema>;
 
@@ -192,6 +241,7 @@ export const storedSiteConfigSchema = z
     knowledge: knowledgeConfigSchema.optional(),
     assistant: assistantConfigSchema.optional(),
     live: liveConfigSchema.optional(),
+    bookings: bookingsConfigSchema.optional(),
     prompt: promptMetaSchema.optional(),
     /** Retired: the instructions form's choices, from when it wrote them into the prompt. Read as `assistant` when that is missing. */
     profile: z.record(z.string(), z.unknown()).optional(),

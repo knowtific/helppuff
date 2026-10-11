@@ -178,6 +178,9 @@ function moveTo(j: Stored, stageId: string, reason?: string) {
 }
 
 /** `/jobs…` in the demo; null when the path is not a jobs one. */
+/** The sample jobs, for the demo's appointments (`bookings.ts`). */
+export const demoJobs = () => jobs.map((j) => ({ id: j.id, number: j.number, title: j.title, leadId: j.leadId, conversationId: j.conversationId, stageId: j.stageId }));
+
 export function jobsRoute(method: string, parts: string[], params: URLSearchParams, body: Record<string, unknown>): Response | null {
   if (parts[0] !== 'jobs') return null;
   const [, id, sub] = parts;
