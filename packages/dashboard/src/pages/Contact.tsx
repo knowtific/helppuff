@@ -2,6 +2,7 @@ import { ArrowLeft, Building2, Mail, MapPin, MessageSquare, Pencil, Phone, Phone
 import { useState, type FormEvent } from 'react';
 import { AttributesEditor, ConversationStatusBadge, LabelChip, NotesPanel, SideSection } from '../components/inbox';
 import { Avatar, Badge, Button, Card, CardHeader, Empty, ErrorNote, Input, Select, Skeleton, statusLabel } from '../components/ui';
+import { RelatedAppointments } from '../components/Appointments';
 import { api, isMember, LEAD_STATUSES, parseSummary, type ContactDetail, type LeadStatus, type Me } from '../lib/api';
 import { RelatedJobs } from './Jobs';
 import { fmtDateTime, fmtRelative, href, pathOf, useData } from '../lib/utils';
@@ -192,6 +193,14 @@ export function Contact({ id, me }: { id: string; me: Me }) {
               <RelatedJobs filter={{ contact: id }} context={{ contactId: id, label: `For ${data.name ?? data.email ?? 'this contact'}` }} />
             </div>
           </Card>
+          {me.sites[0]?.bookings === 'picker' && (
+            <Card>
+              <CardHeader title="Appointments" tip={{ label: 'About appointments', text: 'Booked in the chat, added here, or read from your calendar.' }} />
+              <div className="border-t px-4 py-3">
+                <RelatedAppointments filter={{ contact: id }} context={{ contactId: id, label: `With ${data.name ?? data.email ?? 'this contact'}` }} admin={!member} />
+              </div>
+            </Card>
+          )}
           <Card>
             <CardHeader title="Conversations" tip={{ label: 'About conversations', text: 'Every chat this person has had, newest first.' }} />
             {data.conversations.length === 0 ? (

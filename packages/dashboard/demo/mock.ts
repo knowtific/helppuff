@@ -2,6 +2,7 @@ import { WEBHOOK_EVENTS } from '@helppuff/protocol';
 import type { Callback, CallbackStatus, KnowledgePage, Label, Lead, LeadStatus, Note, Overview, Prefs, PromptVersion, Settings, StoredMessage, Summary, ToolView } from '../src/lib/api';
 import { FACTS, LABELS, PAGES, PROMPT_TEXT, SITE, callbacks, conversations, leads, notes } from './data';
 import { jobsRoute } from './jobs';
+import { bookingsRoute, bookingsSettings } from './bookings';
 
 /**
  * The admin API, answered inside the page with the sample data in `data.ts`.
@@ -50,6 +51,7 @@ let settings: Settings = {
   },
   assistant: { model: '@cf/zai-org/glm-4.7-flash', locale: 'en-AU', timezone: 'Australia/Sydney', rerank: true, reasoning: 'low' },
   behaviour: { goal: 'callbacks', tone: 'friendly', length: 'short', prices: 'share' },
+  bookings: bookingsSettings,
   crawl: { schedule: 'weekly', include: [], exclude: ['/blog/tag/**'], renderJs: 'auto' },
   security: {
     limits: {
@@ -71,6 +73,8 @@ let settings: Settings = {
       handoversPerIpPerDay: 3,
       waitingPerSite: 20,
       liveSocketsPerIp: 3,
+      slotLookupsPerIpPerMinute: 30,
+      bookingsPerIpPerHour: 5,
     },
     signIn: { attemptsPerIp: 10, attemptsPerAccount: 5, windowMinutes: 15, captcha: true },
     allowIps: [],
@@ -305,7 +309,9 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
 
   const jobs = jobsRoute(method, parts, params, body);
   if (jobs) return jobs;
-  if (path === '/me') return json({ admin: { email: OWNER, owner: true, role: 'owner', name: 'Dan' }, sites: [{ ...SITE, live: SITE.live || liveShown() }], summaries: true });
+  const bookings = bookingsRoute(method, parts, params, body);
+  if (bookings) return bookings;
+  if (path === '/me') return json({ admin: { email: OWNER, owner: true, role: 'owner', name: 'Dan' }, sites: [{ ...SITE, live: SITE.live || liveShown(), bookings: settings.bookings?.mode ?? 'none' }], summaries: true });
   if (path === '/prefs') {
     if (method === 'PUT') prefs = { ...prefs, ...(body as Partial<Prefs>) };
     return json(prefs);

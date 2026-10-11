@@ -314,6 +314,39 @@ const data = (await response.json()) as SettingsResponse;
           }
         ]
       }
+    },
+    "bookings": {
+      "mode": "picker",
+      "label": "Book a time",
+      "sync": "none",
+      "title": "Consultation",
+      "duration": 30,
+      "hours": {
+        "mon": [
+          "09:00-17:00"
+        ],
+        "tue": [
+          "09:00-17:00"
+        ],
+        "wed": [
+          "09:00-17:00"
+        ],
+        "thu": [
+          "09:00-17:00"
+        ],
+        "fri": [
+          "09:00-12:00"
+        ],
+        "sat": [],
+        "sun": []
+      },
+      "buffer": 15,
+      "notice": 120,
+      "daysAhead": 30,
+      "timezone": "Australia/Sydney",
+      "phone": "optional",
+      "location": "Our office, 12 Smith St",
+      "syncMinutes": 15
     }
   },
   "hash": "5c1e…",
@@ -441,6 +474,29 @@ type SettingsResponse = {
         }>;
       };
     };
+    bookings: {
+      mode: string;
+      label: string;
+      sync: string;
+      title: string;
+      duration: number;
+      hours: {
+        mon: string[];
+        tue: string[];
+        wed: string[];
+        thu: string[];
+        fri: string[];
+        sat: string[];
+        sun: string[];
+      };
+      buffer: number;
+      notice: number;
+      daysAhead: number;
+      timezone: string;
+      phone: string;
+      location: string;
+      syncMinutes: number;
+    };
   };
   hash: string;
   meta: string | null;
@@ -482,7 +538,7 @@ A partial update: send only the sections to change (nested objects merge one lev
 
 | Body field | Required | Description |
 | --- | --- | --- |
-| `settings` | yes | Any sections of the object `GET /settings` returns: `botName`, `welcomeMessage`, `leads`, `assistant`, `behaviour`, `crawl`, `security`, `home` … `home.shortcuts` is the whole list of home-screen buttons (up to 8; each `action.kind` is `reply`, `url`, `tel`, `email`, `form` or `flow`); `home.links` the list of pages, or null for none. Saving `home` retires the suggestions from the website. |
+| `settings` | yes | Any sections of the object `GET /settings` returns: `botName`, `welcomeMessage`, `leads`, `assistant`, `behaviour`, `crawl`, `security`, `home` … `home.shortcuts` is the whole list of home-screen buttons (up to 8; each `action.kind` is `reply`, `url`, `tel`, `email`, `form` or `flow`); `home.links` the list of pages, or null for none. Saving `home` retires the suggestions from the website. `bookings` is how visitors book: `mode` `none`, `link` or `picker` (null: the website's booking link decides), the picker's calendar (`sync`), hours, duration and the rest (`helppuff.json` → `bookings` in the Configuration reference). |
 
 **Request**
 
@@ -510,7 +566,10 @@ type ChangeSettingsRequest = {
    * `home` … `home.shortcuts` is the whole list of home-screen buttons (up to
    * 8; each `action.kind` is `reply`, `url`, `tel`, `email`, `form` or
    * `flow`); `home.links` the list of pages, or null for none. Saving `home`
-   * retires the suggestions from the website.
+   * retires the suggestions from the website. `bookings` is how visitors book:
+   * `mode` `none`, `link` or `picker` (null: the website's booking link
+   * decides), the picker's calendar (`sync`), hours, duration and the rest
+   * (`helppuff.json` → `bookings` in the Configuration reference).
    */
   settings: {
     welcomeMessage?: string;
@@ -649,6 +708,39 @@ const data = (await response.json()) as ChangeSettingsResponse;
           }
         ]
       }
+    },
+    "bookings": {
+      "mode": "picker",
+      "label": "Book a time",
+      "sync": "none",
+      "title": "Consultation",
+      "duration": 30,
+      "hours": {
+        "mon": [
+          "09:00-17:00"
+        ],
+        "tue": [
+          "09:00-17:00"
+        ],
+        "wed": [
+          "09:00-17:00"
+        ],
+        "thu": [
+          "09:00-17:00"
+        ],
+        "fri": [
+          "09:00-12:00"
+        ],
+        "sat": [],
+        "sun": []
+      },
+      "buffer": 15,
+      "notice": 120,
+      "daysAhead": 30,
+      "timezone": "Australia/Sydney",
+      "phone": "optional",
+      "location": "Our office, 12 Smith St",
+      "syncMinutes": 15
     }
   },
   "hash": "7d2a…",
@@ -742,6 +834,29 @@ type ChangeSettingsResponse = {
           description: string;
         }>;
       };
+    };
+    bookings: {
+      mode: string;
+      label: string;
+      sync: string;
+      title: string;
+      duration: number;
+      hours: {
+        mon: string[];
+        tue: string[];
+        wed: string[];
+        thu: string[];
+        fri: string[];
+        sat: string[];
+        sun: string[];
+      };
+      buffer: number;
+      notice: number;
+      daysAhead: number;
+      timezone: string;
+      phone: string;
+      location: string;
+      syncMinutes: number;
     };
   };
   hash: string;

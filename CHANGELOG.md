@@ -8,9 +8,53 @@ never needs you to change anything. Upgrade with
 
 ## [Unreleased]
 
-## [0.4.1] - 2026-10-09
+## [0.4.1] - 2026-10-11
+
+### Added: booking in the chat
+
+- **Settings → Bookings** chooses how visitors book: **No appointments**,
+  **External booking link** (a *Book a time* button that opens your booking
+  page) or **Date picker in the chat**. Until you choose, a booking link found
+  on your website (Calendly, Cal.com, Acuity, SavvyCal, HubSpot meetings and
+  others, or a "Book a call" page) is offered for you.
+- **The date picker:** the visitor picks a free time in a calendar in the
+  chat, in their own time zone, adds their name and email and presses
+  **Book**. HelpPuff checks the time is one it offered and still free, holds
+  it (no double bookings, even on a double click), books it and shows a card
+  with **Change time** and **Cancel booking**. **The AI never books:** the
+  assistant opens the calendar (`show_booking`), narrowed to what the visitor
+  asked for, and is told what was booked. Why: the wiki's *Why the AI never
+  books* page, with the tests behind it.
+- **Calendar sync**, both ways: none (HelpPuff keeps the appointments, with
+  your hours, gaps, notice and days ahead), Cal.com (cloud or self-hosted,
+  with an instant webhook), Calendly (on a free plan the visitor finishes on
+  Calendly's page and the booking is read back), and Google Calendar or
+  Outlook through Composio. Events made in the calendar show in HelpPuff:
+  on a job when an attendee is a contact, else as busy time.
+- **Appointments are part of jobs**: a booking joins the contact's open job or
+  makes one, and goes into its history. A **Calendar** page (list, month,
+  week, day; **+ New**; **Sync**) and an **Appointments** section on jobs,
+  contacts and conversations appear with the date picker on.
+- **Settings → Integrations**: keys for Composio, Cal.com and Calendly,
+  sealed and live at once, each with a check; Composio calendar accounts
+  are connected through its sign-in page and picked from a list.
+- The API: `/appointments` (list, get, book, change, delete, sync; `jobs:*`
+  scopes), `/bookings` (what is in force, free times, the calendar check) and
+  `/integrations`. The CLI: `helppuff bookings`, `helppuff appointments` and
+  `helppuff integrations`. `bookings` in helppuff.json and the settings.
+- Webhooks `appointment.created`, `appointment.updated`,
+  `appointment.cancelled` and `appointment.reminder` (a day before, for your
+  own emails or texts).
+- The assistant is told today's date and time, in the business's time zone.
+- Two limits in Settings → Advanced: `slotLookupsPerIpPerMinute` (30) and
+  `bookingsPerIpPerHour` (5). The widget's booking calendar is its own small
+  file (`booking-*.js`), downloaded only when one is shown.
 
 ### Changed
+
+- The Worker's cron runs every 15 minutes (it was daily): re-crawls still
+  start only when due, and synced calendars are read on their schedule.
+  `helppuff upgrade` (a deploy) updates the trigger.
 
 - The setup page has three steps: your website, business details, and an
   optional assistant step (**Skip** keeps "offer a callback"). Its choices

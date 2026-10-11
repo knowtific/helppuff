@@ -41,6 +41,10 @@ leads only; see [[Leads]].
 | `job.stage_changed` | A job moved to another stage | `job`, `from`, `to` (stage names) |
 | `job.won` | A job moved to a won stage. Sent with `job.stage_changed` | `job` |
 | `job.lost` | A job moved to a lost stage. Sent with `job.stage_changed` | `job`, `reason` |
+| `appointment.created` | An appointment was booked: in the chat, the dashboard, the API, or found in the synced calendar ([[Bookings]]) | `appointment` |
+| `appointment.updated` | An appointment moved, or its status, title, place or notes changed | `appointment`, `previous` (when it moved) |
+| `appointment.cancelled` | An appointment was cancelled anywhere, the synced calendar included | `appointment`, `reason` |
+| `appointment.reminder` | An appointment starts within a day: send your own reminder. Once per appointment, not for one booked in the last hour | `appointment` |
 | `budget.warning` | Today's AI budget is 80% used; answers are kept shorter. Once a day | `day`, `neuronsUsed`, `dailyBudget`, `resetsAt` |
 | `budget.exhausted` | Today's AI budget is used up; visitors get your contact details and a callback form until `resetsAt`. Once a day | `day`, `neuronsUsed`, `dailyBudget`, `resetsAt` |
 | `knowledge.crawl.finished` | Learning the website finished | `runId`, `status`, `trigger`, `pages` `{learned,failed}`, `passages` |

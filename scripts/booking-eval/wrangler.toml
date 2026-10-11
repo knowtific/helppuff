@@ -1,0 +1,17 @@
+# The booking eval's Worker (wiki: AI-Booking-Tests): HelpPuff's real assistant on real
+# Workers AI (the AI binding is remote: it runs on the logged-in account and uses its
+# daily allowance), with a fake calendar. Local only: every value here is a test value.
+name = "helppuff-booking-eval"
+main = "index.ts"
+compatibility_date = "2026-03-27"
+compatibility_flags = ["nodejs_compat"]
+kv_namespaces = [{ binding = "HELPPUFF_KV", id = "booking-eval", preview_id = "booking-eval" }]
+d1_databases = [{ binding = "HELPPUFF_DB", database_name = "booking-eval", database_id = "booking-eval" }]
+
+[ai]
+binding = "AI"
+
+[vars]
+HELPPUFF_LOG = "0"
+HELPPUFF_SECRET = "booking-eval-only-secret-not-for-any-deployment-0123456789"
+ADMIN_API_KEY = "booking-eval-only-admin-key-not-for-any-deployment-01"

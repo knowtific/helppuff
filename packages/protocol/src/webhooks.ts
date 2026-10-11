@@ -38,6 +38,10 @@ export const WEBHOOK_EVENTS = {
   'job.stage_changed': 'A job moved to another stage.',
   'job.won': 'A job moved to a won stage (it went ahead).',
   'job.lost': 'A job moved to a lost stage, with the reason if one was given.',
+  'appointment.created': 'An appointment was booked: by a visitor in the chat, in the dashboard, with the API, or found in the synced calendar.',
+  'appointment.updated': 'An appointment moved to another time, or its status (completed, no-show), title, place or notes changed.',
+  'appointment.cancelled': 'An appointment was cancelled: by the visitor in the chat, the team, the API, or in the synced calendar.',
+  'appointment.reminder': 'An appointment starts in about 24 hours: send your own reminder (email, SMS) from here. Once per appointment.',
   'knowledge.crawl.finished': 'Learning the website finished.',
   'knowledge.file.processed': 'An uploaded file was learned, or failed.',
 } as const;

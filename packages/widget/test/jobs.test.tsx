@@ -126,3 +126,27 @@ describe('the quote questions', () => {
     expect(api.startSession).toHaveBeenCalledWith(expect.objectContaining({ lead: { name: 'Quinn', phone: '0400 123 456' } }), undefined);
   });
 });
+
+describe('the Book a time shortcut', () => {
+  it('starts the chat first, then opens the booking calendar in it', async () => {
+    const host = document.createElement('helppuff-widget');
+    document.body.appendChild(host);
+    const siteId = `book-${Math.random()}`;
+    const runtime = { host, root: host.attachShadow({ mode: 'open' }), apiBase: 'https://api.test', siteId, rawConfig: {}, capabilities: { poll: false, end: true, stream: false }, disposer: new Disposer(), version: 'test', hide: vi.fn(), emit: vi.fn() } as unknown as Runtime;
+    const config = parseConfig({ leadForm: { enabled: false, fields: [] }, home: { title: 'Hi', shortcuts: [{ id: 'booking', label: 'Book a time', icon: 'calendar', action: { id: 'booking', kind: 'booking', label: 'Book a time' } }] } })!;
+    const api = { startSession: vi.fn(async () => ({ session: { token: 'tok-1', id: 'sid-1', expiresAt: Date.now() + 3600_000 }, messages: [] })), send: vi.fn(), end: vi.fn(), rate: vi.fn() };
+    const handle: AppHandleRef = { current: null };
+    render(<App runtime={runtime} config={config} api={api as unknown as Api} handle={handle} />);
+    await act(async () => handle.current!.open());
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Book a time/ }));
+    });
+    await waitFor(() => expect(api.startSession).toHaveBeenCalledTimes(1));
+    // Nothing is sent: the picker is the widget's own, and the server books from it.
+    expect(api.send).not.toHaveBeenCalled();
+    await waitFor(() => {
+      const stored = JSON.parse(localStorage.getItem(`hp:${siteId}`) ?? '{}') as { messages?: { id: string; type: string }[] };
+      expect(stored.messages?.some((m) => m.type === 'booking' && m.id.startsWith('bk_'))).toBe(true);
+    });
+  });
+});

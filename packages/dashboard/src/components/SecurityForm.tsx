@@ -25,6 +25,8 @@ const MORE: { key: LimitKey; label: string; hint: string; min?: number; max: num
   { key: 'maxLeadFieldLength', label: 'Longest form answer (characters)', hint: 'One field of the lead or callback form.', min: 20, max: 2000 },
   { key: 'maxLeadMessageLength', label: 'Longest form message (characters)', hint: 'A message box in a form.', min: 20, max: 4000 },
   { key: 'feedbackPerIpPerMinute', label: 'Ratings a minute, per visitor', hint: 'Thumbs up or down.', max: 600 },
+  { key: 'slotLookupsPerIpPerMinute', label: 'Calendar loads a minute, per visitor', hint: 'Free times in the booking calendar.', max: 600 },
+  { key: 'bookingsPerIpPerHour', label: 'Bookings an hour, per visitor', hint: 'Booking, moving or cancelling from the chat.', max: 100 },
   { key: 'pollsPerIpPerMinute', label: 'Checks for replies a minute, per visitor', hint: 'Backends that answer later, like Retell.', max: 600 },
   { key: 'endsPerIpPerMinute', label: 'Chats closed a minute, per visitor', hint: 'Each close can send a webhook.', max: 600 },
   { key: 'retellLookupsPerMinute', label: 'Retell knowledge lookups a minute', hint: 'For the whole site.', max: 6000 },

@@ -7,6 +7,7 @@ import { capabilitiesOf, prepareConnector } from '../core/run.js';
 import { liveAvailable } from '../live/service.js';
 import { readQuote, withQuote } from '../jobs/widget.js';
 import { readSuggestedHome, withSuggestedHome } from '../home/suggest.js';
+import { effectiveBooking, withBooking } from '../bookings/found.js';
 import type { HonoEnv, RequestCtx } from '../core/request.js';
 import type { SiteConfig } from '../config/schema.js';
 import type { Platform } from '../core/platform.js';
@@ -64,9 +65,12 @@ configRoutes.get('/v1/sites/:siteId/config', async (c) => {
   // The quote questions (Settings → Jobs) and the home screen suggested from the website,
   // each under its own key so a deploy never drops them.
   const [quote, suggested] = dbFrom(ctx.env) ? await Promise.all([readQuote(ctx.platform.kv, siteId), readSuggestedHome(ctx.platform.kv, siteId)]) : [null, null];
+  // How visitors book (Settings → Bookings): the picker needs the database, the link does not.
+  const booking = effectiveBooking(site, site.bookingFound ?? null);
+  const bookable = booking.mode === 'picker' && !dbFrom(ctx.env) ? { ...booking, mode: 'none' as const } : booking;
   const body: ConfigResponse = {
     siteId,
-    widget: { ...withQuote(withSuggestedHome(site.widget, suggested), quote), ...captchaFor(site, ctx.platform.log, siteId) },
+    widget: { ...withBooking(withQuote(withSuggestedHome(site.widget, suggested), quote), bookable), ...captchaFor(site, ctx.platform.log, siteId) },
     capabilities: capabilitiesFor(ctx, site, siteId),
   };
 

@@ -18,8 +18,10 @@ import { cleanText } from '@helppuff/protocol/text';
 import { localFormId } from '@helppuff/protocol/forms';
 import { HANDOVER_ACTION } from '@helppuff/protocol/live';
 import { JOB_FLOW_PREFIX, QUOTE_CONTACT_FIELDS } from '@helppuff/protocol/jobs';
+import { BOOKING_PICKER_PREFIX } from '@helppuff/protocol/bookings';
+import type { mountBooking } from '../booking/index.js';
 import type { connectLive, LiveConnection } from '../live/index.js';
-import { parseMessage } from './validate.js';
+import { parseMessage, parseMessages } from './validate.js';
 import type { Runtime } from '../loader.js';
 import { toWidgetError, type Api } from './api.js';
 import { clientId, pageContext, pathAllowed, currentPath } from './context.js';
@@ -29,10 +31,12 @@ import { GREETING_PREFIX } from './store.js';
 
 /** The live chunk's file, set at build time (absent in tests: no live connection there). */
 declare const __HELPPUFF_LIVE_FILE__: string | undefined;
+/** The booking chunk's file (the date picker and the appointment card), set at build time. */
+declare const __HELPPUFF_BOOKING_FILE__: string | undefined;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-/i;
 /** Ids the widget made itself (greetings, flow steps, local notes) never reach the server's records. */
-const isServerMessage = (id: string) => !id.startsWith(GREETING_PREFIX) && !isFlowMessage(id) && !UUID.test(id) && !id.startsWith('c_') && !id.startsWith('wf_');
+const isServerMessage = (id: string) => !id.startsWith(GREETING_PREFIX) && !isFlowMessage(id) && !UUID.test(id) && !id.startsWith('c_') && !id.startsWith('wf_') && !id.startsWith(BOOKING_PICKER_PREFIX);
 import {
   findFlow,
   isComplete,
@@ -546,6 +550,53 @@ export function App({
     void doSend(input);
   }, [state.session, doSend]);
 
+  /**
+   * The booking calendar from a shortcut or a button: a picker the widget
+   * shows itself. It needs a chat (its times come with the session), so
+   * without one it starts one first, through the lead form if the site has one.
+   */
+  const pendingBooking = useRef(false);
+  const addPicker = () => dispatch({ type: 'message/local', message: { id: BOOKING_PICKER_PREFIX + clientId().slice(0, 8), ts: Date.now(), role: 'agent', type: 'booking' } as Message });
+  const openBooking = useCallback(() => {
+    if (stateRef.current.session) addPicker();
+    else pendingBooking.current = true;
+    onStart();
+  }, [onStart]);
+  useEffect(() => {
+    if (!state.session || !pendingBooking.current) return;
+    pendingBooking.current = false;
+    addPicker();
+  }, [state.session]);
+
+  /** The booking chunk, loaded once, the first time a booking message is drawn. Any failure: nothing drawn, the chat goes on. */
+  const bookingChunk = useRef<Promise<{ mountBooking: typeof mountBooking }> | null>(null);
+  const mountBookingView = useCallback(
+    (el: HTMLElement, message: Message, consumed: boolean) => {
+      let handle: { destroy: () => void } | undefined;
+      let on = true;
+      (bookingChunk.current ??= Promise.resolve().then(() => import(/* @vite-ignore */ new URL(/* @vite-ignore */ __HELPPUFF_BOOKING_FILE__!, import.meta.url).href)))
+        .then((mod) => {
+          if (on)
+            handle = mod.mountBooking(el, {
+              apiBase: runtime.apiBase,
+              token: () => stateRef.current.session?.token,
+              message: message as Parameters<typeof mountBooking>[1]['message'],
+              consumed,
+              onConsumed: () => dispatch({ type: 'action/consumed', id: message.id }),
+              onMessages: (messages: unknown[]) => parseMessages(messages).forEach((m) => dispatch({ type: 'message/local', message: m })),
+              lead: () => leadRef.current,
+              strings: config.strings,
+            });
+        })
+        .catch(() => {});
+      return () => {
+        on = false;
+        handle?.destroy();
+      };
+    },
+    [runtime, config],
+  );
+
   /** Append a message the widget produced itself, with no server round trip. */
   const addLocal = useCallback((message: Message) => {
     dispatch({ type: 'message/local', message });
@@ -696,6 +747,7 @@ export function App({
           return;
         }
         if (action.kind === 'flow') startFlowRef.current(action.flowId);
+        if (action.kind === 'booking') openBooking();
       },
 
       onFormSubmit: (message: Message, value: string, label: string) => {
@@ -704,6 +756,8 @@ export function App({
       },
 
       isConsumed: (message: Message) => state.consumedActions.includes(message.id),
+
+      booking: typeof __HELPPUFF_BOOKING_FILE__ === 'string' ? mountBookingView : undefined,
 
       // Only replies the server recorded can be rated: not the greeting, a flow step, or a local note.
       rating:
@@ -720,7 +774,7 @@ export function App({
             }
           : undefined,
     }),
-    [config, doSend, addLocal, localMessage, state.consumedActions, state.session, ratings, runtime, api, t],
+    [config, doSend, addLocal, localMessage, state.consumedActions, state.session, ratings, runtime, api, t, openBooking, mountBookingView],
   );
 
   const answerFlowRef = useRef<(value: string) => boolean>(() => false);
@@ -738,7 +792,7 @@ export function App({
         startFlow(action.flowId);
         return;
       }
-      if (action.kind === 'form') {
+      if (action.kind === 'form' || action.kind === 'booking') {
         handlers.onAction({ id: `shortcut_${shortcut.id}` } as Message, action);
         return;
       }

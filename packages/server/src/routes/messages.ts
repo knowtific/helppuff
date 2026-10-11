@@ -19,7 +19,7 @@ import { liveAvailable, messagesSince, readLiveState } from '../live/service.js'
 
 export const messageRoutes = new Hono<HonoEnv>();
 
-type Session = {
+export type Session = {
   payload: SessionTokenPayload;
   site: SiteConfig;
   prepared: PreparedConnector;
@@ -27,7 +27,7 @@ type Session = {
 };
 
 /** Steps 1-2 of the send pipeline: token, then origin against the token's site. */
-async function authenticate(ctx: RequestCtx, authorization: string | undefined): Promise<Session> {
+export async function authenticate(ctx: RequestCtx, authorization: string | undefined): Promise<Session> {
   const secret = requireSecret(ctx);
 
   const token = authorization?.startsWith('Bearer ') ? authorization.slice(7).trim() : '';

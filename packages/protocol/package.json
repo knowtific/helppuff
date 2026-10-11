@@ -14,7 +14,8 @@
     "./live": "./src/handover.ts",
     "./jobs": "./src/jobs.ts",
     "./tools": "./src/tools.ts",
-    "./agents": "./src/agents.ts"
+    "./agents": "./src/agents.ts",
+    "./bookings": "./src/bookings.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

@@ -222,7 +222,11 @@ type Message =
   | Base & { type: 'links'; title?: string; links: LinkItem[] }
   | Base & { type: 'form'; title?: string; fields: Field[]; submitLabel?: string }
   // Live chat's progress: waiting for a person, joined, back to the assistant, closed, or nobody in time.
-  | Base & { type: 'handover'; status: 'waiting' | 'joined' | 'left' | 'closed' | 'missed'; text: string; agentName?: string };
+  | Base & { type: 'handover'; status: 'waiting' | 'joined' | 'left' | 'closed' | 'missed'; text: string; agentName?: string }
+  // The booking picker (Settings → Bookings), or with `booked` the appointment it booked. Only the server writes `booked`.
+  | Base & { type: 'booking'; text?: string; from?: string; to?: string; part?: 'morning' | 'afternoon' | 'evening';
+             prefill?: { name?: string; email?: string; phone?: string }; reschedule?: string;
+             booked?: { id: string; title: string; start: number; end: number; timezone: string; status: 'confirmed' | 'cancelled'; location?: string; cancel?: boolean; change?: boolean } };
 ```
 
 Rules both sides must follow:
@@ -250,11 +254,22 @@ type Action =
   | { id: string; kind: 'tel';   label: string; phone: string }
   | { id: string; kind: 'email'; label: string; email: string }
   | { id: string; kind: 'flow';  label: string; flowId: string }
-  | { id: string; kind: 'form';  label: string; formId: string };
+  | { id: string; kind: 'form';  label: string; formId: string }
+  | { id: string; kind: 'booking'; label: string };
 ```
 
 `reply` sends a `SendRequest` of kind `action`. `flow` and `form` are handled
 entirely client-side and reach the server only as the message they produce.
+`booking` opens the booking picker (a `booking` message the widget shows itself).
+
+The picker talks to the server on the session token, outside the message
+stream: `POST /v1/sessions/booking/slots { from?, to?, tz?, part?, reschedule? }`
+(free times, each with a signed `id`; a POST so the origin is always checked), `POST /v1/sessions/booking { slot, name, email, phone?, timezone?, reschedule? }`
+(answers `{ messages }` with the booked card, or `{ redirect, messages }` when
+the visitor finishes on the provider's page) and
+`POST /v1/sessions/booking/cancel { appointment }`. A connector can open the
+picker by returning a `booking` message without `booked`; a `booked` one from a
+connector is dropped.
 
 ---
 

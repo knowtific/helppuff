@@ -7,6 +7,7 @@ import { requireKnowledgeEnv } from '../knowledge/env.js';
 import { emitTo, runWebhookRetry, workflowRetry, type WebhookRetryParams } from '../webhooks/deliver.js';
 import { setupAfterLearning } from '../jobs/setup.js';
 import { suggestAfterLearning } from '../home/suggest.js';
+import { foundAfterLearning } from '../bookings/found.js';
 import { DEFAULT_CHAT_MODEL } from '../knowledge/env.js';
 import type { KvStore } from '@helppuff/connector-types';
 
@@ -71,6 +72,8 @@ export class CrawlWorkflow extends WorkflowEntrypoint<Record<string, unknown>, J
       await setupAfterLearning({ db: env.db, ai: runner, kv, now: () => Date.now() }, payload.siteId).catch(() => {});
       // And the widget's home screen: useful pages as links, the questions visitors ask (once; the owner's own win).
       await suggestAfterLearning({ db: env.db, ai: runner, kv, model: DEFAULT_CHAT_MODEL, now: () => Date.now() }, payload.siteId, '').catch(() => {});
+      // And the booking link it found: offered while the owner has not chosen how visitors book.
+      await foundAfterLearning({ db: env.db, kv, now: () => Date.now() }, payload.siteId).catch(() => {});
     };
     if ('kind' in payload && payload.kind === 'file') {
       if (!env.uploads) throw new Error('No KV binding to read the upload from.');

@@ -114,6 +114,7 @@ const FEATURES = [
   { icon: 'users', title: 'Built-in CRM', text: 'One contact per person across repeat chats: company, address, custom attributes, private notes, labels and CSV export.', link: 'Leads' },
   { icon: 'headset', title: 'Live chat with your team', text: 'Hand any chat to a person, answered from the dashboard or Telegram, with alerts and sounds. Nobody free? The callback form.', link: 'Live-Chat' },
   { icon: 'briefcase', title: 'Quotes and jobs', text: 'Requests from the chat or a “Get a quote” button land on a board with your own stages, set up from your website by the AI.', link: 'Jobs' },
+  { icon: 'calendar', title: 'Booking in the chat', text: 'Visitors pick a free time in a calendar in the chat and HelpPuff books it, synced with Cal.com, Calendly, Google Calendar or Outlook. Or just offer your booking link.', link: 'Bookings' },
   { icon: 'wrench', title: 'Your APIs as tools', text: 'Paste a curl and the assistant can check an order or a booking. Look visitors up before the chat, and send each finished chat to your CRM.', link: 'Tools' },
   { icon: 'sparkles', title: 'Conversation intelligence', text: 'Automatic summaries with intent, sentiment, lead quality, outcome, topics, next steps and unanswered questions.', link: 'Dashboard#conversations' },
   { icon: 'phone', title: 'Callback requests', text: '“Please call me” becomes a task your team can complete, dismiss or reopen.', link: 'Leads#callbacks' },
@@ -130,6 +131,7 @@ const DASH_TABS = [
   { id: 'conversation', label: 'Conversations', caption: 'Every chat summarised and labelled: intent, sentiment, lead quality, next step, and the questions it could not answer.' },
   { id: 'live', label: 'Live chat', caption: 'A visitor asked for a person: see who is waiting and for how long, take the chat, reply, or hand it back to the assistant.' },
   { id: 'jobs', label: 'Jobs', caption: 'Quote requests and work on a board with your own stages: drag to move, spot what has gone stale, and every update in its history.' },
+  { id: 'calendar', label: 'Calendar', caption: 'Every appointment by month, week or day: booked in the chat, added by hand, or read from your synced calendar, each on its job.' },
   { id: 'leads', label: 'Leads', caption: 'One lead per person, moved through your pipeline from new to won, with notes and CSV export.' },
   { id: 'callbacks', label: 'Callbacks', caption: '“Please call me” becomes a task: tap to call, mark it done with a note, or dismiss it.' },
   { id: 'analytics', label: 'Analytics', caption: 'Conversations, leads and conversion against the previous period, top pages, countries and the latest questions.' },
@@ -184,6 +186,7 @@ const ICONS: Record<string, string> = {
   plug: 'M12 22v-5M9 8V2M15 8V2M18 8v5a6 6 0 0 1-12 0V8Z',
   database: 'M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3ZM4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',
   headset: 'M3 14v-2a9 9 0 0 1 18 0v2M21 16a2 2 0 0 1-2 2h-1v-6h1a2 2 0 0 1 2 2ZM3 16a2 2 0 0 0 2 2h1v-6H5a2 2 0 0 0-2 2ZM18 18v.5a3 3 0 0 1-3 3h-3',
+  calendar: 'M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2ZM4 10h16M8 2v4M16 2v4M9 15l2 2 4-4',
   briefcase: 'M3 7h18v13H3zM8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18',
   refresh: 'M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5',
   lock: 'M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4',
@@ -307,6 +310,36 @@ const ICONS: Record<string, string> = {
             <a :href="WIDGET_DEMO.href" target="_blank" rel="noopener">Open the playground →</a>
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- Booking -->
+    <section class="wrap block booking" id="booking">
+      <header class="section-head">
+        <p class="kicker">Booking in the chat</p>
+        <h2>The AI finds the time. <span class="grad">HelpPuff books it.</span></h2>
+        <p>
+          Visitors pick a free time in a calendar right in the chat, and HelpPuff books it, on a job, in your calendar too.
+          The assistant suggests times but never books: we tested AI models booking by themselves, and even the best
+          sometimes booked the wrong time, or booked twice.
+        </p>
+      </header>
+      <div class="booking-grid">
+        <figure>
+          <Zoom :src="shot('booking-picker')" alt="A calendar in the chat: days along the top, free times below" lazy width="464" height="816" caption="The real free times, in the visitor's own time zone. Days, then times, then their name and email." :demo="WIDGET_DEMO" />
+          <figcaption><b>Free times, in their time zone</b>From your hours, or from Cal.com, Calendly, Google Calendar or Outlook.</figcaption>
+        </figure>
+        <figure>
+          <Zoom :src="shot('booking-booked')" alt="A booked appointment in the chat, with Change time and Cancel booking" lazy width="464" height="816" caption="Booked once, even on a double click, and the visitor can move or cancel it from the chat." :demo="WIDGET_DEMO" />
+          <figcaption><b>Booked once, changeable</b>No double bookings, whichever model you use.</figcaption>
+        </figure>
+        <ul class="booking-points">
+          <li><b>Three choices.</b> No appointments, your booking link, or the date picker. A booking link on your site is found for you.</li>
+          <li><b>Synced both ways.</b> Bookings are written to your calendar, and events made there show in HelpPuff.</li>
+          <li><b>On a job, on the calendar.</b> Each appointment joins the contact's job, with reminders and webhooks.</li>
+          <li><a :href="docs('Bookings')">How booking works →</a></li>
+          <li><a :href="docs('AI-Booking-Tests')">Why the AI never books: our tests →</a></li>
+        </ul>
       </div>
     </section>
 
@@ -622,6 +655,20 @@ h3 { margin: 18px 0 8px; font-size: 22px; font-weight: 700; letter-spacing: -0.0
 .gallery .phone :deep(img) { border-radius: 34px; border: 9px solid #18181f; background: #18181f; }
 figcaption { margin-top: 18px; font-size: 14px; color: var(--ink-2); }
 figcaption b { display: block; font-size: 16px; color: var(--ink); margin-bottom: 2px; }
+
+.booking-grid { display: grid; grid-template-columns: 1fr 1fr 1.1fr; gap: 28px; align-items: center; }
+.booking-grid figure { margin: 0; text-align: center; }
+.booking-grid .hp-zoom { width: 100%; max-width: 300px; margin: 0 auto; filter: drop-shadow(0 24px 40px rgba(30, 30, 80, 0.16)); }
+.booking-points { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; font-size: 15px; color: var(--ink-2); }
+.booking-points b { color: var(--ink); }
+.booking-points a { font-weight: 600; }
+@media (max-width: 900px) {
+  .booking-grid { grid-template-columns: 1fr 1fr; }
+  .booking-points { grid-column: 1 / -1; }
+}
+@media (max-width: 560px) {
+  .booking-grid { grid-template-columns: 1fr; }
+}
 
 .playground-card {
   display: grid; grid-template-columns: 1.6fr 1fr; align-items: center; gap: 32px; margin-top: 72px; padding: 18px; border-radius: 26px;

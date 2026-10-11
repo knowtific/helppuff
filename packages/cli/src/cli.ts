@@ -30,6 +30,7 @@ import { jobsCommand } from './commands/jobs.js';
 import { modelCommand, ragCommand, scaffoldCommand } from './commands/models.js';
 import { apiCommand, keysCommand } from './commands/keys.js';
 import { callbacksCommand } from './commands/callbacks.js';
+import { appointmentsCommand, bookingsCommand, integrationsCommand } from './commands/bookings.js';
 import { upgradeCommand } from './commands/upgrade.js';
 import { promptCommand } from './commands/prompt.js';
 import { liveCommand, telegramCommand } from './commands/live.js';
@@ -62,6 +63,9 @@ const COMMANDS: Record<string, (ctx: Ctx) => Promise<number>> = {
   keys: keysCommand,
   api: apiCommand,
   callbacks: callbacksCommand,
+  bookings: bookingsCommand,
+  appointments: appointmentsCommand,
+  integrations: integrationsCommand,
   jobs: jobsCommand,
   model: modelCommand,
   rag: ragCommand,

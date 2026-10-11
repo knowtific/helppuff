@@ -79,6 +79,9 @@ COMMANDS
     api <METHOD> <path>  Call any public API endpoint with this project's admin key (--data '{…}')
     callbacks            Visitors waiting to be called back: list them, mark them done
     jobs                 Requests, quotes and work on the pipeline: list, create, move, set up
+    bookings             How visitors book: none, a booking link, or a date picker in the chat (HelpPuff books)
+    appointments         The appointments: list, add, move, cancel, mark done, read the synced calendar
+    integrations         Keys for Composio (Google Calendar, Outlook), Cal.com and Calendly
     model [set|test]     Who writes the answers: Workers AI (default), any OpenAI-compatible API, Claude, or your own
     rag [set|test]       What answers come from: HelpPuff's knowledge base (default), AI Search, your own, or none
     scaffold model|rag   A typed starter file for your own model or knowledge base
@@ -362,6 +365,25 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       'The agent file: the assistant\'s setup in one JSON file, the same as the dashboard\'s Settings → Import & export. It holds the prompt, the tools, and the behaviour and lead form settings (not the branding, the knowledge or the team). `export` writes the live setup; secret headers become `${NAME}` placeholders, listed in `needs`. `import` takes a file or a template\'s id, checks it, then applies it: settings, tools (matched by name: created or replaced) and the prompt as a new version. Each `${NAME}` comes from .env (a missing one answers needs_input), and prompt.md and helppuff.json are brought up to date. `--dry-run` shows what would change. `templates` lists the ready-made ones, each with its tutorial.',
     examples: ['helppuff agent templates', 'helppuff agent import order-tracking --dry-run', 'helppuff agent import order-tracking --json', 'helppuff agent export agent.json', 'helppuff agent import agent.json'],
     notes: 'Keep agent.json in your project to share or restore a setup. Secrets are never in it: set them with `helppuff secret set NAME`, then import.',
+  },
+  bookings: {
+    usage: 'helppuff bookings [show] | mode <none|link|picker|auto> [--link url] | sync <none|calcom|calendly|google|outlook> [--event-type id] [--account id] [--calendar id] | set [--title …] [--duration 30] [--buffer 15] [--notice 120] [--days-ahead 30] [--timezone Area/City] [--phone off|optional|required] [--location …] [--label …] [--hours "mon=09:00-17:00;sat="] [--sync-minutes 15] | slots [--from YYYY-MM-DD] [--to YYYY-MM-DD] | test [calendar]',
+    summary:
+      'Appointments, the same as the dashboard\'s Settings → Bookings. `mode`: `none`, `link` (the chat offers your booking page; the booking happens there) or `picker` (a date picker in the chat: the visitor picks a free time and HelpPuff books it; the assistant suggests, never books). `auto` hands the choice back to the website: a booking link found on it (Calendly, Cal.com, Acuity…) is offered. With the picker, `sync` picks the calendar free time is read from and bookings are written to: `none` (HelpPuff keeps them, free time from `--hours`), `calcom` or `calendly` (their event type: `--event-type`; `test` lists them), `google` or `outlook` (through Composio). Keys: `helppuff integrations`. Appointments then belong to jobs, show on the dashboard\'s Calendar, and send the appointment.* webhooks.',
+    examples: ['helppuff bookings', 'helppuff bookings mode picker', 'helppuff bookings set --duration 45 --hours "mon=09:00-17:00;tue=09:00-17:00;fri=09:00-12:00;sat=" --timezone Australia/Melbourne', 'helppuff bookings sync calcom --event-type 1234567', 'helppuff bookings slots --json'],
+    notes: 'Changes are live within a minute; run `helppuff config pull` to keep helppuff.json (`bookings`) in step. Why the AI never books: the wiki page AI-Booking-Tests.',
+  },
+  appointments: {
+    usage: 'helppuff appointments list [--from …] [--to …] [--status active|all|confirmed|cancelled|completed|no_show|busy] [--job id] | add --start ISO [--duration 30 | --end ISO] [--name …] [--email …] [--phone …] [--title …] [--job id] [--location …] [--notes …] [--force] | move <id> --start ISO | cancel <id> [--reason …] | done <id> | no-show <id> | delete <id> | sync',
+    summary:
+      'The appointments, the same as the dashboard\'s Calendar page (on with the date picker). `add` books one by hand: written to the synced calendar first, then put on a job (`--job`, else the contact\'s open job, else a new one); a time that overlaps another is refused unless `--force`. `move` reschedules it there too; `cancel` cancels it there (the record stays); `delete` cancels and removes it. `sync` reads the synced calendar now (30 days back, 90 ahead): new events become appointments when an attendee is a contact, else busy time. Times are ISO 8601 with an offset, or milliseconds.',
+    examples: ['helppuff appointments list --json', 'helppuff appointments add --start 2026-10-15T09:00:00+11:00 --name "Ada Lovelace" --email ada@example.com --title "Site visit"', 'helppuff appointments move apt_4f1c2b9e --start 2026-10-16T10:00:00+11:00', 'helppuff appointments sync'],
+  },
+  integrations: {
+    usage: 'helppuff integrations [list] | add <composio|calcom|calendly> --key-env NAME [--base-url https://…] | test <kind> | remove <kind> | accounts [google|outlook] | connect <google|outlook> | calcom-webhook',
+    summary:
+      'Keys for other services, the same as the dashboard\'s Settings → Integrations: stored sealed on the Worker (live at once, never shown again) and reused by any feature. `add` reads the key from .env (a missing one answers needs_input; set it with `helppuff secret set NAME`) and checks it. Composio connects Google Calendar and Outlook without an OAuth app of your own: `connect google` prints a sign-in link, `accounts` lists what is connected. Cal.com self-hosted: `--base-url` is your API v2 address. `calcom-webhook` prints the address and secret for Cal.com\'s webhook, so changes there show at once.',
+    examples: ['helppuff secret set CALCOM_API_KEY && helppuff integrations add calcom --key-env CALCOM_API_KEY', 'helppuff integrations add composio --key-env COMPOSIO_API_KEY', 'helppuff integrations connect google', 'helppuff integrations accounts google --json'],
   },
   identity: {
     usage: 'helppuff identity [rotate]',

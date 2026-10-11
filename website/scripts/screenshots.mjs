@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
  * bundle, not mock-ups, so they are only ever as good as the widget is.
  *
  *   pnpm build:playground && pnpm --filter @helppuff/dashboard build:demo
- *   pnpm --filter @helppuff/website screenshots
+ *   pnpm --filter @helppuff/website screenshots     (SHOTS=a,b for only those)
  *
  * Widget shots boot the playground's preview page with a setup in its URL,
  * talk to it through `showcase.ts`'s scripted answers, and crop the widget
@@ -50,8 +50,12 @@ const previewUrl = (setup) => `${origin}/playground/preview.html?demo=showcase&s
 const ISOLATE = 'html, body { background: transparent !important; } body > :not(helppuff-widget) { visibility: hidden !important; }';
 
 const browser = await chromium.launch();
+/** `SHOTS=booking-picker,dash-calendar`: take only these (the rest stay as they are). */
+const only = process.env.SHOTS ? new Set(process.env.SHOTS.split(',').map((x) => x.trim())) : null;
+const wanted = (name) => !only || only.has(name);
 
 async function shot(name, { widget, viewport = { width: 1280, height: 900 }, mobile = false, transparent = true, steps }) {
+  if (!wanted(name)) return;
   const page = await browser.newPage({ viewport, deviceScaleFactor: mobile ? 3 : 2, isMobile: mobile, hasTouch: mobile });
   await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: widget.brand?.theme === 'dark' ? 'dark' : 'light' });
   await page.goto(previewUrl({ widget, open: !widget.teaser }), { waitUntil: 'networkidle' });
@@ -188,8 +192,45 @@ await shot('mobile', {
   },
 });
 
+// Booking in the chat: the date picker, then the appointment it booked.
+const physio = {
+  brand: { name: 'Harbour Physio', agentName: 'Mia', accent: '#0F766E', theme: 'light' },
+  home: {
+    title: 'Welcome to Harbour Physio',
+    subtitle: 'Ask about treatments, or book a session.',
+    shortcuts: [{ id: 'booking', label: 'Book a time', description: 'Pick a time that suits you.', icon: 'calendar', action: { id: 'booking', kind: 'booking', label: 'Book a time' } }],
+  },
+  leadForm: { enabled: false },
+  chat: { initialMessages: ['Hi, I’m Mia. Pick a time below, or ask me anything first.'] },
+};
+const openPicker = async (w) => {
+  await w('.hp-panel').waitFor();
+  await w('button:has-text("Book a time")').first().click();
+  await w('.hpb-times .hp-chip').first().waitFor({ timeout: 8000 });
+};
+await shot('booking-picker', {
+  widget: physio,
+  steps: async (w, page) => {
+    await openPicker(w);
+    await w('.hpb-days .hp-chip').nth(1).click();
+    await page.mouse.move(5, 5);
+  },
+});
+await shot('booking-booked', {
+  widget: physio,
+  steps: async (w, page) => {
+    await openPicker(w);
+    await w('.hpb-times .hp-chip').nth(2).click();
+    await w('input[name="name"]').fill('Ada Lovelace');
+    await w('input[name="email"]').fill('ada@example.com');
+    await w('form.hpb button[type="submit"]').click();
+    await w('.hpb-card').waitFor();
+    await page.waitForTimeout(400);
+  },
+});
+
 // The playground itself, for the "make it yours" section.
-{
+if (wanted('playground')) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 880 }, deviceScaleFactor: 2 });
   await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: 'light' });
   await page.goto(`${origin}/playground/#p=trades`, { waitUntil: 'networkidle' });
@@ -203,6 +244,7 @@ await shot('mobile', {
 
 // The dashboard demo, page by page.
 async function dashboard(name, route, { dark = false, live = false, before } = {}) {
+  if (!wanted(name)) return;
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
   await page.addInitScript((theme) => localStorage.setItem('hp-theme', theme), dark ? 'dark' : 'light');
   if (live) {
@@ -260,6 +302,17 @@ await dashboard('dash-live', 'conversations', {
   },
 });
 await dashboard('dash-home-screen', 'settings/home');
+await dashboard('dash-calendar', 'calendar', {
+  before: async (page) => {
+    await page.getByRole('radio', { name: 'Week' }).click();
+    await page.getByText('Site visit').first().waitFor();
+  },
+});
+await dashboard('dash-bookings', 'settings/bookings', {
+  before: async (page) => {
+    await page.getByRole('figure', { name: 'Preview of the date picker' }).waitFor();
+  },
+});
 
 await browser.close();
 server.close();

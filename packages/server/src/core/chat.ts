@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import { cleanText, HANDOVER_ACTION, JOB_FORM_PREFIX, stripChatTokens, type Message, type SendRequest, type StartSessionRequest, type VerifiedUser } from '@helppuff/protocol';
 import { identitySecret, identityVersion, verifyIdentity } from './identity.js';
-import { isCallbackForm, notice } from '@helppuff/connector-types';
+import { isCallbackForm, notice, type ConnectorContext } from '@helppuff/connector-types';
 import type { SiteConfig } from '../config/schema.js';
 import { resolveSecrets } from '../config/load.js';
 import { formLead, recordLead, recordStart, recordTurn } from '../admin/record.js';
@@ -24,6 +24,9 @@ import type { TurnStatus } from '../admin/record.js';
 import { completeJobForm, jobsHandle, submitQuote } from '../jobs/chat.js';
 import { quoteActionId } from '../jobs/widget.js';
 import { conversationFacts, enabledTools, runBeforeTools, toolsHandle } from '../tools/chat.js';
+import { pickerMessage, suggestedBooking } from '../bookings/chat.js';
+import { effectiveBooking } from '../bookings/found.js';
+import { isAssistant } from './assistant.js';
 
 /**
  * A conversation with the assistant, whoever holds it: the widget (a browser
@@ -64,6 +67,29 @@ export type ChatSession = {
 /** What a turn produced: what the route keeps (token or row) and answers with. */
 export type ChatTurn = { sessionId: string; messages: Message[]; state: unknown; forms: string[]; count: number };
 export type Respond<T> = (turn: ChatTurn, streaming: boolean) => Promise<{ body: T; headers?: Record<string, string> }>;
+
+/**
+ * The assistant's way to the booking calendar, when the site books in the
+ * chat: `show` queues the picker, which the server adds to the reply.
+ */
+function bookingsHandle(ctx: RequestCtx, site: SiteConfig, added: Message[], prefill?: Record<string, string>): ConnectorContext<unknown>['bookings'] {
+  if (effectiveBooking(site, site.bookingFound ?? null).mode !== 'picker' || !dbFrom(ctx.env)) return undefined;
+  return {
+    show: (window) => {
+      if (added.some((m) => m.type === 'booking')) return true;
+      const p = prefill ?? {};
+      added.push(pickerMessage({ window: window ?? {}, prefill: { ...(p['name'] ? { name: p['name'] } : {}), ...(p['email'] ? { email: p['email'] } : {}), ...(p['phone'] ? { phone: p['phone'] } : {}) }, now: ctx.platform.now() }));
+      return true;
+    },
+  };
+}
+
+/** The "Book a time" button after an answer about booking, when the reply has no way to book yet. */
+function withBookingSuggestion(ctx: RequestCtx, site: SiteConfig, visitorText: string | undefined, messages: Message[]): Message[] {
+  if (!visitorText) return messages;
+  const suggestion = suggestedBooking(site, visitorText, messages, isAssistant(site), ctx.platform.now());
+  return suggestion ? [...messages, suggestion] : messages;
+}
 
 /** A new chat's text, cleaned: the first message as typed text, the rest single lines. */
 /** A signed identity's verified user, or null (a bad or expired token is ignored, and logged: the chat goes on without one). */
@@ -223,6 +249,9 @@ export async function startChat<T>(
       dispatchLead(ctx, site, siteId, { sessionId, lead: found, context: input.context });
     });
     if (prepared.connector.gated) cctx.gate = gate;
+    const pickers: Message[] = [];
+    const bookings = bookingsHandle(ctx, site, pickers, lead);
+    if (bookings) cctx.bookings = bookings;
     // Before the chat: the tools marked so run with the form's answers, once the limits passed;
     // the first answer has what they returned.
     const tools = await toolsRead;
@@ -240,7 +269,7 @@ export async function startChat<T>(
     // Nothing is recorded for a request the limits refused.
     await verdict;
 
-    const messages = guardReplies(sanitizeConnectorMessages(started.messages, ctx.platform, { allowEmpty: true }), prepared.guidance, ctx.platform);
+    const messages = withBookingSuggestion(ctx, site, input.firstMessage, [...guardReplies(sanitizeConnectorMessages(started.messages, ctx.platform, { allowEmpty: true }), prepared.guidance, ctx.platform), ...pickers]);
     ctx.platform.log('session.started', { siteId, sessionId, messages: messages.length });
 
     // The dashboard's copy, when a database is bound — never blocking.
@@ -427,6 +456,10 @@ export async function sendChat<T>(c: Context<HonoEnv>, options: { session: ChatS
         }
       };
     }
+    // The assistant may open the booking calendar (workers-ai's `show_booking`); the server adds it.
+    const pickers: Message[] = [];
+    const bookings = liveNow ? undefined : bookingsHandle(ctx, site, pickers);
+    if (bookings) cctx.bookings = bookings;
     // The assistant may save a job (workers-ai's `create_job`); the server adds the form for missing details.
     const jobForms: Message[] = [];
     if (!liveNow) {
@@ -439,11 +472,13 @@ export async function sendChat<T>(c: Context<HonoEnv>, options: { session: ChatS
     const result = await ctx.timing.span('connector', () => runConnector(ctx, 'send', () => prepared.connector.send(cctx, session.state, input)));
     const count = await verdict;
     const handed = handover as HandoverResult | null;
-    const messages = [
-      ...guardReplies(sanitizeConnectorMessages(result.messages, ctx.platform, { allowEmpty: Boolean(handed) || jobForms.length > 0 }), prepared.guidance, ctx.platform),
+    const replies = [
+      ...guardReplies(sanitizeConnectorMessages(result.messages, ctx.platform, { allowEmpty: Boolean(handed) || jobForms.length > 0 || pickers.length > 0 }), prepared.guidance, ctx.platform),
+      ...pickers,
       ...(handed?.messages ?? []),
       ...jobForms,
     ];
+    const messages = liveNow || handed ? replies : withBookingSuggestion(ctx, site, input.kind === 'text' ? input.text : undefined, replies);
     ctx.platform.log('message.sent', { siteId, sessionId, count });
     const status: TurnStatus = handed?.status === 'started' || liveNow ? 'keep' : 'bot';
     recordTurn(ctx, { siteId, sessionId, request: input, messages, status });

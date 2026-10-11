@@ -6,6 +6,7 @@ import { NoticeMessage } from './Notice.js';
 import { OptionsMessage } from './Options.js';
 import { TextMessage, UserMessage } from './Text.js';
 import { Rating } from './Rating.js';
+import { BookingView } from './Booking.js';
 
 /** What a message needs from the app to be interactive. */
 export type MessageHandlers = {
@@ -17,6 +18,8 @@ export type MessageHandlers = {
   onFormSubmit: (message: Message, value: string, label: string) => void;
   /** Whether this message has already been answered. */
   isConsumed: (message: Message) => boolean;
+  /** Draws a booking message (the picker or the appointment card) with the booking chunk. */
+  booking?: ((el: HTMLElement, message: Message, consumed: boolean) => () => void) | undefined;
   /** Thumbs up/down on a reply, when the server records ratings. */
   rating?: { get: (message: Message) => number; set: (message: Message, value: 1 | -1 | 0) => void; labels: [string, string] } | undefined;
 };
@@ -108,6 +111,9 @@ export function MessageView({ message, handlers }: { message: Message; handlers:
     case 'handover':
       return <NoticeMessage text={message.text} icon="person" />;
 
+    case 'booking':
+      return handlers.booking ? <BookingView message={message} consumed={consumed} mount={handlers.booking} /> : null;
+
     default:
       return null;
   }
@@ -120,7 +126,7 @@ export function MessageView({ message, handlers }: { message: Message; handlers:
  * row at all. Emitting an empty wrapper still costs a fade-in animation, a
  * gap and a timestamp, so the visitor sees something flash and disappear.
  */
-const DRAWABLE = new Set(['text', 'notice', 'options', 'card', 'carousel', 'links', 'form', 'handover']);
+const DRAWABLE = new Set(['text', 'notice', 'options', 'card', 'carousel', 'links', 'form', 'handover', 'booking']);
 
 export function canRender(message: Message): boolean {
   return DRAWABLE.has(message.type);

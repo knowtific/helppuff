@@ -57,9 +57,11 @@ export type JobsHandle = NonNullable<ConnectorContext<WorkersAiOptions>['jobs']>
 export type OwnTools = NonNullable<ConnectorContext<WorkersAiOptions>['tools']>;
 
 /** Built-in names a site's own tool can never replace. */
-const BUILT_IN = new Set(['create_job', 'request_person', 'request_callback', 'get_business_hours']);
+const BUILT_IN = new Set(['create_job', 'request_person', 'request_callback', 'get_business_hours', 'show_booking']);
 
-export function toolDefinitions(options: WorkersAiOptions, live = false, jobs?: JobsHandle, own?: OwnTools): ToolDef[] {
+export type BookingsHandle = NonNullable<ConnectorContext<WorkersAiOptions>['bookings']>;
+
+export function toolDefinitions(options: WorkersAiOptions, live = false, jobs?: JobsHandle, own?: OwnTools, bookings?: BookingsHandle): ToolDef[] {
   const tools: ToolDef[] = [];
   for (const tool of own?.offered ?? []) {
     if (BUILT_IN.has(tool.name)) continue;
@@ -86,6 +88,24 @@ export function toolDefinitions(options: WorkersAiOptions, live = false, jobs?: 
             },
           },
           required: ['summary'],
+        },
+      },
+    });
+  }
+  if (bookings) {
+    tools.push({
+      type: 'function',
+      function: {
+        name: 'show_booking',
+        description:
+          'Show the booking calendar in the chat: the real free times, where the visitor picks one and books it themselves. Use it when they want to book, schedule or move an appointment. Pass only what they asked for (days, part of the day); never choose a time for them.',
+        parameters: {
+          type: 'object',
+          properties: {
+            from: { type: 'string', description: 'The first day they asked about, YYYY-MM-DD. Leave out for the next available days.' },
+            to: { type: 'string', description: 'The last day they asked about, YYYY-MM-DD.' },
+            part: { type: 'string', enum: ['morning', 'afternoon', 'evening'], description: 'Only if they asked for a part of the day.' },
+          },
         },
       },
     });
@@ -184,6 +204,20 @@ export async function runTool(call: ToolCall, env: ToolEnv): Promise<ToolResult>
       await env.remember(contact);
       return {
         content: `Callback requested for ${contact.phone ?? contact.email}. Confirm briefly that the team will be in touch soon; do not ask for details again.`,
+        messages: [],
+      };
+    }
+    case 'show_booking': {
+      const a = (args && typeof args === 'object' ? args : {}) as Record<string, unknown>;
+      const date = (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
+      const part = a['part'] === 'morning' || a['part'] === 'afternoon' || a['part'] === 'evening' ? a['part'] : undefined;
+      const from = date(a['from']);
+      const to = date(a['to']);
+      const shown = env.ctx.bookings?.show({ ...(from ? { from } : {}), ...(to ? { to } : {}), ...(part ? { part } : {}) }) ?? false;
+      return {
+        content: shown
+          ? 'The booking calendar is now shown under your reply, with the real free times. In one short sentence, invite the visitor to pick a time there. Do not list or suggest times, and do not say anything is booked.'
+          : 'Booking in the chat is not available. Offer the other ways to get in touch.',
         messages: [],
       };
     }

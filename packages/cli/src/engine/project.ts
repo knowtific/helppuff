@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
 import { widgetConfigSchema } from '@helppuff/protocol';
-import { assistantConfigSchema, liveConfigSchema, securitySchema } from '@helppuff/server';
+import { assistantConfigSchema, bookingsConfigSchema, liveConfigSchema, securitySchema } from '@helppuff/server';
 import { workersAiOptionsSchema } from '@helppuff/connector-workers-ai';
 import { CliError } from '../errors.js';
 
@@ -407,6 +407,9 @@ export const projectSchema = z
     live: liveConfigSchema
       .default({})
       .describe('Live chat: visitors can talk to a person on your team, who answers from the dashboard or Telegram. Off by default. `helppuff live on` turns it on.'),
+    bookings: bookingsConfigSchema
+      .default({})
+      .describe('Appointments: `mode` `none`, `link` (offer a booking page) or `picker` (a date picker in the chat; HelpPuff books, the assistant never does). Left out, a booking link found on the website is offered. With the picker, `sync` picks the calendar (keys in Settings → Integrations, `helppuff integrations`). `helppuff bookings` changes them.'),
     leads: z
       .object({
         webhook: z

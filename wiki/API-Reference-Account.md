@@ -71,7 +71,8 @@ const data = (await response.json()) as WhoCallingResponse;
         "dailyCap": 500
       },
       "live": true,
-      "prompt": true
+      "prompt": true,
+      "bookings": "picker"
     }
   ],
   "summaries": true
@@ -109,6 +110,7 @@ type WhoCallingResponse = {
     };
     live: boolean;
     prompt: boolean;
+    bookings: string;
   }>;
   summaries: boolean;
 };

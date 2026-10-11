@@ -66,5 +66,21 @@ export default defineConfig({
       },
       security,
     },
+    /** Booking in the chat (booking.spec.ts): the echo backend, the date picker, every hour bookable so a time is always free. */
+    booking: {
+      origins,
+      connector: site.connector,
+      widget: { brand: { name: 'Harbour Physio', agentName: 'Mia' }, leadForm: { enabled: false } },
+      bookings: {
+        mode: 'picker',
+        title: 'Consultation',
+        duration: 30,
+        notice: 60,
+        timezone: 'Australia/Melbourne',
+        location: '12 Wharf St, Balmain',
+        hours: Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, ['00:00-24:00']])) as Record<'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun', string[]>,
+      },
+      security: { ...security, limits: { ...security.limits, bookingsPerIpPerHour: 100, slotLookupsPerIpPerMinute: 600 } },
+    },
   },
 });

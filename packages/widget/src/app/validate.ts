@@ -71,6 +71,8 @@ export function parseAction(input: unknown): Action | null {
       const formId = str(input['formId'], 64);
       return formId ? { id, kind: 'form', label, formId } : null;
     }
+    case 'booking':
+      return { id, kind: 'booking', label };
     default:
       return null;
   }
@@ -212,6 +214,33 @@ export function parseMessage(input: unknown): Message | null {
         ...(title ? { title } : {}),
         ...(submitLabel ? { submitLabel } : {}),
       };
+    }
+    case 'booking': {
+      // Kept compact: every byte here is in the app bundle; the chunk draws it.
+      const out: Record<string, unknown> = { ...base, type: 'booking' };
+      const date = (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
+      const set = (to: Record<string, unknown>, key: string, value: unknown) => value === undefined || (to[key] = value);
+      set(out, 'text', str(input['text'], 600));
+      set(out, 'from', date(input['from']));
+      set(out, 'to', date(input['to']));
+      set(out, 'part', oneOf(input['part'], ['morning', 'afternoon', 'evening'] as const));
+      set(out, 'reschedule', str(input['reschedule'], 64));
+      if (isObject(input['prefill'])) {
+        const p = input['prefill'];
+        const prefill = {};
+        for (const [key, max] of [['name', 200], ['email', 200], ['phone', 40]] as const) set(prefill, key, str(p[key], max));
+        if (Object.keys(prefill).length) out['prefill'] = prefill;
+      }
+      const b = input['booked'];
+      if (isObject(b)) {
+        const booked: Record<string, unknown> = { id: str(b['id'], 64), title: str(b['title'], 160), start: num(b['start'], 0, 9e15), end: num(b['end'], 0, 9e15), timezone: str(b['timezone'], 64), status: oneOf(b['status'], ['confirmed', 'cancelled'] as const) };
+        if (Object.values(booked).includes(undefined)) return null;
+        set(booked, 'location', str(b['location'], 300));
+        set(booked, 'cancel', bool(b['cancel']));
+        set(booked, 'change', bool(b['change']));
+        out['booked'] = booked;
+      }
+      return out as Message;
     }
     case 'handover': {
       const text = str(input['text'], 600);

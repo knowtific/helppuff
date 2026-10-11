@@ -77,6 +77,40 @@ export type Field = z.infer<typeof fieldSchema>;
 export const HANDOVER_STATUSES = ['waiting', 'joined', 'left', 'closed', 'missed'] as const;
 export type HandoverStatus = (typeof HANDOVER_STATUSES)[number];
 
+const bookingDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const bookingContact = z.string().max(200);
+
+/**
+ * The booking picker (Settings → Bookings: date picker in the chat). Without
+ * `booked`: the visitor picks a time, optionally within a window the
+ * assistant narrowed. With `booked`: the appointment, as booked. Only the
+ * server writes `booked` (a connector's is dropped, `core/sanitize.ts`).
+ */
+export const bookingMessageSchema = z.object({
+  ...base,
+  type: z.literal('booking'),
+  text: z.string().max(600).optional(),
+  from: bookingDate.optional(),
+  to: bookingDate.optional(),
+  part: z.enum(['morning', 'afternoon', 'evening']).optional(),
+  prefill: z.object({ name: bookingContact.optional(), email: bookingContact.optional(), phone: z.string().max(40).optional() }).optional(),
+  /** The appointment of this conversation the picker moves. */
+  reschedule: z.string().min(1).max(64).optional(),
+  booked: z
+    .object({
+      id: z.string().min(1).max(64),
+      title: z.string().min(1).max(160),
+      start: z.number().int().nonnegative(),
+      end: z.number().int().nonnegative(),
+      timezone: z.string().min(1).max(64),
+      status: z.enum(['confirmed', 'cancelled']),
+      location: z.string().max(300).optional(),
+      cancel: z.boolean().optional(),
+      change: z.boolean().optional(),
+    })
+    .optional(),
+});
+
 export const messageSchema = z.discriminatedUnion('type', [
   z.object({ ...base, type: z.literal('text'), text: z.string().min(1).max(8000) }),
   z.object({
@@ -121,6 +155,7 @@ export const messageSchema = z.discriminatedUnion('type', [
     text: z.string().min(1).max(600),
     agentName: z.string().min(1).max(80).optional(),
   }),
+  bookingMessageSchema,
 ]);
 
 export type Message = z.infer<typeof messageSchema>;

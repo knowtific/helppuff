@@ -26,7 +26,10 @@ export function sanitizeConnectorMessages(
   platform: Pick<Platform, 'log' | 'now'>,
   options: { allowEmpty?: boolean } = {},
 ): Message[] {
-  const { messages, dropped } = sanitizeMessages(input);
+  const parsed = sanitizeMessages(input);
+  // A booked appointment is the server's word alone: a backend cannot claim one was made.
+  const messages = parsed.messages.filter((m) => !(m.type === 'booking' && m.booked));
+  const dropped = parsed.dropped + parsed.messages.length - messages.length;
   if (dropped > 0) platform.log('connector.messages_dropped', { dropped });
 
   if (messages.length > 0) return messages;

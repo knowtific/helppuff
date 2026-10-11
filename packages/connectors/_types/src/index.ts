@@ -82,6 +82,14 @@ export type ConnectorContext<Opts> = {
    * and resolves the text for the model. Never throws.
    */
   tools?: ToolsHandle;
+  /**
+   * Appointments, when the site books in the chat (Settings → Bookings: date
+   * picker). `show` adds the booking calendar to the reply, narrowed to the
+   * dates (`YYYY-MM-DD`, the visitor's) or the part of the day they asked
+   * for; the visitor picks a free time and books it there. The assistant
+   * never books, holds or confirms a time. Once per turn; never throws.
+   */
+  bookings?: { show: (window?: { from?: string; to?: string; part?: 'morning' | 'afternoon' | 'evening' }) => boolean };
   /** Tell the site's webhooks something happened that only the connector knows (its daily budget). Never throws. */
   notify?: (type: 'budget.warning' | 'budget.exhausted', data: Record<string, unknown>) => void;
   /**

@@ -35,7 +35,7 @@ describe('workers-ai projects', () => {
       vectorize: [{ binding: 'VECTORS', index_name: 'knowtific-helppuff-acme' }],
       d1_databases: [{ binding: 'HELPPUFF_DB', database_id: 'db1' }],
       workflows: [{ name: 'knowtific-helppuff-acme-crawl', binding: 'CRAWL_WORKFLOW', class_name: 'CrawlWorkflow' }],
-      triggers: { crons: ['23 3 * * *'] },
+      triggers: { crons: ['*/15 * * * *'] },
       browser: { binding: 'BROWSER' },
     });
     expect(compiled.secrets).toEqual(['HELPPUFF_SECRET', 'ADMIN_API_KEY']);

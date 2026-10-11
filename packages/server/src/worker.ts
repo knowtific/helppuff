@@ -5,7 +5,8 @@ import { resilientKv } from './core/platform.js';
 import { setExtensions, type Extensions, type KvStore } from '@helppuff/connector-types';
 import { knowledgeEnv } from './knowledge/env.js';
 import { runScheduledCrawls } from './knowledge/crawl.js';
-import { ensureSchema } from './db/d1.js';
+import { dbFrom, ensureSchema } from './db/d1.js';
+import { runScheduledBookings } from './bookings/cron.js';
 
 type Ctx = { waitUntil(promise: Promise<unknown>): void };
 
@@ -22,17 +23,24 @@ export function createWorker(config: HelpPuffConfig, extensions: Extensions = {}
   const app = createApp(config);
   return {
     fetch: app.fetch,
+    /**
+     * Every 15 minutes: re-crawls that are due (by each site's schedule),
+     * then bookings (the synced calendars, reminders). One trigger, so a
+     * deployment never needs a second.
+     */
     async scheduled(_controller: unknown, env: Record<string, unknown>, ctx: Ctx): Promise<void> {
+      const db = dbFrom(env);
+      if (!db) return;
       const knowledge = knowledgeEnv(env);
-      if (!knowledge) return;
       const kv = resilientKv(env['HELPPUFF_KV'] as KvStore | undefined, () => {});
       const platform = { kv, log: () => {} };
       ctx.waitUntil(
         (async () => {
-          await ensureSchema(knowledge.db);
+          await ensureSchema(db);
           const sites: Record<string, SiteConfig> = {};
           for (const id of Object.keys(config.sites)) sites[id] = await resolveSite({ config, platform }, id);
-          await runScheduledCrawls(knowledge, sites, Date.now());
+          if (knowledge) await runScheduledCrawls(knowledge, sites, Date.now()).catch(() => {});
+          await runScheduledBookings(env, db, sites, Date.now()).catch(() => {});
         })().catch(() => {}),
       );
     },

@@ -13,7 +13,7 @@ describe('messageSchema', () => {
 
   it('covers every message type in the fixtures', () => {
     const types = new Set(validMessages.map((m) => m.type));
-    expect([...types].sort()).toEqual(['card', 'carousel', 'form', 'handover', 'links', 'notice', 'options', 'text']);
+    expect([...types].sort()).toEqual(['booking', 'card', 'carousel', 'form', 'handover', 'links', 'notice', 'options', 'text']);
   });
 });
 
@@ -25,6 +25,7 @@ describe('actionSchema', () => {
     ['email', { id: 'a', kind: 'email', label: 'Mail', email: 'a@b.co' }],
     ['flow', { id: 'a', kind: 'flow', label: 'Quote', flowId: 'quote' }],
     ['form', { id: 'a', kind: 'form', label: 'Book', formId: 'booking' }],
+    ['booking', { id: 'a', kind: 'booking', label: 'Book a time' }],
   ])('accepts a %s action', (_kind, action) => {
     expect(actionSchema.safeParse(action).success).toBe(true);
   });

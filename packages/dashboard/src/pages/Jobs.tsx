@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type DragEvent, type FormEvent, type React
 import { PageHeader } from '../components/Shell';
 import { NotesPanel, SideSection } from '../components/inbox';
 import { Avatar, Badge, Button, Card, Empty, ErrorNote, InfoTip, Input, Segmented, Select, Skeleton, Textarea } from '../components/ui';
+import { RelatedAppointments } from '../components/Appointments';
 import { api, isMember, type Job, type JobDetail, type JobEvent, type JobField, type JobList, type JobStage, type Me, type PipelineView, type Team } from '../lib/api';
 import { useLiveEvents } from '../lib/live';
 import { cn, fmtDateTime, fmtRelative, href, useData, useDebounced, usePersisted } from '../lib/utils';
@@ -13,8 +14,8 @@ import { cn, fmtDateTime, fmtRelative, href, useData, useDebounced, usePersisted
  * a panel per job with its fields, details, updates, notes and history.
  */
 
-const SOURCE: Record<Job['source'], string> = { chat: 'From the chat', quote: 'Quote questions', api: 'API', manual: 'Added by hand', callback: 'From a callback' };
-const CREATED: Record<Job['source'], string> = { chat: 'from the chat', quote: 'from the quote questions', api: 'through the API', manual: 'by hand', callback: 'from a callback request' };
+const SOURCE: Record<Job['source'], string> = { chat: 'From the chat', quote: 'Quote questions', api: 'API', manual: 'Added by hand', callback: 'From a callback', booking: 'From a booking' };
+const CREATED: Record<Job['source'], string> = { chat: 'from the chat', quote: 'from the quote questions', api: 'through the API', manual: 'by hand', callback: 'from a callback request', booking: 'by booking an appointment' };
 
 export function money(cents: number | null, currency: string | null): string {
   if (cents === null) return '';
@@ -381,6 +382,12 @@ export function describeEvent(event: JobEvent): string {
       return String(d['text']);
     case 'edited':
       return d['field'] === 'title' ? `Title: ${v(d['from'])} → ${v(d['to'])}` : d['field'] === 'due' ? 'Due date changed' : 'Details changed';
+    case 'appointment': {
+      const when = typeof d['start'] === 'number' ? new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).format(d['start']) : '';
+      const what = String(d['title'] ?? 'Appointment');
+      if (d['change'] === 'cancelled') return `${what} on ${when} cancelled${d['reason'] ? `: ${String(d['reason'])}` : ''}`;
+      return d['change'] === 'moved' ? `${what} moved to ${when}` : `${what} booked for ${when}`;
+    }
     default:
       return event.kind;
   }
@@ -536,6 +543,12 @@ function JobPanel({ id, me, pipeline, team, onChanged }: { id: string; me: Me; p
           {data.details && !fields.some((f) => f.name === 'description' && data.fields['description'] === data.details) && (
             <SideSection title="Request">
               <p className="whitespace-pre-wrap rounded-md border bg-subtle px-3 py-2 text-[13px]">{data.details}</p>
+            </SideSection>
+          )}
+
+          {me.sites[0]?.bookings === 'picker' && (
+            <SideSection title="Appointments">
+              <RelatedAppointments filter={{ job: id }} context={{ jobId: id, label: `For #${data.number} ${data.title}` }} admin={!member} />
             </SideSection>
           )}
 

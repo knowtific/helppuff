@@ -2,6 +2,7 @@ import type { HelpPuffConfig, SiteConfig } from './schema.js';
 import { assistantConfigSchema, storedSiteConfigSchema } from './schema.js';
 import { HelpPuffError } from '../core/errors.js';
 import type { Platform } from '../core/platform.js';
+import { readFoundBooking } from '../bookings/found.js';
 
 /**
  * Site config, read from KV first and the bundled `helppuff.config.ts` second.
@@ -35,6 +36,14 @@ export function siteConfigKey(siteId: string): string {
 type Ctx = { config: HelpPuffConfig; platform: Pick<Platform, 'kv' | 'log'> };
 
 export async function resolveSite(ctx: Ctx, siteId: string): Promise<SiteConfig> {
+  const site = await resolveConfigured(ctx, siteId);
+  // While the owner has not chosen how visitors book, the link the website has is offered.
+  if (site.bookings.mode !== undefined) return site;
+  const found = await readFoundBooking(ctx.platform.kv, siteId);
+  return found ? { ...site, bookingFound: found } : site;
+}
+
+async function resolveConfigured(ctx: Ctx, siteId: string): Promise<SiteConfig> {
   const bundled = ctx.config.sites[siteId];
   if (!bundled) throw new HelpPuffError('not_found', { detail: 'unknown_site' });
 
@@ -57,6 +66,7 @@ export async function resolveSite(ctx: Ctx, siteId: string): Promise<SiteConfig>
     ...(overrides.widget ? { widget: overrides.widget } : {}),
     ...(overrides.knowledge ? { knowledge: overrides.knowledge } : {}),
     ...(overrides.live ? { live: overrides.live } : {}),
+    ...(overrides.bookings ? { bookings: overrides.bookings } : {}),
     ...(overrides.assistant ? { assistant: overrides.assistant } : legacyAssistant(overrides.profile)),
   };
 }

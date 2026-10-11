@@ -67,6 +67,14 @@ come from the assistant, the widget's quote questions, the API and by hand
 (also from a contact, a conversation or a callback request). The first time
 the AI sets them up from your website, Home says what it chose. See [[Jobs]].
 
+## Calendar
+
+With the [[date picker|Bookings]] on: every appointment as a list, a month,
+a week or a day. **+ New** books one by hand (written to the synced calendar
+too); click one to move it, mark it completed or a no-show, or cancel it;
+**Sync** reads the synced calendar now. Jobs, contacts and conversations show
+their appointments too. See [[Bookings and the calendar|Bookings]].
+
 ## Contacts
 
 One row per **person**, keyed by email: a visitor who comes back gets their
@@ -117,9 +125,9 @@ from Cloudflare's request metadata; HelpPuff does not store visitor IP addresses
 ## Settings
 
 Opens as a menu in the sidebar, in four groups: **Assistant** (Instructions,
-Prompt & tools, Knowledge, Business details, Import & export), **Widget** (Chat, Home screen,
+Prompt & tools, Knowledge, Business details, Bookings, Import & export), **Widget** (Chat, Home screen,
 Appearance, Lead form), **Team** (Live chat, Labels, Jobs, Notifications) and
-**System** (Advanced, Webhooks, API keys, Team & security, Updates). What each
+**System** (Advanced, Webhooks, Integrations, API keys, Team & security, Updates). What each
 page is for is behind the (?) beside its title.
 
 **No need to set them by hand:** every page has **Ask your AI agent**, with a
@@ -136,6 +144,7 @@ agent goes through that page with you and changes it through the same API
 | **Instructions** | What to do when a visitor is interested, tone, answer length and prices: settings HelpPuff adds around the prompt |
 | **Prompt & tools** | A chat as a diagram: [[tools|Tools]] before it, the prompt (click it to edit, add tools and see its history and everything HelpPuff adds) with Knowledge above and Webhooks below, then the summary and labels and the tools after it. See [[Prompt and instructions|Prompts-and-Instructions]] |
 | **Knowledge** | What it has learned; see [Knowledge](#knowledge) above |
+| **Bookings** | How visitors book: not at all, through your booking page, or a date picker in the chat that HelpPuff books (the AI never does); the calendar it syncs with, the hours, and a live preview. See [[Bookings]] |
 | **Import & export** | The whole setup (prompt, tools, behaviour and lead form) as one [[agent file|Agent-Files]]: start from a [[tutorial's template|Tutorials]], import a file, or download this site's |
 | **Business details** | Phone, email, address, hours, service areas: read from your site, yours to correct (a crawl never overwrites your changes) |
 | **Live chat** | Let visitors talk to a person; how long they wait before the callback form; when conversations close; [[Telegram]]. See [[Live chat|Live-Chat]] |
@@ -144,6 +153,7 @@ agent goes through that page with you and changes it through the same API
 | **Notifications** | Your own: browser notifications and sound for live chats, and whether you are available. Every member of the team sets their own |
 | **Advanced** | The AI model (see [[AI models|AI-Models]]), thinking (low, medium, high), "double-check answers before replying" (the reranker), how often the site is re-learned, time zone and language. **Limits and access**: every rate limit and cap, how long a chat lasts, IP addresses (or ranges) that are never limited or are blocked, and the sign-in limits and Turnstile on the sign-in form. See [[Security|Security#every-limit]] |
 | **Webhooks** | Endpoints that receive every event as signed JSON; see [[Webhooks]] |
+| **Integrations** | Keys for Composio (Google Calendar, Outlook), Cal.com and Calendly, each with a check; shown while the date picker is on. See [[Integrations]] |
 | **API keys** | Keys for the public API, to use HelpPuff from your own servers: name, what it may do (scopes or a preset), expiry, IP addresses. The key is shown once. The base URL and a curl example; see [[The API|API]] |
 | **Team & security** | Who can sign in and their role, invitations, and what to do when locked out |
 | **Updates** | Checks the version running against the latest npm release, shows an update notice and command, and links to the [[upgrade instructions|Upgrading]] |

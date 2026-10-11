@@ -133,6 +133,32 @@ Requests, quotes, projects or tickets on the site's pipeline: create them from y
 - [[Use another template|API-Reference-Jobs#use-another-template]]: `POST /jobs/pipeline/template`
 - [[Let the AI set the pipeline up|API-Reference-Jobs#let-the-ai-set-the-pipeline-up]]: `POST /jobs/setup`
 
+### [[Appointments|API-Reference-Appointments]]
+
+Booking in the chat (Settings → Bookings: date picker): what is in force, the free times, appointments on jobs (from the chat, the dashboard, your systems or the synced calendar), and the sync. On only with the date picker; the assistant never books.
+
+- [[How visitors book|API-Reference-Appointments#how-visitors-book]]: `GET /bookings`
+- [[Free times|API-Reference-Appointments#free-times]]: `GET /bookings/slots`
+- [[Check the calendar|API-Reference-Appointments#check-the-calendar]]: `POST /bookings/test`
+- [[List appointments|API-Reference-Appointments#list-appointments]]: `GET /appointments`
+- [[Get an appointment|API-Reference-Appointments#get-an-appointment]]: `GET /appointments/:id`
+- [[Book an appointment|API-Reference-Appointments#book-an-appointment]]: `POST /appointments`
+- [[Change an appointment|API-Reference-Appointments#change-an-appointment]]: `PATCH /appointments/:id`
+- [[Delete an appointment|API-Reference-Appointments#delete-an-appointment]]: `DELETE /appointments/:id`
+- [[Read the synced calendar now|API-Reference-Appointments#read-the-synced-calendar-now]]: `POST /appointments/sync`
+
+### [[Integrations|API-Reference-Integrations]]
+
+Keys for other services (Composio, Cal.com, Calendly), sealed and live at once, and Composio's connected calendar accounts.
+
+- [[List integrations|API-Reference-Integrations#list-integrations]]: `GET /integrations`
+- [[Connect an integration|API-Reference-Integrations#connect-an-integration]]: `PUT /integrations/:kind`
+- [[Check an integration|API-Reference-Integrations#check-an-integration]]: `POST /integrations/:kind/test`
+- [[Remove an integration|API-Reference-Integrations#remove-an-integration]]: `DELETE /integrations/:kind`
+- [[Composio's connected accounts|API-Reference-Integrations#composios-connected-accounts]]: `GET /integrations/composio/accounts`
+- [[Connect a calendar account|API-Reference-Integrations#connect-a-calendar-account]]: `POST /integrations/composio/connect`
+- [[Cal.com webhook details|API-Reference-Integrations#calcom-webhook-details]]: `GET /integrations/calcom/webhook`
+
 ### [[Callbacks|API-Reference-Callbacks]]
 
 Visitors who asked to be called back, as tasks.

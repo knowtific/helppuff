@@ -478,6 +478,28 @@ describe('replies stay safe and clean', () => {
     expect(result.content).toContain('Saved as job #1042. A short form is now shown for: Address or suburb');
   });
 
+  it('opens the booking calendar with show_booking, narrowed to what was asked, and never books itself', async () => {
+    const shown: unknown[] = [];
+    const w = await world(
+      [
+        { tool_calls: [{ id: 't1', name: 'show_booking', arguments: '{"from":"2026-10-15","to":"2026-10-16","part":"morning","time":"06:00"}' }] },
+        { content: 'Here are the free times: pick one that suits you.' },
+      ],
+      {},
+      { bookings: { show: (window: unknown) => (shown.push(window), true) } },
+    );
+    await w.send("I'm in Perth, can I book Thursday morning or Friday?");
+    const first = w.chats[0]!;
+    expect((first['tools'] as { function: { name: string } }[]).map((t) => t.function.name)).toContain('show_booking');
+    const system = (first['messages'] as { content: string }[])[0]!.content;
+    expect(system).toContain('use show_booking (once)');
+    // A booking is no longer a reason for a callback or a job.
+    expect(system).not.toContain('quote or a booking');
+    expect(shown).toEqual([{ from: '2026-10-15', to: '2026-10-16', part: 'morning' }]);
+    const result = (w.chats[1]!['messages'] as { role: string; content: string }[]).at(-1)!;
+    expect(result.content).toContain('do not say anything is booked');
+  });
+
   it('tells the model when nobody is free, so it points to the callback form', async () => {
     const w = await world(
       [{ tool_calls: [{ id: 't1', name: 'request_person', arguments: '{}' }] }, { content: 'Nobody is free; leave your details below.' }],
