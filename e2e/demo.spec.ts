@@ -115,6 +115,18 @@ test.describe('the options playground', () => {
     await expect(frame.locator('helppuff-widget form input[type="tel"]')).toHaveCount(0);
   });
 
+  test('the date picker books a time through the in-page API', async ({ page }) => {
+    await page.goto('/playground.html');
+    const frame = preview(page);
+    await showPreview(page);
+    await frame.getByRole('button', { name: /^Booking \/booking/ }).click();
+    const widget = frame.locator('helppuff-widget');
+    await widget.locator('.hpb-times .hp-chip').first().click();
+    await widget.getByLabel('Email', { exact: true }).fill('ada@example.com');
+    await widget.getByRole('button', { name: 'Book', exact: true }).click();
+    await expect(widget.locator('.hpb-card')).toContainText('Booked');
+  });
+
   test('the API buttons drive the widget, and the page logs its events', async ({ page }) => {
     await page.goto('/playground.html');
     const frame = preview(page);

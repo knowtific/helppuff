@@ -9,6 +9,11 @@ Visitors can book an appointment from the chat. You choose how, in
 | **External booking link** | A **Book a time** button that opens your booking page (Calendly, Cal.com, Acuity, your own…) | Keeping the booking tool you already have |
 | **Date picker in the chat** | A calendar in the chat: the visitor picks a free time, adds their name and email, and presses **Book**. HelpPuff books it | Booking without leaving the chat, with the appointment on a job |
 
+To see the date picker before you switch it on, open the
+[playground](https://knowtific.github.io/helppuff/playground/) and press
+**Booking** beside the chat (or **Book a time** on the home screen): the
+times there are made up and the booking stays in the page.
+
 If you haven't chosen, HelpPuff looks at your website: a booking link it
 finds there (a Calendly, Cal.com, Acuity, SavvyCal, HubSpot meetings or
 similar link, or a "Book a call" page on your site) is offered as

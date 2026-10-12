@@ -19,6 +19,7 @@ const MESSAGE_TYPES: { label: string; send: string; note: string }[] = [
   { label: 'Carousel', send: '/carousel', note: 'Cards that scroll sideways' },
   { label: 'Links', send: '/links', note: 'A list of pages' },
   { label: 'Inline form', send: '/form', note: 'Fields inside the chat' },
+  { label: 'Booking', send: '/booking', note: 'The date picker' },
   { label: 'Notice', send: '/notice', note: 'A system warning' },
   { label: 'Typing indicator', send: '/slow', note: 'A three-second wait' },
   { label: 'Long reply', send: '/long', note: 'Scrolling and streaming' },

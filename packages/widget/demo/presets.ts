@@ -6,7 +6,7 @@
 
 export type WidgetJson = Record<string, unknown>;
 
-/** Home-screen buttons. The flow and form they open are in `SUPPORT` below. */
+/** Home-screen buttons. The flow they open is in `SUPPORT` below; the date picker needs nothing. */
 export const HOME_SHORTCUTS = [
   {
     id: 'quote',
@@ -24,10 +24,10 @@ export const HOME_SHORTCUTS = [
   },
   {
     id: 'booking',
-    label: 'Book a visit',
-    description: 'Opens an inline form.',
+    label: 'Book a time',
+    description: 'Pick a free time in the chat.',
     icon: 'calendar',
-    action: { id: 'booking', kind: 'form', label: 'Book a visit', formId: 'booking' },
+    action: { id: 'booking', kind: 'booking', label: 'Book a time' },
   },
   {
     id: 'call',
@@ -65,18 +65,8 @@ export const FIELD_LIBRARY = [
 
 export const PRIVACY = { text: 'We only use this to reply to you.', url: 'https://knowtific.com/privacy-policy' };
 
-/** The flow and form the shortcuts open. Harmless when nothing opens them. */
+/** The flow the shortcuts open. Harmless when nothing opens it. */
 const SUPPORT = {
-  forms: {
-    booking: {
-      title: 'Book a visit',
-      submitLabel: 'Request booking',
-      fields: [
-        { name: 'suburb', label: 'Suburb', type: 'text', required: true, placeholder: 'Richmond' },
-        { name: 'when', label: 'When', type: 'select', required: true, options: ['Today', 'Tomorrow', 'This week'] },
-      ],
-    },
-  },
   flows: [
     {
       id: 'quote',

@@ -28,6 +28,7 @@
 - [[Agent files: import and export|Agent-Files]]
 - [[Signed-in visitors|Signed-In-Visitors]]
 - [[The widget|Widget]]
+- [[The playground|Playground]]
 - [[Leads and callbacks|Leads]]
 - [[Jobs]]
 - [[Bookings and the calendar|Bookings]]

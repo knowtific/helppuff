@@ -14,6 +14,9 @@ const ADMIN_KEY = 'e2e-only-admin-key-not-for-any-deployment-012345';
 const OWNER = { email: 'owner@e2e.test', password: 'owner-password-123' };
 const MEMBER = { email: 'mo@e2e.test', password: 'member-password-123' };
 
+/** New contacts per run: the Worker keeps its data between runs and retries (serial: a retry reruns the file). */
+const RUN = Date.now().toString(36);
+
 type Sent = { host: string; path: string; method: string; headers: Record<string, string>; body: Record<string, unknown> };
 
 test.describe.configure({ mode: 'serial' });
@@ -50,6 +53,8 @@ async function signIn(browser: Browser, who: { email: string; password: string }
 
 test('the owner connects an email service, chooses an email, and a new contact emails only them', async ({ browser, request }) => {
   await request.delete(`${WORKER}/fake-llm/outbox`);
+  // From no service, as on a first visit: an earlier run or a retry saved one.
+  await admin(request, 'DELETE', '/notifications/email?site=demo');
   const page = await signIn(browser, OWNER);
   await page.goto('/admin/#/settings/notifications');
 
@@ -74,11 +79,18 @@ test('the owner connects an email service, chooses an email, and a new contact e
   await expect(page.getByRole('button', { name: 'Send me a test' })).toBeVisible();
 
   // Only for the owner: they tick New contact; the member has chosen nothing.
-  await page.getByRole('checkbox', { name: /New contact/ }).check();
+  const newContact = page.getByRole('checkbox', { name: /New contact/ });
+  // An earlier run may have ticked it already: untick first, so the tick below is saved here.
+  if (await newContact.isChecked()) {
+    await newContact.uncheck();
+    await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible();
+  }
+  await newContact.check();
   await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible();
+  await expect(newContact).toBeChecked();
 
   await request.delete(`${WORKER}/fake-llm/outbox`);
-  expect((await admin(request, 'POST', '/leads', { site: 'demo', name: 'Ada Email', email: 'ada.email@example.com', phone: '0400 000 111' })).status()).toBe(201);
+  expect((await admin(request, 'POST', '/leads', { site: 'demo', name: 'Ada Email', email: `ada.${RUN}@example.com`, phone: '0400 000 111' })).status()).toBe(201);
   await expect.poll(async () => (await outbox(request)).filter((s) => s.host === 'mail.e2e.test').map((s) => [s.body['to'], s.body['subject']])).toEqual([[OWNER.email, 'New contact: Ada Email']]);
   const email = (await outbox(request)).find((s) => s.host === 'mail.e2e.test')!;
   expect(String(email.body['text'])).toContain('Phone: 0400 000 111');
@@ -114,10 +126,10 @@ test('a webhook in its own format: made in the form, sent as written, signed', a
   await expect(page.getByText('Your own request · PUT')).toBeVisible();
 
   await request.delete(`${WORKER}/fake-llm/outbox`);
-  expect((await admin(request, 'POST', '/leads', { site: 'demo', name: 'Ben Hook', email: 'ben.hook@example.com' })).status()).toBe(201);
+  expect((await admin(request, 'POST', '/leads', { site: 'demo', name: 'Ben Hook', email: `ben.${RUN}@example.com` })).status()).toBe(201);
   await expect
     .poll(async () => (await outbox(request)).filter((s) => s.host === 'hooks.e2e.test' && s.body['name'] === 'Ben Hook').map((s) => [s.method, s.path, s.body['event']]))
-    .toEqual([['PUT', `/leads/${encodeURIComponent('ben.hook@example.com')}`, 'lead.captured']]);
+    .toEqual([['PUT', `/leads/${encodeURIComponent(`ben.${RUN}@example.com`)}`, 'lead.captured']]);
   const delivery = (await outbox(request)).find((s) => s.host === 'hooks.e2e.test' && s.body['name'] === 'Ben Hook')!;
   expect(delivery.headers['x-helppuff-signature']).toMatch(/^sha256=[0-9a-f]{64}$/);
   expect(delivery.headers['x-helppuff-event']).toBe('lead.captured');

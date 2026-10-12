@@ -229,12 +229,11 @@ function OptionsForm({ widget, update, backend, setBackend, embed, setEmbed }: {
   const poweredBy = getPath(widget, 'poweredBy');
   const poweredByMode = poweredBy === false ? 'hidden' : poweredBy && typeof poweredBy === 'object' ? 'custom' : 'HelpPuff';
 
-  /** Shortcuts open the quote flow and booking form, so switching them on brings those along. */
+  /** Shortcuts open the quote flow, so switching them on brings it along. */
   const withSupport = (path: string, value: unknown) => {
     update(path, value);
     if (value !== undefined) {
       if (!getPath(widget, 'flows')) update('flows', SUPPORT_CONFIG.flows);
-      if (!getPath(widget, 'forms')) update('forms', SUPPORT_CONFIG.forms);
     }
   };
 
@@ -299,7 +298,7 @@ function OptionsForm({ widget, update, backend, setBackend, embed, setEmbed }: {
       <Section title="Home screen">
         <TextInput label="Title" path="home.title" value={str('home.title')} placeholder="Hi there" onChange={(v) => update('home.title', v)} />
         <TextInput label="Subtitle" path="home.subtitle" value={str('home.subtitle')} placeholder="Ask anything, or pick a shortcut." onChange={(v) => update('home.subtitle', v)} />
-        <Toggle label="Shortcut buttons" path="home.shortcuts" checked={Boolean(getPath(widget, 'home.shortcuts'))} onChange={(on) => withSupport('home.shortcuts', on ? HOME_SHORTCUTS : undefined)} hint="A guided quote flow, an example card, an inline booking form and a call button. Each shortcut runs an action: reply, flow, form, url, tel or email." />
+        <Toggle label="Shortcut buttons" path="home.shortcuts" checked={Boolean(getPath(widget, 'home.shortcuts'))} onChange={(on) => withSupport('home.shortcuts', on ? HOME_SHORTCUTS : undefined)} hint="A guided quote flow, an example card, the booking date picker and a call button. Each shortcut runs an action: reply, flow, form, booking, url, tel or email." />
         <Toggle label="Useful links" path="home.links" checked={Boolean(getPath(widget, 'home.links'))} onChange={(on) => update('home.links', on ? HOME_LINKS : undefined)} />
       </Section>
 
@@ -481,6 +480,10 @@ function Export({ widget, embed, share }: { widget: WidgetJson; embed: Embed; sh
       <CopyBlock label="helppuff.json" text={json} />
       <CopyBlock label="Embed" text={snippet} />
       <CopyBlock label="Link to this exact setup" text={share} />
+      <p class="note">
+        The whole setup is in the link, after the <code>#</code>: nothing is stored anywhere, and anyone with the link sees the same
+        options. The address bar has it too. <a href={`${DOCS}/Playground`}>How it works</a>
+      </p>
     </div>
   );
 }

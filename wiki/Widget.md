@@ -7,7 +7,8 @@ loads once the page is idle, or as soon as a visitor reaches for the button,
 so it never slows your page down.
 
 **Try it first:** the [playground](https://knowtific.github.io/helppuff/playground/) runs the real widget with every
-option below in a panel beside it, and exports the config you build.
+option below in a panel beside it, and exports the config you build. A link
+to your setup keeps all of it; see [[The playground|Playground]].
 
 ## Embedding
 

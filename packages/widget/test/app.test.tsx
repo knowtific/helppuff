@@ -775,4 +775,18 @@ describe('keyboard and focus', () => {
       expect(panel?.contains(document.activeElement)).toBe(true);
     });
   });
+
+  it('leaves focus on the page when it opens by itself (data-open)', async () => {
+    const outside = document.createElement('button');
+    document.body.append(outside);
+    outside.focus();
+    const { handle } = setup();
+    await act(async () => {
+      commands(handle).open({ focus: false });
+    });
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(document.activeElement).toBe(outside);
+    outside.remove();
+  });
 });

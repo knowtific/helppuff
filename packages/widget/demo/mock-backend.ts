@@ -37,7 +37,7 @@ export type MockOptions = {
   respond?: (text: string) => Message[] | null;
 };
 
-const GREETING = 'Hi! This is the HelpPuff playground. Ask anything, or try /options, /card, /carousel, /links, /form, /slow, /long or /error.';
+const GREETING = 'Hi! This is the HelpPuff playground. Ask anything, or try /options, /card, /carousel, /links, /form, /booking, /slow, /long or /error.';
 
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } });

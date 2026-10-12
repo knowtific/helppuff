@@ -335,7 +335,8 @@ class Loader {
       if (this.queue.length > 0) void this.ensureApp();
       this.scheduleIdleLoad();
 
-      if (this.script?.hasAttribute('data-open')) this.command('open')();
+      // Opened by the page, not the visitor: focus stays where it is.
+      if (this.script?.hasAttribute('data-open')) this.command('open')({ focus: false });
     } catch (error) {
       log('mount_failed', error);
       this.hide('shell_mount_failed');

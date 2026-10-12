@@ -41,7 +41,7 @@ mkdirSync(dist, { recursive: true });
 const minifyCssLiterals = {
   name: 'helppuff-minify-css',
   transform(code, id) {
-    if (!/(launcher-shell|widget\.css)\.ts$/.test(id)) return null;
+    if (!/(launcher-shell|widget\.css|tokens)\.ts$/.test(id)) return null;
     return {
       code: code.replace(/`\n([^`]*?)`/g, (match, css) => {
         if (!/[{;]/.test(css)) return match;

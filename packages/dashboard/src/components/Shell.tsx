@@ -259,18 +259,25 @@ function AccountMenu({ me, notifications, onLogout }: { me: Me; notifications: b
     const outside = (event: MouseEvent) => {
       if (!box.current?.contains(event.target as Node)) setOpen(false);
     };
+    // Escape closes it wherever focus is: also before it has moved into the menu.
+    const escape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      setOpen(false);
+      trigger.current?.focus();
+    };
     document.addEventListener('mousedown', outside);
-    return () => document.removeEventListener('mousedown', outside);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('mousedown', outside);
+      document.removeEventListener('keydown', escape);
+    };
   }, [open]);
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const list = items();
     const at = list.indexOf(document.activeElement as HTMLElement);
     const move: Record<string, number> = { ArrowDown: at + 1, ArrowUp: at - 1, Home: 0, End: list.length - 1 };
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      setOpen(false);
-      trigger.current?.focus();
-    } else if (event.key in move) {
+    if (event.key in move) {
       event.preventDefault();
       list[(move[event.key]! + list.length) % list.length]?.focus();
     } else if (event.key === 'Tab') setOpen(false);

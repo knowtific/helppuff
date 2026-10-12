@@ -128,6 +128,10 @@ async function respond(command: string, raw: string, delayMs: number): Promise<M
         }),
       ];
 
+    case '/booking':
+      // The date picker. Its times come from the server's booking routes (Settings → Bookings), or the playground's own.
+      return [agent({ type: 'booking', text: 'Pick a time that suits you.' })];
+
     case '/notice':
       return [
         { id: messageId('echo'), ts: Date.now(), role: 'system', type: 'notice', text: 'This is a warning notice.', tone: 'warn' },

@@ -155,6 +155,13 @@ describe('the shell', () => {
     });
     expect(view.querySelector('[role="menu"]')).toBeNull();
     expect(document.activeElement).toBe(row);
+    // …also while focus is still on the row, before it has moved into the menu.
+    await click(row);
+    row.focus();
+    await act(async () => {
+      row.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(view.querySelector('[role="menu"]')).toBeNull();
     // Notifications is a link: the menu waits for it to be followed before it closes.
     await click(row);
     const link = view.querySelector<HTMLAnchorElement>('[role="menuitem"][href="#/settings/notifications"]')!;

@@ -10,14 +10,15 @@ function focusable(root: HTMLElement): HTMLElement[] {
 }
 
 /**
- * Keep Tab inside the panel while it is open, and move focus into it on open.
- * The dialog is `aria-modal="false"` — it does not block the page —
- * so this only loops Tab, it does not take the page hostage.
+ * Keep Tab inside the panel while it is open, and move focus into it on open
+ * (unless `move` is false: a panel that opened by itself leaves focus where
+ * the visitor has it). The dialog is `aria-modal="false"` — it does not block
+ * the page — so this only loops Tab, it does not take the page hostage.
  */
-export function trapFocus(panel: HTMLElement): () => void {
+export function trapFocus(panel: HTMLElement, move = true): () => void {
   const first = focusable(panel)[0];
   try {
-    (first ?? panel).focus({ preventScroll: true });
+    if (move) (first ?? panel).focus({ preventScroll: true });
   } catch {
     // A browser that refuses focus is not a reason to fail.
   }

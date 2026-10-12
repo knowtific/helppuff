@@ -33,7 +33,7 @@ The dashboard needs a database, which `pnpm dev` does not have: run
 reload on :5174 and sends its API calls to :8787 (`HELPPUFF_DEV_URL` to change).
 
 The `echo` backend needs no key and answers `/options`, `/multi`, `/card`,
-`/carousel`, `/links`, `/form`, `/notice`, `/slow`, `/long`, `/multipart` and
+`/carousel`, `/links`, `/form`, `/booking`, `/notice`, `/slow`, `/long`, `/multipart` and
 `/error`, one for each widget feature. The dev server's config is
 `helppuff.config.ts` (gitignored; created from `helppuff.config.demo.ts` on first
 run). Secrets for local development go in `packages/server/.dev.vars`, also

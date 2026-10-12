@@ -56,6 +56,7 @@ describe('echo connector', () => {
     ['/carousel', 'carousel'],
     ['/links', 'links'],
     ['/form', 'form'],
+    ['/booking', 'booking'],
     ['/notice', 'notice'],
     ['/long', 'text'],
   ])('%s returns a valid %s message', async (command, type) => {

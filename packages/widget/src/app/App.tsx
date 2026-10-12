@@ -103,7 +103,8 @@ export class Boundary extends Component<
 export type AppHandleRef = { current: AppCommands | null };
 
 export type AppCommands = {
-  open: () => void;
+  /** `{ focus: false }`: open without moving focus (`data-open`, which the visitor did not ask for). */
+  open: (how?: unknown) => void;
   close: () => void;
   toggle: () => void;
   send: (text: string) => void;
@@ -305,10 +306,13 @@ export function App({
     return () => window.removeEventListener('keydown', onKeyDown, true);
   }, [state.open]);
 
-  // Focus moves into the panel on open and back to the launcher on close.
+  // Focus moves into the panel on open and back to the launcher on close; not when it opened by itself.
+  const quiet = useRef(false);
   useEffect(() => {
     if (!state.open || !panel.current) return;
-    return trapFocus(panel.current);
+    const move = !quiet.current;
+    quiet.current = false;
+    return trapFocus(panel.current, move);
   }, [state.open, state.screen]);
 
   // The iOS keyboard shrinks the visual viewport; keep the composer visible.
@@ -368,7 +372,8 @@ export function App({
 
   // ---------------------------------------------------------------- actions
 
-  const open = useCallback(() => {
+  const open = useCallback((how?: unknown) => {
+    quiet.current = (how as { focus?: unknown } | undefined)?.focus === false;
     setShowTeaser(false);
     dispatch({ type: 'open' });
     runtime.emit('open');

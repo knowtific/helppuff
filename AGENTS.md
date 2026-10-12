@@ -172,7 +172,7 @@ pnpm check          # lint + typecheck + test + build + e2e (what CI runs)
   reuses it locally.
 - Never name a root script `deploy` or `setup`: pnpm built-ins shadow them.
 - `echo` connector answers `/options`, `/multi`, `/card`, `/carousel`,
-  `/links`, `/form`, `/notice`, `/slow`, `/long`, `/multipart`, `/error` —
+  `/links`, `/form`, `/booking`, `/notice`, `/slow`, `/long`, `/multipart`, `/error` —
   use it to exercise widget features without keys.
 
 ## Rules (also enforced by eslint)
