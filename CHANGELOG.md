@@ -8,6 +8,26 @@ never needs you to change anything. Upgrade with
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-12
+
+### Changed
+
+- The playground shows the booking date picker: a **Book a time** shortcut
+  on the home screen and a **Booking** message button, booked in the page.
+  The `echo` test backend answers `/booking` with the picker too.
+- New wiki page, **The playground**: its panel, and how a link to a setup
+  works (the whole setup is in the link; nothing is stored).
+- The widget's CSS variables and base styles are minified in the bundle
+  like the rest of its CSS: about 0.5 KB less to download.
+
+### Fixed
+
+- Widget: a chat opened by the page itself (`data-open`, such as the
+  dashboard's test chat) no longer moves focus into the chat. Focus stays
+  where the visitor has it; opening the chat yourself still moves it in.
+- Dashboard: Escape closes the account menu even before focus has moved
+  into it.
+
 ## [0.6.0] - 2026-10-12
 
 ### Added: email notifications and webhooks in your own format
@@ -90,13 +110,6 @@ never needs you to change anything. Upgrade with
 - New wiki page, **Email notifications**: an email for new or hot leads
   through your own email service (Resend, Postmark or any send API), or for
   any event through a webhook and n8n, Make or Zapier.
-- The playground shows the booking date picker: a **Book a time** shortcut
-  on the home screen and a **Booking** message button, booked in the page.
-  The `echo` test backend answers `/booking` with the picker too.
-- New wiki page, **The playground**: its panel, and how a link to a setup
-  works (the whole setup is in the link; nothing is stored).
-- The widget's CSS variables and base styles are minified in the bundle
-  like the rest of its CSS: about 0.5 KB less to download.
 
 ### Fixed
 
@@ -113,11 +126,6 @@ never needs you to change anything. Upgrade with
   the form they sit in.
 - The audit log lists changes made in the same millisecond newest first, not
   in any order.
-- Widget: a chat opened by the page itself (`data-open`, such as the
-  dashboard's test chat) no longer moves focus into the chat. Focus stays
-  where the visitor has it; opening the chat yourself still moves it in.
-- Dashboard: Escape closes the account menu even before focus has moved
-  into it.
 
 ## [0.5.0] - 2026-10-12
 
