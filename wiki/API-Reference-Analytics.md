@@ -4,16 +4,16 @@
 
 Totals, usage and the running version. Part of the [[API reference|API-Reference]]: setup, shared types and errors are there.
 
-- [[Totals over a period|API-Reference-Analytics#totals-over-a-period]]: `GET /overview`
+- [[Analytics over a period|API-Reference-Analytics#analytics-over-a-period]]: `GET /overview`
 - [[AI usage by day|API-Reference-Analytics#ai-usage-by-day]]: `GET /usage`
 - [[Running version|API-Reference-Analytics#running-version]]: `GET /version`
 - [[Check the widget is on the website|API-Reference-Analytics#check-the-widget-is-on-the-website]]: `GET /install-check`
 
-## Totals over a period
+## Analytics over a period
 
 `GET /overview` · scope `analytics:read`
 
-Conversations, messages, leads and conversion over `days`, against the period before, a day-by-day series, top pages, countries, recent questions and leads.
+Conversations, messages, leads and conversion over `days`, against the period before, a day-by-day series, top pages and countries. `headline` (both periods): conversations summarised, resolved by the assistant alone (answered, booked or a lead, no person), handed to a person in live chat (`escalated`), needed a person at all (a live chat or a callback: `needsPerson`), with a question it could not answer (`unanswered`), ratings and callbacks. `insights`: how conversations ended, sentiment, lead quality, engagement (messages, median length, left after one message, returning visitors), the questions it could not answer (most asked first), topics, chats by hour, live chat (asked, answered, missed, median wait, by person), callbacks, jobs and appointments. `health`: what is failing now (webhooks, email, tools, the AI budget, pages it could not learn), each with the dashboard page that fixes it. `recentQuestions` and `recentLeads` are kept for older integrations.
 
 | Parameter | In | Required | Description |
 | --- | --- | --- | --- |
@@ -35,7 +35,7 @@ const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/overview`, {
   },
 });
 if (!response.ok) throw new Error(((await response.json()) as ApiError).error.message);
-const data = (await response.json()) as TotalsOverPeriodResponse;
+const data = (await response.json()) as AnalyticsOverPeriodResponse;
 ```
 <!-- /tabs -->
 
@@ -99,11 +99,142 @@ const data = (await response.json()) as TotalsOverPeriodResponse;
       "at": 1760000000000,
       "conversationId": "1b0f6a52-3c1e-4c55-9f0e-2d1c7a9e5b10"
     }
+  ],
+  "headline": {
+    "current": {
+      "summarized": 112,
+      "resolved": 81,
+      "escalated": 9,
+      "needsPerson": 14,
+      "unanswered": 7,
+      "ratedUp": 40,
+      "ratedDown": 3,
+      "callbacks": 6
+    },
+    "previous": {
+      "summarized": 90,
+      "resolved": 60,
+      "escalated": 11,
+      "needsPerson": 15,
+      "unanswered": 10,
+      "ratedUp": 28,
+      "ratedDown": 4,
+      "callbacks": 5
+    }
+  },
+  "insights": {
+    "outcomes": {
+      "answered": 62,
+      "booked": 8,
+      "lead_captured": 22,
+      "callback_requested": 6,
+      "unanswered": 7,
+      "abandoned": 7,
+      "pending": 8
+    },
+    "sentiment": {
+      "positive": 61,
+      "neutral": 44,
+      "negative": 7
+    },
+    "leadQuality": {
+      "hot": 12,
+      "warm": 25,
+      "cold": 50,
+      "none": 25
+    },
+    "engagement": {
+      "avgMessages": 6.9,
+      "medianSeconds": 140,
+      "oneMessage": 30,
+      "returningVisitors": 14
+    },
+    "unansweredQuestions": [
+      {
+        "text": "Do you service Penrith?",
+        "count": 3,
+        "conversationId": "1b0f6a52-3c1e-4c55-9f0e-2d1c7a9e5b10"
+      }
+    ],
+    "topics": [
+      {
+        "topic": "Pricing",
+        "count": 34
+      }
+    ],
+    "hours": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      3,
+      9,
+      12,
+      11,
+      10,
+      9,
+      10,
+      11,
+      9,
+      8,
+      7,
+      6,
+      5,
+      4,
+      3,
+      1,
+      0
+    ],
+    "live": {
+      "requested": 9,
+      "answered": 8,
+      "missed": 1,
+      "medianWaitSeconds": 65,
+      "byPerson": [
+        {
+          "name": "Sam",
+          "count": 6
+        }
+      ]
+    },
+    "callbacks": {
+      "requested": 6,
+      "done": 4,
+      "dismissed": 1,
+      "open": 1,
+      "medianHoursToDone": 2.5
+    },
+    "jobs": {
+      "created": 14,
+      "fromChat": 11,
+      "won": 5,
+      "lost": 2,
+      "wonValue": 3200,
+      "currency": "AUD"
+    },
+    "appointments": {
+      "booked": 9,
+      "fromChat": 7,
+      "completed": 6,
+      "noShow": 1,
+      "cancelled": 1
+    }
+  },
+  "health": [
+    {
+      "kind": "webhook",
+      "title": "A webhook is failing: CRM sync",
+      "detail": "HTTP 500",
+      "page": "#/settings/webhooks"
+    }
   ]
 }
 ```
 ```ts [Type]
-type TotalsOverPeriodResponse = {
+type AnalyticsOverPeriodResponse = {
   range: {
     days: number;
     since: number;
@@ -149,6 +280,104 @@ type TotalsOverPeriodResponse = {
     status: string;
     at: number;
     conversationId: string;
+  }>;
+  headline: {
+    current: {
+      summarized: number;
+      resolved: number;
+      escalated: number;
+      needsPerson: number;
+      unanswered: number;
+      ratedUp: number;
+      ratedDown: number;
+      callbacks: number;
+    };
+    previous: {
+      summarized: number;
+      resolved: number;
+      escalated: number;
+      needsPerson: number;
+      unanswered: number;
+      ratedUp: number;
+      ratedDown: number;
+      callbacks: number;
+    };
+  };
+  insights: {
+    outcomes: {
+      answered: number;
+      booked: number;
+      lead_captured: number;
+      callback_requested: number;
+      unanswered: number;
+      abandoned: number;
+      pending: number;
+    };
+    sentiment: {
+      positive: number;
+      neutral: number;
+      negative: number;
+    };
+    leadQuality: {
+      hot: number;
+      warm: number;
+      cold: number;
+      none: number;
+    };
+    engagement: {
+      avgMessages: number;
+      medianSeconds: number | null;
+      oneMessage: number;
+      returningVisitors: number;
+    };
+    unansweredQuestions: Array<{
+      text: string;
+      count: number;
+      conversationId: string;
+    }>;
+    topics: Array<{
+      topic: string;
+      count: number;
+    }>;
+    hours: number[];
+    live: {
+      requested: number;
+      answered: number;
+      missed: number;
+      medianWaitSeconds: number | null;
+      byPerson: Array<{
+        name: string;
+        count: number;
+      }>;
+    };
+    callbacks: {
+      requested: number;
+      done: number;
+      dismissed: number;
+      open: number;
+      medianHoursToDone: number | null;
+    };
+    jobs: {
+      created: number;
+      fromChat: number;
+      won: number;
+      lost: number;
+      wonValue: number;
+      currency: string | null;
+    };
+    appointments: {
+      booked: number;
+      fromChat: number;
+      completed: number;
+      noShow: number;
+      cancelled: number;
+    };
+  };
+  health: Array<{
+    kind: string;
+    title: string;
+    detail: string;
+    page: string;
   }>;
 };
 ```

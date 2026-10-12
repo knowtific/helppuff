@@ -276,6 +276,44 @@ export async function knowledgeCommand(ctx: Ctx): Promise<number> {
       });
       return 0;
     }
+    case 'gaps': {
+      // Questions to answer: asked by visitors, not in the knowledge base.
+      assertKnown(ctx.flags, ['status'], 'knowledge');
+      const status = str(ctx.flags, 'status') ?? 'open';
+      const listed = await api.get<{ gaps: { id: string; question: string; count: number; lastAskedAt: number; status: string }[]; counts: Record<string, number> }>(
+        `/admin/api/knowledge/gaps?status=${encodeURIComponent(status)}`,
+      );
+      ctx.out.result(listed, () => {
+        if (!listed.gaps.length) process.stdout.write(c.dim('Nothing to answer: everything visitors asked is covered.\n'));
+        for (const g of listed.gaps) process.stdout.write(`${g.id}  ${c.dim(`×${g.count}`)}  ${g.question}\n`);
+        if (listed.gaps.length) process.stdout.write(c.dim('Answer one: helppuff knowledge answer <id> --text "…"   (or dismiss <id>)\n'));
+      });
+      return 0;
+    }
+    case 'answer': {
+      assertKnown(ctx.flags, ['text', 'title'], 'knowledge');
+      const id = rest[0];
+      if (!id) throw new CliError('usage', 'Usage: helppuff knowledge answer <id> --text "…"  (ids: helppuff knowledge gaps)', { exitCode: EXIT.usage });
+      const text = str(ctx.flags, 'text');
+      if (!text) {
+        return ctx.out.needsInput({
+          message: 'The answer is the business owner\'s to give: ask them, then run this again.',
+          questions: [{ id: 'text', ask: 'What should the assistant tell visitors who ask this question?', flag: '--text', kind: 'text', required: true }],
+        });
+      }
+      const title = str(ctx.flags, 'title');
+      const done = await api.send<{ gap: { question: string }; entry: { id: string } }>('POST', `/admin/api/knowledge/gaps/${encodeURIComponent(id)}/answer`, { answer: text, ...(title ? { title } : {}) });
+      ctx.out.result(done, () => ctx.out.success(`Answered "${done.gap.question}": saved as ${done.entry.id}, live now.`));
+      return 0;
+    }
+    case 'dismiss': {
+      assertKnown(ctx.flags, [], 'knowledge');
+      const id = rest[0];
+      if (!id) throw new CliError('usage', 'Usage: helppuff knowledge dismiss <id>', { exitCode: EXIT.usage });
+      const gap = await api.send<{ question: string }>('PATCH', `/admin/api/knowledge/gaps/${encodeURIComponent(id)}`, { status: 'dismissed' });
+      ctx.out.result(gap, () => ctx.out.success(`Dismissed "${gap.question}".`));
+      return 0;
+    }
     case 'remove': {
       assertKnown(ctx.flags, [], 'knowledge');
       const id = rest[0];

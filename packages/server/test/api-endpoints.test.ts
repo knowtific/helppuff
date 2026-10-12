@@ -467,6 +467,21 @@ describe('knowledge, end to end through /api/v1', () => {
     expect(found.json['chunks'].map((c: Json) => c['title'])).toContain('Holiday hours');
     expectDocumented('POST', '/knowledge/search', found.json);
 
+    // Questions to answer: one answered becomes hand-written knowledge, found at once; another dismissed.
+    const { recordGaps } = await import('../src/knowledge/gaps.js');
+    const [lpg, parking] = await recordGaps(db, 'demo', null, ['Do you convert cooktops from natural gas to LPG?', 'Is there parking?'], Date.now());
+    const listed = await call('GET', '/knowledge/gaps');
+    expect(listed.json['counts']).toMatchObject({ open: 2 });
+    expectDocumented('GET', '/knowledge/gaps', listed.json);
+    const answered = await call('POST', `/knowledge/gaps/${lpg!.id}/answer`, { answer: 'No: natural gas only. For LPG, call a licensed gas fitter.' });
+    expect(answered.status, JSON.stringify(answered.json)).toBe(200);
+    expectDocumented('POST', '/knowledge/gaps/:id/answer', answered.json);
+    const lpgFound = await call('POST', '/knowledge/search', { query: 'LPG cooktop conversion', k: 3 });
+    expect(lpgFound.json['chunks'].map((c: Json) => c['title'])).toContain('Do you convert cooktops from natural gas to LPG?');
+    const dismissed = await call('PATCH', `/knowledge/gaps/${parking!.id}`, { status: 'dismissed' });
+    expectDocumented('PATCH', '/knowledge/gaps/:id', dismissed.json);
+    expect((await call('GET', '/knowledge/gaps')).json['counts']).toEqual({ open: 0, answered: 1, dismissed: 1 });
+
     const facts = await call('PUT', '/knowledge/facts', { facts: { phone: '1300 000 000' } });
     expect(facts.json['facts']).toContainEqual({ key: 'phone', value: '1300 000 000' });
     expectDocumented('PUT', '/knowledge/facts', facts.json);

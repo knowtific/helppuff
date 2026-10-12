@@ -97,10 +97,32 @@ export async function readPipeline(db: D1Like, siteId: string): Promise<Pipeline
   };
 }
 
-/** The site's pipeline, made from the basic template the first time it is needed. */
+/**
+ * The site's pipeline, made from the basic template the first time it is
+ * needed. Two first visits at once (two tabs, the assistant and the
+ * dashboard) would both make one: the pipeline's row is claimed first, and
+ * only the request that claims it makes the stages; the other waits for them.
+ */
 export async function ensurePipeline(db: D1Like, siteId: string, now: number): Promise<Pipeline> {
   const found = await readPipeline(db, siteId);
-  if (found) return found;
+  if (found?.stages.length) return found;
+  if (!found) {
+    const claim = (await db
+      .prepare("INSERT INTO pipelines (site_id, template, chosen_by, reason, updated_at) VALUES (?, ?, 'default', NULL, ?) ON CONFLICT (site_id) DO NOTHING")
+      .bind(siteId, BASIC, now)
+      .run()) as { meta?: { changes?: number }; changes?: number } | undefined;
+    if ((claim?.meta?.changes ?? claim?.changes ?? 1) > 0) {
+      await applyTemplate(db, siteId, templateById(BASIC)!, { chosenBy: 'default', reason: null }, now);
+      return (await readPipeline(db, siteId))!;
+    }
+  }
+  // Someone else is making it: its stages arrive in a moment.
+  for (let i = 0; i < 20; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const ready = await readPipeline(db, siteId);
+    if (ready?.stages.length) return ready;
+  }
+  // Still none (it failed half-way): make them now.
   await applyTemplate(db, siteId, templateById(BASIC)!, { chosenBy: 'default', reason: null }, now);
   return (await readPipeline(db, siteId))!;
 }
@@ -135,8 +157,14 @@ export async function applyTemplate(db: D1Like, siteId: string, template: Templa
         statements.push(db.prepare('UPDATE jobs SET stage_id = ? WHERE site_id = ? AND stage_id = ?').bind(target.id, siteId, old.id));
       });
     }
-    statements.push(db.prepare(`DELETE FROM pipeline_stages WHERE site_id = ? AND id NOT IN (${stages.map(() => '?').join(', ')})`).bind(siteId, ...stages.map((s) => s.id)));
   }
+  // Whatever was read above, these are the stages now: another template applied at the same moment
+  // (two first visits, or the AI's choice and the owner's) leaves none of its own behind, and no job
+  // stays on a stage that is gone.
+  const ids = stages.map((s) => s.id);
+  const firstOpen = stages.find((s) => s.kind === 'open') ?? stages[0]!;
+  statements.push(db.prepare(`UPDATE jobs SET stage_id = ? WHERE site_id = ? AND stage_id NOT IN (${ids.map(() => '?').join(', ')})`).bind(firstOpen.id, siteId, ...ids));
+  statements.push(db.prepare(`DELETE FROM pipeline_stages WHERE site_id = ? AND id NOT IN (${ids.map(() => '?').join(', ')})`).bind(siteId, ...ids));
   const names = new Set(template.fields.map((f) => f.name));
   template.fields.forEach((f, position) => {
     statements.push(

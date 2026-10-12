@@ -44,6 +44,7 @@ export const WEBHOOK_EVENTS = {
   'appointment.reminder': 'An appointment starts in about 24 hours: send your own reminder (email, SMS) from here. Once per appointment.',
   'knowledge.crawl.finished': 'Learning the website finished.',
   'knowledge.file.processed': 'An uploaded file was learned, or failed.',
+  'knowledge.gap': 'A visitor asked something about the business that the assistant could not answer and the knowledge base does not cover: answer it in the dashboard (Knowledge → Questions to answer). Once per question; asked again, its count grows.',
 } as const;
 
 export type WebhookEventType = keyof typeof WEBHOOK_EVENTS | 'test.ping';

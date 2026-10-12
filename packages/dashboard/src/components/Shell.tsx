@@ -279,6 +279,8 @@ function AccountMenu({ me, notifications, onLogout }: { me: Me; notifications: b
     setOpen(false);
     run?.();
   };
+  // A link closes the menu after the browser has followed it: removed at once, it would go nowhere.
+  const follow = () => setTimeout(() => setOpen(false));
   const item = 'flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-left text-[13px] text-foreground outline-none hover:bg-muted focus-visible:bg-muted [&_svg]:size-4 [&_svg]:text-muted-foreground';
   return (
     <div ref={box} className="relative border-t p-2">
@@ -308,14 +310,14 @@ function AccountMenu({ me, notifications, onLogout }: { me: Me; notifications: b
           </div>
           <div role="separator" className="-mx-1 my-1 border-t" />
           {notifications && (
-            <a role="menuitem" href={href({ page: 'settings', id: 'notifications' })} onClick={choose()} className={item}>
+            <a role="menuitem" href={href({ page: 'settings', id: 'notifications' })} onClick={follow} className={item}>
               <Bell aria-hidden /> Notifications
             </a>
           )}
           <button role="menuitem" type="button" onClick={choose(toggleTheme)} className={item}>
             {dark ? <Sun aria-hidden /> : <Moon aria-hidden />} {dark ? 'Light theme' : 'Dark theme'}
           </button>
-          <WikiLink page="Home" role="menuitem" onClick={choose()} className={item}>
+          <WikiLink page="Home" role="menuitem" onClick={follow} className={item}>
             <CircleHelp aria-hidden /> Help and documentation
           </WikiLink>
           <div role="separator" className="-mx-1 my-1 border-t" />

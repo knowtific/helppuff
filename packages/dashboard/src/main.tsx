@@ -53,8 +53,8 @@ function App() {
   if (me === 'signed-out') return <Login onDone={load} />;
 
   // Members see the inbox: pages for admins send them to it.
-  // A member has settings only with live chat on (their notifications).
-  const adminOnly = ['home', 'analytics', 'prompt', 'knowledge', 'onboarding', 'setup', ...(me.sites[0]?.live ? [] : ['settings'])];
+  // A member's settings are their own notifications (the emails they get), whether or not live chat is on.
+  const adminOnly = ['home', 'analytics', 'prompt', 'knowledge', 'onboarding', 'setup'];
   if (isMember(me) && adminOnly.includes(route.page)) {
     window.location.hash = '#/conversations';
     return null;

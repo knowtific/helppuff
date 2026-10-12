@@ -8,7 +8,12 @@ round speech bubble, with a short speech tail that ends in one small puff.
 Half speech bubble, half breath. The other concepts' files were removed;
 this brief is kept as the record of what was considered.
 
-Files here: `helppuff.svg` (the mark, one path, `#5B5BF7`),
+Colours (2026-10-13): the Oxblood & Electric Citron palette, as on the
+website: oxblood `#3B0D24` on light backgrounds, citron `#E4F568` on dark
+ones, and citron on an oxblood tile where one image must work on both.
+
+Files here: `helppuff.svg` (the mark, one path, oxblood), `helppuff-dark.svg` (citron),
+`helppuff-icon.svg` (citron on a rounded oxblood tile),
 `helppuff-mono.svg` (`currentColor`), `helppuff-tile.svg` (white on indigo,
 for app icons and avatars), `helppuff-lockup.svg` and
 `helppuff-lockup-dark.svg` (with the wordmark, Plus Jakarta Sans Bold as

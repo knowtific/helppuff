@@ -71,6 +71,7 @@ break out of its field.
 | **A chat given to me** | Someone on the team gave you a conversation (only you get it) |
 | **New job** | A [[job|Jobs]] was created |
 | **New booking**, **Booking cancelled** | An [[appointment|Bookings]] was booked or cancelled |
+| **A question to answer** | A visitor asked something your knowledge base does not cover ([[answer it|Knowledge-Base#5a-questions-to-answer]]; admins only) |
 | **AI budget used up** | Today's AI budget ran out (admins only) |
 
 Nothing is ticked until you choose. Members choose too: they see this page

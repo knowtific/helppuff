@@ -111,6 +111,7 @@ it is not in the main menu). What the assistant has learned and where from:
   **Try again** on a failed page (or all of them), without changing the selection.
 - **Files**: upload PDF, Word, Markdown or text files (up to 10 MB). They
   are read and learned in the background.
+- **Questions to answer** (at the top): what visitors asked that the knowledge base does not cover, most asked first. **Answer** saves your answer as one of your own answers, live at once; **Dismiss** takes one off the list. See [[Questions to answer|Knowledge-Base#5a-questions-to-answer]].
 - **Your own answers**: things that are not on the site, live as soon as you add them.
 - **Test a question**: the passages it would answer from, best first, with scores.
 - Today's use of the free AI allowance.
@@ -119,12 +120,44 @@ See [[Knowledge base|Knowledge-Base]].
 
 ## Analytics
 
-Conversations and leads over time, conversion, top pages, countries, recent
-questions. Choose 7, 30 or 90 days. **Became a lead** is the share of
-conversations linked to a person who provided contact details; **messages per
-conversation** counts visitor and assistant messages together. Countries come
-from Cloudflare's request metadata; HelpPuff does not store visitor IP addresses
-(only a salted hash of each, which the per-visitor limits count by).
+Is the assistant helping? Choose 7, 30 or 90 days; every headline number is
+compared with the period before (and says whether that is better or worse).
+Nothing extra is tracked for it: it is read from the conversations, their AI
+summaries, ratings, live chat, callbacks, jobs and bookings HelpPuff records
+anyway.
+
+- **Needs attention** (only when something is wrong): a failing webhook, email
+  notifications or a tool, days the AI budget ran out, pages of your site it
+  could not learn; each with a link to fix it.
+- **The headline**: conversations; **solved by the assistant** (of the
+  summarised ones, answered or a lead, with no person); **became a contact**;
+  **needed a person** (a live chat or a callback); **could not answer**
+  (conversations with a question it could not answer); **rated helpful**
+  (thumbs up of all ratings).
+- **Activity**: conversations and leads per day.
+- **How conversations ended** (answered, booked a time or a job, left their
+  details, asked for a callback, could not answer, left without an answer), and **engagement**:
+  messages per conversation, the typical length (first to last message, the
+  median), how many left after one message, and visitors who came back. With
+  the mood and lead quality the AI gave each one.
+- **Questions to answer**: what visitors asked about the business that the
+  knowledge base does not cover, most asked first, each with **Answer** (it
+  becomes one of your own answers) and **Dismiss**. And **what visitors ask
+  about** (the summaries' topics).
+- **Live chat** (asked for a person, answered, nobody took it, the typical wait
+  for the team's first reply, who took them) and **callbacks** (requested,
+  done, still waiting, the typical time to call back).
+- **Jobs** (new, from the chat, won and their value, lost) and **bookings**
+  (booked, by visitors in the chat, completed, no-shows, cancelled), when you
+  use them.
+- **When visitors chat** (by hour, in your time zone: when someone should be
+  around for live chat), **where chats start** and **countries**.
+
+Summaries are made five minutes after a chat goes quiet, so the last few
+minutes show as *not summarised yet*. Countries come from Cloudflare's request
+metadata; HelpPuff does not store visitor IP addresses (only a salted hash of
+each, which the per-visitor limits count by). The same numbers are in the API:
+`GET /overview` ([[Analytics|API-Reference-Analytics]]).
 
 ## Settings
 

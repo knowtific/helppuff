@@ -2,11 +2,15 @@ import type { StepLike } from '@helppuff/rag';
 import { resolveSite } from '../config/site.js';
 import type { RequestCtx } from '../core/request.js';
 import type { D1Like } from '../db/d1.js';
-import { aiSettingsFor } from '../knowledge/env.js';
+import { aiSettingsFor, ownsKnowledge } from '../knowledge/env.js';
 import { emitTo, type WebhookRetryParams } from '../webhooks/deliver.js';
 import { summarizeConversation, type AiRunner } from './summary.js';
 import { parseJsonObject } from '../admin/inbox.js';
 import { afterToolIds, runAfterTool } from '../tools/chat.js';
+import { guidanceFor } from '../core/guidance.js';
+import { promptField } from '../admin/prompts.js';
+import { missingFromKnowledge, recordGaps, gapView, type KnowledgeSearch } from '../knowledge/gaps.js';
+import type { SiteConfig } from '../config/schema.js';
 import { parseData } from '../tools/run.js';
 
 /**
@@ -19,8 +23,11 @@ import { parseData } from '../tools/run.js';
  *
  *   1. summarises and labels it (intent, sentiment, lead quality, outcome,
  *      topics, unanswered questions), saved for the dashboard;
- *   2. calls the site's after-chat tools (the Prompt page) with all of it;
- *   3. sends `conversation.completed` to the site's webhooks, with the
+ *   2. checks the questions it could not answer against the knowledge base,
+ *      and adds the ones it does not cover to the questions to answer
+ *      (`knowledge/gaps.ts`), telling the owner about new ones;
+ *   3. calls the site's after-chat tools (the Prompt page) with all of it;
+ *   4. sends `conversation.completed` to the site's webhooks, with the
  *      summary, the lead, the transcript and the tools' data.
  *
  * Sleeping instances cost nothing on the Free plan (they do not count towards
@@ -38,7 +45,22 @@ export type ConversationParams = {
   /** The site's daily neuron budget: no summary once it is spent. 0 = no limit. */
   budget: number;
   idleMs?: number;
+  /** What the business told the assistant, when the job started: what it was told not to answer is no gap. */
+  instructions?: string;
+  /** The site uses HelpPuff's own knowledge base: an answer to a question can go there. Otherwise no questions are kept. */
+  knowledgeBase?: boolean;
 };
+
+/** The settings HelpPuff writes around the prompt, and the owner's prompt: what the assistant was told. */
+export function assistantInstructions(site: SiteConfig): string {
+  let prompt: string;
+  try {
+    prompt = promptField(site.connector).text;
+  } catch {
+    prompt = '';
+  }
+  return [guidanceFor(site).before, prompt].filter((part) => part.trim()).join('\n\n').slice(0, 6000);
+}
 
 export const IDLE_MS = 5 * 60_000;
 /** A conversation still going after this long is completed anyway, and again when it really ends. */
@@ -58,6 +80,8 @@ export type ConversationJobDeps = {
   owner?: string | undefined;
   /** HELPPUFF_SECRET: opens the after-chat tools' secret headers. Without it they do not run. */
   secret?: string | undefined;
+  /** Searches the site's own knowledge base: an unanswered question it covers is no gap. */
+  knowledge?: KnowledgeSearch | undefined;
 };
 
 /** The model summaries use: HELPPUFF_SUMMARY_MODEL, else the site's own chat model. */
@@ -86,6 +110,8 @@ export function startConversationJob(ctx: RequestCtx, siteId: string, conversati
         conversationId,
         model: ctx.env['AI'] ? await summaryModel(ctx, siteId) : null,
         budget,
+        instructions: assistantInstructions(site),
+        knowledgeBase: ownsKnowledge(site),
       };
       await workflow.create!({ id: instance.slice(0, 100), params });
     })().catch(() => {
@@ -131,11 +157,34 @@ export async function runConversationJob(step: StepLike, deps: ConversationJobDe
         const used = (await deps.db.prepare('SELECT neurons_est AS n FROM usage_daily WHERE day = ? AND site_id = ?').bind(day, params.siteId).first<{ n: number }>())?.n ?? 0;
         if (used >= params.budget) return false;
       }
-      const result = await summarizeConversation({ db: deps.db, ai: deps.ai, now }, params.conversationId, params.model);
+      const result = await summarizeConversation({ db: deps.db, ai: deps.ai, now }, params.conversationId, params.model, params.instructions);
       return Boolean(result);
     });
   } catch {
     deps.log?.('conversation.summary_failed');
+  }
+
+  // What it could not answer, and the knowledge base does not cover: the owner's questions to answer.
+  try {
+    await step.do('gaps', async () => {
+      const row = await deps.db.prepare('SELECT summary FROM conversations WHERE id = ?').bind(params.conversationId).first<{ summary: string | null }>();
+      let unanswered: string[];
+      try {
+        const listed = (JSON.parse(row?.summary ?? '{}') as { unanswered?: unknown }).unanswered;
+        unanswered = Array.isArray(listed) ? listed.filter((q): q is string => typeof q === 'string' && q.trim().length > 0) : [];
+      } catch {
+        unanswered = [];
+      }
+      if (!unanswered.length || !params.knowledgeBase) return 0;
+      const missing = await missingFromKnowledge({ search: deps.knowledge, ai: deps.ai, model: params.model, db: deps.db, now, log: deps.log }, params.siteId, unanswered);
+      const fresh = await recordGaps(deps.db, params.siteId, params.conversationId, missing, now());
+      for (const gap of fresh) {
+        await emitTo({ db: deps.db, fetch: deps.fetch, now, retry: deps.retry, secret: deps.secret, owner: deps.owner, ...(deps.log ? { log: deps.log } : {}) }, params.siteId, 'knowledge.gap', gapView(gap));
+      }
+      return fresh.length;
+    });
+  } catch {
+    deps.log?.('conversation.gaps_failed');
   }
 
   // The site's after-chat tools, one step each (retried on a 5xx or a timeout), before the event, so it carries what they returned.

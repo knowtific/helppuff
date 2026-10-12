@@ -49,7 +49,11 @@ accessRoutes.post('/admins', async (c) => {
   // Without a password, a hash nothing matches: they sign in with the link, then set one with `helppuff users reset`.
   const hash = password ? await hashPassword(password) : `none$${crypto.randomUUID()}`;
   const now = c.get('helppuff').platform.now();
-  await d.prepare('INSERT INTO admins (email, password_hash, name, role, created_at) VALUES (?, ?, ?, ?, ?)').bind(email, hash, name, role, now).run();
+  // Two adds at once both pass the check above: the insert is what decides, and the second is told it exists.
+  const added = (await d.prepare('INSERT INTO admins (email, password_hash, name, role, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (email) DO NOTHING').bind(email, hash, name, role, now).run()) as
+    | { meta?: { changes?: number }; changes?: number }
+    | undefined;
+  if ((added?.meta?.changes ?? added?.changes ?? 1) === 0) throw new HelpPuffError('conflict', { message: `${email} can already sign in.`, detail: 'team_exists' });
   const link = password ? null : await mintLink(c, 'login', email, INVITE_TTL);
   return c.json({ email, name, role, createdAt: now, signInLink: link?.url ?? null, signInLinkExpiresAt: link?.expiresAt ?? null }, 201);
 });
@@ -220,7 +224,7 @@ accessRoutes.get('/audit', async (c) => {
     params.push(before);
   }
   const rows = await db(c)
-    .prepare(`SELECT id, at, actor, action, target, site_id AS site, status FROM audit_log WHERE ${where.join(' AND ')} ORDER BY at DESC LIMIT ?`)
+    .prepare(`SELECT id, at, actor, action, target, site_id AS site, status FROM audit_log WHERE ${where.join(' AND ')} ORDER BY at DESC, rowid DESC LIMIT ?`)
     .bind(...params, limit + 1)
     .all<{ at: number }>();
   const items = rows.results.slice(0, limit);

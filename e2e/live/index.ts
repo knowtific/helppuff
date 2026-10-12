@@ -29,9 +29,27 @@ const worker = createWorker(config, {
  */
 const realFetch = globalThis.fetch.bind(globalThis);
 let lastToolCall: { url: string; authorization: string | null } | null = null;
+/**
+ * What the Worker sent to the fake email service (`https://mail.e2e.test/send`)
+ * and the fake webhook receiver (`https://hooks.e2e.test/…`), for the
+ * notifications e2e: read with GET /fake-llm/outbox, emptied with DELETE.
+ */
+const outbox: { host: string; path: string; method: string; headers: Record<string, string>; body: unknown }[] = [];
 globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const request = new Request(input, init);
   const url = new URL(request.url);
+  if (url.hostname === 'mail.e2e.test' || url.hostname === 'hooks.e2e.test') {
+    const text = await request.text();
+    let body: unknown = text;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      // Not JSON: kept as text.
+    }
+    outbox.push({ host: url.hostname, path: url.pathname, method: request.method, headers: Object.fromEntries(request.headers), body });
+    if (url.hostname === 'mail.e2e.test' && request.headers.get('x-api-key') !== 'e2e-mail-key') return Response.json({ error: 'bad key' }, { status: 401 });
+    return Response.json({ id: `msg_${outbox.length}` });
+  }
   if (url.hostname !== 'tools.e2e.test') return realFetch(input, init);
   lastToolCall = { url: request.url, authorization: request.headers.get('authorization') };
   if (request.headers.get('authorization') !== 'Bearer e2e-tool-key') return Response.json({ error: 'bad key' }, { status: 401 });
@@ -56,6 +74,10 @@ async function fakeLlm(request: Request, env: Record<string, unknown>): Promise<
   const url = new URL(request.url);
   if (url.pathname === '/fake-llm/last') return Response.json(last.get(url.searchParams.get('model') ?? 'fake-model') ?? {});
   if (url.pathname === '/fake-llm/tool') return Response.json(lastToolCall);
+  if (url.pathname === '/fake-llm/outbox') {
+    if (request.method === 'DELETE') outbox.length = 0;
+    return Response.json(outbox);
+  }
   if (request.headers.get('authorization') !== `Bearer ${String(env['FAKE_LLM_KEY'])}`) return new Response('{"error":"bad key"}', { status: 401 });
   const body = (await request.json()) as { model: string; stream?: boolean; tools?: { function: { name: string } }[]; messages: { role: string; content: string }[] };
   const system = body.messages.find((m) => m.role === 'system')?.content ?? '';

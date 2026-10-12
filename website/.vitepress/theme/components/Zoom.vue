@@ -34,6 +34,6 @@ const open = () =>
   text-align: inherit;
   cursor: zoom-in;
 }
-.hp-zoom:focus-visible { outline: 2px solid var(--vp-c-brand-1); outline-offset: 4px; border-radius: 16px; }
+.hp-zoom:focus-visible { outline: 2px solid var(--hp-focus); outline-offset: 4px; border-radius: 16px; }
 .hp-zoom img { display: block; width: 100%; height: auto; }
 </style>

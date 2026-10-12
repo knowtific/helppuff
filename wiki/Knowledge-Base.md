@@ -254,6 +254,38 @@ Models: `@cf/zai-org/glm-4.7-flash` by default, thinking at `medium`
 others, compared for speed, quality and answers a day, are on
 [[AI models|AI-Models]].
 
+## 5a. Questions to answer
+
+After every conversation, the same background job that summarises it looks
+for what the knowledge base is missing (with HelpPuff's own knowledge base,
+where an answer can go; with another source, Analytics lists what it could not
+answer instead):
+
+1. The summary lists the questions **about the business** (its services,
+   prices, areas, hours, bookings, policies) that the assistant could not
+   answer for lack of information. It is shown what the assistant was told
+   (your settings and prompt), so off-topic questions, and ones your
+   instructions say not to answer ("never quote prices"), are left out.
+2. Each one is searched in the knowledge base. Nothing found: it is missing.
+   Something found: one AI call checks whether the passages really answer it.
+3. What is left joins **Questions to answer** (Knowledge, and Analytics): one
+   line per question, whatever its case or punctuation, counted each time a
+   visitor asks it again.
+
+**Answer** opens a dialog: what you write becomes one of **Your own
+answers**, with the question as its title, searchable at once, so the
+assistant answers it from the next chat. **Dismiss** takes one off the list
+(it stays off if asked again). A new question also sends `knowledge.gap` to
+[[webhooks|Webhooks]], and an email to whoever chose **A question to answer**
+in Settings → Notifications ([[Email notifications|Email-Notifications]]).
+
+From the terminal: `helppuff knowledge gaps`, `helppuff knowledge answer <id>
+--text "…"` and `helppuff knowledge dismiss <id>`; in the API,
+`GET /knowledge/gaps` and `POST /knowledge/gaps/:id/answer`
+([[the reference|API-Reference-Knowledge]]). The check costs one search per
+question and, when something was found, one small AI call per conversation:
+only when a conversation had a question it could not answer.
+
 ## 5b. The same knowledge base with another model
 
 `openai`, `gemini` and `anthropic` take `"retrieval": "helppuff"` in their

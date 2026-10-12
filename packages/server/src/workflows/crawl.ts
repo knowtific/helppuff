@@ -1,9 +1,9 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from 'cloudflare:workers';
-import { runCrawlPart, runFileJob, type CrawlParams, type FileParams, type Notify, type StepLike } from '@helppuff/rag';
+import { retrieve, runCrawlPart, runFileJob, type CrawlParams, type FileParams, type Notify, type StepLike } from '@helppuff/rag';
 import { runConversationJob, type ConversationParams } from '../conversations/complete.js';
 import type { AiRunner } from '../conversations/summary.js';
 import { dbFrom } from '../db/d1.js';
-import { requireKnowledgeEnv } from '../knowledge/env.js';
+import { knowledgeEnv, requireKnowledgeEnv } from '../knowledge/env.js';
 import { emitTo, outboundOf, runWebhookRetry, secretOf, workflowRetry, type WebhookRetryParams } from '../webhooks/deliver.js';
 import { setupAfterLearning } from '../jobs/setup.js';
 import { suggestAfterLearning } from '../home/suggest.js';
@@ -47,6 +47,8 @@ export class CrawlWorkflow extends WorkflowEntrypoint<Record<string, unknown>, J
       if (!db) throw new Error('No D1 binding.');
       if (payload.kind === 'webhook') return runWebhookRetry(steps, { db, fetch: fetcher, secret: secretOf(this.env) }, payload);
       const ai = this.env['AI'] as Partial<AiRunner> | undefined;
+      // The site's own knowledge base, when it has one: what it covers is no question to answer.
+      const known = knowledgeEnv(this.env);
       return runConversationJob(
         steps,
         {
@@ -55,6 +57,12 @@ export class CrawlWorkflow extends WorkflowEntrypoint<Record<string, unknown>, J
           retry: workflowRetry(this.env),
           ...outboundOf(this.env),
           ...(ai && typeof ai.run === 'function' ? { ai: ai as AiRunner } : {}),
+          ...(known
+            ? {
+                knowledge: async (siteId: string, query: string) =>
+                  (await retrieve({ db: known.db, ai: known.ai, vectors: known.vectors }, siteId, query)).chunks.map((c) => ({ title: c.title, content: c.content, score: c.score })),
+              }
+            : {}),
         },
         payload,
       );

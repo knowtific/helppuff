@@ -55,6 +55,16 @@ describe('roles', () => {
   });
 });
 
+describe('adding someone twice at once', () => {
+  it('adds them once, and tells the other request they exist (never a 500)', async () => {
+    const w = await world();
+    const body = { email: 'twice@acme.com', name: 'Twice', password: 'member-password-1', role: 'member' };
+    const answers = await Promise.all([w.owner.send('POST', '/admins', body), w.owner.send('POST', '/admins', body)]);
+    expect(answers.map((r) => r.status).sort()).toEqual([201, 409]);
+    expect(w.db.raw.prepare("SELECT COUNT(*) AS n FROM admins WHERE email = 'twice@acme.com'").get()).toEqual({ n: 1 });
+  });
+});
+
 describe('attributes, labels and notes', () => {
   it('merges attributes: set, keep, and null removes', () => {
     expect(mergeAttributes({ plan: 'pro', seats: '3' }, { seats: 5, region: 'EU', plan: null })).toEqual({ seats: '5', region: 'EU' });

@@ -1,3 +1,10 @@
+<p class="wiki-logo">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/knowtific/helppuff/main/logo/helppuff-lockup-dark.svg">
+    <img src="https://raw.githubusercontent.com/knowtific/helppuff/main/logo/helppuff-lockup.svg" alt="HelpPuff" height="56">
+  </picture>
+</p>
+
 # HelpPuff
 
 HelpPuff is an open-source AI chat assistant for websites that runs entirely on

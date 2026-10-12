@@ -565,7 +565,7 @@ function Playground() {
           <h1>
             <a class="home" href={SITE} title="HelpPuff website">
               <svg viewBox="0 0 64 64" aria-hidden="true">
-                <path d="M32 5.5a19 19 0 1 1 0 38a19 19 0 1 1 0-38ZM32 17a7.5 7.5 0 1 0 0 15a7.5 7.5 0 1 0 0-15ZM13 24.5H24V41.5L13 47.5ZM11 49a5 5 0 1 1 0 10a5 5 0 1 1 0-10Z" fill="#5B5BF7" />
+                <path d="M32 5.5a19 19 0 1 1 0 38a19 19 0 1 1 0-38ZM32 17a7.5 7.5 0 1 0 0 15a7.5 7.5 0 1 0 0-15ZM13 24.5H24V41.5L13 47.5ZM11 49a5 5 0 1 1 0 10a5 5 0 1 1 0-10Z" fill="#3B0D24" />
               </svg>
               HelpPuff
             </a>{' '}

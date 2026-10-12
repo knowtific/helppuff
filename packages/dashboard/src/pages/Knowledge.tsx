@@ -2,6 +2,7 @@ import { BookOpen, ChevronDown, ChevronRight, FileText, Loader2, Plus, RefreshCw
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { CrawlProgress, PagePicker, PageStatusBadge, categoryLabel, useKnowledgeStatus } from '../components/knowledge';
 import { PageHeader, SettingsTabs } from '../components/Shell';
+import { QuestionsToAnswer } from '../components/Gaps';
 import { AskAgent, agentRequest } from './Settings';
 import { Badge, Button, Card, CardHeader, Empty, ErrorNote, InfoTip, Input, Segmented, Skeleton, Textarea } from '../components/ui';
 import { api, uploadFile, type FileStatus, type KnowledgeFile, type KnowledgePage, type ManualEntry, type Me, type SearchResult, type Usage } from '../lib/api';
@@ -54,6 +55,8 @@ export function Knowledge({ me }: { me: Me }) {
   const crawl = useKnowledgeStatus(site.knowledge);
   const pages = useData(() => api<{ pages: KnowledgePage[] }>('/knowledge/pages'), [crawl.status?.run?.status, crawl.status?.chunks]);
   const [filter, setFilter] = useState<Filter>('all');
+  // An answered question is a new own answer: the list below reloads.
+  const [answered, setAnswered] = useState(0);
   const [choosing, setChoosing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -128,6 +131,8 @@ export function Knowledge({ me }: { me: Me }) {
           <Card className="px-4 py-3">{crawl.status ? <UsageMeter usage={crawl.status.usage} /> : <Skeleton className="h-14" />}</Card>
         </div>
 
+        <QuestionsToAnswer onAnswered={() => setAnswered((n) => n + 1)} />
+
         {choosing && (
           <Card>
             <CardHeader title="Choose pages" tip={{ label: 'About choosing pages', text: 'Unticked pages are removed from the knowledge base on the next crawl.' }} />
@@ -183,7 +188,7 @@ export function Knowledge({ me }: { me: Me }) {
         <Files />
 
         <div className="grid gap-4 lg:grid-cols-2">
-          <ManualKnowledge />
+          <ManualKnowledge key={answered} />
           <TestSearch />
         </div>
       </div>

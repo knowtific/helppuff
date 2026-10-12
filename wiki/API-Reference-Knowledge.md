@@ -16,6 +16,9 @@ What the assistant knows: the website it learned, uploaded files, hand-written k
 - [[List hand-written knowledge|API-Reference-Knowledge#list-hand-written-knowledge]]: `GET /knowledge/manual`
 - [[Add or replace hand-written knowledge|API-Reference-Knowledge#add-or-replace-hand-written-knowledge]]: `POST /knowledge/manual`
 - [[Remove hand-written knowledge|API-Reference-Knowledge#remove-hand-written-knowledge]]: `DELETE /knowledge/manual/:id`
+- [[Questions to answer|API-Reference-Knowledge#questions-to-answer]]: `GET /knowledge/gaps`
+- [[Answer a question|API-Reference-Knowledge#answer-a-question]]: `POST /knowledge/gaps/:id/answer`
+- [[Dismiss a question, or open it again|API-Reference-Knowledge#dismiss-a-question-or-open-it-again]]: `PATCH /knowledge/gaps/:id`
 - [[List uploaded files|API-Reference-Knowledge#list-uploaded-files]]: `GET /knowledge/files`
 - [[Upload a file|API-Reference-Knowledge#upload-a-file]]: `POST /knowledge/files`
 - [[Remove an uploaded file|API-Reference-Knowledge#remove-an-uploaded-file]]: `DELETE /knowledge/files/:id`
@@ -844,6 +847,250 @@ const data = (await response.json()) as RemoveHandWrittenKnowledgeResponse;
 ```ts [Type]
 type RemoveHandWrittenKnowledgeResponse = {
   deleted: boolean;
+};
+```
+<!-- /tabs -->
+
+## Questions to answer
+
+`GET /knowledge/gaps` · scope `knowledge:read`
+
+What visitors asked about the business that the assistant could not answer and the knowledge base does not cover, found after each conversation (off-topic questions, and ones the instructions say not to answer, are left out). Most asked first. Answer one with `POST /knowledge/gaps/:id/answer`; a new one also sends `knowledge.gap` to webhooks and, to whoever chose it, an email.
+
+| Parameter | In | Required | Description |
+| --- | --- | --- | --- |
+| `status` | query | no | `open` (the default), `answered`, `dismissed` or `all`. |
+| `limit` | query | no | 1–200, default 100. |
+| `site` | query | no | The site (a key always uses its own). |
+
+**Request**
+
+<!-- tabs -->
+```bash [curl]
+curl "$HELPPUFF_URL/api/v1/knowledge/gaps" \
+  -H "Authorization: Bearer $HELPPUFF_API_KEY"
+```
+```ts [TypeScript]
+const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/knowledge/gaps`, {
+  headers: {
+    Authorization: `Bearer ${process.env.HELPPUFF_API_KEY}`,
+  },
+});
+if (!response.ok) throw new Error(((await response.json()) as ApiError).error.message);
+const data = (await response.json()) as QuestionsToAnswerResponse;
+```
+<!-- /tabs -->
+
+**Response** `200`
+
+<!-- tabs -->
+```json [Example]
+{
+  "gaps": [
+    {
+      "id": "gap_4f3e2d1c0b9a8f7e6d5c",
+      "question": "Do you convert cooktops from natural gas to LPG?",
+      "count": 3,
+      "firstAskedAt": 1760000000000,
+      "lastAskedAt": 1760000000000,
+      "conversationId": "1b0f6a52-3c1e-4c55-9f0e-2d1c7a9e5b10",
+      "status": "open",
+      "answerId": null,
+      "answeredBy": null
+    }
+  ],
+  "counts": {
+    "open": 4,
+    "answered": 9,
+    "dismissed": 1
+  }
+}
+```
+```ts [Type]
+type QuestionsToAnswerResponse = {
+  gaps: Array<{
+    id: string;
+    question: string;
+    count: number;
+    firstAskedAt: number;
+    lastAskedAt: number;
+    conversationId: string | null;
+    status: string;
+    answerId: string | null;
+    answeredBy: string | null;
+  }>;
+  counts: Record<string, number>;
+};
+```
+<!-- /tabs -->
+
+## Answer a question
+
+`POST /knowledge/gaps/:id/answer` · scope `knowledge:write`
+
+The answer becomes hand-written knowledge (`/knowledge/manual`, the question as its title), searchable at once; the question is marked answered. Answering again replaces it.
+
+| Parameter | In | Required | Description |
+| --- | --- | --- | --- |
+| `id` | path | yes | The record's id. |
+
+| Body field | Required | Description |
+| --- | --- | --- |
+| `answer` | yes | The answer, up to 20,000 characters. |
+| `title` | no | The entry's title (default: the question). |
+
+**Request**
+
+<!-- tabs -->
+```bash [curl]
+curl -X POST "$HELPPUFF_URL/api/v1/knowledge/gaps/ID/answer" \
+  -H "Authorization: Bearer $HELPPUFF_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "answer": "No: we only work on natural gas cooktops. For LPG, call a licensed gas fitter."
+}'
+```
+```ts [TypeScript]
+type AnswerQuestionRequest = {
+  /** The answer, up to 20,000 characters. */
+  answer: string;
+  /** The entry's title (default: the question). */
+  title?: string;
+};
+
+const id = '…';
+const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/knowledge/gaps/${id}/answer`, {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${process.env.HELPPUFF_API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    answer: 'No: we only work on natural gas cooktops. For LPG, call a licensed gas fitter.'
+  } satisfies AnswerQuestionRequest),
+});
+if (!response.ok) throw new Error(((await response.json()) as ApiError).error.message);
+const data = (await response.json()) as AnswerQuestionResponse;
+```
+<!-- /tabs -->
+
+**Response** `200`
+
+<!-- tabs -->
+```json [Example]
+{
+  "gap": {
+    "id": "gap_4f3e2d1c0b9a8f7e6d5c",
+    "question": "Do you convert cooktops from natural gas to LPG?",
+    "count": 3,
+    "firstAskedAt": 1760000000000,
+    "lastAskedAt": 1760000000000,
+    "conversationId": "1b0f6a52-3c1e-4c55-9f0e-2d1c7a9e5b10",
+    "status": "answered",
+    "answerId": "gap-4f3e2d1c0b9a8f7e6d5c",
+    "answeredBy": "Olivia"
+  },
+  "entry": {
+    "id": "gap-4f3e2d1c0b9a8f7e6d5c",
+    "chunks": 1
+  }
+}
+```
+```ts [Type]
+type AnswerQuestionResponse = {
+  gap: {
+    id: string;
+    question: string;
+    count: number;
+    firstAskedAt: number;
+    lastAskedAt: number;
+    conversationId: string;
+    status: string;
+    answerId: string;
+    answeredBy: string;
+  };
+  entry: {
+    id: string;
+    chunks: number;
+  };
+};
+```
+<!-- /tabs -->
+
+## Dismiss a question, or open it again
+
+`PATCH /knowledge/gaps/:id` · scope `knowledge:write`
+
+`status`: `dismissed` (not something to answer; it stays out of the list, asked again or not) or `open`.
+
+| Parameter | In | Required | Description |
+| --- | --- | --- | --- |
+| `id` | path | yes | The record's id. |
+
+| Body field | Required | Description |
+| --- | --- | --- |
+| `status` | yes | `dismissed` or `open`. |
+
+**Request**
+
+<!-- tabs -->
+```bash [curl]
+curl -X PATCH "$HELPPUFF_URL/api/v1/knowledge/gaps/ID" \
+  -H "Authorization: Bearer $HELPPUFF_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "status": "dismissed"
+}'
+```
+```ts [TypeScript]
+type DismissQuestionOpenItAgainRequest = {
+  /** `dismissed` or `open`. */
+  status: string;
+};
+
+const id = '…';
+const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/knowledge/gaps/${id}`, {
+  method: 'PATCH',
+  headers: {
+    Authorization: `Bearer ${process.env.HELPPUFF_API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    status: 'dismissed'
+  } satisfies DismissQuestionOpenItAgainRequest),
+});
+if (!response.ok) throw new Error(((await response.json()) as ApiError).error.message);
+const data = (await response.json()) as DismissQuestionOpenItAgainResponse;
+```
+<!-- /tabs -->
+
+**Response** `200`
+
+<!-- tabs -->
+```json [Example]
+{
+  "id": "gap_4f3e2d1c0b9a8f7e6d5c",
+  "question": "Do you convert cooktops from natural gas to LPG?",
+  "count": 3,
+  "firstAskedAt": 1760000000000,
+  "lastAskedAt": 1760000000000,
+  "conversationId": "1b0f6a52-3c1e-4c55-9f0e-2d1c7a9e5b10",
+  "status": "dismissed",
+  "answerId": null,
+  "answeredBy": null
+}
+```
+```ts [Type]
+type DismissQuestionOpenItAgainResponse = {
+  id: string;
+  question: string;
+  count: number;
+  firstAskedAt: number;
+  lastAskedAt: number;
+  conversationId: string | null;
+  status: string;
+  answerId: string | null;
+  answeredBy: string | null;
 };
 ```
 <!-- /tabs -->

@@ -665,7 +665,7 @@ describe('background jobs', () => {
     const params = created[0]!.params as Parameters<typeof runConversationJob>[2];
     expect(await runConversationJob(steps, { db: w.db, ai, fetch: globalThis.fetch, now: () => clock.now }, params)).toEqual({ status: 'completed' });
     // It slept until five minutes after the last message, then checked again.
-    expect(steps.names).toEqual(['check:0', 'idle:0', 'check:1', 'summarize', 'complete']);
+    expect(steps.names).toEqual(['check:0', 'idle:0', 'check:1', 'summarize', 'gaps', 'complete']);
     expect(clock.now).toBe(lastAt + 5 * 60_000);
 
     const stored = w.db.raw.prepare('SELECT summary, intent, completed_at FROM conversations WHERE id = ?').get(started.sessionId) as Record<string, unknown>;

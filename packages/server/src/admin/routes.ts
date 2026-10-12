@@ -20,6 +20,7 @@ import { resolveSite } from '../config/site.js';
 import { knowledgeEnv, ownsKnowledge } from '../knowledge/env.js';
 import { settingsRoutes } from './settings.js';
 import { setupRoutes } from './setup.js';
+import { headline, health, insights } from './analytics.js';
 import { notificationRoutes } from './notifications.js';
 import { webhookRoutes } from './webhooks.js';
 import { toolRoutes } from './tools.js';
@@ -39,7 +40,7 @@ import { versionRoutes } from './version.js';
 import { dbFrom, ensureSchema, type D1Like } from '../db/d1.js';
 import { emit } from '../webhooks/deliver.js';
 import { summarizeConversation, type AiRunner } from '../conversations/summary.js';
-import { summaryModel } from '../conversations/complete.js';
+import { assistantInstructions, summaryModel } from '../conversations/complete.js';
 export { extractJson } from '../conversations/summary.js';
 import { PROMPT_LIMIT, PROMPT_SQL, promptCtx, promptField, publishPrompt, readPromptState, type PromptVersionRow, type PublishResult } from './prompts.js';
 
@@ -276,6 +277,14 @@ adminRoutes.get('/overview', async (c) => {
 
   // Waiting now, whatever the range: a callback is a task, not a statistic.
   const openCallbacks = await d.prepare(`SELECT COUNT(*) AS n FROM callbacks WHERE status = 'open'${f.sql}`).bind(...f.params).first<{ n: number }>().catch(() => null);
+  // How the assistant is doing, what it brings in, and what is broken (admin/analytics.ts).
+  const scope = { site: (f.params[0] as string | undefined) ?? null };
+  const [headNow, headBefore, detail, issues] = await Promise.all([
+    headline(d, scope, since, now + 1),
+    headline(d, scope, previous, since),
+    insights(d, scope, since, now + 1, offset),
+    health(d, scope, since),
+  ]);
 
   return c.json({
     range: { days, since },
@@ -299,6 +308,9 @@ adminRoutes.get('/overview', async (c) => {
     countries: countries.results,
     recentQuestions: questions.results,
     recentLeads: recentLeads.results,
+    headline: { current: headNow, previous: headBefore },
+    insights: detail,
+    health: issues,
   });
 });
 
@@ -435,7 +447,7 @@ adminRoutes.post('/conversations/:id/summary', async (c) => {
   const model = await summaryModel(ctx, String(conversation['site_id']));
   let result;
   try {
-    result = await summarizeConversation({ db: db(c), ai: ai as AiRunner, now: () => ctx.platform.now() }, id, model);
+    result = await summarizeConversation({ db: db(c), ai: ai as AiRunner, now: () => ctx.platform.now() }, id, model, assistantInstructions(await resolveSite(ctx, String(conversation['site_id']))));
   } catch {
     throw new HelpPuffError('connector_error', { message: 'The summary could not be generated. Try again.', detail: 'admin_summary_unparsable' });
   }

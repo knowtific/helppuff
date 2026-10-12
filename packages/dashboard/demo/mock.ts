@@ -1,5 +1,5 @@
 import { EMAIL_NOTIFICATIONS, EMAIL_PRESETS, WEBHOOK_EVENTS } from '@helppuff/protocol';
-import type { Callback, CallbackStatus, EmailService, KnowledgePage, Label, Lead, LeadStatus, Note, Overview, Prefs, PromptVersion, Settings, StoredMessage, Summary, ToolView } from '../src/lib/api';
+import type { Callback, CallbackStatus, EmailService, Gap, Headline, Insights, KnowledgePage, Label, Lead, LeadStatus, Note, Overview, Prefs, PromptVersion, Settings, StoredMessage, Summary, ToolView } from '../src/lib/api';
 import { FACTS, LABELS, PAGES, PROMPT_TEXT, SITE, callbacks, conversations, leads, notes } from './data';
 import { jobsRoute } from './jobs';
 import { bookingsRoute, bookingsSettings } from './bookings';
@@ -236,6 +236,24 @@ const knowledgePages: KnowledgePage[] = PAGES.map(([path, title, category, chunk
   crawledAt: NOW - 2 * DAY,
   chunks,
 }));
+/** Questions to answer: what the sample visitors asked that the sample knowledge base lacks. */
+const gaps: Gap[] = [
+  ['Do you convert cooktops from natural gas to LPG?', 4, 2],
+  ['Do you service the Blue Mountains?', 3, 5],
+  ['Can you install a rainwater tank pump?', 2, 9],
+  ['Do you offer a seniors discount?', 1, 1],
+].map(([question, count, daysAgo], i) => ({
+  id: `gap_demo${i + 1}`,
+  question: question as string,
+  count: count as number,
+  firstAskedAt: NOW - (daysAgo as number) * DAY * 3,
+  lastAskedAt: NOW - (daysAgo as number) * DAY,
+  conversationId: null,
+  status: 'open',
+  answerId: null,
+  answeredBy: null,
+}));
+
 const totalChunks = knowledgePages.reduce((n, p) => n + p.chunks, 0) + files.reduce((n, f) => n + f.chunks, 0) + manual.length;
 
 // ------------------------------------------------------------------ views
@@ -273,6 +291,82 @@ function overview(days: number): Overview {
     countries: count(inRange.map((c) => c.country!)).map(([country, n]) => ({ country, count: n })),
     recentQuestions: inRange.slice(0, 8).map((c) => ({ id: c.id, text: c.firstMessage!, at: c.startedAt })),
     recentLeads: leads.slice(0, 6).map((l) => ({ id: l.id, name: l.name, email: l.email, phone: l.phone, status: l.status, at: l.createdAt ?? NOW, conversationId: l.lastConversationId ?? null })),
+    openCallbacks: callbacks.filter((cb) => cb.status === 'open').length,
+    headline: { current: headline(since, NOW + 1), previous: headline(since - days * DAY, since) },
+    insights: insights(inRange, days),
+    health: [{ kind: 'knowledge', title: '1 page of your site could not be learned', detail: 'Try it again, or upload the information as a file.', page: '#/knowledge' }],
+  };
+}
+
+type Labels = { outcome?: string; sentiment?: string; leadQuality?: string; topics?: string[]; unanswered?: string[] };
+const summaryOf = (c: (typeof conversations)[number]): Labels | null => {
+  try {
+    return c.summaryJson ? (JSON.parse(c.summaryJson) as Labels) : null;
+  } catch {
+    return null;
+  }
+};
+const handedOver = (c: (typeof conversations)[number]) => c.messages.some((m) => m.type === 'handover');
+
+/** The same numbers the Worker reads, from the sample conversations. */
+function headline(from: number, to: number): Headline {
+  const list = conversations.filter((c) => c.startedAt >= from && c.startedAt < to);
+  const summarised = list.filter((c) => summaryOf(c));
+  const ratings = list.flatMap((c) => c.messages.map((m) => m.feedback)).filter((f) => f === 1 || f === -1);
+  return {
+    summarized: summarised.length,
+    resolved: summarised.filter((c) => !handedOver(c) && ['answered', 'booked', 'lead_captured'].includes(summaryOf(c)!.outcome ?? '')).length,
+    escalated: list.filter(handedOver).length,
+    needsPerson: list.filter((c) => handedOver(c) || callbacks.some((cb) => cb.conversationId === c.id)).length,
+    unanswered: summarised.filter((c) => summaryOf(c)!.outcome === 'unanswered' || (summaryOf(c)!.unanswered ?? []).length > 0).length,
+    ratedUp: ratings.filter((f) => f === 1).length,
+    ratedDown: ratings.filter((f) => f === -1).length,
+    callbacks: callbacks.filter((cb) => cb.requestedAt >= from && cb.requestedAt < to).length,
+  };
+}
+
+function insights(list: typeof conversations, days: number): Insights {
+  const summaries = list.map(summaryOf);
+  const tally = <K extends string>(keys: readonly K[], pick: (s: Labels) => string | undefined) =>
+    Object.fromEntries(keys.map((k) => [k, summaries.filter((s) => s && pick(s) === k).length])) as Record<K, number>;
+  const grouped = (values: string[]) => {
+    const map = new Map<string, { text: string; count: number }>();
+    for (const v of values) map.set(v.toLowerCase(), { text: v, count: (map.get(v.toLowerCase())?.count ?? 0) + 1 });
+    return [...map.values()].sort((a, b) => b.count - a.count).slice(0, 8);
+  };
+  const hours = Array.from({ length: 24 }, () => 0);
+  for (const c of list) hours[new Date(c.startedAt).getHours()]! += 1;
+  const lengths = list.map((c) => c.lastAt - c.startedAt).sort((a, b) => a - b);
+  const handed = list.filter(handedOver);
+  const scale = (n: number) => Math.max(0, Math.round((n * days) / 30));
+  return {
+    outcomes: { ...tally(['answered', 'booked', 'lead_captured', 'callback_requested', 'unanswered', 'abandoned'] as const, (s) => s.outcome), pending: summaries.filter((s) => !s).length },
+    sentiment: tally(['positive', 'neutral', 'negative'] as const, (s) => s.sentiment),
+    leadQuality: tally(['hot', 'warm', 'cold', 'none'] as const, (s) => s.leadQuality),
+    engagement: {
+      avgMessages: list.length ? list.reduce((n, c) => n + c.messageCount, 0) / list.length : 0,
+      medianSeconds: lengths.length ? Math.round(lengths[Math.floor(lengths.length / 2)]! / 1000) : null,
+      oneMessage: list.filter((c) => c.messages.filter((m) => m.role === 'user').length === 1).length,
+      returningVisitors: Math.round(list.length * 0.12),
+    },
+    unansweredQuestions: grouped(list.flatMap((c) => (summaryOf(c)?.unanswered ?? []).map((q) => q))).map((q) => ({ ...q, conversationId: list.find((c) => (summaryOf(c)?.unanswered ?? []).includes(q.text))!.id })),
+    topics: grouped(summaries.flatMap((s) => s?.topics ?? [])).map((t) => ({ topic: t.text, count: t.count })),
+    hours,
+    live: {
+      requested: handed.length,
+      answered: handed.filter((c) => c.messages.some((m) => m.role === 'agent' && m.author)).length,
+      missed: handed.filter((c) => c.messages.some((m) => m.type === 'handover' && (m.payload as { status?: string } | null)?.status === 'missed')).length,
+      medianWaitSeconds: handed.length ? 70 : null,
+      byPerson: handed.some((c) => c.assignedName) ? [{ name: 'Priya', count: handed.filter((c) => c.assignedName).length }] : [],
+    },
+    callbacks: (() => {
+      const since = NOW - days * DAY;
+      const inRange = callbacks.filter((cb) => cb.requestedAt >= since);
+      return { requested: inRange.length, done: inRange.filter((cb) => cb.status === 'done').length, dismissed: inRange.filter((cb) => cb.status === 'dismissed').length, open: inRange.filter((cb) => cb.status === 'open').length, medianHoursToDone: inRange.some((cb) => cb.status === 'done') ? 2.5 : null };
+    })(),
+    // Sample figures for the sample business, scaled to the period.
+    jobs: { created: scale(14), fromChat: scale(11), won: scale(5), lost: scale(2), wonValue: scale(5) * 640, currency: 'AUD' },
+    appointments: { booked: scale(9), fromChat: scale(7), completed: scale(6), noShow: scale(1), cancelled: scale(1) },
   };
 }
 
@@ -710,6 +804,24 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
           return json({ ok: true });
         }
         return json({ entries: manual });
+      case 'gaps': {
+        if (!sub) {
+          const status = params.get('status') ?? 'open';
+          const counts = { open: 0, answered: 0, dismissed: 0 };
+          for (const g of gaps) counts[g.status] += 1;
+          return json({ gaps: gaps.filter((g) => status === 'all' || g.status === status).sort((a, b) => b.count - a.count), counts });
+        }
+        const gap = gaps.find((g) => g.id === sub);
+        if (!gap) return notFound();
+        if (parts[3] === 'answer') {
+          const entryId = `m${manual.length + 1}`;
+          manual.unshift({ id: entryId, title: gap.question, content: String(body['answer'] ?? ''), updatedAt: Date.now() });
+          Object.assign(gap, { status: 'answered', answerId: entryId, answeredBy: 'Dan' });
+          return json({ gap, entry: { id: entryId, chunks: 1 } });
+        }
+        if (method === 'PATCH') Object.assign(gap, { status: body['status'] === 'open' ? 'open' : 'dismissed' });
+        return json(gap);
+      }
       case 'facts':
         return json({ facts: FACTS });
       case 'search':

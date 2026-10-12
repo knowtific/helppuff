@@ -115,15 +115,17 @@ const AREAS = [
   {
     id: 'analytics',
     kicker: 'Analytics',
-    title: 'See what visitors ask, and what it brings in.',
-    text: 'Conversations and leads over 7, 30 or 90 days, compared with the period before.',
+    title: 'Is it helping? See for yourself.',
+    text: 'How much the assistant handles on its own, where it needs your team, what it brings in, and what is broken, against the period before.',
     points: [
-      'Conversations, leads, the share that became a lead, messages per chat',
-      'Daily activity, top pages and countries',
-      'The latest questions and the newest leads',
+      'Solved by the assistant, became a contact, needed a person, rated helpful',
+      'The questions it could not answer, most asked first: what to teach it next',
+      'Live chat answered and missed, the typical wait, callbacks done',
+      'Jobs won and their value, bookings and no-shows, and when visitors chat',
+      'Needs attention: a failing webhook, email or tool, a day the AI budget ran out',
     ],
     image: 'dash-analytics',
-    alt: 'Analytics: totals with change against the previous period, a daily activity chart, latest questions and new leads',
+    alt: 'Analytics: what needs attention, the headline numbers against the previous period, how conversations ended and the questions it could not answer',
     route: 'analytics',
     doc: 'Dashboard#analytics',
   },
@@ -168,11 +170,11 @@ const AREAS = [
 <template>
   <div class="tour">
     <section class="intro">
-      <div class="glow" aria-hidden="true"><span /><span /></div>
+      <div class="glow" aria-hidden="true" />
       <div class="wrap intro-grid">
         <div>
           <p class="kicker">The dashboard</p>
-          <h1>Your conversations, leads and follow-ups. <span class="grad">In one place.</span></h1>
+          <h1>Your conversations, leads and follow-ups. <span class="hp-emph">In one place.</span></h1>
           <p class="lede">
             Every HelpPuff deployment includes a dashboard for the people who answer the phone. It runs in your
             own Cloudflare account, and its data lives in your D1 database.
@@ -234,45 +236,41 @@ const AREAS = [
 </template>
 
 <style scoped>
-.tour { --ink: var(--vp-c-text-1); --ink-2: var(--vp-c-text-2); --line: var(--vp-c-divider); --card: var(--vp-c-bg); --soft: var(--vp-c-bg-soft); overflow-x: clip; padding-bottom: 96px; }
+.tour { --ink: var(--hp-text); --ink-2: var(--hp-text-muted); --line: var(--hp-border); --control: var(--hp-control-border); --card: var(--hp-surface); --soft: var(--hp-inset); overflow-x: clip; padding-bottom: 96px; }
 .wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
-.grad { background: var(--hp-gradient); -webkit-background-clip: text; background-clip: text; color: transparent; }
 a { text-decoration: none; }
-.kicker { margin: 0 0 12px; font-size: 13px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--vp-c-brand-1); }
+.kicker { margin: 0 0 12px; font-size: 13px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--hp-heading-accent); }
 h1 { margin: 0 0 18px; font-size: clamp(34px, 4.2vw, 50px); line-height: 1.05; letter-spacing: -0.04em; font-weight: 800; color: var(--ink); text-wrap: balance; }
 h2 { margin: 0 0 12px; font-size: clamp(26px, 3.2vw, 36px); line-height: 1.12; letter-spacing: -0.03em; font-weight: 800; color: var(--ink); border: 0; padding: 0; text-wrap: balance; }
 .lede { margin: 0; font-size: 18px; line-height: 1.6; color: var(--ink-2); max-width: 560px; }
 .note { margin: 16px 0 0; font-size: 14px; color: var(--ink-2); max-width: 520px; }
 .ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
 .btn { display: inline-flex; align-items: center; height: 46px; padding: 0 22px; border-radius: 999px; font-weight: 600; font-size: 15px; border: 1px solid transparent; transition: transform 160ms, box-shadow 160ms; }
-.btn.primary { background: var(--hp-gradient); color: #fff; box-shadow: 0 8px 24px -8px rgba(91, 91, 247, 0.65); }
-.btn.primary:hover { transform: translateY(-1px); }
-.btn.ghost { color: var(--ink); border-color: var(--line); background: var(--card); }
-.btn.ghost:hover { border-color: var(--hp-indigo); }
+.btn.primary { background: var(--hp-accent); color: var(--hp-on-accent); border-color: var(--hp-accent-edge); }
+.btn.primary:hover { background: var(--hp-accent-hover); transform: translateY(-1px); }
+.btn.primary:active { background: var(--hp-accent-active); }
+.btn.ghost { color: var(--ink); border-color: var(--control); background: transparent; }
+.btn.ghost:hover { border-color: var(--ink); background: var(--card); }
 
 .intro { position: relative; padding: 64px 0 40px; }
-.glow { position: absolute; inset: -120px 0 auto; height: 640px; pointer-events: none; filter: blur(80px); opacity: 0.45; }
-.glow span { position: absolute; border-radius: 50%; }
-.glow span:nth-child(1) { width: 520px; height: 520px; left: 55%; top: 80px; background: #7c7cff; }
-.glow span:nth-child(2) { width: 380px; height: 380px; left: 10%; top: 0; background: #93c5fd; }
-.dark .glow { opacity: 0.25; }
+.glow { position: absolute; inset: -120px 0 auto; height: 720px; pointer-events: none; background: radial-gradient(520px 420px at 72% 50%, var(--hp-glow), transparent 70%); }
 .intro-grid { position: relative; display: grid; grid-template-columns: 1fr 1.1fr; gap: 48px; align-items: center; }
-.intro-shot :deep(img), .frame :deep(img) { border-radius: 14px; border: 1px solid var(--line); box-shadow: 0 40px 80px -40px rgba(20, 20, 60, 0.5); transition: transform 300ms; }
+.intro-shot :deep(img), .frame :deep(img) { border-radius: 14px; border: 1px solid var(--line); box-shadow: 0 40px 80px -40px var(--hp-shadow); transition: transform 300ms; }
 .intro-shot:hover :deep(img), .frame:hover :deep(img) { transform: translateY(-4px); }
 .frame { width: 100%; }
 
 .jump { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 40px auto 24px; }
 .jump a { padding: 7px 16px; border-radius: 999px; border: 1px solid var(--line); font-size: 14px; font-weight: 500; color: var(--ink); background: var(--card); }
-.jump a:hover { border-color: var(--hp-indigo); }
+.jump a:hover { border-color: var(--ink); }
 
 .area { display: grid; grid-template-columns: 0.8fr 1.2fr; gap: 56px; align-items: center; margin-top: 100px; scroll-margin-top: 96px; }
 .area.flip .area-copy { order: 2; }
 .area-copy p:not(.kicker) { margin: 0; font-size: 17px; line-height: 1.6; color: var(--ink-2); }
 .area-copy ul { margin: 18px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; }
 .area-copy li { position: relative; padding-left: 26px; font-size: 15px; line-height: 1.5; color: var(--ink); }
-.area-copy li::before { content: ''; position: absolute; left: 0; top: 4px; width: 16px; height: 16px; border-radius: 50%; background: var(--vp-c-brand-soft); box-shadow: inset 0 0 0 5px var(--vp-c-brand-soft), inset 0 0 0 16px var(--vp-c-brand-1); transform: scale(0.55); }
+.area-copy li::before { content: ''; position: absolute; left: 0; top: 4px; width: 16px; height: 16px; border-radius: 50%; background: var(--hp-accent-soft); box-shadow: inset 0 0 0 5px var(--hp-accent-soft), inset 0 0 0 16px var(--hp-heading-accent); transform: scale(0.55); }
 .area-links { display: flex; gap: 18px; margin-top: 22px; font-size: 15px; font-weight: 600; }
-.area-links a { color: var(--vp-c-brand-1); }
+.area-links a { color: var(--hp-link); text-decoration: underline; text-underline-offset: 3px; }
 .area-links a:last-child { color: var(--ink-2); font-weight: 500; }
 
 .also { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 24px; margin-top: 110px; padding: 40px; border-radius: 26px; border: 1px solid var(--line); background: var(--soft); }

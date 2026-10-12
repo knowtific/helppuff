@@ -105,11 +105,11 @@ function onClick(event: MouseEvent) {
   text-decoration: none;
   cursor: pointer;
 }
-.lb-demo { background: var(--hp-gradient); color: #fff; }
+.lb-demo { background: var(--hp-citron); color: var(--hp-ink); }
 .lb-demo svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .lb-close { border: 1px solid rgba(255, 255, 255, 0.25); background: transparent; color: #fff; }
 .lb-close:hover { background: rgba(255, 255, 255, 0.1); }
-.lb-demo:focus-visible, .lb-close:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.lb-demo:focus-visible, .lb-close:focus-visible { outline: 2px solid var(--hp-citron); outline-offset: 2px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .hp-lightbox[open] { animation: none; } }
 @media (max-width: 600px) {

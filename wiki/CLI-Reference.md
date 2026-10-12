@@ -144,10 +144,10 @@ helppuff chat
 ### `helppuff knowledge`
 
 ```
-helppuff knowledge status | sync [--wait] | add (--file f.md | --title t --text …) | upload <file…> [--wait] | files [remove <id>] | list | remove <id> | pages [--status s] | facts [set k=v …] | suggest [--apply]
+helppuff knowledge status | sync [--wait] | add (--file f.md | --title t --text …) | upload <file…> [--wait] | files [remove <id>] | list | remove <id> | pages [--status s] | facts [set k=v …] | suggest [--apply] | gaps [--status open|answered|dismissed|all] | answer <id> --text … | dismiss <id>
 ```
 
-workers-ai: the knowledge base on your Worker. `sync` re-crawls the selected pages (same as `helppuff crawl`); `add` indexes hand-written knowledge at once; `upload` sends PDF, Word (.docx), Markdown or text files (up to 10 MB) that the Worker reads, cleans and learns in the background — `files` shows their progress, and `--wait` follows them to the end. Files listed in `knowledge.files` in helppuff.json are synced on every deploy (new and changed ones uploaded, removed ones deleted); `facts` are the business details (phone, hours…) answers always see — yours are never overwritten by a crawl. Other backends: `sync` uploads the website and knowledge.files to AI Search, an OpenAI vector store or a Gemini File Search store.
+workers-ai: the knowledge base on your Worker. `sync` re-crawls the selected pages (same as `helppuff crawl`); `add` indexes hand-written knowledge at once; `upload` sends PDF, Word (.docx), Markdown or text files (up to 10 MB) that the Worker reads, cleans and learns in the background — `files` shows their progress, and `--wait` follows them to the end. Files listed in `knowledge.files` in helppuff.json are synced on every deploy (new and changed ones uploaded, removed ones deleted); `facts` are the business details (phone, hours…) answers always see — yours are never overwritten by a crawl. `gaps` lists the questions to answer: what visitors asked about the business that the assistant could not answer and the knowledge base does not cover (found after each conversation; off-topic questions and ones the instructions say not to answer are left out), most asked first; `answer <id> --text …` saves the owner's answer as hand-written knowledge, live at once (no `--text`: needs_input, the answer is the owner's to give); `dismiss <id>` takes one off the list. Other backends: `sync` uploads the website and knowledge.files to AI Search, an OpenAI vector store or a Gemini File Search store.
 
 ```bash
 helppuff knowledge status --json
@@ -156,6 +156,8 @@ helppuff knowledge upload price-list.pdf brochure.docx --wait --json
 helppuff knowledge add --title "Warranty" --text "All installs carry a 5 year warranty."
 helppuff knowledge facts set phone="03 9876 5432" hours="Mon-Fri 7am-5pm"
 helppuff knowledge pages --status error
+helppuff knowledge gaps --json
+helppuff knowledge answer gap_4f3e2d1c0b9a --text "No: natural gas only. For LPG, call a licensed gas fitter."
 helppuff knowledge suggest --apply   (starter questions written from the crawled pages)
 ```
 

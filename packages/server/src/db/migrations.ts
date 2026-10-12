@@ -714,6 +714,33 @@ export const MIGRATIONS: readonly Migration[] = [
       )`,
     ],
   },
+  {
+    id: 16,
+    name: 'knowledge_gaps',
+    // Questions to answer: what visitors asked about the business that the
+    // knowledge base does not cover (knowledge/gaps.ts), one row per question
+    // per site (`key` is it normalised), counted each time it is asked again.
+    // Answered, it points at the hand-written answer it became
+    // (knowledge_manual); dismissed, it stays out of the list.
+    statements: [
+      `CREATE TABLE IF NOT EXISTS knowledge_gaps (
+        id TEXT PRIMARY KEY,
+        site_id TEXT NOT NULL,
+        question TEXT NOT NULL,
+        key TEXT NOT NULL,
+        count INTEGER NOT NULL DEFAULT 1,
+        first_at INTEGER NOT NULL,
+        last_at INTEGER NOT NULL,
+        conversation_id TEXT,
+        status TEXT NOT NULL DEFAULT 'open',
+        answer_id TEXT,
+        answered_by TEXT,
+        updated_at INTEGER NOT NULL
+      )`,
+      'CREATE UNIQUE INDEX IF NOT EXISTS knowledge_gaps_key ON knowledge_gaps (site_id, key)',
+      'CREATE INDEX IF NOT EXISTS knowledge_gaps_open ON knowledge_gaps (site_id, status, count DESC)',
+    ],
+  },
 ];
 
 export const LATEST_MIGRATION = MIGRATIONS[MIGRATIONS.length - 1]!.id;

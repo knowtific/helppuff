@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { JOB_FORM_PREFIX } from '@helppuff/protocol';
 import { awaitingSetup, customise, setupAfterLearning, setupJobs } from '../src/jobs/setup.js';
 import { TEMPLATES } from '../src/jobs/templates.js';
-import { validateTemplate } from '../src/jobs/store.js';
+import { ensurePipeline, validateTemplate } from '../src/jobs/store.js';
 import { jobsHandle } from '../src/jobs/chat.js';
 import { forgetPipeline, quoteActionId, withQuote } from '../src/jobs/widget.js';
 import { chat, say, world } from './inbox-helpers.js';
@@ -299,5 +299,28 @@ describe('jobs from the chat', () => {
     forgetPipeline();
     const ctx = { env: w.env, secret: 'x', config: {}, platform: { now: Date.now, waitUntil: () => {}, log: () => {}, kv: w.env['HELPPUFF_KV'] } } as never;
     expect(await jobsHandle(ctx, 'demo', 'c1', [])).toBeUndefined();
+  });
+});
+
+describe('the pipeline, the first time', () => {
+  it('is made once, even when two requests need it at the same moment', async () => {
+    const w = await world();
+    const [a, b] = await Promise.all([ensurePipeline(w.db, 'demo', Date.now()), ensurePipeline(w.db, 'demo', Date.now())]);
+    expect(a.stages.map((s) => s.id)).toEqual(b.stages.map((s) => s.id));
+    const rows = w.db.raw.prepare("SELECT COUNT(*) AS n FROM pipeline_stages WHERE site_id = 'demo'").get() as { n: number };
+    expect(rows.n).toBe(a.stages.length);
+  });
+
+  it('keeps one set of stages when two templates are applied at once: the last one', async () => {
+    const { applyTemplate } = await import('../src/jobs/store.js');
+    const { templateById } = await import('../src/jobs/templates.js');
+    const w = await world();
+    await Promise.all([
+      applyTemplate(w.db, 'demo', templateById('service-quote')!, { chosenBy: 'owner', reason: null }, Date.now()),
+      applyTemplate(w.db, 'demo', templateById('basic')!, { chosenBy: 'default', reason: null }, Date.now()),
+    ]);
+    const names = (w.db.raw.prepare("SELECT name FROM pipeline_stages WHERE site_id = 'demo'").all() as { name: string }[]).map((r) => r.name);
+    expect(new Set(names).size).toBe(names.length);
+    expect([templateById('service-quote')!.stages.length, templateById('basic')!.stages.length]).toContain(names.length);
   });
 });

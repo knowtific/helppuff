@@ -38,10 +38,44 @@ never needs you to change anything. Upgrade with
 - One D1 migration (15), additive: four columns on `webhooks` and the
   `email_service` table. `helppuff upgrade` applies it.
 
+### Added: questions to answer
+
+- After each conversation, the questions about the business the assistant
+  could not answer are checked against the knowledge base; the ones it does
+  not cover join **Questions to answer** (Knowledge, and Analytics), most
+  asked first. Off-topic questions, and ones the instructions say not to
+  answer (the summary now sees your settings and prompt), are left out.
+- **Answer** opens a dialog; the answer becomes one of **Your own answers**,
+  live at once. **Dismiss** takes a question off the list.
+- A new question sends `knowledge.gap` to webhooks and an email to whoever
+  chose **A question to answer**. `helppuff knowledge gaps`, `answer` and
+  `dismiss`; `GET /knowledge/gaps`, `POST /knowledge/gaps/:id/answer`,
+  `PATCH /knowledge/gaps/:id`. One more D1 migration (16), additive.
+- Summaries tell **booked** (an appointment or a job was made) from other
+  outcomes; it counts as solved by the assistant in Analytics.
+
+### Added: analytics that say whether the assistant is helping
+
+- **Analytics** is rebuilt around how much the assistant handles: solved by
+  the assistant alone, became a contact, needed a person (live chat or a
+  callback), could not answer and rated helpful, each against the period
+  before; how conversations ended; engagement (messages, typical length, left
+  after one message, came back); the questions it could not answer, most
+  asked first; topics, mood and lead quality; live chat (answered, missed,
+  typical wait, by person); callbacks (done, waiting, time to call back);
+  jobs won and their value; bookings and no-shows; chats by hour.
+- **Needs attention** at the top lists what is failing: webhooks, email
+  notifications, tools, days the AI budget ran out, pages it could not learn,
+  each with where to fix it.
+- The latest questions and new leads lists left the page (Conversations and
+  Contacts have them). `GET /overview` keeps them for older integrations and
+  adds `headline`, `insights` and `health`.
+
 ### Changed
 
 - **A new HelpPuff logo**: a "p" whose bowl is a speech bubble and whose
-  tail ends in a small puff. It is the favicon of the website, the
+  tail ends in a small puff, in oxblood and electric citron (the website's
+  new palette: oxblood on light, citron on dark). It is the favicon of the website, the
   playground and the dashboard (where the unread count sits on it, in your
   site's colour), and is in the README. Sources, a one-colour version,
   lockups and icons are in `logo/`.
@@ -70,6 +104,8 @@ never needs you to change anything. Upgrade with
   broken page; they open the wiki.
 - Dashboard: the two-way toggles (like **List**/**Board**) no longer submit
   the form they sit in.
+- The audit log lists changes made in the same millisecond newest first, not
+  in any order.
 
 ## [0.5.0] - 2026-10-12
 

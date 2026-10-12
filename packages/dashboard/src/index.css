@@ -8,6 +8,8 @@
  * quiet, dense look of Notion / Twenty rather than a "dashboard template".
  */
 :root {
+  /* HelpPuff's own mark (components/ui.tsx), not the site's colour. */
+  --hp-mark: #3b0d24;
   --background: #ffffff;
   --foreground: #18181b;
   --muted: #f4f4f5;
@@ -32,6 +34,7 @@
 }
 
 .dark {
+  --hp-mark: #e4f568;
   /* A soft dark grey, not black: easier on the eyes, and cards lift off the page. */
   --background: #1c1d21;
   --foreground: #f4f4f5;

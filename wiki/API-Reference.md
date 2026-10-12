@@ -182,6 +182,9 @@ What the assistant knows: the website it learned, uploaded files, hand-written k
 - [[List hand-written knowledge|API-Reference-Knowledge#list-hand-written-knowledge]]: `GET /knowledge/manual`
 - [[Add or replace hand-written knowledge|API-Reference-Knowledge#add-or-replace-hand-written-knowledge]]: `POST /knowledge/manual`
 - [[Remove hand-written knowledge|API-Reference-Knowledge#remove-hand-written-knowledge]]: `DELETE /knowledge/manual/:id`
+- [[Questions to answer|API-Reference-Knowledge#questions-to-answer]]: `GET /knowledge/gaps`
+- [[Answer a question|API-Reference-Knowledge#answer-a-question]]: `POST /knowledge/gaps/:id/answer`
+- [[Dismiss a question, or open it again|API-Reference-Knowledge#dismiss-a-question-or-open-it-again]]: `PATCH /knowledge/gaps/:id`
 - [[List uploaded files|API-Reference-Knowledge#list-uploaded-files]]: `GET /knowledge/files`
 - [[Upload a file|API-Reference-Knowledge#upload-a-file]]: `POST /knowledge/files`
 - [[Remove an uploaded file|API-Reference-Knowledge#remove-an-uploaded-file]]: `DELETE /knowledge/files/:id`
@@ -238,7 +241,7 @@ Endpoints that receive events as signed JSON, or as a request in their own forma
 
 Totals, usage and the running version.
 
-- [[Totals over a period|API-Reference-Analytics#totals-over-a-period]]: `GET /overview`
+- [[Analytics over a period|API-Reference-Analytics#analytics-over-a-period]]: `GET /overview`
 - [[AI usage by day|API-Reference-Analytics#ai-usage-by-day]]: `GET /usage`
 - [[Running version|API-Reference-Analytics#running-version]]: `GET /version`
 - [[Check the widget is on the website|API-Reference-Analytics#check-the-widget-is-on-the-website]]: `GET /install-check`

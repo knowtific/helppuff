@@ -156,6 +156,8 @@ describe('who gets which email', () => {
     const booking = writeEmail('appointment.created', { appointment: { title: 'Site visit', start: Date.UTC(2026, 9, 13, 22, 0), timezone: 'Australia/Sydney', attendee: { name: 'Ada', phone: '0400' } } }, null);
     expect(booking.subject).toBe('New booking: Site visit, Wed 14 Oct, 09:00 GMT+11');
     expect(booking.text).not.toContain('dashboard');
+    // A contact added by hand has no conversation to open: the email opens the contacts.
+    expect(writeEmail('lead.captured', { name: 'Ada', conversationId: null }, 'https://x.example').text).toContain('https://x.example/admin/#/leads');
   });
 });
 

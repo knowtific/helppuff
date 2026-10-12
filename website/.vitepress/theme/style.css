@@ -1,39 +1,168 @@
 /*
- * The site's colours are the widget's: the launcher's indigo-to-violet
- * gradient is the brand, so the docs and the product read as one thing.
+ * The site's colours: Oxblood & Electric Citron. Six approved values per
+ * theme, plus a deeper page in dark mode (light on :root, dark under VitePress's `.dark`, which its own
+ * script sets before first paint from the saved choice or the system), and
+ * everything else derived from them. Citron is the action colour in both
+ * themes; on porcelain it is a fill or an underline, never text.
  */
 :root {
-  --hp-indigo: #5b5bf7;
-  --hp-violet: #8b5cf6;
-  --hp-pink: #c04cf2;
-  --hp-gradient: linear-gradient(120deg, #6d6dfa 0%, #5b5bf7 35%, #8b5cf6 70%, #c04cf2 100%);
+  /* The approved values, once. */
+  --hp-oxblood: #3B0D24;
+  --hp-oxblood-surface: #4A1A32;
+  --hp-oxblood-glow: #75233E;
+  --hp-porcelain: #F6F3EA;
+  --hp-porcelain-surface: #EDE7DD;
+  --hp-porcelain-glow: #E8C9D3;
+  --hp-citron: #E4F568;
+  --hp-ink: #171513;
+  /* Dark mode's page: deeper than oxblood, so oxblood bands and cards stand apart from it. */
+  --hp-oxblood-deep: #16000B;
 
-  --vp-c-brand-1: #4f4fe6;
-  --vp-c-brand-2: #5b5bf7;
-  --vp-c-brand-3: #5b5bf7;
-  --vp-c-brand-soft: rgba(91, 91, 247, 0.12);
+  --hp-bg: var(--hp-porcelain);
+  --hp-surface: var(--hp-porcelain-surface);
+  --hp-accent: var(--hp-citron);
+  --hp-text: var(--hp-oxblood);
+  --hp-glow: var(--hp-porcelain-glow);
+  --hp-on-accent: var(--hp-ink);
 
-  --vp-button-brand-bg: #5b5bf7;
-  --vp-button-brand-hover-bg: #4f4fe6;
-  --vp-button-brand-active-bg: #4444d6;
-
-  --vp-home-hero-name-color: transparent;
-  --vp-home-hero-name-background: var(--hp-gradient);
+  --hp-heading-accent: var(--hp-text);
+  --hp-link: var(--hp-text);
+  --hp-focus: var(--hp-text);
+  /* Citron on porcelain is a pale shape: a citron fill gets an edge here (3:1 against the page). */
+  --hp-accent-edge: var(--hp-control-border);
+  /* Between the page and a card: bands and insets. */
+  --hp-inset: color-mix(in srgb, var(--hp-surface) 55%, var(--hp-bg));
 }
 
 .dark {
-  --vp-c-brand-1: #a5a5ff;
-  --vp-c-brand-2: #8c8cff;
-  --vp-c-brand-3: #6d6dfa;
-  --vp-c-brand-soft: rgba(140, 140, 255, 0.16);
+  --hp-bg: var(--hp-oxblood-deep);
+  --hp-surface: var(--hp-oxblood-surface);
+  --hp-accent: var(--hp-citron);
+  --hp-text: var(--hp-porcelain);
+  --hp-glow: var(--hp-oxblood-glow);
+  --hp-on-accent: var(--hp-ink);
+
+  --hp-heading-accent: var(--hp-accent);
+  --hp-link: var(--hp-accent);
+  --hp-focus: var(--hp-accent);
+  --hp-accent-edge: transparent;
+  /* Bands and insets are the oxblood itself, between the page and a card. */
+  --hp-inset: var(--hp-oxblood);
 }
 
+:root,
+.dark {
+  --hp-text-muted: color-mix(in srgb, var(--hp-text) 76%, var(--hp-bg));
+  --hp-text-faint: color-mix(in srgb, var(--hp-text) 66%, var(--hp-bg));
+  --hp-border: color-mix(in srgb, var(--hp-text) 18%, var(--hp-bg));
+  /* Inputs and controls: a boundary you have to see, not decoration. */
+  --hp-control-border: color-mix(in srgb, var(--hp-text) 55%, var(--hp-bg));
+  --hp-accent-hover: color-mix(in srgb, var(--hp-accent) 92%, var(--hp-on-accent));
+  --hp-accent-active: color-mix(in srgb, var(--hp-accent) 84%, var(--hp-on-accent));
+  --hp-accent-soft: color-mix(in srgb, var(--hp-accent) 12%, var(--hp-surface));
+  --hp-shadow: color-mix(in srgb, var(--hp-on-accent) 30%, transparent);
+
+  /* VitePress, from the palette: the docs follow the same two themes. */
+  --vp-c-bg: var(--hp-bg);
+  --vp-c-bg-alt: var(--hp-surface);
+  --vp-c-bg-soft: var(--hp-surface);
+  --vp-c-bg-elv: var(--hp-surface);
+  --vp-c-text-1: var(--hp-text);
+  --vp-c-text-2: var(--hp-text-muted);
+  --vp-c-text-3: var(--hp-text-faint);
+  --vp-c-divider: var(--hp-border);
+  --vp-c-border: var(--hp-control-border);
+  --vp-c-gutter: var(--hp-bg);
+  --vp-c-brand-1: var(--hp-link);
+  --vp-c-brand-2: var(--hp-accent-hover);
+  --vp-c-brand-3: var(--hp-accent);
+  --vp-c-brand-soft: var(--hp-accent-soft);
+  --vp-c-default-soft: var(--hp-inset);
+  --vp-nav-bg-color: var(--hp-bg);
+  --vp-local-nav-bg-color: var(--hp-bg);
+  --vp-sidebar-bg-color: var(--hp-surface);
+  --vp-code-block-bg: var(--hp-surface);
+  --vp-code-bg: var(--hp-inset);
+  --vp-code-color: var(--hp-text);
+  --vp-code-copy-code-bg: var(--hp-bg);
+
+  --vp-button-brand-border: var(--hp-accent-edge);
+  --vp-button-brand-text: var(--hp-on-accent);
+  --vp-button-brand-bg: var(--hp-accent);
+  --vp-button-brand-hover-border: var(--hp-accent-edge);
+  --vp-button-brand-hover-text: var(--hp-on-accent);
+  --vp-button-brand-hover-bg: var(--hp-accent-hover);
+  --vp-button-brand-active-border: var(--hp-accent-edge);
+  --vp-button-brand-active-text: var(--hp-on-accent);
+  --vp-button-brand-active-bg: var(--hp-accent-active);
+  --vp-button-alt-border: var(--hp-control-border);
+  --vp-button-alt-text: var(--hp-text);
+  --vp-button-alt-bg: transparent;
+  --vp-button-alt-hover-border: var(--hp-text);
+  --vp-button-alt-hover-text: var(--hp-text);
+  --vp-button-alt-hover-bg: var(--hp-surface);
+
+  --vp-home-hero-name-color: var(--hp-heading-accent);
+  --vp-home-hero-name-background: none;
+}
+
+body { background: var(--hp-bg); }
+::selection { background: var(--hp-accent); color: var(--hp-on-accent); }
+
+/* One focus ring everywhere: citron on oxblood, oxblood on porcelain, set off the control. */
+:focus-visible { outline: 2px solid var(--hp-focus); outline-offset: 2px; }
+
+/* Selection is more than a colour: the current page in the sidebar and the nav is bold, and underlined in the nav. */
+.VPSidebarItem.is-active > .item .text { font-weight: 600; }
+.VPNavBarMenuLink.active { text-decoration: underline; text-decoration-color: var(--hp-accent); text-decoration-thickness: 3px; text-underline-offset: 8px; }
+:root:not(.dark) .VPNavBarMenuLink.active { text-decoration-color: var(--hp-text); }
+
+/*
+ * Emphasised words in headings: citron on oxblood; on porcelain the text
+ * stays oxblood over a citron underline (citron text there is unreadable).
+ */
+.hp-emph {
+  color: var(--hp-heading-accent);
+  background-image: linear-gradient(transparent 70%, var(--hp-accent) 70%, var(--hp-accent) 92%, transparent 92%);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.dark .hp-emph { background-image: none; }
+
 /* Docs: a touch more air and a calmer table. */
-.vp-doc table { display: table; width: 100%; font-size: 14px; }
+.vp-doc table { font-size: 14px; }
+/* Full width from tablets up; on a phone a wide table scrolls inside itself (VitePress's own behaviour). */
+@media (min-width: 768px) { .vp-doc table { display: table; width: 100%; } }
 .vp-doc th { white-space: nowrap; }
 .vp-doc td:first-child code { white-space: nowrap; }
 .vp-doc h1 { letter-spacing: -0.02em; }
 .vp-doc h2 { letter-spacing: -0.01em; }
 
+/* The wiki's front page opens with the logo for GitHub; on the website the header has it already. */
+.vp-doc .wiki-logo,
+.vp-doc p:has(> picture img[src*="/logo/helppuff-lockup"]) { display: none; }
+
 /* The landing page owns its own width. */
 .landing-page .VPPage { padding: 0; }
+
+/* The header's logo and name: larger than VitePress's 24px / 16px, still inside its 64px bar. */
+.VPNavBarTitle .title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.VPNavBarTitle .logo {
+  height: 34px;
+  width: auto;
+  /* The mark has a little room on its right already. */
+  margin-right: 4px;
+}
+/* Tablets and phones: the nav's menu and links need the room. */
+@media (max-width: 1023px) {
+  .VPNavBarTitle .title {
+    font-size: 18px;
+  }
+  .VPNavBarTitle .logo {
+    height: 30px;
+  }
+}

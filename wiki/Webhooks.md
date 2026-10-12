@@ -50,6 +50,7 @@ leads only; see [[Leads]].
 | `budget.exhausted` | Today's AI budget is used up; visitors get your contact details and a callback form until `resetsAt`. Once a day | `day`, `neuronsUsed`, `dailyBudget`, `resetsAt` |
 | `knowledge.crawl.finished` | Learning the website finished | `runId`, `status`, `trigger`, `pages` `{learned,failed}`, `passages` |
 | `knowledge.file.processed` | An uploaded file was learned, or failed | `fileId`, `name`, `status` (`indexed` or `error`), `passages`, `truncated`, `error` |
+| `knowledge.gap` | A visitor asked something about the business that the assistant could not answer and the knowledge base does not cover ([[Questions to answer|Knowledge-Base#5a-questions-to-answer]]). Once per question; asked again, its count grows | `id`, `question`, `count`, `firstAskedAt`, `lastAskedAt`, `conversationId`, `status` |
 | `test.ping` | **Send test** in the dashboard, or `helppuff webhooks test` | `message` |
 
 **Which to pick.** For a CRM, a spreadsheet or a team chat, three cover most

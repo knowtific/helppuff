@@ -29,7 +29,8 @@ import { HelpPuffError } from '../core/errors.js';
 import type { HonoEnv } from '../core/request.js';
 import { aiSettingsFor, requireKnowledgeEnv, websiteFor, type KnowledgeEnv } from '../knowledge/env.js';
 import { cancelCrawl, crawlStatus, discoverSite, retryFailed, startCrawl, userAgentFor, type CrawlTrigger } from '../knowledge/crawl.js';
-import { assertSameOrigin, currentAdmin, jsonBody, siteParam } from './guard.js';
+import { assertSameOrigin, currentAdmin, db, jsonBody, siteParam } from './guard.js';
+import { gapView, GAP_STATUSES, listGaps, type GapRow, type GapStatus } from '../knowledge/gaps.js';
 import { suggestQuestions } from '../home/suggest.js';
 
 /**
@@ -247,6 +248,16 @@ knowledgeRoutes.post('/knowledge/manual', async (c) => {
   const content = typeof body['content'] === 'string' ? body['content'].trim().slice(0, 100_000) : '';
   if (!title || !content) throw new HelpPuffError('bad_request', { message: 'Give the entry a title and some text.', detail: 'manual_body' });
   const id = typeof body['id'] === 'string' && /^[a-z0-9-]{1,64}$/.test(body['id']) ? body['id'] : crypto.randomUUID();
+  return c.json(await saveManual({ siteId, site, env, now }, id, title, content));
+});
+
+/** One of "Your own answers", stored and indexed at once: the assistant uses it in the next answer. */
+export async function saveManual(
+  { siteId, site, env, now }: Awaited<ReturnType<typeof siteOf>>,
+  id: string,
+  title: string,
+  content: string,
+): Promise<{ id: string; chunks: number }> {
   const url = manualUrl(id);
   await env.db
     .prepare(
@@ -265,7 +276,56 @@ knowledgeRoutes.post('/knowledge/manual', async (c) => {
     .run();
   const markdown = /^#/.test(content) ? content : `# ${title}\n\n${content}`;
   const indexed = await indexDocument({ db: env.db, ai: env.ai, vectors: env.vectors }, { siteId, url, title, category: 'faq', markdown }, aiSettingsFor(site));
-  return c.json({ id, chunks: indexed.chunks });
+  return { id, chunks: indexed.chunks };
+}
+
+// ------------------------------------------------------------ questions to answer
+
+knowledgeRoutes.get('/knowledge/gaps', async (c) => {
+  await currentAdmin(c);
+  const siteId = siteParam(c, c.req.query('site'));
+  const raw = c.req.query('status') ?? 'open';
+  const status = raw === 'all' || (GAP_STATUSES as readonly string[]).includes(raw) ? (raw as GapStatus | 'all') : 'open';
+  const { gaps, counts } = await listGaps(db(c), siteId, status, Math.min(200, Math.max(1, Number(c.req.query('limit') ?? 100) || 100)));
+  return c.json({ gaps: gaps.map(gapView), counts });
+});
+
+async function gapOf(c: Context<HonoEnv>, siteId: string): Promise<GapRow> {
+  const row = await db(c).prepare('SELECT * FROM knowledge_gaps WHERE id = ? AND site_id = ?').bind(c.req.param('id'), siteId).first<GapRow>();
+  if (!row) throw new HelpPuffError('not_found', { message: 'No such question.', detail: 'gap_unknown' });
+  return row;
+}
+
+/** Answer a question: it becomes one of "Your own answers" (the question as its title), live at once. */
+knowledgeRoutes.post('/knowledge/gaps/:id/answer', async (c) => {
+  assertSameOrigin(c);
+  const admin = await currentAdmin(c);
+  const body = await jsonBody(c);
+  const found = await siteOf(c, body['site'] ?? c.req.query('site'));
+  const gap = await gapOf(c, found.siteId);
+  const answer = typeof body['answer'] === 'string' ? body['answer'].trim().slice(0, 20_000) : '';
+  if (!answer) throw new HelpPuffError('bad_request', { message: 'Write the answer.', detail: 'gap_answer_empty' });
+  const title = typeof body['title'] === 'string' && body['title'].trim() ? body['title'].trim().slice(0, 200) : gap.question.slice(0, 200);
+  // Answering again replaces the entry it became.
+  const entry = await saveManual(found, gap.answer_id ?? `gap-${gap.id.slice(4).toLowerCase()}`, title, answer);
+  await db(c)
+    .prepare("UPDATE knowledge_gaps SET status = 'answered', answer_id = ?, answered_by = ?, updated_at = ? WHERE id = ?")
+    .bind(entry.id, admin.name ?? admin.email, found.now, gap.id)
+    .run();
+  return c.json({ gap: gapView({ ...gap, status: 'answered', answer_id: entry.id, answered_by: admin.name ?? admin.email }), entry });
+});
+
+/** Dismiss a question (not something visitors should be told), or open it again. */
+knowledgeRoutes.patch('/knowledge/gaps/:id', async (c) => {
+  assertSameOrigin(c);
+  await currentAdmin(c);
+  const body = await jsonBody(c);
+  const siteId = siteParam(c, body['site'] ?? c.req.query('site'));
+  const gap = await gapOf(c, siteId);
+  const status = body['status'];
+  if (status !== 'dismissed' && status !== 'open') throw new HelpPuffError('bad_request', { message: 'The status is dismissed or open.', detail: 'gap_status' });
+  await db(c).prepare('UPDATE knowledge_gaps SET status = ?, updated_at = ? WHERE id = ?').bind(status, c.get('helppuff').platform.now(), gap.id).run();
+  return c.json(gapView({ ...gap, status }));
 });
 
 knowledgeRoutes.delete('/knowledge/manual/:id', async (c) => {

@@ -155,6 +155,13 @@ describe('the shell', () => {
     });
     expect(view.querySelector('[role="menu"]')).toBeNull();
     expect(document.activeElement).toBe(row);
+    // Notifications is a link: the menu waits for it to be followed before it closes.
+    await click(row);
+    const link = view.querySelector<HTMLAnchorElement>('[role="menuitem"][href="#/settings/notifications"]')!;
+    act(() => link.click());
+    expect(link.isConnected).toBe(true);
+    await flush();
+    expect(view.querySelector('[role="menu"]')).toBeNull();
     await click(row);
     await click(button(view.querySelector('[role="menu"]')!, 'Sign out'));
     expect(onLogout).toHaveBeenCalledTimes(1);
@@ -170,7 +177,7 @@ describe('the shell', () => {
       </Shell>,
     );
     const head = view.querySelector('aside > div')!;
-    expect(head.querySelector('svg path')?.getAttribute('fill')).toBe('#5B5BF7');
+    expect(head.querySelector('svg path')?.getAttribute('fill')).toBe('var(--hp-mark)');
     expect(head.textContent).toBe('AcmeHelpPuff');
     await unmount();
   });

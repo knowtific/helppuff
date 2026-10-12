@@ -31,11 +31,11 @@ export function useModal<T extends HTMLElement>(onClose: () => void) {
   return ref;
 }
 
-/** HelpPuff's mark, always in the brand's indigo (the site's own colour is for the site's things). */
+/** HelpPuff's mark, in the brand's colours whatever the site's (`--hp-mark`: oxblood, citron in the dark theme). */
 export function HelpPuffMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false" className={className}>
-      <path fill="#5B5BF7" d={HELPPUFF_MARK} />
+      <path fill="var(--hp-mark)" d={HELPPUFF_MARK} />
     </svg>
   );
 }

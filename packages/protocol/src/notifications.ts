@@ -26,6 +26,7 @@ export const EMAIL_NOTIFICATIONS = {
   'job.created': { label: 'New job', description: 'A job was created: from the chat, the quote questions, the API or the dashboard.' },
   'appointment.created': { label: 'New booking', description: 'An appointment was booked.' },
   'appointment.cancelled': { label: 'Booking cancelled', description: 'An appointment was cancelled.' },
+  'knowledge.gap': { label: 'A question to answer', description: 'A visitor asked something the knowledge base does not cover. Answer it and the assistant knows it next time.', admin: true },
   'budget.exhausted': { label: 'AI budget used up', description: 'Today’s AI budget ran out: visitors get your contact details until midnight UTC.', admin: true },
 } as const satisfies Record<string, { label: string; description: string; admin?: boolean }>;
 

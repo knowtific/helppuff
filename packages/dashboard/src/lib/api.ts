@@ -83,6 +83,8 @@ export const isMember = (me: Me) => roleOf(me) === 'member';
 
 export type Overview = {
   range: { days: number; since: number };
+  /** Callbacks waiting now, whatever the range. */
+  openCallbacks?: number;
   totals: Totals;
   previous: Totals;
   series: { date: string; conversations: number; leads: number }[];
@@ -90,7 +92,39 @@ export type Overview = {
   countries: { country: string; count: number }[];
   recentQuestions: { id: string; text: string; at: number }[];
   recentLeads: { id: string; name: string | null; email: string | null; phone: string | null; status: string; at: number; conversationId: string | null }[];
+  /** Older Workers have none of these. */
+  headline?: { current: Headline; previous: Headline };
+  insights?: Insights;
+  health?: HealthIssue[];
 };
+export type Headline = { summarized: number; resolved: number; escalated: number; needsPerson: number; unanswered: number; ratedUp: number; ratedDown: number; callbacks: number };
+export type Insights = {
+  outcomes: Record<'answered' | 'booked' | 'lead_captured' | 'callback_requested' | 'unanswered' | 'abandoned' | 'pending', number>;
+  sentiment: Record<'positive' | 'neutral' | 'negative', number>;
+  leadQuality: Record<'hot' | 'warm' | 'cold' | 'none', number>;
+  engagement: { avgMessages: number; medianSeconds: number | null; oneMessage: number; returningVisitors: number };
+  unansweredQuestions: { text: string; count: number; conversationId: string }[];
+  topics: { topic: string; count: number }[];
+  hours: number[];
+  live: { requested: number; answered: number; missed: number; medianWaitSeconds: number | null; byPerson: { name: string; count: number }[] };
+  callbacks: { requested: number; done: number; dismissed: number; open: number; medianHoursToDone: number | null };
+  jobs: { created: number; fromChat: number; won: number; lost: number; wonValue: number; currency: string | null };
+  appointments: { booked: number; fromChat: number; completed: number; noShow: number; cancelled: number };
+};
+/** A question to answer (`GET /knowledge/gaps`): asked by visitors, not in the knowledge base. */
+export type Gap = {
+  id: string;
+  question: string;
+  count: number;
+  firstAskedAt: number;
+  lastAskedAt: number;
+  conversationId: string | null;
+  status: 'open' | 'answered' | 'dismissed';
+  answerId: string | null;
+  answeredBy: string | null;
+};
+export type GapList = { gaps: Gap[]; counts: Record<Gap['status'], number> };
+export type HealthIssue = { kind: 'webhook' | 'email' | 'tool' | 'budget' | 'knowledge'; title: string; detail: string | null; page: string };
 export type Totals = { conversations: number; messages: number; leads: number; conversion: number; avgMessages: number };
 
 export type ConversationRow = {
@@ -133,7 +167,7 @@ export type Summary = {
   sentiment: string | null;
   followUp: string | null;
   leadQuality?: 'hot' | 'warm' | 'cold' | 'none' | null;
-  outcome?: 'answered' | 'callback_requested' | 'lead_captured' | 'unanswered' | 'abandoned' | null;
+  outcome?: 'answered' | 'booked' | 'callback_requested' | 'lead_captured' | 'unanswered' | 'abandoned' | null;
   topics?: string[];
   unanswered?: string[];
 };

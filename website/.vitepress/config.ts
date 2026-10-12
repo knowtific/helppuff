@@ -54,10 +54,11 @@ export default defineConfig({
   },
 
   head: [
-    ['link', { rel: 'icon', type: 'image/svg+xml', href: `${BASE}logo.svg` }],
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: `${BASE}favicon.svg` }],
     ['link', { rel: 'icon', href: `${BASE}favicon.ico`, sizes: '48x48' }],
     ['link', { rel: 'apple-touch-icon', href: `${BASE}apple-touch-icon.png` }],
-    ['meta', { name: 'theme-color', content: '#5B5BF7' }],
+    ['meta', { name: 'theme-color', content: '#F6F3EA', media: '(prefers-color-scheme: light)' }],
+    ['meta', { name: 'theme-color', content: '#16000B', media: '(prefers-color-scheme: dark)' }],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:title', content: 'HelpPuff: your website’s AI assistant, owned by you' }],
     ['meta', { property: 'og:description', content: DESCRIPTION }],
@@ -66,7 +67,8 @@ export default defineConfig({
   ],
 
   themeConfig: {
-    logo: '/logo.svg',
+    // The mark in the site's palette: oxblood on porcelain, citron on oxblood.
+    logo: { light: '/logo-light.svg', dark: '/logo-dark.svg', alt: 'HelpPuff' },
     siteTitle: 'HelpPuff',
 
     nav: [

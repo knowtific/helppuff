@@ -12,6 +12,7 @@ import { cn, flag, fmtDateTime, fmtRelative, fmtTime, href, pathOf, useData, use
 const QUALITY_DOT = { hot: '#dc2626', warm: '#f59e0b', cold: '#3b82f6', none: '#a1a1aa' } as const;
 const OUTCOME_LABEL = {
   answered: 'answered',
+  booked: 'booked',
   callback_requested: 'callback requested',
   lead_captured: 'details left',
   unanswered: 'not answered',

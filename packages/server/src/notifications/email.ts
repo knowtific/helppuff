@@ -93,6 +93,8 @@ export function writeEmail(kind: EmailNotification | 'test', data: Record<string
     case 'lead.captured':
       subject = `New contact: ${who(data) || 'a visitor'}`;
       lines = [line('Name', data['name']), line('Email', data['email']), line('Phone', data['phone']), line('Message', data['message'])];
+      // Added by hand or over the API: no conversation, so the contacts.
+      path = toConversation || '#/leads';
       break;
     case 'lead.hot': {
       const lead = obj(data['lead']);
@@ -143,6 +145,14 @@ export function writeEmail(kind: EmailNotification | 'test', data: Record<string
       path = '#/calendar';
       break;
     }
+    case 'knowledge.gap':
+      subject = `A question to answer: ${str(data['question']).slice(0, 120)}`;
+      lines = [
+        `A visitor asked: ${str(data['question'])}`,
+        'The assistant could not answer it, and your knowledge base does not cover it. Answer it once and the assistant knows it from then on.',
+      ];
+      path = '#/knowledge';
+      break;
     case 'budget.exhausted':
       subject = 'Today’s AI budget is used up';
       lines = [EMAIL_NOTIFICATIONS['budget.exhausted'].description, line('Back at', data['resetsAt'])];
@@ -159,7 +169,7 @@ export function writeEmail(kind: EmailNotification | 'test', data: Record<string
   const html =
     `<div style="font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:14px;line-height:1.55;color:#16163a">` +
     `<p style="margin:0 0 12px">${escapeHtml(text).replace(/\n/g, '<br>')}</p>` +
-    (link ? `<p style="margin:0"><a href="${escapeHtml(link)}" style="color:#5b5bf7">Open in the dashboard</a></p>` : '') +
+    (link ? `<p style="margin:0"><a href="${escapeHtml(link)}" style="color:#3b0d24">Open in the dashboard</a></p>` : '') +
     `</div>`;
   return { subject: subject.slice(0, 200), text: link ? `${text}\n\nOpen in the dashboard: ${link}` : text, html };
 }

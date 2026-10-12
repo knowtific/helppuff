@@ -1,6 +1,6 @@
 # @knowtific/helppuff
 
-<img src="https://raw.githubusercontent.com/knowtific/helppuff/main/logo/helppuff.svg" alt="HelpPuff logo" width="56" height="56">
+<img src="https://raw.githubusercontent.com/knowtific/helppuff/main/logo/helppuff-icon.svg" alt="HelpPuff logo" width="56" height="56">
 
 ### Your website's AI assistant — deployed by your AI agent, owned by you.
 
