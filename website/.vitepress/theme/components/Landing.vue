@@ -203,7 +203,6 @@ const ICONS: Record<string, string> = {
   <div class="hp">
     <!-- Hero -->
     <section class="hero">
-      <div class="glow" aria-hidden="true" />
       <div class="wrap hero-grid">
         <div class="hero-copy">
           <a class="eyebrow" :href="REPO" target="_blank" rel="noopener">
@@ -234,6 +233,16 @@ const ICONS: Record<string, string> = {
         </div>
 
         <div class="hero-art">
+          <svg class="shapes" viewBox="0 0 700 720" aria-hidden="true" focusable="false">
+            <path class="blob-soft" transform="translate(-30 380) scale(.6)" d="M409 514C352 549 248 568 192 538C135 509 113 421 96 351C80 281 65 198 101 148C137 99 222 78 295 74C368 70 467 80 506 128C544 177 527 274 510 343C492 412 466 479 409 514Z" />
+            <path class="blob" transform="translate(96 -30) scale(1.08)" d="M539 374C519 428 457 458 400 490C343 522 277 565 223 550C168 535 131 466 98 406C66 347 23 272 42 220C61 168 144 146 204 118C264 90 318 50 373 63C428 76 481 133 511 189C540 245 559 320 539 374Z" />
+            <circle class="ring" cx="96" cy="112" r="44" />
+            <g class="puffs">
+              <circle cx="606" cy="660" r="10" />
+              <circle cx="636" cy="622" r="15" />
+              <circle cx="672" cy="572" r="22" />
+            </g>
+          </svg>
           <Zoom class="art back" :src="shot('card-dark')" alt="The widget in dark mode with an orange accent, showing an emergency callout card" width="464" height="816" :demo="WIDGET_DEMO" />
           <Zoom class="art front" :src="shot('chat-light')" alt="The widget answering a pricing question with a list and booking options" width="464" height="816" :demo="WIDGET_DEMO" />
         </div>
@@ -574,8 +583,6 @@ a { text-decoration: none; }
 
 /* Hero */
 .hero { position: relative; padding: 72px 0 40px; }
-/* One soft glow behind the product visual, kept away from the text. */
-.glow { position: absolute; inset: -120px 0 auto; height: 820px; pointer-events: none; z-index: 0; background: radial-gradient(520px 440px at 74% 52%, var(--hp-glow), transparent 70%); }
 
 .hero-grid { position: relative; z-index: 1; display: grid; grid-template-columns: 1.05fr 1fr; gap: 40px; align-items: center; }
 .eyebrow {
@@ -602,7 +609,16 @@ h1 { text-wrap: balance; margin: 22px 0 18px; font-size: clamp(40px, 6.2vw, 72px
 .sub-note { margin: 12px 0 0; font-size: 14px; color: var(--ink-2); }
 .sub-note a { color: var(--hp-link); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
 
+.hero-copy { position: relative; z-index: 1; }
 .hero-art { position: relative; height: 640px; }
+/* Citron shapes behind the product visual: one blob, a softer one, a ring and the logo's rising puffs. */
+.shapes { position: absolute; right: -80px; top: -40px; width: 700px; height: 720px; z-index: 0; stroke: none; pointer-events: none; overflow: visible; }
+.shapes .blob { fill: var(--hp-accent); transform-box: fill-box; transform-origin: center; animation: drift 16s ease-in-out infinite; }
+.shapes .blob-soft { fill: var(--hp-glow); }
+.shapes .ring { fill: none; stroke: var(--hp-accent); stroke-width: 3; }
+.shapes .puffs { fill: var(--hp-accent); animation: rise 7s ease-in-out infinite; }
+@keyframes drift { 50% { rotate: 5deg; scale: 1.03; } }
+@keyframes rise { 50% { translate: 0 -8px; } }
 .art { position: absolute; height: auto; filter: drop-shadow(0 30px 50px var(--hp-shadow)); }
 .art.front { width: 360px; right: 40px; top: 10px; z-index: 2; animation: float 7s ease-in-out infinite; }
 .art.back { width: 320px; right: 290px; top: 90px; z-index: 1; transform: rotate(-6deg); opacity: 0.97; animation: float-back 8s ease-in-out infinite; }
@@ -753,7 +769,13 @@ figcaption b { display: block; font-size: 16px; color: var(--ink); margin-bottom
 .final .ctas { position: relative; }
 
 @media (prefers-reduced-motion: reduce) {
-  .art { animation: none !important; }
+  .art, .shapes * { animation: none !important; }
+}
+
+@media (max-width: 1200px) {
+  .art.front { width: 320px; right: 20px; }
+  .art.back { width: 260px; right: 220px; }
+  .shapes { right: -60px; top: -30px; width: 620px; height: 638px; }
 }
 
 @media (max-width: 960px) {
@@ -762,6 +784,7 @@ figcaption b { display: block; font-size: 16px; color: var(--ink); margin-bottom
   .hero-art { height: 520px; max-width: 520px; width: 100%; margin: 0 auto; }
   .art.front { width: 290px; right: 10px; }
   .art.back { width: 250px; right: 200px; top: 70px; }
+  .shapes { right: -60px; top: -30px; width: 540px; height: 556px; }
   .stats, .stack-grid { grid-template-columns: repeat(2, 1fr); }
   .features { grid-template-columns: repeat(2, 1fr); }
   .gallery { grid-template-columns: 1fr 1fr; }
@@ -776,6 +799,7 @@ figcaption b { display: block; font-size: 16px; color: var(--ink); margin-bottom
   .hero-art { height: 470px; }
   .art.back { display: none; }
   .art.front { width: 260px; left: 50%; right: auto; margin-left: -130px; }
+  .shapes { left: 50%; right: auto; margin-left: -251px; top: -22px; width: 440px; height: 453px; }
   .features, .gallery, .stack-grid { grid-template-columns: 1fr; }
   .gallery .phone { grid-column: auto; }
   .stats { grid-template-columns: 1fr 1fr; gap: 10px; }
