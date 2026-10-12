@@ -106,10 +106,9 @@ export function SettingsTabs({ me, route }: { me: Me; route: Route }) {
 }
 
 export function settingsSections(site: Site | undefined, me?: Me): { id: SettingsSection; label: string }[] {
-  // Notifications are live chat's: with it off (the default) there is no such page.
-  const live = Boolean(site?.live);
-  // Members change only their own notifications.
-  if (me && isMember(me)) return live ? [{ id: 'notifications' as const, label: 'Notifications' }] : [];
+  // Everyone has their own notifications: the emails they get, and live chat's alerts when it is on.
+  // Members change only those.
+  if (me && isMember(me)) return [{ id: 'notifications' as const, label: 'Notifications' }];
   return [
     { id: 'chat' as const, label: 'Chat' },
     { id: 'home' as const, label: 'Home screen' },
@@ -123,7 +122,7 @@ export function settingsSections(site: Site | undefined, me?: Me): { id: Setting
     { id: 'live' as const, label: 'Live chat' },
     { id: 'labels' as const, label: 'Labels' },
     { id: 'jobs' as const, label: 'Jobs' },
-    ...(live ? [{ id: 'notifications' as const, label: 'Notifications' }] : []),
+    { id: 'notifications' as const, label: 'Notifications' },
     ...(site?.knowledge || site?.connector === 'workers-ai' ? [{ id: 'advanced' as const, label: 'Advanced' }] : []),
     { id: 'webhooks' as const, label: 'Webhooks' },
     // Keys for other services: shown while a feature can use one (bookings' calendar sync, for now).
@@ -332,8 +331,8 @@ function AccountMenu({ me, notifications, onLogout }: { me: Me; notifications: b
 export function Shell({ me, route, onLogout, children }: { me: Me; route: Route; onLogout: () => void; children: ReactNode }) {
   const site = me.sites[0];
   const member = isMember(me);
-  // A member with live chat off has no settings at all: no Settings entry.
-  const NAV = ALL_NAV.filter((item) => (!item.knowledge || site?.knowledge) && (!item.admin || !member) && (!item.picker || site?.bookings === 'picker') && (item.page !== 'settings' || !member || site?.live));
+  // A member's Settings is only their own Notifications.
+  const NAV = ALL_NAV.filter((item) => (!item.knowledge || site?.knowledge) && (!item.admin || !member) && (!item.picker || site?.bookings === 'picker'));
   const inSettings = route.page === 'settings' || route.page === 'prompt' || route.page === 'knowledge';
   const menu = settingsMenu(site, me);
   // A bare #/settings shows the first settings page.

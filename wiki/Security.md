@@ -349,6 +349,12 @@ connection reaches the site's hub (a Durable Object with no route of its own):
   compared in constant time); only the linked chat is read. The bot token is
   stored in D1 encrypted (AES-GCM, key derived from `HELPPUFF_SECRET` by
   HKDF): rotating the secret means connecting Telegram again.
+- **Requests you write** (tools, custom webhooks, the email service): https
+  only, the host fixed (`{{…}}` only in the path and query), no redirects
+  followed for webhooks and email. Credential header values are sealed the
+  same way and never returned by any route; rotating `HELPPUFF_SECRET` means
+  entering them again (the dashboard says which). Email notifications go only
+  to current accounts that chose them (and the owner), one person per email.
 
 A person's replies pass the same cleaning as everything else and render
 through the widget's one Markdown renderer. In the assistant's history they

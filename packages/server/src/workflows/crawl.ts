@@ -4,7 +4,7 @@ import { runConversationJob, type ConversationParams } from '../conversations/co
 import type { AiRunner } from '../conversations/summary.js';
 import { dbFrom } from '../db/d1.js';
 import { requireKnowledgeEnv } from '../knowledge/env.js';
-import { emitTo, runWebhookRetry, workflowRetry, type WebhookRetryParams } from '../webhooks/deliver.js';
+import { emitTo, outboundOf, runWebhookRetry, secretOf, workflowRetry, type WebhookRetryParams } from '../webhooks/deliver.js';
 import { setupAfterLearning } from '../jobs/setup.js';
 import { suggestAfterLearning } from '../home/suggest.js';
 import { foundAfterLearning } from '../bookings/found.js';
@@ -45,7 +45,7 @@ export class CrawlWorkflow extends WorkflowEntrypoint<Record<string, unknown>, J
     if ('kind' in payload && (payload.kind === 'conversation' || payload.kind === 'webhook')) {
       const db = dbFrom(this.env);
       if (!db) throw new Error('No D1 binding.');
-      if (payload.kind === 'webhook') return runWebhookRetry(steps, { db, fetch: fetcher }, payload);
+      if (payload.kind === 'webhook') return runWebhookRetry(steps, { db, fetch: fetcher, secret: secretOf(this.env) }, payload);
       const ai = this.env['AI'] as Partial<AiRunner> | undefined;
       return runConversationJob(
         steps,
@@ -53,7 +53,7 @@ export class CrawlWorkflow extends WorkflowEntrypoint<Record<string, unknown>, J
           db,
           fetch: fetcher,
           retry: workflowRetry(this.env),
-          secret: typeof this.env['HELPPUFF_SECRET'] === 'string' ? this.env['HELPPUFF_SECRET'] : undefined,
+          ...outboundOf(this.env),
           ...(ai && typeof ai.run === 'function' ? { ai: ai as AiRunner } : {}),
         },
         payload,
@@ -64,7 +64,7 @@ export class CrawlWorkflow extends WorkflowEntrypoint<Record<string, unknown>, J
     // The site's webhooks hear when learning finishes; a failing endpoint never fails the job.
     // Learning the site the first time also sets Jobs and the home screen up from it (once; never over the owner's).
     const notify: Notify = async (type, data) => {
-      await emitTo({ db: env.db, fetch: fetcher, retry: workflowRetry(this.env) }, payload.siteId, type, data).catch(() => {});
+      await emitTo({ db: env.db, fetch: fetcher, retry: workflowRetry(this.env), ...outboundOf(this.env) }, payload.siteId, type, data).catch(() => {});
       if (type !== 'knowledge.crawl.finished') return;
       const ai = this.env['AI'] as Partial<AiRunner> | undefined;
       const runner = ai && typeof ai.run === 'function' ? (ai as AiRunner) : undefined;

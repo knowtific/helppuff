@@ -233,6 +233,29 @@ export type Prefs = {
   sound: 'chime' | 'bell' | 'pop';
   volume: number;
   repeatUntilTaken: boolean;
+  /** The emails this person gets (Settings → Notifications). */
+  emails: string[];
+};
+
+/** What there is to choose, and whether the site can send email (`GET /notifications`). */
+export type NotificationsInfo = {
+  email: { configured: boolean; enabled: boolean; lastStatus?: string | null; lastError?: string | null; lastAt?: number | null };
+  choices: { type: string; label: string; description: string }[];
+};
+
+/** The email service (`GET /notifications/email`, admins). */
+export type EmailService = {
+  method: string;
+  url: string;
+  headers: ToolHeaderView[];
+  body: string;
+  enabled: boolean;
+  dashboardUrl: string | null;
+  lastStatus: 'ok' | 'failed' | null;
+  lastError: string | null;
+  lastAt: number | null;
+  updatedBy: string | null;
+  updatedAt: number;
 };
 
 export type LiveStatus = {

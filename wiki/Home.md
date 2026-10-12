@@ -35,7 +35,7 @@ give your agent the shared [instructions.md](https://raw.githubusercontent.com/k
 - **[[Agent files|Agent-Files]]**: the whole setup as one file, to import, export or share.
 - **[[The widget|Widget]]**: embedding, customising, and its JavaScript API.
 - **[[Leads and callbacks|Leads]]** and **[[Webhooks]]**: where conversations and contact details go.
-- **[[Email notifications|Email-Notifications]]**: an email for new leads, callbacks or live chats, through the email service you already use.
+- **[[Email notifications|Email-Notifications]]**: an email for new leads, callbacks, live chats, jobs and bookings, through the email service you already use; everyone picks their own.
 - **[[Jobs]]**: requests, quotes and work from the chat, on a board with your own stages.
 - **[[Bookings and the calendar|Bookings]]** and **[[Integrations]]**: visitors book a time in the chat, synced with your calendar.
 - **[[Signed-in visitors|Signed-In-Visitors]]**: tell the assistant who a signed-in customer is.

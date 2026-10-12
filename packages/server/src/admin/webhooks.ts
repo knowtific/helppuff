@@ -1,9 +1,10 @@
 import { Hono, type Context } from 'hono';
 import { ALL_WEBHOOK_EVENTS, WEBHOOK_EVENTS, isWebhookEvent } from '@helppuff/protocol';
 import { HelpPuffError } from '../core/errors.js';
-import type { HonoEnv } from '../core/request.js';
+import { headersView, sealHeaders, storedHeaders, validMethod, validOutboundUrl } from '../core/outbound.js';
+import { requireSecret, type HonoEnv } from '../core/request.js';
 import { ensureSchema } from '../db/d1.js';
-import { deliver, envelope, eventsOf, forgetWebhooks, type WebhookRow } from '../webhooks/deliver.js';
+import { deliver, envelope, eventsOf, forgetWebhooks, HEADER_PURPOSE, type WebhookRow } from '../webhooks/deliver.js';
 import { assertSameOrigin, currentAdmin, db, jsonBody, siteParam } from './guard.js';
 
 /**
@@ -26,7 +27,34 @@ const view = (row: WebhookRow) => ({
   lastError: row.last_error,
   lastAt: row.last_at,
   createdAt: row.created_at,
+  format: row.format === 'custom' ? ('custom' as const) : ('helppuff' as const),
+  ...(row.format === 'custom' ? { method: row.method ?? 'POST', headers: headersView(storedHeaders(row.headers)), body: row.body ?? '' } : {}),
 });
+
+type Request = Pick<WebhookRow, 'url' | 'format' | 'method' | 'headers' | 'body'>;
+
+/**
+ * The address and what is sent there. `helppuff` (the default) is the signed
+ * envelope; `custom` is the owner's own request: a method, headers (secret
+ * values sealed) and a body template, with `{{…}}` allowed in the address's
+ * path and query too. Over `was` when editing.
+ */
+async function validRequest(body: Record<string, unknown>, was: Request | null, secret: () => string): Promise<Request> {
+  const format = body['format'] === undefined ? (was?.format === 'custom' ? 'custom' : 'helppuff') : body['format'];
+  if (format !== 'helppuff' && format !== 'custom') throw new HelpPuffError('bad_request', { message: 'The format is helppuff or custom.', detail: 'webhook_format' });
+  const rawUrl = body['url'] === undefined ? was?.url : body['url'];
+  if (format === 'helppuff') return { url: validUrl(rawUrl), format: null, method: null, headers: null, body: null };
+  const keptHeaders = was?.format === 'custom' ? storedHeaders(was.headers) : [];
+  const headers = body['headers'] === undefined ? keptHeaders : await sealHeaders(body['headers'], keptHeaders, secret(), HEADER_PURPOSE, 'webhook');
+  const text = body['body'] === undefined ? (was?.format === 'custom' ? (was.body ?? '') : '') : typeof body['body'] === 'string' ? body['body'].slice(0, 20_000) : '';
+  return {
+    url: validOutboundUrl(rawUrl, 'webhook_url'),
+    format: 'custom',
+    method: validMethod(body['method'] === undefined ? (was?.method ?? 'POST') : body['method']),
+    headers: JSON.stringify(headers),
+    body: text || null,
+  };
+}
 
 /** Signed deliveries carry visitors' details: https only, and a real host. */
 function validUrl(value: unknown): string {
@@ -74,7 +102,7 @@ webhookRoutes.post('/webhooks', async (c) => {
   await currentAdmin(c);
   const body = await jsonBody(c);
   const siteId = siteParam(c, body['site']);
-  const url = validUrl(body['url']);
+  const request = await validRequest(body, null, () => requireSecret(c.get('helppuff')));
   const events = validEvents(body['events']);
   const description = typeof body['description'] === 'string' ? body['description'].trim().slice(0, 200) || null : null;
   const d = db(c);
@@ -84,8 +112,8 @@ webhookRoutes.post('/webhooks', async (c) => {
   const now = c.get('helppuff').platform.now();
   const id = `wh_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`;
   await d
-    .prepare('INSERT INTO webhooks (id, site_id, url, description, events, secret, enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)')
-    .bind(id, siteId, url, description, JSON.stringify(events), newSecret(), now, now)
+    .prepare('INSERT INTO webhooks (id, site_id, url, description, events, secret, enabled, created_at, updated_at, format, method, headers, body) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)')
+    .bind(id, siteId, request.url, description, JSON.stringify(events), newSecret(), now, now, request.format, request.method, request.headers, request.body)
     .run();
   forgetWebhooks(siteId);
   const row = (await d.prepare('SELECT * FROM webhooks WHERE id = ?').bind(id).first<WebhookRow>())!;
@@ -98,16 +126,17 @@ webhookRoutes.patch('/webhooks/:id', async (c) => {
   const body = await jsonBody(c);
   const siteId = siteParam(c, body['site'] ?? c.req.query('site'));
   const row = await hookOf(c, siteId);
+  const request = await validRequest(body, row, () => requireSecret(c.get('helppuff')));
   const next = {
-    url: body['url'] === undefined ? row.url : validUrl(body['url']),
+    ...request,
     events: body['events'] === undefined ? row.events : JSON.stringify(validEvents(body['events'])),
     enabled: typeof body['enabled'] === 'boolean' ? (body['enabled'] ? 1 : 0) : row.enabled,
     description: typeof body['description'] === 'string' ? body['description'].trim().slice(0, 200) || null : row.description,
     secret: body['rotateSecret'] === true ? newSecret() : row.secret,
   };
   await db(c)
-    .prepare('UPDATE webhooks SET url = ?, events = ?, enabled = ?, description = ?, secret = ?, updated_at = ? WHERE id = ?')
-    .bind(next.url, next.events, next.enabled, next.description, next.secret, c.get('helppuff').platform.now(), row.id)
+    .prepare('UPDATE webhooks SET url = ?, events = ?, enabled = ?, description = ?, secret = ?, format = ?, method = ?, headers = ?, body = ?, updated_at = ? WHERE id = ?')
+    .bind(next.url, next.events, next.enabled, next.description, next.secret, next.format, next.method, next.headers, next.body, c.get('helppuff').platform.now(), row.id)
     .run();
   forgetWebhooks(siteId);
   return c.json(view({ ...row, ...next }));
@@ -136,7 +165,7 @@ webhookRoutes.post('/webhooks/:id/test', async (c) => {
   const ctx = c.get('helppuff');
   const now = () => ctx.platform.now();
   const event = envelope(siteId, 'test.ping', { message: 'A test from your HelpPuff dashboard. Deliveries like this one are signed: check X-HelpPuff-Signature.' }, now());
-  const result = await deliver(db(c), row, event, globalThis.fetch.bind(globalThis), now);
+  const result = await deliver(db(c), row, event, globalThis.fetch.bind(globalThis), now, 2, 'failed', ctx.secret || undefined);
   return c.json({ ...result, eventId: event.id });
 });
 

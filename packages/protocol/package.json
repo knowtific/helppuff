@@ -15,7 +15,8 @@
     "./jobs": "./src/jobs.ts",
     "./tools": "./src/tools.ts",
     "./agents": "./src/agents.ts",
-    "./bookings": "./src/bookings.ts"
+    "./bookings": "./src/bookings.ts",
+    "./notifications": "./src/notifications.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

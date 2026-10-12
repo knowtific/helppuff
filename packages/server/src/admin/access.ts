@@ -93,6 +93,8 @@ accessRoutes.delete('/admins/:email', async (c) => {
     throw new HelpPuffError('bad_request', { message: 'The owner is set in the Worker’s config; change it with the CLI.', detail: 'team_owner' });
   }
   const result = (await db(c).prepare('DELETE FROM admins WHERE email = ?').bind(email).run()) as { meta?: { changes?: number } } | undefined;
+  // Their own settings go with them: no more email notifications to a former teammate.
+  await db(c).prepare('DELETE FROM admin_prefs WHERE email = ?').bind(email).run();
   if (result?.meta?.changes === 0) throw new HelpPuffError('not_found', { message: `No account for ${email}.`, detail: 'team_unknown' });
   return c.json({ email, deleted: true });
 });

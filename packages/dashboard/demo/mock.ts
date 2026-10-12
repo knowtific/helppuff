@@ -1,5 +1,5 @@
-import { WEBHOOK_EVENTS } from '@helppuff/protocol';
-import type { Callback, CallbackStatus, KnowledgePage, Label, Lead, LeadStatus, Note, Overview, Prefs, PromptVersion, Settings, StoredMessage, Summary, ToolView } from '../src/lib/api';
+import { EMAIL_NOTIFICATIONS, EMAIL_PRESETS, WEBHOOK_EVENTS } from '@helppuff/protocol';
+import type { Callback, CallbackStatus, EmailService, KnowledgePage, Label, Lead, LeadStatus, Note, Overview, Prefs, PromptVersion, Settings, StoredMessage, Summary, ToolView } from '../src/lib/api';
 import { FACTS, LABELS, PAGES, PROMPT_TEXT, SITE, callbacks, conversations, leads, notes } from './data';
 import { jobsRoute } from './jobs';
 import { bookingsRoute, bookingsSettings } from './bookings';
@@ -83,7 +83,21 @@ let settings: Settings = {
   },
   live: { enabled: true, waitSeconds: 120, closeAfterMinutes: 60, showAgentName: true, aiWhileWaiting: false },
 };
-let prefs: Prefs = { available: true, notifyNewChat: true, notifyNewMessage: true, soundNewChat: true, soundNewMessage: true, sound: 'chime', volume: 0.7, repeatUntilTaken: false };
+let prefs: Prefs = { available: true, notifyNewChat: true, notifyNewMessage: true, soundNewChat: true, soundNewMessage: true, sound: 'chime', volume: 0.7, repeatUntilTaken: false, emails: ['lead.hot', 'callback.requested', 'handover.requested'] };
+/** The email service, connected to Resend. Secret header values never come back, as on the Worker. */
+let emailService: EmailService | null = {
+  ...(({ method, url, body }) => ({ method, url, body }))(EMAIL_PRESETS[0]!.request('Harbour Plumbing <assistant@harbourplumbing.example>', '')),
+  headers: EMAIL_PRESETS[0]!.request('', '').headers.map((h) => ({ ...h, value: h.secret ? '' : h.value, set: true })),
+  enabled: true,
+  dashboardUrl: 'https://knowtific-helppuff-harbour.example.workers.dev',
+  lastStatus: 'ok',
+  lastError: null,
+  lastAt: NOW - 3 * 3600_000,
+  updatedBy: OWNER,
+  updatedAt: NOW - 9 * DAY,
+};
+type Header = { name: string; value: string; secret: boolean; set?: boolean };
+const masked = (headers: unknown): Header[] => (Array.isArray(headers) ? (headers as Header[]) : []).map((h) => ({ name: h.name, value: h.secret ? '' : h.value, secret: Boolean(h.secret), set: true }));
 const labels: Label[] = LABELS.map((l) => ({ ...l }));
 let settingsAt = NOW - 6 * DAY;
 const DEMO_KEY = {
@@ -169,6 +183,10 @@ type Hook = {
   lastStatus: 'ok' | 'failed' | 'retrying' | null;
   lastError: string | null;
   lastAt: number | null;
+  format: 'helppuff' | 'custom';
+  method?: string;
+  headers?: Header[];
+  body?: string;
 };
 
 const webhooks: Hook[] = [
@@ -182,6 +200,25 @@ const webhooks: Hook[] = [
     lastStatus: 'ok',
     lastError: null,
     lastAt: NOW - 2 * 3600_000,
+    format: 'helppuff',
+  },
+  {
+    id: 'w2',
+    url: 'https://slack.com/api/chat.postMessage',
+    description: 'Callback requests to #office',
+    events: ['callback.requested'],
+    enabled: true,
+    secret: 'whsec_demo_••••••••',
+    lastStatus: 'ok',
+    lastError: null,
+    lastAt: NOW - 5 * 3600_000,
+    format: 'custom',
+    method: 'POST',
+    headers: [
+      { name: 'Content-Type', value: 'application/json; charset=utf-8', secret: false, set: true },
+      { name: 'Authorization', value: '', secret: true, set: true },
+    ],
+    body: '{\n  "channel": "#office",\n  "text": "Call back {{data.name}} on {{data.phone}}: {{data.message}}"\n}',
   },
 ];
 
@@ -312,6 +349,36 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
   const bookings = bookingsRoute(method, parts, params, body);
   if (bookings) return bookings;
   if (path === '/me') return json({ admin: { email: OWNER, owner: true, role: 'owner', name: 'Dan' }, sites: [{ ...SITE, live: SITE.live || liveShown(), bookings: settings.bookings?.mode ?? 'none' }], summaries: true });
+  if (path === '/notifications') {
+    return json({
+      email: { configured: Boolean(emailService), enabled: Boolean(emailService?.enabled), lastStatus: emailService?.lastStatus ?? null, lastError: null, lastAt: emailService?.lastAt ?? null },
+      choices: Object.entries(EMAIL_NOTIFICATIONS).map(([type, about]) => ({ type, label: about.label, description: about.description })),
+    });
+  }
+  if (path === '/notifications/email') {
+    if (method === 'DELETE') {
+      emailService = null;
+      return json({ deleted: true });
+    }
+    if (method === 'PUT') {
+      const was: Omit<EmailService, 'method' | 'url' | 'headers' | 'body'> = emailService ?? { enabled: true, dashboardUrl: location.origin, lastStatus: null, lastError: null, lastAt: null, updatedBy: OWNER, updatedAt: Date.now() };
+      emailService = {
+        ...was,
+        method: String(body['method'] ?? emailService?.method ?? 'POST'),
+        url: String(body['url'] ?? emailService?.url ?? ''),
+        headers: 'headers' in body ? masked(body['headers']) : (emailService?.headers ?? []),
+        body: String(body['body'] ?? emailService?.body ?? ''),
+        enabled: typeof body['enabled'] === 'boolean' ? body['enabled'] : was.enabled,
+        updatedAt: Date.now(),
+      };
+      return json(emailService);
+    }
+    return json({ service: emailService, presets: EMAIL_PRESETS.map((p) => ({ id: p.id, name: p.name, docs: p.docs, key: p.key, request: p.request('you@yourdomain.com', '') })) });
+  }
+  if (path === '/notifications/email/test') {
+    // Nothing leaves the browser in the demo.
+    return json({ ok: true, status: 200, error: null, retryable: false, to: OWNER });
+  }
   if (path === '/prefs') {
     if (method === 'PUT') prefs = { ...prefs, ...(body as Partial<Prefs>) };
     return json(prefs);
@@ -731,6 +798,8 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
           lastStatus: null,
           lastError: null,
           lastAt: null,
+          format: body['format'] === 'custom' ? 'custom' : 'helppuff',
+          ...(body['format'] === 'custom' ? { method: String(body['method'] ?? 'POST'), headers: masked(body['headers']), body: String(body['body'] ?? '') } : {}),
         };
         webhooks.push(hook);
         return json(hook);
@@ -743,7 +812,7 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
     if (sub === 'test') return json({ ok: true, status: 200, error: null });
     const at = webhooks.findIndex((w) => w.id === id);
     if (method === 'DELETE' && at >= 0) webhooks.splice(at, 1);
-    if (method === 'PATCH' && at >= 0) Object.assign(webhooks[at]!, body);
+    if (method === 'PATCH' && at >= 0) Object.assign(webhooks[at]!, body, 'headers' in body ? { headers: masked(body['headers']) } : {});
     return json(webhooks[at] ?? { ok: true });
   }
 

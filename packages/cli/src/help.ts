@@ -71,7 +71,8 @@ COMMANDS
     users list|add|role|remove|reset Who can sign in to the dashboard, as admin or member
     live on|off|status   Live chat: visitors talk to a person on your team
     telegram connect|status|test|disconnect  Answer live chats from Telegram
-    webhooks             Send chats, messages, leads and callbacks to other tools (signed JSON)
+    webhooks             Send chats, messages, leads and callbacks to other tools (signed JSON, or your own request)
+    email                The email service for the team's notifications: show, set, test, pause, remove
     tools                Your APIs the assistant calls before, during and after a chat ({{name}} in the prompt)
     agent                The whole setup as one file: export it, import it, or start from a template
     identity             The secret your server signs logged-in visitors with (rotate: a new one)
@@ -341,10 +342,28 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     notes: 'Making the bot with @BotFather, and sending /link in the chat, are steps for the person: an agent can run everything else once it has the token.',
   },
   webhooks: {
-    usage: 'helppuff webhooks list | add <url> [--events a,b] [--description …] | remove <id> | test <id> | enable <id> | disable <id> | events',
+    usage:
+      "helppuff webhooks list | add <url> [--events a,b] [--description …] [--method POST] [--header 'Name: value'] [--body '…'] | set <id> [--url …] [the same flags] [--format helppuff|custom] | remove <id> | test <id> | enable <id> | disable <id> | events",
     summary:
-      'Endpoints that receive what happens, as signed JSON: conversations, messages, leads, callback requests and their updates, summaries, budget alerts, learning (`helppuff webhooks events` lists every type). The same as Settings → Webhooks in the dashboard; stored on the Worker. Each has a signing secret: X-HelpPuff-Signature is sha256= + hex HMAC-SHA256 of "<X-HelpPuff-Timestamp>.<body>". https only; up to 10 per site.',
-    examples: ['helppuff webhooks add https://hooks.zapier.com/hooks/catch/123/abc --events lead.captured,callback.requested --json', 'helppuff webhooks test wh_1a2b3c', 'helppuff webhooks list --json'],
+      'Endpoints that receive what happens, as signed JSON: conversations, messages, leads, callback requests and their updates, summaries, budget alerts, learning (`helppuff webhooks events` lists every type). The same as Settings → Webhooks in the dashboard; stored on the Worker. Each has a signing secret: X-HelpPuff-Signature is sha256= + hex HMAC-SHA256 of "<X-HelpPuff-Timestamp>.<body>". `--method`, `--header` or `--body` make it a custom webhook: your own request, for a service with its own format (Slack, a CRM, an SMS API), with `{{event.type}}`, `{{data.name}}`… in the body (and the address\'s path); credential headers are stored encrypted, `${NAME}` comes from .env. `--format helppuff` goes back to the envelope. https only; up to 10 per site.',
+    examples: [
+      'helppuff webhooks add https://hooks.zapier.com/hooks/catch/123/abc --events lead.captured,callback.requested --json',
+      "helppuff webhooks add https://slack.com/api/chat.postMessage --events callback.requested --header 'Authorization: Bearer ${SLACK_BOT_TOKEN}' --body '{\"channel\": \"#sales\", \"text\": \"Call {{data.name}} on {{data.phone}}\"}'",
+      'helppuff webhooks test wh_1a2b3c',
+      'helppuff webhooks list --json',
+    ],
+  },
+  email: {
+    usage: "helppuff email show | set --preset resend|postmark|sendgrid|brevo --from <address> --key '${NAME}' | set --url <https://…> [--method POST] [--header 'Name: value'] [--body '…'] | test --to <address> | pause | resume | remove",
+    summary:
+      'The email service that sends the team\'s notifications, the same as Settings → Notifications in the dashboard (stored on the Worker). One request for any service with a send API: HelpPuff writes each email and fills in {{email.to}} (one person per request), {{email.subject}}, {{email.text}} and {{email.html}} (the text, escaped). `--preset` fills the request in for Resend, Postmark, SendGrid or Brevo; `--url`, `--header` and `--body` write or change it for any other service. The key is stored encrypted; write `${NAME}` to take it from .env (a missing one answers needs_input). Who gets which email (new contacts, hot leads, callbacks, live chats, jobs, bookings) is each person\'s choice in the dashboard.',
+    examples: [
+      "helppuff email set --preset resend --from 'HelpPuff <assistant@yourdomain.com>' --key '${RESEND_API_KEY}' --json",
+      "helppuff email set --url https://api.example-mail.com/send --header 'X-Api-Key: ${MAIL_KEY}' --body '{\"to\": \"{{email.to}}\", \"subject\": \"{{email.subject}}\", \"text\": \"{{email.text}}\"}'",
+      'helppuff email test --to you@yourdomain.com',
+      'helppuff email show --json',
+    ],
+    notes: 'The address to send from must be on a domain verified in the email service. Links in emails go to the dashboard address the CLI saved it through.',
   },
   tools: {
     usage: 'helppuff tools list | show <name> | add <name> (--curl \'…\' | --url <https://…> [--method POST] [--header "Name: value"] [--body …] | --extract --field name="what it is") --description "…" [--param name="what it is"] [--pick a,b] [--before] [--after [--when path=value,…]] [--timeout ms] | set <name> [the same flags, --no-before, --no-after] | test <name> [--arg name=value] [--prechat field=value] [--data tool.key=value] | enable <name> | disable <name> | remove <name>',

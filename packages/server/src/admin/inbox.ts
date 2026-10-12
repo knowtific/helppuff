@@ -1,6 +1,6 @@
 import { Hono, type Context } from 'hono';
 import { parseData } from '../tools/run.js';
-import { cleanText } from '@helppuff/protocol';
+import { cleanText, emailAllowed, isEmailNotification, type EmailNotification } from '@helppuff/protocol';
 import { resolveSite } from '../config/site.js';
 import { HelpPuffError } from '../core/errors.js';
 import type { HonoEnv } from '../core/request.js';
@@ -370,6 +370,8 @@ export const DEFAULT_PREFS = {
   sound: 'chime' as 'chime' | 'bell' | 'pop',
   volume: 0.7,
   repeatUntilTaken: false,
+  /** The emails this person gets (Settings → Notifications); none until they choose. */
+  emails: [] as EmailNotification[],
 };
 export type Prefs = typeof DEFAULT_PREFS;
 
@@ -385,6 +387,7 @@ export function cleanPrefs(input: unknown, base: Prefs = DEFAULT_PREFS): Prefs {
     sound: o['sound'] === 'bell' || o['sound'] === 'pop' || o['sound'] === 'chime' ? o['sound'] : base.sound,
     volume: typeof o['volume'] === 'number' && Number.isFinite(o['volume']) ? Math.min(1, Math.max(0, o['volume'])) : base.volume,
     repeatUntilTaken: bool('repeatUntilTaken'),
+    emails: Array.isArray(o['emails']) ? [...new Set(o['emails'].filter(isEmailNotification))] : [...base.emails],
   };
 }
 
@@ -406,7 +409,9 @@ inboxRoutes.put('/prefs', async (c) => {
   assertSameOrigin(c);
   const admin = await currentAdmin(c);
   const d = db(c);
-  const prefs = cleanPrefs(await jsonBody(c), await readPrefs(d, admin.email));
+  const cleaned = cleanPrefs(await jsonBody(c), await readPrefs(d, admin.email));
+  // A member cannot choose an admin's email (the AI budget).
+  const prefs = { ...cleaned, emails: cleaned.emails.filter((type) => emailAllowed(type, admin.role)) };
   await d
     .prepare('INSERT INTO admin_prefs (email, prefs, updated_at) VALUES (?, ?, ?) ON CONFLICT (email) DO UPDATE SET prefs = excluded.prefs, updated_at = excluded.updated_at')
     .bind(admin.email, JSON.stringify(prefs), c.get('helppuff').platform.now())

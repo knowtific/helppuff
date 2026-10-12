@@ -1,7 +1,7 @@
 # Webhooks
 
 Send what happens on the assistant to other tools as it happens: Zapier, Make,
-n8n, a CRM, a Slack bot, your own server (for email, see
+n8n, a CRM, a Slack bot, your own server, as signed JSON or as [your own request](#your-own-request) (for email, see
 [[Email notifications|Email-Notifications]]). Add endpoints in the dashboard
 (**Settings → Webhooks**) or from the terminal:
 
@@ -158,6 +158,44 @@ the endpoint saying no, and is not retried. The dashboard keeps the last 50
 deliveries of each endpoint (**Recent deliveries**: every try, with its status
 and timing) and shows "trying again later" while a retry is pending. Nothing
 about a delivery ever reaches the visitor: events are sent after their reply.
+
+## Your own request
+
+Some services want their own format rather than HelpPuff's: Slack's
+`chat.postMessage`, a CRM's "create a lead", an SMS API. A webhook can send
+**your own request** instead of the signed JSON, filled in for each event.
+No connector per service: you write the request, so a service changing its
+API never waits for a HelpPuff release.
+
+In **Settings → Webhooks** → **Add webhook** → **Your own request**: the
+method, the address, headers (a credential header is stored encrypted, and
+never shown again) and the body. Or from the terminal:
+
+```bash
+helppuff secret set SLACK_BOT_TOKEN
+helppuff webhooks add https://slack.com/api/chat.postMessage \
+  --events callback.requested \
+  --header 'Content-Type: application/json; charset=utf-8' \
+  --header 'Authorization: Bearer ${SLACK_BOT_TOKEN}' \
+  --body '{"channel": "#office", "text": "Call back {{data.name}} on {{data.phone}}: {{data.message}}"}'
+```
+
+In the body, the headers and the address's path and query:
+
+| Value | What it is |
+| --- | --- |
+| `{{event.type}}`, `{{event.id}}`, `{{event.createdAt}}` | The event |
+| `{{data.name}}`, `{{data.job.title}}`… | Anything in the event's `data` (the table above) |
+| `"{{data}}"` (a whole JSON value) | The object itself |
+| `{{site.id}}` | The site |
+
+Values are escaped for where they go (JSON in a JSON body, URL-encoded in the
+address), so nothing a visitor types can break out of its place. An empty
+body sends the signed JSON, so a custom webhook can also just add a header
+(an `Authorization` for your own API). The X-HelpPuff-* headers come with
+every custom request too, the signature over the body actually sent.
+Retries, the delivery log and **Send test** work the same. `helppuff
+webhooks set <id> --format helppuff` goes back to the signed JSON.
 
 ## Checking a delivery came from us
 

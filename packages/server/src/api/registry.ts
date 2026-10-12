@@ -59,7 +59,7 @@ export const TAGS: { name: string; description: string }[] = [
   { name: 'Prompt', description: 'The business-specific instructions, versioned, and the agent file: the prompt, tools and behaviour settings as one file to export and import.' },
   { name: 'Tools', description: 'Your own APIs, called before, during and after a chat (`{{name}}` in the prompt), and extract tools that save what the assistant learns. What they return is kept on the conversation (`data`) and sent to webhooks.' },
   { name: 'Settings', description: 'The assistant, widget, lead form, limits and IP lists, as one object.' },
-  { name: 'Webhooks', description: 'Endpoints that receive events as signed JSON.' },
+  { name: 'Webhooks', description: 'Endpoints that receive events as signed JSON, or as a request in their own format; and the email service that sends the team\'s email notifications.' },
   { name: 'Analytics', description: 'Totals, usage and the running version.' },
   { name: 'Team', description: 'Who can sign in to the dashboard.' },
   { name: 'API keys', description: 'Keys for this API.' },
@@ -115,6 +115,38 @@ const webhook = {
   lastError: null,
   lastAt: T,
   createdAt: T,
+  format: 'helppuff',
+};
+/** A webhook in its own format: Slack's, here, with the token sealed. */
+const customWebhook = {
+  ...webhook,
+  id: 'wh_7f6e5d',
+  url: 'https://slack.com/api/chat.postMessage',
+  description: 'Callbacks to #sales',
+  events: ['callback.requested'],
+  format: 'custom',
+  method: 'POST',
+  headers: [
+    { name: 'Content-Type', value: 'application/json; charset=utf-8', secret: false, set: true },
+    { name: 'Authorization', value: '', secret: true, set: true },
+  ],
+  body: '{"channel": "#sales", "text": "Call back {{data.name}} on {{data.phone}}: {{data.message}}"}',
+};
+const emailServiceView = {
+  method: 'POST',
+  url: 'https://api.resend.com/emails',
+  headers: [
+    { name: 'Content-Type', value: 'application/json', secret: false, set: true },
+    { name: 'Authorization', value: '', secret: true, set: true },
+  ],
+  body: '{"from": "HelpPuff <assistant@acme.example>", "to": ["{{email.to}}"], "subject": "{{email.subject}}", "text": "{{email.text}}", "html": "{{email.html}}"}',
+  enabled: true,
+  dashboardUrl: 'https://knowtific-helppuff-acme.acme.workers.dev',
+  lastStatus: 'ok',
+  lastError: null,
+  lastAt: T,
+  updatedBy: 'owner@acme.example',
+  updatedAt: T,
 };
 const agentFile = {
   helppuff: 'agent',
@@ -1858,7 +1890,7 @@ export const ENDPOINTS: Endpoint[] = [
     summary: 'List webhook endpoints',
     description: 'With every event type there is to subscribe to.',
     query: [siteQuery],
-    response: { webhooks: [webhook], events: [{ type: 'lead.captured', description: 'Contact details arrived…' }] },
+    response: { webhooks: [webhook, customWebhook], events: [{ type: 'lead.captured', description: 'Contact details arrived…' }] },
   },
   {
     method: 'POST',
@@ -1866,11 +1898,16 @@ export const ENDPOINTS: Endpoint[] = [
     scope: 'webhooks:write',
     tag: 'Webhooks',
     summary: 'Add a webhook endpoint',
-    description: 'An https URL and the events it wants (`["*"]` or absent: all). Deliveries are signed with the returned `secret`. Up to 10 per site.',
+    description:
+      'An https URL and the events it wants (`["*"]` or absent: all). Deliveries are signed with the returned `secret`. Up to 10 per site. `format: "custom"` sends your own request instead of the envelope, for a service that wants its own format (Slack, a CRM, an SMS API): a method, headers (secret values are stored encrypted and never returned) and a body template with `{{event.type}}`, `{{data.name}}`…; an empty body sends the envelope. The X-HelpPuff-* headers come with it, the signature over the body sent.',
     fields: [
-      { name: 'url', description: 'An https URL.', required: true },
+      { name: 'url', description: 'An https URL. With `format: "custom"`, its path and query may use `{{data.…}}`.', required: true },
       { name: 'events', description: 'Event types (`GET /webhooks` lists them), or `["*"]` for all (the default).' },
       { name: 'description', description: 'Up to 200 characters.' },
+      { name: 'format', description: '`helppuff` (the signed envelope, the default) or `custom`.' },
+      { name: 'method', description: 'Custom: `POST` (the default), `PUT`, `PATCH`, `GET` or `DELETE`.' },
+      { name: 'headers', description: 'Custom: a list of `{ name, value, secret }`; `${…}` is not expanded here, send the value. An empty secret value keeps the stored one.' },
+      { name: 'body', description: 'Custom: the body template. `{{event.id}}`, `{{event.type}}`, `{{event.createdAt}}`, `{{data.…}}` (the event\'s data), `{{site.id}}`; a whole `"{{data}}"` is the object itself. Values are escaped for JSON.' },
     ],
     body: { url: 'https://hooks.example.com/helppuff', events: ['lead.captured', 'callback.requested'], description: 'CRM sync' },
     status: 201,
@@ -1882,7 +1919,7 @@ export const ENDPOINTS: Endpoint[] = [
     scope: 'webhooks:write',
     tag: 'Webhooks',
     summary: 'Change a webhook endpoint',
-    description: 'Any of `url`, `events`, `enabled`, `description`; `rotateSecret: true` makes a new signing secret.',
+    description: 'Any of `url`, `events`, `enabled`, `description`, `format`, `method`, `headers`, `body`; `rotateSecret: true` makes a new signing secret.',
     body: { enabled: false },
     response: { ...webhook, enabled: false },
   },
@@ -1914,6 +1951,67 @@ export const ENDPOINTS: Endpoint[] = [
     description: 'The last 50 attempts for an endpoint.',
     query: [siteQuery],
     response: { deliveries: [{ id: 'd_1', eventId: 'evt_4f3e2d1c', event: 'lead.captured', ok: true, status: 200, error: null, attempts: 1, durationMs: 182, at: T }] },
+  },
+  {
+    method: 'GET',
+    path: '/notifications/email',
+    scope: 'webhooks:read',
+    tag: 'Webhooks',
+    summary: 'The email service',
+    description: 'The request that sends the team\'s email notifications (null until one is set up), and starting points for well-known services (`presets`, with an empty key). Secret header values never come back.',
+    query: [siteQuery],
+    response: {
+      service: emailServiceView,
+      presets: [{ id: 'resend', name: 'Resend', docs: 'https://resend.com/docs/api-reference/emails/send-email', key: { header: 'Authorization', prefix: 'Bearer ', label: 'API key' }, request: { method: 'POST', url: 'https://api.resend.com/emails', headers: emailServiceView.headers.map(({ set: _set, ...h }) => h), body: emailServiceView.body } }],
+    },
+    nullable: ['service'],
+  },
+  {
+    method: 'PUT',
+    path: '/notifications/email',
+    scope: 'webhooks:write',
+    tag: 'Webhooks',
+    summary: 'Set up the email service',
+    description:
+      'One request that sends one email, for any service with a send API: HelpPuff writes each email and fills `{{email.to}}` (one person per request), `{{email.subject}}`, `{{email.text}}` and `{{email.html}}` (the text, escaped). Who gets which email is each person\'s choice in the dashboard (Settings → Notifications). Links in emails go to the address this was saved from.',
+    fields: [
+      { name: 'url', description: 'An https URL; its path and query may use `{{email.…}}`.', required: true },
+      { name: 'method', description: '`POST` (the default), `PUT`, `PATCH`, `GET` or `DELETE`.' },
+      { name: 'headers', description: 'A list of `{ name, value, secret }`; secret values are stored encrypted. An empty secret value keeps the stored one.' },
+      { name: 'body', description: 'The body template. It must use `{{email.to}}` and `{{email.text}}` (or `{{email.html}}`) somewhere in the request.' },
+      { name: 'enabled', description: 'false pauses every email.' },
+    ],
+    body: {
+      url: 'https://api.resend.com/emails',
+      headers: [
+        { name: 'Content-Type', value: 'application/json', secret: false },
+        { name: 'Authorization', value: 'Bearer re_123456789', secret: true },
+      ],
+      body: emailServiceView.body,
+    },
+    response: emailServiceView,
+    errors: [{ status: 400, code: 'bad_request', when: 'The request has no `{{email.to}}` or no `{{email.text}}`/`{{email.html}}`.' }],
+  },
+  {
+    method: 'DELETE',
+    path: '/notifications/email',
+    scope: 'webhooks:write',
+    tag: 'Webhooks',
+    summary: 'Remove the email service',
+    description: 'No email is sent until one is set up again; everyone\'s choices are kept.',
+    query: [siteQuery],
+    response: { deleted: true },
+  },
+  {
+    method: 'POST',
+    path: '/notifications/email/test',
+    scope: 'webhooks:write',
+    tag: 'Webhooks',
+    summary: 'Send a test email',
+    description: 'Sends a test email now to `to` (a dashboard user: their own address) and says what the service answered. With `url`, `headers`, `body` or `method`, it tests those unsaved changes instead.',
+    fields: [{ name: 'to', description: 'The address to send the test to.' }],
+    body: { to: 'owner@acme.example' },
+    response: { ok: true, status: 200, error: null, retryable: false, to: 'owner@acme.example' },
   },
   // --------------------------------------------------------------------- team
   {
@@ -2030,7 +2128,7 @@ export const ENDPOINTS: Endpoint[] = [
     response: { items: [{ id: 'au_1', at: T, actor: 'key:k7m3p9q2r4s8', action: 'PATCH /leads/:id', target: leadId, site: 'acme', status: 200 }], next: null },
   },
   // ---------------------------------------------------- the dashboard's own
-  ...(['GET /prefs', 'PUT /prefs', 'POST /login', 'POST /logout', 'GET /login/options', 'POST /links', 'GET /setup', 'POST /setup', 'POST /login-link', 'GET /setup/state', 'POST /diagnostics/models', 'GET /identity', 'POST /identity/rotate'] as const).map((route) => {
+  ...(['GET /prefs', 'PUT /prefs', 'GET /notifications', 'POST /login', 'POST /logout', 'GET /login/options', 'POST /links', 'GET /setup', 'POST /setup', 'POST /login-link', 'GET /setup/state', 'POST /diagnostics/models', 'GET /identity', 'POST /identity/rotate'] as const).map((route) => {
     const [method, path] = route.split(' ') as [Method, string];
     return { method, path, scope: null, tag: 'Dashboard', summary: 'The dashboard\'s own (not part of the public API)' } satisfies Endpoint;
   }),

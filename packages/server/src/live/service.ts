@@ -3,7 +3,7 @@ import { cleanText, type HandoverStatus, type Message } from '@helppuff/protocol
 import type { LiveConfig, SiteConfig } from '../config/schema.js';
 import type { RequestCtx } from '../core/request.js';
 import { dbFrom, type D1Like, type D1Statement } from '../db/d1.js';
-import { emitTo, workflowRetry } from '../webhooks/deliver.js';
+import { emitTo, outboundOf, workflowRetry } from '../webhooks/deliver.js';
 import type { HubCore, HubEvent, HubSettings } from './hub.js';
 import { closeThread, openThread, postToThread, readTelegram, telegramReady, type Telegram } from './telegram.js';
 
@@ -163,7 +163,7 @@ export async function messagesSince(db: D1Like, conversationId: string, after: n
 // ----------------------------------------------------------------- webhooks
 
 function emit(deps: LiveDeps, siteId: string, type: Parameters<typeof emitTo>[2], data: Record<string, unknown>): Promise<void> {
-  return emitTo({ db: deps.db, fetch: deps.fetch, now: deps.now, log: deps.log, retry: workflowRetry(deps.env) }, siteId, type, data).catch(() => {
+  return emitTo({ db: deps.db, fetch: deps.fetch, now: deps.now, log: deps.log, retry: workflowRetry(deps.env), ...outboundOf(deps.env) }, siteId, type, data).catch(() => {
     deps.log('webhook.emit_failed', { type });
   });
 }

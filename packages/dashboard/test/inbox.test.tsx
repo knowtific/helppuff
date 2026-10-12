@@ -3,6 +3,7 @@ import { act } from 'react';
 import { Shell } from '../src/components/Shell';
 import { AttributesEditor, NotesPanel } from '../src/components/inbox';
 import { NotificationSettings } from '../src/components/LiveChat';
+import { EmailChoices, EmailServiceCard } from '../src/components/Notifications';
 import { Conversations } from '../src/pages/Conversations';
 import type { ConversationRow, Note } from '../src/lib/api';
 import { button, byText, click, fakeApi, flush, me, mount, select, type, unmount } from './helpers';
@@ -95,7 +96,7 @@ describe('the shell', () => {
     await unmount();
   });
 
-  it('shows nothing of live chat by default (live chat off): no switch, no Notifications, no Settings for members', async () => {
+  it('shows nothing of live chat by default (live chat off), but everyone keeps their own Notifications', async () => {
     fakeApi(base);
     const admin = await mount(
       <Shell me={me('owner', false)} route={{ page: 'settings' }} onLogout={() => {}}>
@@ -105,7 +106,8 @@ describe('the shell', () => {
     expect(admin.querySelector('[role="switch"]')).toBeNull();
     const sections = [...admin.querySelectorAll('#settings-menu a')].map((a) => a.textContent);
     expect(sections).toContain('Live chat');
-    expect(sections).not.toContain('Notifications');
+    // The emails they get, whether or not live chat is on.
+    expect(sections).toContain('Notifications');
     await unmount();
     const member = await mount(
       <Shell me={me('member', false)} route={{ page: 'conversations' }} onLogout={() => {}}>
@@ -113,7 +115,7 @@ describe('the shell', () => {
       </Shell>,
     );
     const nav = [...member.querySelectorAll('nav[aria-label="Main"]')[0]!.querySelectorAll(':scope > a, :scope > div > button')].map((el) => el.textContent?.trim());
-    expect(nav).toEqual(['Conversations', 'Jobs', 'Contacts', 'Callbacks']);
+    expect(nav).toEqual(['Conversations', 'Jobs', 'Contacts', 'Callbacks', 'Settings']);
     await unmount();
   });
 
@@ -295,6 +297,39 @@ describe('notification settings', () => {
     await click(byText(view, 'Allow notifications', 'button'));
     expect(ask).toHaveBeenCalled();
     expect(byText(view, 'Test notification', 'button')).toBeTruthy();
+    await unmount();
+  });
+  it('lets each person choose their emails, and says when nobody has connected email yet', async () => {
+    const choices = [
+      { type: 'lead.captured', label: 'New contact', description: 'Someone left their details.' },
+      { type: 'callback.requested', label: 'Callback request', description: 'A visitor asked to be called back.' },
+    ];
+    const calls = fakeApi({
+      'GET /notifications': { email: { configured: false, enabled: false }, choices },
+      'GET /prefs': { ...PREFS, emails: [] },
+      'PUT /prefs': ({ body }: { body: unknown }) => ({ ...PREFS, ...(body as object) }),
+    });
+    const view = await mount(<EmailChoices admin={false} />);
+    expect(byText(view, /An admin has not connected an email service yet/)).toBeTruthy();
+    await click(byText(view, 'Callback request', 'span')!.closest('label')!.querySelector('input'));
+    expect(calls).toContainEqual({ method: 'PUT', path: '/prefs', body: { emails: ['callback.requested'] } });
+    expect(byText(view, 'Saved')).toBeTruthy();
+    await unmount();
+  });
+
+  it('connects an email service from a preset: the address to send from and the key, sealed on the Worker', async () => {
+    const calls = fakeApi({
+      'GET /notifications/email': { service: null, presets: [] },
+      'PUT /notifications/email': ({ body }: { body: Record<string, unknown> }) => ({ ...body, enabled: true, dashboardUrl: null, lastStatus: null, lastError: null, lastAt: null, updatedBy: null, updatedAt: 0 }),
+    });
+    const view = await mount(<EmailServiceCard />);
+    await type(view.querySelector('input[type="email"]'), 'assistant@acme.example');
+    await type(view.querySelector('input[type="password"]'), 're_live_123');
+    await click(button(view, 'Save'));
+    const saved = calls.find((c) => c.method === 'PUT' && c.path === '/notifications/email')!.body as { url: string; headers: { name: string; value: string; secret: boolean }[]; body: string };
+    expect(saved.url).toBe('https://api.resend.com/emails');
+    expect(saved.headers).toContainEqual({ name: 'Authorization', value: 'Bearer re_live_123', secret: true });
+    expect(JSON.parse(saved.body)).toMatchObject({ from: 'assistant@acme.example', to: ['{{email.to}}'], text: '{{email.text}}' });
     await unmount();
   });
 });

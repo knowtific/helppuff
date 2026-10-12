@@ -1,12 +1,14 @@
 import { Check, ChevronRight, Copy, Eye, EyeOff, Loader2, Plus, Send, ShieldCheck, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { api } from '../lib/api';
+import { api, type ToolHeaderView } from '../lib/api';
 import { cn, copyText, fmtRelative, useData } from '../lib/utils';
-import { Badge, Button, Card, Empty, ErrorNote, InfoTip, Input, Skeleton } from './ui';
+import { Badge, Button, Card, Empty, ErrorNote, InfoTip, Input, Segmented, Skeleton } from './ui';
+import { RequestEditor, type RequestDraft } from './RequestFields';
 
 /**
  * Settings → Webhooks: endpoints that receive what happens — chats, messages,
- * leads, callbacks, ratings, learning — as signed JSON. The same API as
+ * leads, callbacks, ratings, learning — as signed JSON, or as your own
+ * request for a service with its own format. The same API as
  * `helppuff webhooks`.
  */
 
@@ -20,6 +22,10 @@ type Webhook = {
   lastStatus: 'ok' | 'failed' | 'retrying' | null;
   lastError: string | null;
   lastAt: number | null;
+  format: 'helppuff' | 'custom';
+  method?: string;
+  headers?: ToolHeaderView[];
+  body?: string;
 };
 type EventInfo = { type: string; description: string };
 type Delivery = { id: string; event: string; ok: boolean; status: number | null; error: string | null; attempts: number; durationMs: number; at: number };
@@ -27,6 +33,8 @@ type TestResult = { ok: boolean; status: number | null; error: string | null };
 
 const ALL = '*';
 const SIGNED_HEADERS = ['X-HelpPuff-Event', 'X-HelpPuff-Delivery', 'X-HelpPuff-Timestamp', 'X-HelpPuff-Signature'];
+const CUSTOM_VALUES = 'Use {{event.type}}, {{event.id}}, {{event.createdAt}} and the event’s data, like {{data.name}}, {{data.phone}} or {{data.job.title}}, in the body, headers and the address’s path. A whole "{{data}}" is the object itself. An empty body sends HelpPuff’s signed JSON.';
+const CUSTOM_EXAMPLE = '{\n  "channel": "#sales",\n  "text": "Call {{data.name}} on {{data.phone}}: {{data.message}}"\n}';
 
 export function Webhooks() {
   const list = useData(() => api<{ webhooks: Webhook[]; events: EventInfo[] }>('/webhooks'), []);
@@ -142,13 +150,23 @@ function WebhookForm({ events, initial, onSaved, onCancel }: { events: EventInfo
   const [url, setUrl] = useState(initial?.url ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
   const [chosen, setChosen] = useState<string[]>(initial?.events ?? [ALL]);
+  const [format, setFormat] = useState<'helppuff' | 'custom'>(initial?.format ?? 'helppuff');
+  const [request, setRequest] = useState<RequestDraft>({
+    method: initial?.method ?? 'POST',
+    url: initial?.url ?? '',
+    headers: initial?.headers ?? [{ name: 'Content-Type', value: 'application/json', secret: false }],
+    body: initial?.body ?? '',
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const save = async () => {
     setBusy(true);
     setError(null);
     try {
-      const json = { url, description, events: chosen };
+      const json =
+        format === 'custom'
+          ? { url: request.url, description, events: chosen, format, method: request.method, headers: request.headers.filter((h) => h.name.trim()).map(({ name, value, secret }) => ({ name, value, secret })), body: request.body }
+          : { url, description, events: chosen, format };
       if (initial) await api(`/webhooks/${initial.id}`, { method: 'PATCH', json });
       else await api('/webhooks', { method: 'POST', json });
       onSaved();
@@ -166,10 +184,35 @@ function WebhookForm({ events, initial, onSaved, onCancel }: { events: EventInfo
         void save();
       }}
     >
-      <label className="block space-y-1.5">
-        <span className="text-xs font-medium">Endpoint URL</span>
-        <Input type="url" required placeholder="https://hooks.zapier.com/hooks/catch/…" value={url} onChange={(e) => setUrl(e.target.value)} />
-      </label>
+      <div className="space-y-1.5">
+        <span className="block text-xs font-medium">Send</span>
+        <Segmented
+          label="What to send"
+          value={format}
+          onChange={(next) => {
+            if (next === 'custom' && !request.url) setRequest({ ...request, url });
+            if (next === 'helppuff' && !url) setUrl(request.url);
+            setFormat(next);
+          }}
+          options={[
+            { value: 'helppuff', label: 'Signed JSON' },
+            { value: 'custom', label: 'Your own request' },
+          ]}
+        />
+        <p className="text-xs text-muted-foreground">
+          {format === 'helppuff'
+            ? 'HelpPuff’s standard event, signed: for Zapier, Make, n8n or your own server.'
+            : 'For a service that wants its own format (Slack, a CRM, an SMS API): you write the request; HelpPuff fills it in for each event.'}
+        </p>
+      </div>
+      {format === 'helppuff' ? (
+        <label className="block space-y-1.5">
+          <span className="text-xs font-medium">Endpoint URL</span>
+          <Input type="url" required placeholder="https://hooks.zapier.com/hooks/catch/…" value={url} onChange={(e) => setUrl(e.target.value)} />
+        </label>
+      ) : (
+        <RequestEditor id={`hook-${initial?.id ?? 'new'}`} value={request} onChange={setRequest} values={CUSTOM_VALUES} bodyPlaceholder={CUSTOM_EXAMPLE} />
+      )}
       <label className="block space-y-1.5">
         <span className="text-xs font-medium">Description (optional)</span>
         <Input placeholder="e.g. New leads to HubSpot" maxLength={200} value={description} onChange={(e) => setDescription(e.target.value)} />
@@ -180,7 +223,7 @@ function WebhookForm({ events, initial, onSaved, onCancel }: { events: EventInfo
         <Button type="button" variant="ghost" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" disabled={busy || !url.trim() || !chosen.length}>
+        <Button type="submit" disabled={busy || !(format === 'custom' ? request.url : url).trim() || !chosen.length}>
           {busy && <Loader2 className="animate-spin" />}
           {initial ? 'Save' : 'Add webhook'}
         </Button>
@@ -243,6 +286,7 @@ function WebhookCard({ hook, events, onChanged }: { hook: Webhook; events: Event
           </p>
           {hook.description && <p className="mt-0.5 text-xs text-muted-foreground">{hook.description}</p>}
           <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+            {hook.format === 'custom' && <Badge>Your own request · {hook.method ?? 'POST'}</Badge>}
             {all ? (
               <Badge>All events</Badge>
             ) : (

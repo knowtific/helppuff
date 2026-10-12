@@ -43,6 +43,7 @@ const MEMBER_ROUTES: [method: string | '*', path: RegExp][] = [
   ['*', /^\/callbacks(\/[^/]+)?$/],
   ['GET', /^\/labels$/],
   ['*', /^\/prefs$/],
+  ['GET', /^\/notifications$/],
   ['GET', /^\/live\/(status|socket)$/],
   ['GET', /^\/jobs(\/pipeline)?$/],
   ['POST', /^\/jobs$/],

@@ -54,6 +54,8 @@ export type ConversationJobDeps = {
   log?: (event: string, data?: object) => void;
   /** Hand a failed webhook delivery to the Workflow for later tries. */
   retry?: ((params: WebhookRetryParams) => Promise<void>) | undefined;
+  /** ADMIN_EMAIL: the owner, for email notifications (they may have no row in `admins`). */
+  owner?: string | undefined;
   /** HELPPUFF_SECRET: opens the after-chat tools' secret headers. Without it they do not run. */
   secret?: string | undefined;
 };
@@ -155,7 +157,7 @@ export async function runConversationJob(step: StepLike, deps: ConversationJobDe
       .bind(now(), params.conversationId)
       .run()) as { meta?: { changes?: number }; changes?: number } | undefined;
     if ((claim?.meta?.changes ?? claim?.changes ?? 1) === 0) return false;
-    await emitTo({ db: deps.db, fetch: deps.fetch, now, retry: deps.retry, ...(deps.log ? { log: deps.log } : {}) }, params.siteId, 'conversation.completed', await completedEvent(deps.db, params.conversationId));
+    await emitTo({ db: deps.db, fetch: deps.fetch, now, retry: deps.retry, secret: deps.secret, owner: deps.owner, ...(deps.log ? { log: deps.log } : {}) }, params.siteId, 'conversation.completed', await completedEvent(deps.db, params.conversationId));
     return true;
   });
   return { status: sent ? 'completed' : 'skipped' };

@@ -61,4 +61,14 @@ export type WebhookEnvelope<T = Record<string, unknown>> = {
   data: T;
 };
 
+/**
+ * What an endpoint receives: `helppuff`, the signed envelope above, or
+ * `custom`, a request the owner wrote (method, headers, a body template with
+ * `{{event.type}}`, `{{data.name}}`… ; empty sends the envelope) for a
+ * service that wants its own format. A custom request carries the same
+ * X-HelpPuff-* headers, the signature over the body actually sent.
+ */
+export const WEBHOOK_FORMATS = ['helppuff', 'custom'] as const;
+export type WebhookFormat = (typeof WEBHOOK_FORMATS)[number];
+
 export const isWebhookEvent = (value: string): value is keyof typeof WEBHOOK_EVENTS => value in WEBHOOK_EVENTS;

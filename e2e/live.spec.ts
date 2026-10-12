@@ -256,9 +256,9 @@ test('with live chat off (the default), nothing of it shows: no button, no switc
   await team.getByRole('radio', { name: /Take their details for a callback/ }).check();
   await team.getByRole('button', { name: 'Save' }).click();
   await expect(team.getByText('Saved.')).toBeVisible();
-  // The dashboard follows at once: no Available switch, no Notifications page.
+  // The dashboard follows at once: no Available switch. Notifications stays: it holds the emails each person gets.
   await expect(team.getByRole('switch', { name: 'Available for live chats' })).toHaveCount(0);
-  await expect(team.locator('#settings-menu').getByRole('link', { name: 'Notifications' })).toHaveCount(0);
+  await expect(team.locator('#settings-menu').getByRole('link', { name: 'Notifications' })).toHaveCount(1);
 
   const page = await visitor(browser);
   await expect(composer(page)).toBeVisible();

@@ -80,6 +80,10 @@ again.
 
 ## Notifications
 
+With the dashboard closed, an email can tell you instead: tick **A visitor
+wants a person** or **A chat given to me** in Settings → Notifications (see
+[[Email notifications|Email-Notifications]]), or connect [[Telegram]].
+
 The dashboard gets your attention the way support tools do, and only for
 what concerns you:
 

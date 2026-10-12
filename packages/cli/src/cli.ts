@@ -23,6 +23,7 @@ import {
 import type { Ctx } from './commands/context.js';
 import { dashboardCommand, usersCommand } from './commands/users.js';
 import { webhooksCommand } from './commands/webhooks.js';
+import { emailCommand } from './commands/email.js';
 import { toolsCommand } from './commands/tools.js';
 import { agentCommand } from './commands/agent.js';
 import { identityCommand } from './commands/identity.js';
@@ -57,6 +58,7 @@ const COMMANDS: Record<string, (ctx: Ctx) => Promise<number>> = {
   embed: embedCommand,
   users: usersCommand,
   webhooks: webhooksCommand,
+  email: emailCommand,
   tools: toolsCommand,
   agent: agentCommand,
   identity: identityCommand,

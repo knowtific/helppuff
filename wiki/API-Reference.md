@@ -221,7 +221,7 @@ The assistant, widget, lead form, limits and IP lists, as one object.
 
 ### [[Webhooks|API-Reference-Webhooks]]
 
-Endpoints that receive events as signed JSON.
+Endpoints that receive events as signed JSON, or as a request in their own format; and the email service that sends the team's email notifications.
 
 - [[List webhook endpoints|API-Reference-Webhooks#list-webhook-endpoints]]: `GET /webhooks`
 - [[Add a webhook endpoint|API-Reference-Webhooks#add-a-webhook-endpoint]]: `POST /webhooks`
@@ -229,6 +229,10 @@ Endpoints that receive events as signed JSON.
 - [[Remove a webhook endpoint|API-Reference-Webhooks#remove-a-webhook-endpoint]]: `DELETE /webhooks/:id`
 - [[Send a test event|API-Reference-Webhooks#send-a-test-event]]: `POST /webhooks/:id/test`
 - [[Recent deliveries|API-Reference-Webhooks#recent-deliveries]]: `GET /webhooks/:id/deliveries`
+- [[The email service|API-Reference-Webhooks#the-email-service]]: `GET /notifications/email`
+- [[Set up the email service|API-Reference-Webhooks#set-up-the-email-service]]: `PUT /notifications/email`
+- [[Remove the email service|API-Reference-Webhooks#remove-the-email-service]]: `DELETE /notifications/email`
+- [[Send a test email|API-Reference-Webhooks#send-a-test-email]]: `POST /notifications/email/test`
 
 ### [[Analytics|API-Reference-Analytics]]
 

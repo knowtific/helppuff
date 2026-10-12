@@ -1,112 +1,97 @@
 # Email notifications
 
-HelpPuff has no mail server of its own: you bring the email service you
-already use (Resend, Postmark, SendGrid, Mailgun, Brevo, Amazon SES…), with
-its API key, and HelpPuff calls it. Nothing to install and no per-provider
-connector: the same pattern works for any service with a REST API.
+An email when something needs you: a new contact, a hot lead, a callback
+request, a visitor waiting for a person, a new job or booking. You bring the
+email service you already use (Resend, Postmark, SendGrid, Brevo or any
+other with a send API) and its key; HelpPuff writes each email and sends it
+through that service. Everyone on the team chooses which emails they get.
 
-Pick by what you want to hear about:
+No connector per provider: the service is one request you can see and
+change, so a provider changing its API never waits for a HelpPuff release.
 
-| You want | Use | How fast |
-| --- | --- | --- |
-| An email for each new lead, or only hot leads, with the AI's summary | [An after-chat tool](#1-an-email-when-a-chat-ends) that calls your email service | Five quiet minutes after the chat |
-| An email the moment a visitor asks for a callback, a person, or books a time | [A webhook to n8n, Make or Zapier](#2-an-email-for-any-event) | Right away |
-| To answer live chats as they arrive | The dashboard's notifications and sound, or [[Telegram]] ([[Live chat|Live-Chat]]) | Right away |
+## 1. Connect your email service (an admin, once)
 
-## 1. An email when a chat ends
+**Settings → Notifications** → **Email service**:
 
-An [[after-chat tool|Tools#3-after-the-chat]] runs when a conversation goes
-quiet (or a live chat closes), with the contact, the summary, the labels and
-the transcript. Point it at your email service's send API.
+1. **Service**: Resend, Postmark, SendGrid or Brevo, or **Another service**.
+2. **Send from**: an address on a domain you verified in that service.
+3. **API key** (Postmark: the server token). Stored encrypted, never shown
+   again.
+4. **Send me a test**, then **Save**.
 
-### With Resend
-
-1. In [Resend](https://resend.com), verify your domain and make an API key.
-2. Add the tool:
+Or from the project folder:
 
 ```bash
-helppuff secret set RESEND_API_KEY        # or put it in .env
-helppuff tools add email_new_lead --after --method POST \
-  --url https://api.resend.com/emails \
-  --header 'Content-Type: application/json' \
-  --header 'Authorization: Bearer ${RESEND_API_KEY}' \
-  --body '{"from": "HelpPuff <assistant@yourdomain.com>", "to": ["sales@yourdomain.com"], "subject": "New lead: {{lead.name}}", "text": "{{lead.name}} ({{lead.email}} · {{lead.phone}})\n\n{{summary}}\n\nNext: {{conversation.followUp}}\n\nhttps://YOUR-WORKER/admin/#/conversations/{{conversation.id}}"}' \
-  --when lead.email \
-  --description 'Email the team about a chat that left an email.'
+helppuff secret set RESEND_API_KEY
+helppuff email set --preset resend --from 'HelpPuff <assistant@yourdomain.com>' --key '${RESEND_API_KEY}'
+helppuff email test --to you@yourdomain.com
 ```
 
-Replace `YOUR-WORKER` with your dashboard's address, so the email links to
-the conversation.
+`--preset` is `resend`, `postmark`, `sendgrid` or `brevo`. **Pause emails**
+(`helppuff email pause`) stops every email until you resume; **Remove**
+keeps everyone's choices for when you connect one again.
 
-### With Postmark
+### Another service
 
-The same tool, with Postmark's address, header and field names:
+Choose **Another service**, or **Edit the request** on a preset, and write the
+request its "send an email" API wants: the method, the address, headers (put
+the key in a secret one) and the body. HelpPuff fills in:
+
+| Value | What it is |
+| --- | --- |
+| `{{email.to}}` | One person's address: each person gets their own email |
+| `{{email.subject}}` | The subject, like `Callback requested: Ada` |
+| `{{email.text}}` | The message as plain text, with a link to the dashboard |
+| `{{email.html}}` | The same message as HTML, everything a visitor wrote escaped |
+
+The request must use `{{email.to}}` and `{{email.text}}` (or
+`{{email.html}}`). For example, a service that takes JSON with an `X-Api-Key`:
 
 ```bash
-helppuff secret set POSTMARK_SERVER_TOKEN
-helppuff tools add email_new_lead --after --method POST \
-  --url https://api.postmarkapp.com/email \
+helppuff email set --url https://api.example-mail.com/v1/send \
   --header 'Content-Type: application/json' \
-  --header 'Accept: application/json' \
-  --header 'X-Postmark-Server-Token: ${POSTMARK_SERVER_TOKEN}' \
-  --body '{"From": "assistant@yourdomain.com", "To": "sales@yourdomain.com", "Subject": "New lead: {{lead.name}}", "TextBody": "{{lead.name}} ({{lead.email}} · {{lead.phone}})\n\n{{summary}}\n\nNext: {{conversation.followUp}}"}' \
-  --when lead.email \
-  --description 'Email the team about a chat that left an email.'
+  --header 'X-Api-Key: ${MAIL_API_KEY}' \
+  --body '{"from": "assistant@yourdomain.com", "to": "{{email.to}}", "subject": "{{email.subject}}", "text": "{{email.text}}"}'
 ```
 
-`From` must be a confirmed sender signature in Postmark.
+Values are escaped for JSON in a JSON body, so nothing a visitor types can
+break out of its field.
 
-### Any other service
+## 2. Choose your emails (everyone)
 
-Look up its "send an email" API and fill in the same four things: the
-address, the header with the key (`${NAME}`, stored encrypted), the body in
-its field names, and **Only when**. On the dashboard it is **Prompt & tools**
-→ **After the chat** → **+ Add** → **New tool**.
+**Settings → Notifications** → **Email me when**, ticked for yourself only:
 
-- **Which chats:** `--when lead.email` (any chat that left an email),
-  `--when labels.leadQuality=hot` (hot leads only), `hot,warm`, or none (every
-  chat). On the dashboard: **Only when**.
-- **What you can put in it:** `{{lead.name}}`, `{{lead.email}}`,
-  `{{lead.phone}}`, `{{summary}}`, `{{conversation.followUp}}`,
-  `{{conversation.labels.leadQuality}}`, `{{conversation.id}}`, any
-  `{{attributes.*}}`, and everything else `conversation.completed` carries
-  (see [[Webhooks]]).
-- **Send text, not HTML.** Values are escaped for JSON, not for HTML, and a
-  visitor writes part of them: use the service's plain-text field (`text`,
-  `TextBody`) so nothing a visitor types can become a link or markup.
-- **Several people:** most services take a list in `to`.
+| Email | When |
+| --- | --- |
+| **New contact** | Someone left their name, email or phone in the chat |
+| **Hot lead** | A chat ended and the AI rated the lead hot, with its summary and next step (five minutes after the chat went quiet) |
+| **Callback request** | A visitor asked to be called back |
+| **A visitor wants a person** | Someone asked for the team in [[live chat|Live-Chat]] |
+| **A live chat nobody took** | Nobody took it in time; the visitor got the callback form |
+| **A chat given to me** | Someone on the team gave you a conversation (only you get it) |
+| **New job** | A [[job|Jobs]] was created |
+| **New booking**, **Booking cancelled** | An [[appointment|Bookings]] was booked or cancelled |
+| **AI budget used up** | Today's AI budget ran out (admins only) |
 
-### Check it
+Nothing is ticked until you choose. Members choose too: they see this page
+even with live chat off. Someone removed from the team gets nothing more.
+Each email links to the conversation, job, callbacks or calendar.
 
-Have a chat that leaves an email, then wait five minutes. The conversation's
-**Data from tools** in the dashboard shows the email service's answer under
-the tool's name, and `helppuff tools list` shows the last status. A 401 or
-403 is the key; a 422 (Postmark) or 403 (Resend) about the sender means the
-domain or sender is not verified yet.
+## Check it
 
-## 2. An email for any event
+**Send me a test** sends one now and says what the service answered. The
+**Email service** card shows when the last email went and, if it failed,
+why. A 401 or 403 is usually the key; a 403 or 422 about the sender means
+its domain (or Postmark's sender signature) is not verified yet. Emails are
+sent after the visitor's reply, never in its way, and HelpPuff's logs keep
+only the kind of email and the status, never an address or what it said.
 
-[[Webhooks]] send every event the moment it happens, as signed JSON:
-`callback.requested`, `handover.requested` (a visitor wants a person),
-`handover.missed`, `lead.captured`, `appointment.created`, `job.created` and
-the rest. Their body is always the same, so a small workflow in front of
-your email turns it into the message you want, for any provider:
+## Other channels
 
-1. In [n8n](https://n8n.io), [Make](https://www.make.com) or
-   [Zapier](https://zapier.com), start a workflow with a webhook trigger and
-   copy its address.
-2. In HelpPuff, **Settings → Webhooks** → add that address, and tick the
-   events you want (or `helppuff webhooks add <url> --events callback.requested,handover.requested`).
-3. Add an email step (n8n's **Send Email** or Gmail node, or your provider's)
-   and write the message from the event's fields, like `data.name`,
-   `data.phone` and `data.message` for a callback.
-4. **Send test** in HelpPuff checks the address (a `test.ping`). To build
-   the email from real fields, make the event happen once (ask for a callback
-   in the [playground](https://knowtific.github.io/helppuff/playground/) or your
-   preview page), or use the example bodies in [[Webhooks]].
+Slack, Microsoft Teams, SMS or your CRM want their own format: send any
+event there with a [[webhook in your own format|Webhooks#your-own-request]],
+or through n8n, Make or Zapier with the signed JSON ([[Webhooks]]). For
+real-time alerts while you work, use the dashboard's notifications and sound,
+or [[Telegram]].
 
-To be sure a call came from your Worker, check its `X-HelpPuff-Signature`
-([[checking a delivery|Webhooks#checking-a-delivery-came-from-us]]). n8n can run on your own server,
-so nothing leaves your hands.
-
-Back to [[Leads and callbacks|Leads]] or the [[dashboard|Dashboard]].
+Back to [[the dashboard|Dashboard]].

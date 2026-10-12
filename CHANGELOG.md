@@ -8,7 +8,35 @@ never needs you to change anything. Upgrade with
 
 ## [Unreleased]
 
-## [0.5.1] - 2026-10-12
+## [0.6.0] - 2026-10-12
+
+### Added: email notifications and webhooks in your own format
+
+- **Email notifications.** An admin connects the email service you already
+  use, once, in **Settings → Notifications** (or `helppuff email set`):
+  Resend, Postmark, SendGrid and Brevo are filled in from the address to
+  send from and the key; any other service works with its own request.
+  HelpPuff writes each email (a plain-text body, and an HTML one with
+  everything a visitor wrote escaped) and sends it with `{{email.to}}`,
+  `{{email.subject}}`, `{{email.text}}` and `{{email.html}}`. The key is
+  stored encrypted. **Send me a test**, pause and remove.
+- **Everyone chooses their own emails**, members too: new contact, hot lead
+  (with the AI's summary), callback request, a visitor wants a person, a live
+  chat nobody took, a chat given to me (only to that person), new job, new or
+  cancelled booking, and the AI budget used up (admins). Nothing is sent
+  until a person ticks it; someone removed from the team gets nothing more.
+  Settings → Notifications is there for everyone now, with live chat off too.
+- **Webhooks in your own format.** A webhook can send your own request
+  instead of the signed JSON, for a service that wants its own format
+  (Slack, a CRM, an SMS API): the method, headers (credentials stored
+  encrypted) and a body with `{{event.type}}` and `{{data.…}}`. Retries,
+  the delivery log and the X-HelpPuff-* signature work the same. In the
+  dashboard (**Your own request**), `helppuff webhooks add … --header …
+  --body …`, `helppuff webhooks set`, and the API (`format: "custom"`).
+- The API: `GET`, `PUT` and `DELETE /notifications/email` and
+  `POST /notifications/email/test` (scopes `webhooks:read`/`write`).
+- One D1 migration (15), additive: four columns on `webhooks` and the
+  `email_service` table. `helppuff upgrade` applies it.
 
 ### Changed
 
@@ -40,6 +68,8 @@ never needs you to change anything. Upgrade with
   the clipboard: the text is selected to copy by hand.
 - Dashboard: the two **Learn more** links in Settings → Bookings opened a
   broken page; they open the wiki.
+- Dashboard: the two-way toggles (like **List**/**Board**) no longer submit
+  the form they sit in.
 
 ## [0.5.0] - 2026-10-12
 

@@ -4,6 +4,7 @@ import { PageHeader, settingsSections, SettingsTabs, type SettingsSection } from
 import { Avatar, Badge, Button, Card, CardHeader, Input, Select, Skeleton } from '../components/ui';
 import { api, isMember, type Me, type Team as TeamList } from '../lib/api';
 import { LabelsSettings, LiveChatSettings, NotificationSettings } from '../components/LiveChat';
+import { EmailChoices, EmailServiceCard } from '../components/Notifications';
 import { cn, copyText, fmtRelative, useData } from '../lib/utils';
 import { SettingsForm } from '../components/SettingsForm';
 import { InstructionsForm } from '../components/InstructionsForm';
@@ -105,7 +106,7 @@ const DESCRIPTIONS: Record<SettingsSection, string> = {
   live: 'Let visitors talk to a person on your team, from the dashboard or Telegram.',
   labels: 'Tag conversations, by hand or by the AI, and filter by them.',
   jobs: 'Requests, quotes and work: the stages they go through, what you need to know, and the quote questions on the widget.',
-  notifications: 'Your own alerts for live chats: browser notifications, sound and availability.',
+  notifications: 'The emails you get, and your own alerts for live chats. Everyone on the team chooses their own.',
   advanced: 'The model, how often your site is re-read, rate limits, blocked IPs and sign-in protection.',
   webhooks: 'Send chats, messages, leads and callbacks to other tools as they happen.',
   api: 'Use HelpPuff from your own servers, as a backend: keys, the base URL and examples.',
@@ -126,7 +127,7 @@ const HELP: Record<SettingsSection, string> = {
   live: 'Live-Chat',
   labels: 'Dashboard#labels',
   jobs: 'Jobs',
-  notifications: 'Live-Chat#notifications',
+  notifications: 'Email-Notifications',
   advanced: 'AI-Models',
   webhooks: 'Webhooks',
   api: 'API',
@@ -173,7 +174,18 @@ export function Settings({ me, section }: { me: Me; section: string | undefined 
         {current.id === 'integrations' && <Integrations />}
         {current.id === 'labels' && <LabelsSettings />}
         {current.id === 'jobs' && <JobsSettings />}
-        {current.id === 'notifications' && <NotificationSettings />}
+        {current.id === 'notifications' && (
+          <div className="space-y-4">
+            <EmailChoices admin={!isMember(me)} />
+            {!isMember(me) && <EmailServiceCard />}
+            {site?.live && (
+              <>
+                <h2 className="pt-2 text-sm font-semibold">Live chat</h2>
+                <NotificationSettings />
+              </>
+            )}
+          </div>
+        )}
         {current.id === 'team' && <Team me={me} />}
         {current.id === 'updates' && <Updates />}
       </div>

@@ -6,6 +6,7 @@ import { adminApi } from '../engine/admin-api.js';
 import { loadEnv } from '../engine/env.js';
 import { loadProject } from '../engine/project.js';
 import type { Ctx } from './context.js';
+import { expand } from './request-flags.js';
 
 /**
  * `helppuff tools` — the site's own tools, the same as the tools on the
@@ -59,15 +60,6 @@ function pairs(value: unknown, flag: string): [string, string][] {
     const at = String(item).indexOf('=');
     if (at < 1) throw new CliError('usage', `--${flag} takes name=value, like --${flag} order_number="Like A-1042".`, { exitCode: EXIT.usage });
     return [String(item).slice(0, at).trim(), String(item).slice(at + 1)];
-  });
-}
-
-/** `${NAME}` in a header value, from .env or the environment; a missing one is a question for the user. */
-function expand(value: string, env: Record<string, string>, missing: Set<string>): string {
-  return value.replace(/\$\{([A-Z_][A-Z0-9_]*)\}/g, (_all, name: string) => {
-    const found = env[name];
-    if (found === undefined) missing.add(name);
-    return found ?? '';
   });
 }
 

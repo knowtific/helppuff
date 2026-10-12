@@ -1,9 +1,10 @@
 import { Check, Loader2, Play, Plus, Terminal, Trash2, X } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { parseCurl, promptToolRefs, toolArgs, TOOL_METHODS, TOOL_NAME, isSecretHeader } from '@helppuff/protocol/tools';
+import { parseCurl, promptToolRefs, toolArgs, TOOL_METHODS, TOOL_NAME } from '@helppuff/protocol/tools';
 import { api, type ToolHeaderView, type ToolParamView, type ToolsList, type ToolTestResult, type ToolView } from '../lib/api';
 import { cn } from '../lib/utils';
 import { Button, Card, InfoTip, Input, Segmented, Select, Textarea } from './ui';
+import { HeaderList } from './RequestFields';
 
 /**
  * The Prompt page's tools: the dialog that makes one (paste a curl, or fill
@@ -459,45 +460,6 @@ function Field({ label, htmlFor, hint, children }: { label: string; htmlFor: str
         {hint && <InfoTip label={`About ${label.toLowerCase()}`}>{hint}</InfoTip>}
       </div>
       {children}
-    </div>
-  );
-}
-
-function HeaderList({ headers, onChange }: { headers: ToolHeaderView[]; onChange: (headers: ToolHeaderView[]) => void }) {
-  const update = (i: number, patch: Partial<ToolHeaderView>) => onChange(headers.map((h, j) => (j === i ? { ...h, ...patch } : h)));
-  return (
-    <div className="space-y-1.5">
-      <p className="text-xs font-medium">Headers</p>
-      {headers.map((h, i) => (
-        <div key={i} className="grid grid-cols-[minmax(0,10rem)_minmax(0,1fr)_auto_auto] items-center gap-1.5">
-          <Input
-            value={h.name}
-            onChange={(e) => update(i, { name: e.target.value, ...(isSecretHeader(e.target.value) && !h.secret && !h.value ? { secret: true } : {}) })}
-            placeholder="Name"
-            aria-label={`Header ${i + 1} name`}
-            className="font-mono text-xs"
-          />
-          <Input
-            value={h.value}
-            type={h.secret ? 'password' : 'text'}
-            onChange={(e) => update(i, { value: e.target.value })}
-            placeholder={h.secret && h.set ? 'Stored: leave empty to keep it' : 'Value'}
-            aria-label={`Header ${i + 1} value`}
-            className="font-mono text-xs"
-            autoComplete="off"
-          />
-          <label className="flex items-center gap-1 text-xs text-muted-foreground" title="Stored encrypted and never shown again">
-            <input type="checkbox" checked={h.secret} onChange={(e) => update(i, { secret: e.target.checked })} /> Secret
-          </label>
-          <Button variant="ghost" size="icon" className="size-7" onClick={() => onChange(headers.filter((_, j) => j !== i))} aria-label={`Remove header ${h.name || i + 1}`}>
-            <X />
-          </Button>
-        </div>
-      ))}
-      <button type="button" onClick={() => onChange([...headers, { name: '', value: '', secret: false }])} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-        <Plus className="size-3" /> Add a header
-      </button>
-      {headers.some((h) => h.secret) && <p className="text-xs text-muted-foreground">Secret values are stored encrypted and never shown again.</p>}
     </div>
   );
 }

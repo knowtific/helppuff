@@ -1,6 +1,6 @@
 import type { SiteConfig } from '../config/schema.js';
 import type { D1Like } from '../db/d1.js';
-import { emitTo, workflowRetry } from '../webhooks/deliver.js';
+import { emitTo, outboundOf, workflowRetry } from '../webhooks/deliver.js';
 import { effectiveBooking } from './found.js';
 import { bookingsOf, lastSynced, sendReminders, syncCalendar, type BookingDeps } from './service.js';
 
@@ -25,7 +25,7 @@ export async function runScheduledBookings(env: Record<string, unknown>, db: D1L
       now: () => now,
       log: () => {},
       emit: (type, data) => {
-        deliveries.push(emitTo({ db, fetch: fetcher, now: () => now, retry: workflowRetry(env) }, siteId, type, data).catch(() => {}));
+        deliveries.push(emitTo({ db, fetch: fetcher, now: () => now, retry: workflowRetry(env), ...outboundOf(env) }, siteId, type, data).catch(() => {}));
       },
     };
     try {

@@ -683,6 +683,37 @@ export const MIGRATIONS: readonly Migration[] = [
       'ALTER TABLE integrations ADD COLUMN last_at INTEGER',
     ],
   },
+  {
+    id: 15,
+    name: 'custom_webhooks_and_email',
+    // A webhook can send the owner's own request instead of the envelope
+    // (`format` 'custom'): method, headers (secret values sealed with
+    // HELPPUFF_SECRET, like tools'), a body template. NULL is the envelope.
+    // The email service: one request per site that sends one email, filled
+    // with {{email.to}}, {{email.subject}}, {{email.text}}, {{email.html}};
+    // `dashboard_url` is where the owner saved it from, for links in emails.
+    // Who gets which email is each person's own (admin_prefs.prefs.emails).
+    statements: [
+      'ALTER TABLE webhooks ADD COLUMN format TEXT',
+      'ALTER TABLE webhooks ADD COLUMN method TEXT',
+      'ALTER TABLE webhooks ADD COLUMN headers TEXT',
+      'ALTER TABLE webhooks ADD COLUMN body TEXT',
+      `CREATE TABLE IF NOT EXISTS email_service (
+        site_id TEXT PRIMARY KEY,
+        method TEXT NOT NULL,
+        url TEXT NOT NULL,
+        headers TEXT NOT NULL,
+        body TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        dashboard_url TEXT,
+        last_status TEXT,
+        last_error TEXT,
+        last_at INTEGER,
+        updated_by TEXT,
+        updated_at INTEGER NOT NULL
+      )`,
+    ],
+  },
 ];
 
 export const LATEST_MIGRATION = MIGRATIONS[MIGRATIONS.length - 1]!.id;

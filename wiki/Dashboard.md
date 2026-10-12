@@ -16,8 +16,8 @@ link (the way back in if you lose your password). Teammates:
 `helppuff users add <email>`.
 
 **Your account.** Your name at the bottom of the sidebar opens a menu: who
-is signed in and their role, your [Notifications](#settings) (with live
-chat on), the light or dark theme, help, and **Sign out**.
+is signed in and their role, your [Notifications](#settings) (the emails you
+get), the light or dark theme, help, and **Sign out**.
 
 ## Home
 
@@ -154,9 +154,9 @@ agent goes through that page with you and changes it through the same API
 | **Live chat** | Let visitors talk to a person; how long they wait before the callback form; when conversations close; [[Telegram]]. See [[Live chat|Live-Chat]] |
 | **Labels** | The labels for conversations, and which the AI may use |
 | **Jobs** | The template (and **Let the AI choose again**), what a job is called, the stages, the fields, the widget's quote questions, and a `curl` to send jobs from other tools. See [[Jobs]] |
-| **Notifications** | Your own: browser notifications and sound for live chats, and whether you are available. Every member of the team sets their own |
+| **Notifications** | Your own: the emails you get (new contacts, hot leads, callbacks, a visitor waiting for a person, jobs, bookings), and with live chat on, browser notifications, sound and whether you are available. Everyone on the team sets their own; admins also connect the **email service** that sends them. See [[Email notifications|Email-Notifications]] |
 | **Advanced** | The AI model (see [[AI models|AI-Models]]), thinking (low, medium, high), "double-check answers before replying" (the reranker), how often the site is re-learned, time zone and language. **Limits and access**: every rate limit and cap, how long a chat lasts, IP addresses (or ranges) that are never limited or are blocked, and the sign-in limits and Turnstile on the sign-in form. See [[Security|Security#every-limit]] |
-| **Webhooks** | Endpoints that receive every event as signed JSON; see [[Webhooks]] |
+| **Webhooks** | Endpoints that receive every event as signed JSON, or as your own request for a service with its own format (Slack, a CRM); see [[Webhooks]] |
 | **Integrations** | Keys for Composio (Google Calendar, Outlook), Cal.com and Calendly, each with a check; shown while the date picker is on. See [[Integrations]] |
 | **API keys** | Keys for the public API, to use HelpPuff from your own servers: name, what it may do (scopes or a preset), expiry, IP addresses. The key is shown once. The base URL and a curl example; see [[The API|API]] |
 | **Team & security** | Who can sign in and their role, invitations, and what to do when locked out |
@@ -175,7 +175,7 @@ The first person who claims the setup link is the owner. Everyone else has a
 | Role | Can |
 | --- | --- |
 | **Admin** | Everything, like the owner (except removing the owner) |
-| **Member** | Conversations (read, reply in live chats, take, close, label, notes, attributes), jobs (create, move, edit, updates, notes), contacts, callbacks, and their own notifications. No settings, knowledge, prompt, analytics, webhooks or API keys; cannot delete anything or give a chat to someone else |
+| **Member** | Conversations (read, reply in live chats, take, close, label, notes, attributes), jobs (create, move, edit, updates, notes), contacts, callbacks, and their own notifications (which emails they get). No settings, knowledge, prompt, analytics, webhooks or API keys; cannot delete anything or give a chat to someone else |
 
 Invite people in Settings → **Team & security** (name, email, role: they get
 a one-time sign-in link), change a role there, or from the project folder:

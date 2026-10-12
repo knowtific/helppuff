@@ -12,9 +12,9 @@ import {
   type ToolParam,
 } from '@helppuff/protocol';
 import { HelpPuffError } from '../core/errors.js';
-import { open, seal } from '../core/secretbox.js';
+import { open } from '../core/secretbox.js';
+import { isHeader, sealHeaders, validOutboundUrl } from '../core/outbound.js';
 import { ensureSchema, type D1Like } from '../db/d1.js';
-import { renderUrl } from './template.js';
 
 /**
  * The owner's tools, one D1 row each (`tools`, migration 12). Secret header
@@ -86,7 +86,6 @@ const list = <T>(raw: string | null, ok: (v: unknown) => v is T): T[] => {
   }
 };
 const isParam = (v: unknown): v is ToolParam => Boolean(v && typeof v === 'object' && typeof (v as ToolParam).name === 'string');
-const isHeader = (v: unknown): v is ToolHeader => Boolean(v && typeof v === 'object' && typeof (v as ToolHeader).name === 'string' && typeof (v as ToolHeader).value === 'string');
 const isString = (v: unknown): v is string => typeof v === 'string';
 
 /** The row as stored, secrets still sealed. */
@@ -219,20 +218,7 @@ function params(value: unknown, what: string): ToolParam[] {
 }
 
 /** The URL must be https with a real host, and the host fixed: only the path and query may use `{{…}}`. */
-export function validToolUrl(value: unknown): string {
-  const raw = text(value, 2000);
-  let url: URL;
-  try {
-    url = new URL(renderUrl(raw, {}).replace(/\{\{|\}\}/g, ''));
-  } catch {
-    throw bad('Enter the full address, starting with https://', 'tool_url');
-  }
-  const origin = /^https:\/\/[^/?#]+/i.exec(raw)?.[0] ?? '';
-  if (url.protocol !== 'https:' || !url.hostname.includes('.') || url.username || url.password || origin.includes('{{')) {
-    throw bad('The address must start with https:// and name a real host (only the path and query may use {{…}}).', 'tool_url');
-  }
-  return raw;
-}
+export const validToolUrl = (value: unknown): string => validOutboundUrl(value, 'tool_url');
 
 export type Stored = Omit<ToolRow, 'id' | 'site_id' | 'last_status' | 'last_error' | 'last_at' | 'created_at' | 'updated_at'>;
 
@@ -296,26 +282,8 @@ export async function validTool(body: Record<string, unknown>, current: ToolRow 
   if (!url) throw bad('Enter the address to call.', 'tool_url');
   const bodyText = pick('body', (v) => (typeof v === 'string' ? v.slice(0, 20_000) : ''), was?.body ?? '');
 
-  let headers: ToolHeader[];
-  if (body['headers'] === undefined) headers = was?.headers ?? [];
-  else {
-    if (!Array.isArray(body['headers'])) throw bad('Headers must be a list of { name, value }.', 'tool_headers');
-    headers = [];
-    for (const raw of body['headers'].slice(0, 30)) {
-      if (!raw || typeof raw !== 'object') continue;
-      const h = raw as Record<string, unknown>;
-      const hName = text(h['name'], 100);
-      if (!hName) continue;
-      if (!/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(hName)) throw bad(`Check the header "${hName.slice(0, 40)}".`, 'tool_header_name');
-      const value = typeof h['value'] === 'string' ? h['value'].replace(/[\r\n]+/g, ' ').slice(0, 8000) : '';
-      const isSecret = h['secret'] === true;
-      if (isSecret) {
-        // Empty: keep what is stored (the dashboard never sees it).
-        const kept = was?.headers.find((o) => o.secret && o.name.toLowerCase() === hName.toLowerCase())?.value ?? '';
-        headers.push({ name: hName, value: value ? await seal(secret, SECRET_PURPOSE, value) : kept, secret: true });
-      } else headers.push({ name: hName, value, secret: false });
-    }
-  }
+  // Empty secret values keep what is stored (the dashboard never sees it).
+  const headers: ToolHeader[] = body['headers'] === undefined ? (was?.headers ?? []) : await sealHeaders(body['headers'], was?.headers ?? [], secret, SECRET_PURPOSE);
 
   const when = pick('when', readWhen, was?.when ?? null);
   const parameters = pick('parameters', (v) => params(v, 'Parameters'), was?.parameters ?? []);

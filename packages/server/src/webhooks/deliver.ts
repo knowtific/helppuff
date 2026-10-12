@@ -1,5 +1,7 @@
 import { ALL_WEBHOOK_EVENTS, type WebhookEnvelope, type WebhookEventType } from '@helppuff/protocol';
+import { openHeaders, sendOutbound, storedHeaders, type OutboundSpec } from '../core/outbound.js';
 import type { RequestCtx } from '../core/request.js';
+import { notifyByEmail } from '../notifications/email.js';
 import { dbFrom, ensureSchema, type D1Like } from '../db/d1.js';
 
 /**
@@ -26,7 +28,16 @@ export type WebhookRow = {
   last_at: number | null;
   created_at: number;
   updated_at: number;
+  /** 'custom': the owner's own request below; null or 'helppuff': the signed envelope. */
+  format?: string | null;
+  method?: string | null;
+  /** JSON headers, secret values sealed (`HEADER_PURPOSE`). */
+  headers?: string | null;
+  body?: string | null;
 };
+
+/** What seals a custom webhook's secret header values. */
+export const HEADER_PURPOSE = 'webhook-header';
 
 export type Delivery = { ok: boolean; status: number | null; error: string | null; attempts: number; durationMs: number; retryable: boolean };
 
@@ -83,53 +94,57 @@ export async function signDelivery(secret: string, timestamp: number, body: stri
   return `sha256=${[...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, '0')).join('')}`;
 }
 
-const retryable = (status: number) => status === 429 || status >= 500;
+/** A custom webhook's request, its secret header values opened; null when one cannot be (HELPPUFF_SECRET changed). */
+async function customSpec(hook: WebhookRow, secret: string | undefined): Promise<OutboundSpec | null> {
+  const headers = await openHeaders(storedHeaders(hook.headers), secret, HEADER_PURPOSE);
+  if (!headers) return null;
+  const method = (['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const).find((m) => m === hook.method) ?? 'POST';
+  return { method, url: hook.url, headers, body: hook.body ?? '' };
+}
 
 /**
- * POST one envelope to one endpoint, up to `tries` times a moment apart, and
- * record the outcome. Never throws. `retryable` says whether trying later
- * could help (a timeout, a network error, 429 or 5xx).
+ * Deliver one event to one endpoint, up to `tries` times a moment apart, and
+ * record the outcome. The signed envelope by default; a `custom` endpoint
+ * gets its own request, filled from `{{event.*}}` and `{{data.*}}` (an empty
+ * body sends the envelope), with the same X-HelpPuff-* headers. Never throws.
+ * `retryable` says whether trying later could help (a timeout, a network
+ * error, 429 or 5xx). `secret` opens a custom endpoint's secret headers.
  */
-export async function deliver(db: D1Like, hook: WebhookRow, event: WebhookEnvelope, doFetch: typeof fetch, now: () => number, tries = 2, status_ = 'failed'): Promise<Delivery> {
-  const body = JSON.stringify(event);
+export async function deliver(db: D1Like, hook: WebhookRow, event: WebhookEnvelope, doFetch: typeof fetch, now: () => number, tries = 2, status_ = 'failed', secret?: string): Promise<Delivery> {
+  const envelopeBody = JSON.stringify(event);
+  const custom = hook.format === 'custom' ? await customSpec(hook, secret) : undefined;
+  const spec: OutboundSpec | null = custom === undefined ? { method: 'POST', url: hook.url, headers: [], body: '' } : custom;
+  const scope = { event: { id: event.id, type: event.type, createdAt: event.createdAt, site: event.site }, data: event.data, site: { id: event.site } };
   const started = now();
   let status: number | null = null;
   let error: string | null = null;
+  let again = false;
   let attempts = 0;
-  while (attempts < tries) {
-    attempts++;
-    const timestamp = Math.floor(now() / 1000);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-    try {
-      const response = await doFetch(hook.url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'HelpPuff-Webhooks/1',
+  if (!spec) {
+    error = 'A secret header could not be read (HELPPUFF_SECRET changed): enter its value again.';
+  } else {
+    while (attempts < tries) {
+      attempts++;
+      const timestamp = Math.floor(now() / 1000);
+      const sent = await sendOutbound(spec, scope, doFetch, {
+        timeoutMs: TIMEOUT_MS,
+        userAgent: 'HelpPuff-Webhooks/1',
+        fallbackBody: envelopeBody,
+        extraHeaders: async (body) => ({
           'X-HelpPuff-Event': event.type,
           'X-HelpPuff-Delivery': event.id,
           'X-HelpPuff-Timestamp': String(timestamp),
           'X-HelpPuff-Signature': await signDelivery(hook.secret, timestamp, body),
-        },
-        body,
-        signal: controller.signal,
-        redirect: 'manual',
+        }),
       });
-      status = response.status;
-      error = response.ok ? null : `HTTP ${response.status}`;
-      // The body is never needed; release it.
-      await response.body?.cancel().catch(() => {});
-      if (response.ok || !retryable(response.status)) break;
-    } catch (thrown) {
-      status = null;
-      error = controller.signal.aborted ? `No answer within ${TIMEOUT_MS / 1000} s` : String((thrown as Error)?.message ?? thrown).slice(0, 200);
-    } finally {
-      clearTimeout(timer);
+      status = sent.status;
+      error = sent.error;
+      again = sent.retryable;
+      if (sent.ok || !sent.retryable) break;
+      if (attempts < tries) await new Promise((resolve) => setTimeout(resolve, RETRY_AFTER_MS));
     }
-    if (attempts < tries) await new Promise((resolve) => setTimeout(resolve, RETRY_AFTER_MS));
   }
-  const result: Delivery = { ok: error === null, status, error, attempts, durationMs: now() - started, retryable: error !== null && (status === null || retryable(status)) };
+  const result: Delivery = { ok: error === null, status, error, attempts, durationMs: now() - started, retryable: error !== null && again };
   const at = now();
   await db
     .batch([
@@ -156,19 +171,30 @@ export async function deliver(db: D1Like, hook: WebhookRow, event: WebhookEnvelo
  * the next hours (RETRY_SCHEDULE_MS): an endpoint that is down for a while
  * still gets everything. Without it, a second attempt follows a moment later.
  */
-export async function emitTo(
-  deps: { db: D1Like; fetch: typeof fetch; now?: () => number; log?: (event: string, data?: object) => void; retry?: Retry | undefined },
-  siteId: string,
-  type: WebhookEventType,
-  data: Record<string, unknown>,
-): Promise<void> {
+export type EmitDeps = {
+  db: D1Like;
+  fetch: typeof fetch;
+  now?: () => number;
+  log?: (event: string, data?: object) => void;
+  retry?: Retry | undefined;
+  /** HELPPUFF_SECRET: opens custom webhooks' and the email service's secret headers. */
+  secret?: string | undefined;
+  /** ADMIN_EMAIL: the owner, who may have no row in `admins`, can choose emails too. */
+  owner?: string | undefined;
+};
+
+export async function emitTo(deps: EmitDeps, siteId: string, type: WebhookEventType, data: Record<string, unknown>): Promise<void> {
+  await Promise.all([emitHooks(deps, siteId, type, data), notifyByEmail(deps, siteId, type, data)]);
+}
+
+async function emitHooks(deps: EmitDeps, siteId: string, type: WebhookEventType, data: Record<string, unknown>): Promise<void> {
   const now = deps.now ?? Date.now;
   const hooks = (await enabledHooks(deps.db, siteId, now())).filter((hook) => wants(hook, type));
   if (!hooks.length) return;
   const event = envelope(siteId, type, data, now());
   await Promise.all(
     hooks.map(async (hook) => {
-      const result = await deliver(deps.db, hook, event, deps.fetch, now, deps.retry ? 1 : 2, deps.retry ? 'retrying' : 'failed');
+      const result = await deliver(deps.db, hook, event, deps.fetch, now, deps.retry ? 1 : 2, deps.retry ? 'retrying' : 'failed', deps.secret);
       if (result.ok) return;
       // The type and status only: never the payload.
       deps.log?.('webhook.failed', { type, status: result.status });
@@ -191,7 +217,7 @@ export async function emitTo(
  */
 export async function runWebhookRetry(
   step: { do<T>(name: string, run: () => Promise<T>): Promise<T>; sleep(name: string, ms: number): Promise<void> },
-  deps: { db: D1Like; fetch: typeof fetch; now?: () => number },
+  deps: { db: D1Like; fetch: typeof fetch; now?: () => number; secret?: string | undefined },
   params: WebhookRetryParams,
 ): Promise<{ delivered: boolean; tries: number }> {
   const now = deps.now ?? Date.now;
@@ -201,7 +227,7 @@ export async function runWebhookRetry(
     const outcome = await step.do(`try:${i + 2}`, async () => {
       const hook = await deps.db.prepare('SELECT * FROM webhooks WHERE id = ? AND site_id = ? AND enabled = 1').bind(params.hookId, params.siteId).first<WebhookRow>();
       if (!hook) return 'gone' as const;
-      const result = await deliver(deps.db, hook, params.event, deps.fetch, now, 1, last ? 'failed' : 'retrying');
+      const result = await deliver(deps.db, hook, params.event, deps.fetch, now, 1, last ? 'failed' : 'retrying', deps.secret);
       if (result.ok) return 'ok' as const;
       if (!result.retryable && !last) {
         await deps.db.prepare("UPDATE webhooks SET last_status = 'failed' WHERE id = ?").bind(hook.id).run();
@@ -212,6 +238,15 @@ export async function runWebhookRetry(
   }
   return { delivered: false, tries: RETRY_SCHEDULE_MS.length + 1 };
 }
+
+/** HELPPUFF_SECRET from the Worker's env. */
+export const secretOf = (env: Record<string, unknown>): string | undefined => (typeof env['HELPPUFF_SECRET'] === 'string' && env['HELPPUFF_SECRET'] ? env['HELPPUFF_SECRET'] : undefined);
+
+/** What sending needs from the Worker's env: the secret, and the owner (ADMIN_EMAIL). */
+export const outboundOf = (env: Record<string, unknown>) => ({
+  secret: secretOf(env),
+  owner: typeof env['ADMIN_EMAIL'] === 'string' && env['ADMIN_EMAIL'] ? env['ADMIN_EMAIL'].toLowerCase() : undefined,
+});
 
 /** The Worker's Workflow, as a retry hand-off; undefined without the binding. */
 export function workflowRetry(env: Record<string, unknown>): Retry | undefined {
@@ -228,7 +263,7 @@ export function emit(ctx: RequestCtx, siteId: string, type: WebhookEventType, da
   if (!db) return;
   ctx.platform.waitUntil(
     emitTo(
-      { db, fetch: globalThis.fetch.bind(globalThis), now: () => ctx.platform.now(), log: (name, extra) => ctx.platform.log(name, extra), retry: workflowRetry(ctx.env) },
+      { db, fetch: globalThis.fetch.bind(globalThis), now: () => ctx.platform.now(), log: (name, extra) => ctx.platform.log(name, extra), retry: workflowRetry(ctx.env), ...outboundOf(ctx.env) },
       siteId,
       type,
       data,
