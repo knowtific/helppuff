@@ -8,6 +8,39 @@ never needs you to change anything. Upgrade with
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-12
+
+### Changed
+
+- **A new HelpPuff logo**: a "p" whose bowl is a speech bubble and whose
+  tail ends in a small puff. It is the favicon of the website, the
+  playground and the dashboard (where the unread count sits on it, in your
+  site's colour), and is in the README. Sources, a one-colour version,
+  lockups and icons are in `logo/`.
+- **Dashboard**: the logo sits beside your site's name at the top of the
+  sidebar and on the sign-in and setup pages. The person at the bottom of
+  the sidebar opens a menu: who is signed in and their role, Notifications,
+  the theme, help, and Sign out.
+- The website now gives the widget's size as about 35 KB gzipped, loaded
+  after the page. It used to say 6 KB (that is only the loader) and that
+  the rest loaded only when a visitor opened the chat, but it loads once
+  the page is idle.
+- New wiki page, **Email notifications**: an email for new or hot leads
+  through your own email service (Resend, Postmark or any send API), or for
+  any event through a webhook and n8n, Make or Zapier.
+
+### Fixed
+
+- Dashboard: **Export CSV** downloads the file without leaving the page; a
+  failed export shows an error instead of replacing the dashboard (the
+  website's demo exports its sample contacts too).
+- Dashboard: the **New job** and appointment dialogs close with Escape, take
+  focus when they open and give it back when they close.
+- Dashboard: copy buttons no longer fail silently where the browser refuses
+  the clipboard: the text is selected to copy by hand.
+- Dashboard: the two **Learn more** links in Settings → Bookings opened a
+  broken page; they open the wiki.
+
 ## [0.5.0] - 2026-10-12
 
 ### Added: booking in the chat

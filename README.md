@@ -1,4 +1,9 @@
-# HelpPuff
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="logo/helppuff-lockup-dark.svg">
+    <img src="logo/helppuff-lockup.svg" alt="HelpPuff" height="56">
+  </picture>
+</h1>
 
 ### Your website's AI assistant — deployed by your AI agent, owned by you.
 
@@ -112,10 +117,10 @@ experience, the operational tools and the customer follow-up workflow.
 | Feature | What it gives you | Learn more |
 | --- | --- | --- |
 | **Website and file knowledge** | Crawls selected pages and learns PDF, Word, Markdown and text files using hybrid semantic + keyword search | [Knowledge base](wiki/Knowledge-Base.md) |
-| **Fast, isolated widget** | An accessible, mobile-first widget in a shadow root; one script tag and about 6 KB gzipped before lazy loading | [Widget](wiki/Widget.md) |
+| **Fast, isolated widget** | An accessible, mobile-first widget in a shadow root; one script tag, about 35 KB gzipped, loaded after the page is ready | [Widget](wiki/Widget.md) |
 | **Rich conversations** | Streaming replies, shortcut buttons, suggested questions, option chips, cards, links and forms directly inside chat | [Widget](wiki/Widget.md) |
 | **Pre-chat forms** | Capture name, email, phone and custom fields before a conversation, with configurable required fields | [Leads](wiki/Leads.md) |
-| **Built-in CRM** | One lead per person, repeat conversations, pipeline stages, notes, custom answers and CSV export | [Dashboard](wiki/Dashboard.md#leads) |
+| **Built-in CRM** | One lead per person, repeat conversations, pipeline stages, notes, custom answers and CSV export | [Dashboard](wiki/Dashboard.md#contacts) |
 | **Conversation intelligence** | Automatic summaries, intent, sentiment, lead quality, outcome, topics, next steps and unanswered questions | [Dashboard](wiki/Dashboard.md#conversations) |
 | **Callback requests** | Turns “please call me” into a tracked task your team can complete, dismiss or reopen | [Callbacks](wiki/Leads.md#callbacks) |
 | **Analytics and ratings** | Conversation and lead trends, conversion, top pages, countries and visitor feedback | [Dashboard](wiki/Dashboard.md#analytics) |

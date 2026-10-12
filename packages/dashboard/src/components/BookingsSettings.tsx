@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, type BookingSlots, type BookingsPatch, type BookingsSettings as Bookings, type BookingsStatus, type CalendarSync, type EventType, type SettingsView, type Weekday } from '../lib/api';
 import { cn, href, useData } from '../lib/utils';
 import { Choice } from './InstructionsForm';
-import { WikiLink } from './Shell';
+import { WikiLink, wikiHref } from './Shell';
 import { Badge, Button, Card, CardHeader, ErrorNote, InfoTip, Input, Select, Skeleton } from './ui';
 
 /**
@@ -274,7 +274,7 @@ export function BookingsSettings() {
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
       <div className="space-y-4">
         <Card role="region" aria-label="Appointments">
-          <CardHeader title="Appointments" tip={{ label: 'About appointments', text: 'How visitors book from the chat. You can change it any time; appointments already made are kept.', href: 'Bookings' }} />
+          <CardHeader title="Appointments" tip={{ label: 'About appointments', text: 'How visitors book from the chat. You can change it any time; appointments already made are kept.', href: wikiHref('Bookings') }} />
           <div className="space-y-3 border-t p-4">
             <Choice name="How visitors book" value={mode} options={MODES} onChange={(value) => set({ mode: value })} />
             {!draft.mode && (
@@ -304,7 +304,7 @@ export function BookingsSettings() {
             {mode === 'picker' && (
               <p className="flex items-start gap-1.5 text-[13px]">
                 <span>Visitors pick a time in a calendar in the chat, and HelpPuff books it. The AI suggests times but never books.</span>
-                <InfoTip label="Why the AI never books" href="AI-Booking-Tests">
+                <InfoTip label="Why the AI never books" href={wikiHref('AI-Booking-Tests')}>
                   {NOTE_TIP}
                 </InfoTip>
               </p>

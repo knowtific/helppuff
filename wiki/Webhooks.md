@@ -1,7 +1,8 @@
 # Webhooks
 
 Send what happens on the assistant to other tools as it happens: Zapier, Make,
-n8n, a CRM, a Slack bot, your own server. Add endpoints in the dashboard
+n8n, a CRM, a Slack bot, your own server (for email, see
+[[Email notifications|Email-Notifications]]). Add endpoints in the dashboard
 (**Settings → Webhooks**) or from the terminal:
 
 ```bash

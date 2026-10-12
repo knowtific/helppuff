@@ -2,7 +2,7 @@ import { Download, MessageSquare, Search, Users } from 'lucide-react';
 import { Fragment, useState } from 'react';
 import { PageHeader } from '../components/Shell';
 import { Avatar, Badge, Button, Card, Empty, ErrorNote, Input, Select, Skeleton, statusLabel } from '../components/ui';
-import { api, LEAD_STATUSES, type Lead, type LeadStatus } from '../lib/api';
+import { api, download, LEAD_STATUSES, type Lead, type LeadStatus } from '../lib/api';
 import { cn, fmtRelative, href, useData, useDebounced } from '../lib/utils';
 
 const SOURCE: Record<Lead['source'], string> = { form: 'Form', chat: 'Typed in chat', ai: 'Found by AI', api: 'Added over the API' };
@@ -16,6 +16,15 @@ export function Leads() {
     [q, status],
   );
   const [edits, setEdits] = useState<Record<string, Lead>>({});
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<Error | null>(null);
+  const exportCsv = () => {
+    setExporting(true);
+    setExportError(null);
+    download('/leads.csv')
+      .catch((e: unknown) => setExportError(e instanceof Error ? e : new Error(String(e))))
+      .finally(() => setExporting(false));
+  };
   const leads = (data?.items ?? []).map((lead) => edits[lead.id] ?? lead);
   const total = Object.values(data?.counts ?? {}).reduce((a, b) => a + b, 0);
 
@@ -32,7 +41,7 @@ export function Leads() {
         description="People who left their details. Open one for their history, notes and attributes."
         help="Leads"
         actions={
-          <Button variant="outline" onClick={() => (window.location.href = '/admin/api/leads.csv')}>
+          <Button variant="outline" onClick={exportCsv} disabled={exporting}>
             <Download /> Export CSV
           </Button>
         }
@@ -61,6 +70,7 @@ export function Leads() {
         </div>
 
         {error && <ErrorNote error={error} onRetry={reload} />}
+        {exportError && <ErrorNote error={exportError} onRetry={exportCsv} />}
 
         <Card className="overflow-hidden">
           {loading && !data && [0, 1, 2, 3].map((i) => <Skeleton key={i} className="m-3 h-10" />)}

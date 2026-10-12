@@ -43,7 +43,7 @@ UTC day) and steps down gracefully instead of failing:
 [[Webhooks]] can tell you as it happens: `budget.warning` at 80% and
 `budget.exhausted` at 100%, each once a day.
 
-It resets at 00:00 UTC. The dashboard's Knowledge page and `helppuff knowledge
+It resets at 00:00 UTC. Settings → Knowledge in the dashboard and `helppuff knowledge
 status` show today's use. On Workers Paid, raise
 `backend.budget.dailyNeurons` to whatever you are happy to spend.
 

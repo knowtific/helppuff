@@ -2,7 +2,7 @@ import { AlertTriangle, ArrowLeft, Briefcase, CalendarDays, ExternalLink, Loader
 import { useEffect, useRef, useState, type DragEvent, type FormEvent, type ReactNode } from 'react';
 import { PageHeader } from '../components/Shell';
 import { NotesPanel, SideSection } from '../components/inbox';
-import { Avatar, Badge, Button, Card, Empty, ErrorNote, InfoTip, Input, Segmented, Select, Skeleton, Textarea } from '../components/ui';
+import { Avatar, Badge, Button, Card, Empty, ErrorNote, InfoTip, Input, Segmented, Select, Skeleton, Textarea, useModal } from '../components/ui';
 import { RelatedAppointments } from '../components/Appointments';
 import { api, isMember, type Job, type JobDetail, type JobEvent, type JobField, type JobList, type JobStage, type Me, type PipelineView, type Team } from '../lib/api';
 import { useLiveEvents } from '../lib/live';
@@ -252,6 +252,7 @@ export function NewJob({ fields, itemSingular, context, onClose, onCreated }: { 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const linked = Boolean(context?.contactId || context?.conversationId || context?.callbackId);
+  const dialog = useModal<HTMLDivElement>(onClose);
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
@@ -278,7 +279,7 @@ export function NewJob({ fields, itemSingular, context, onClose, onCreated }: { 
     }
   };
   return (
-    <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/30 p-4 pt-[8vh]" role="dialog" aria-modal="true" aria-label={`New ${itemSingular.toLowerCase()}`}>
+    <div ref={dialog} className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/30 p-4 pt-[8vh]" role="dialog" aria-modal="true" aria-label={`New ${itemSingular.toLowerCase()}`}>
       <Card className="w-full max-w-lg">
         <form onSubmit={(e) => void submit(e)} className="space-y-3 p-4">
           <div className="flex items-center justify-between">

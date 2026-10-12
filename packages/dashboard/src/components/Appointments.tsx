@@ -2,7 +2,7 @@ import { CalendarClock, ExternalLink, Loader2, MessagesSquare, Plus, Trash2, X }
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { api, type Appointment, type AppointmentStatus } from '../lib/api';
 import { cn, href, useData } from '../lib/utils';
-import { Badge, Button, Card, Input, Select, Textarea } from './ui';
+import { Badge, Button, Card, Input, Select, Textarea, useModal } from './ui';
 
 /**
  * Appointments in the dashboard (on with the date picker, Settings →
@@ -47,14 +47,9 @@ function Field({ label, children, htmlFor }: { label: string; children: ReactNod
 }
 
 export function Dialog({ title, onClose, children, wide = false }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
+  const ref = useModal<HTMLDivElement>(onClose);
   return (
-    <div
-      className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/30 p-4 pt-[8vh]"
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-      onKeyDown={(e) => e.key === 'Escape' && onClose()}
-    >
+    <div ref={ref} className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/30 p-4 pt-[8vh]" role="dialog" aria-modal="true" aria-label={title}>
       <Card className={cn('w-full', wide ? 'max-w-xl' : 'max-w-lg')}>
         <div className="flex items-center justify-between border-b px-4 py-3">
           <h2 className="text-[15px] font-semibold">{title}</h2>

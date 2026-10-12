@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JobsSettings } from '../src/components/JobsSettings';
-import { describeEvent, Jobs } from '../src/pages/Jobs';
+import { describeEvent, Jobs, NewJob } from '../src/pages/Jobs';
+import { act } from 'react';
 import { concerns } from '../src/lib/attention';
 import type { Job, JobField, JobStage, Pipeline, PipelineView } from '../src/lib/api';
 import { button, byText, click, fakeApi, flush, me, mount, select, type, unmount } from './helpers';
@@ -136,6 +137,26 @@ describe('a job', () => {
     expect(e('stage', { from: 'Quote sent', to: 'Lost', reason: 'Too far' })).toBe('Moved from Quote sent to Lost: Too far');
     expect(e('assigned', { to: null })).toBe('Unassigned');
     expect(e('update', { text: 'Booked.' })).toBe('Booked.');
+  });
+});
+
+describe('the new job dialog', () => {
+  it('takes focus when it opens, closes on Escape and gives focus back', async () => {
+    fakeApi({});
+    const opener = document.createElement('button');
+    document.body.appendChild(opener);
+    opener.focus();
+    const onClose = vi.fn();
+    const view = await mount(<NewJob fields={[]} itemSingular="Job" onClose={onClose} onCreated={() => {}} />);
+    const dialog = view.querySelector('[role="dialog"]')!;
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    await unmount();
+    expect(document.activeElement).toBe(opener);
+    opener.remove();
   });
 });
 

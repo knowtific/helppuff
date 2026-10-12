@@ -35,6 +35,7 @@
 - [[Live chat|Live-Chat]]
 - [[Telegram]]
 - [[Webhooks]]
+- [[Email notifications|Email-Notifications]]
 
 **API**
 - [[The API (guide)|API]]

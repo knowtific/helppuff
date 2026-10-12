@@ -4,7 +4,7 @@ import { PageHeader, settingsSections, SettingsTabs, type SettingsSection } from
 import { Avatar, Badge, Button, Card, CardHeader, Input, Select, Skeleton } from '../components/ui';
 import { api, isMember, type Me, type Team as TeamList } from '../lib/api';
 import { LabelsSettings, LiveChatSettings, NotificationSettings } from '../components/LiveChat';
-import { cn, fmtRelative, useData } from '../lib/utils';
+import { cn, copyText, fmtRelative, useData } from '../lib/utils';
 import { SettingsForm } from '../components/SettingsForm';
 import { InstructionsForm } from '../components/InstructionsForm';
 import { FactsForm } from '../components/FactsForm';
@@ -69,16 +69,18 @@ export function AskAgent({ request }: { request: string }) {
 
 export function CopyBlock({ text, label, wrap = false }: { text: string; label: string; wrap?: boolean }) {
   const [copied, setCopied] = useState(false);
+  const code = useRef<HTMLElement>(null);
   return (
     <div className="flex items-start gap-2 rounded-md border bg-subtle p-2 pl-3">
-      <code className={cn('min-w-0 flex-1 py-1 text-xs', wrap ? 'whitespace-pre-wrap' : 'overflow-x-auto whitespace-pre scroll-thin')}>{text}</code>
+      <code ref={code} className={cn('min-w-0 flex-1 py-1 text-xs', wrap ? 'whitespace-pre-wrap' : 'overflow-x-auto whitespace-pre scroll-thin')}>{text}</code>
       <Button
         variant="ghost"
         size="icon"
         className="size-7"
         aria-label={`Copy ${label}`}
         onClick={() => {
-          void navigator.clipboard.writeText(text).then(() => {
+          void copyText(text, code.current).then((ok) => {
+            if (!ok) return;
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);
           });

@@ -71,5 +71,5 @@ helppuff ask "How much is a service call?" --timing
 
 Measured in Workers AI **neurons**: 10,000 a day are free. A typical answer
 uses a few dozen, so the free allowance covers a few hundred answers a day;
-the dashboard's Knowledge page shows today's use. Crawling costs neurons only
+Settings → Knowledge in the dashboard shows today's use. Crawling costs neurons only
 for pages that changed. See [[Costs and limits|Costs-and-Limits]].

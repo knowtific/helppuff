@@ -47,10 +47,11 @@ attributes and notes of their own too (`PATCH /conversations/:id`).
 
 ## In the dashboard
 
-**Leads** lists people by when they were last active, with:
+**Contacts** lists people by when they were last active, with:
 
 - **Status**: new → contacted → qualified → won / lost (changed inline).
-- **Notes**, and their form answers.
+- **Notes**, and their form answers. Open a contact for their page: details,
+  attributes, the team's notes, every chat and their history.
 - **Chats**: how many, with a link to the latest transcript.
 - **Export CSV** for a spreadsheet or CRM. Cells that start with `=`, `+`, `-`
   or `@` are escaped, so a lead cannot plant a formula in your spreadsheet.

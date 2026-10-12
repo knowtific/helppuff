@@ -1,7 +1,7 @@
 import { Check, ChevronRight, Copy, Eye, EyeOff, Loader2, Plus, Send, ShieldCheck, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { api } from '../lib/api';
-import { cn, fmtRelative, useData } from '../lib/utils';
+import { cn, copyText, fmtRelative, useData } from '../lib/utils';
 import { Badge, Button, Card, Empty, ErrorNote, InfoTip, Input, Skeleton } from './ui';
 
 /**
@@ -193,6 +193,7 @@ function WebhookCard({ hook, events, onChanged }: { hook: Webhook; events: Event
   const [editing, setEditing] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
   const [copied, setCopied] = useState(false);
+  const secretBox = useRef<HTMLElement>(null);
   const [testing, setTesting] = useState(false);
   const [test, setTest] = useState<TestResult | null>(null);
   const [open, setOpen] = useState(false);
@@ -309,7 +310,7 @@ function WebhookCard({ hook, events, onChanged }: { hook: Webhook; events: Event
 
       <div className="flex items-center gap-2 border-t px-4 py-2.5 text-xs">
         <span className="font-medium">Signing secret</span>
-        <code className="min-w-0 flex-1 truncate text-muted-foreground">{showSecret ? hook.secret : '•'.repeat(24)}</code>
+        <code ref={secretBox} className="min-w-0 flex-1 truncate text-muted-foreground">{showSecret ? hook.secret : '•'.repeat(24)}</code>
         <Button variant="ghost" size="icon" className="size-7" aria-label={showSecret ? 'Hide secret' : 'Show secret'} onClick={() => setShowSecret(!showSecret)}>
           {showSecret ? <EyeOff /> : <Eye />}
         </Button>
@@ -319,7 +320,13 @@ function WebhookCard({ hook, events, onChanged }: { hook: Webhook; events: Event
           className="size-7"
           aria-label="Copy secret"
           onClick={() =>
-            void navigator.clipboard.writeText(hook.secret).then(() => {
+            void copyText(hook.secret).then((ok) => {
+              if (!ok) {
+                // Refused: show the secret, selected, to copy by hand.
+                setShowSecret(true);
+                setTimeout(() => secretBox.current && window.getSelection()?.selectAllChildren(secretBox.current));
+                return;
+              }
               setCopied(true);
               setTimeout(() => setCopied(false), 1500);
             })

@@ -1,10 +1,10 @@
-import { ArrowUpCircle, Bot, Briefcase, CalendarDays, ChartColumn, ChevronDown, CircleHelp, House, LogOut, MessagesSquare, Moon, PanelsTopLeft, PhoneCall, Server, Settings, Sun, Users } from 'lucide-react';
-import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
-import { api, isMember, type CallbackList, type LiveStatus, type Me, type Prefs, type Site } from '../lib/api';
+import { ArrowUpCircle, Bell, Bot, Briefcase, CalendarDays, ChartColumn, ChevronDown, ChevronsUpDown, CircleHelp, House, LogOut, MessagesSquare, Moon, PanelsTopLeft, PhoneCall, Server, Settings, Sun, Users } from 'lucide-react';
+import { useEffect, useRef, useState, type ComponentProps, type KeyboardEvent, type ReactNode } from 'react';
+import { api, isMember, roleOf, type CallbackList, type LiveStatus, type Me, type Prefs, type Site } from '../lib/api';
 import { onToast, setAvailable, unlockAudio, useLiveConnection, useLiveEvents, type Toast } from '../lib/live';
 import { setAccent, setWaiting } from '../lib/attention';
 import { cn, href, useTheme, type Route } from '../lib/utils';
-import { Avatar, Button, InfoTip } from './ui';
+import { Avatar, Button, HelpPuffMark, InfoTip } from './ui';
 import { useVersion } from './Updates';
 
 const WIKI = 'https://github.com/knowtific/helppuff/wiki';
@@ -239,8 +239,97 @@ function Availability({ live }: { live: ReturnType<typeof useLive> }) {
   );
 }
 
-export function Shell({ me, route, onLogout, children }: { me: Me; route: Route; onLogout: () => void; children: ReactNode }) {
+const ROLES = { owner: 'Owner', admin: 'Admin', member: 'Member' } as const;
+
+/**
+ * Who is signed in, at the bottom of the sidebar, and a menu of what is
+ * theirs: notifications, the theme, help, sign out. Opens upward; closes on
+ * a choice, a click outside, Tab or Escape (which puts focus back on the row).
+ */
+function AccountMenu({ me, notifications, onLogout }: { me: Me; notifications: boolean; onLogout: () => void }) {
+  const [open, setOpen] = useState(false);
   const [dark, toggleTheme] = useTheme();
+  const box = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const name = me.admin.name?.trim() || null;
+  const items = () => [...(menu.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
+  useEffect(() => {
+    if (!open) return;
+    items()[0]?.focus();
+    const outside = (event: MouseEvent) => {
+      if (!box.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', outside);
+    return () => document.removeEventListener('mousedown', outside);
+  }, [open]);
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const list = items();
+    const at = list.indexOf(document.activeElement as HTMLElement);
+    const move: Record<string, number> = { ArrowDown: at + 1, ArrowUp: at - 1, Home: 0, End: list.length - 1 };
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      setOpen(false);
+      trigger.current?.focus();
+    } else if (event.key in move) {
+      event.preventDefault();
+      list[(move[event.key]! + list.length) % list.length]?.focus();
+    } else if (event.key === 'Tab') setOpen(false);
+  };
+  const choose = (run?: () => void) => () => {
+    setOpen(false);
+    run?.();
+  };
+  const item = 'flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-left text-[13px] text-foreground outline-none hover:bg-muted focus-visible:bg-muted [&_svg]:size-4 [&_svg]:text-muted-foreground';
+  return (
+    <div ref={box} className="relative border-t p-2">
+      <button
+        ref={trigger}
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? 'account-menu' : undefined}
+        aria-label={`Your account: ${name ?? me.admin.email}`}
+        className={cn('flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left transition-colors hover:bg-muted/60', open && 'bg-muted')}
+      >
+        <Avatar name={name ?? me.admin.email} className="size-6 text-[10px]" />
+        <span className="min-w-0 flex-1">
+          {name && <span className="block truncate text-xs font-medium">{name}</span>}
+          <span className="block truncate text-xs text-muted-foreground">{me.admin.email}</span>
+        </span>
+        <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+      </button>
+      {open && (
+        <div ref={menu} id="account-menu" role="menu" aria-label="Your account" onKeyDown={onKeyDown} className="absolute right-2 bottom-full left-2 z-30 mb-1 rounded-lg border bg-card p-1 shadow-lg">
+          <div role="none" className="px-2 pt-1.5 pb-2">
+            <p className="truncate text-[13px] font-medium">{name ?? me.admin.email}</p>
+            {name && <p className="truncate text-xs text-muted-foreground">{me.admin.email}</p>}
+            <p className="mt-0.5 text-[11px] text-muted-foreground">{ROLES[roleOf(me)]}</p>
+          </div>
+          <div role="separator" className="-mx-1 my-1 border-t" />
+          {notifications && (
+            <a role="menuitem" href={href({ page: 'settings', id: 'notifications' })} onClick={choose()} className={item}>
+              <Bell aria-hidden /> Notifications
+            </a>
+          )}
+          <button role="menuitem" type="button" onClick={choose(toggleTheme)} className={item}>
+            {dark ? <Sun aria-hidden /> : <Moon aria-hidden />} {dark ? 'Light theme' : 'Dark theme'}
+          </button>
+          <WikiLink page="Home" role="menuitem" onClick={choose()} className={item}>
+            <CircleHelp aria-hidden /> Help and documentation
+          </WikiLink>
+          <div role="separator" className="-mx-1 my-1 border-t" />
+          <button role="menuitem" type="button" onClick={choose(onLogout)} className={item}>
+            <LogOut aria-hidden /> Sign out
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function Shell({ me, route, onLogout, children }: { me: Me; route: Route; onLogout: () => void; children: ReactNode }) {
   const site = me.sites[0];
   const member = isMember(me);
   // A member with live chat off has no settings at all: no Settings entry.
@@ -268,15 +357,12 @@ export function Shell({ me, route, onLogout, children }: { me: Me; route: Route;
   return (
     <div className="flex h-full">
       <aside className="hidden w-60 shrink-0 flex-col border-r bg-sidebar md:flex">
-        <div className="flex h-12 items-center gap-2 px-3">
-          {site?.avatar ? (
-            <img src={site.avatar} alt="" className="size-6 rounded-md object-cover" />
-          ) : (
-            <span className="flex size-6 items-center justify-center rounded-md text-[11px] font-semibold text-white" style={{ background: site?.accent ?? '#18181b' }}>
-              {(site?.name ?? 'M')[0]}
-            </span>
-          )}
-          <span className="truncate font-semibold">{site?.name ?? 'Dashboard'}</span>
+        <div className="flex h-12 items-center gap-2.5 px-3">
+          <HelpPuffMark className="size-6 shrink-0" />
+          <span className="min-w-0 leading-tight">
+            <span className="block truncate text-[13px] font-semibold">{site?.name ?? 'Dashboard'}</span>
+            <span className="block text-[11px] text-muted-foreground">HelpPuff</span>
+          </span>
         </div>
         <nav className="flex flex-col gap-0.5 px-2 py-2" aria-label="Main">
           {NAV.map((item) =>
@@ -370,26 +456,7 @@ export function Shell({ me, route, onLogout, children }: { me: Me; route: Route;
             </span>
           </a>
         )}
-        <div className="flex items-center gap-2 border-t px-3 py-2.5">
-          <Avatar name={me.admin.email} className="size-6 text-[10px]" />
-          <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" title={me.admin.email}>
-            {me.admin.email}
-          </span>
-          <WikiLink
-            page="Home"
-            className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            aria-label="Open HelpPuff help"
-            title="Help and documentation"
-          >
-            <CircleHelp className="size-4" aria-hidden />
-          </WikiLink>
-          <Button variant="ghost" size="icon" className="size-7" onClick={toggleTheme} aria-label={dark ? 'Light theme' : 'Dark theme'}>
-            {dark ? <Sun /> : <Moon />}
-          </Button>
-          <Button variant="ghost" size="icon" className="size-7" onClick={onLogout} aria-label="Sign out">
-            <LogOut />
-          </Button>
-        </div>
+        <AccountMenu me={me} notifications={settingsSections(site, me).some((section) => section.id === 'notifications')} onLogout={onLogout} />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">

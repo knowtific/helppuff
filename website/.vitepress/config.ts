@@ -55,6 +55,8 @@ export default defineConfig({
 
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: `${BASE}logo.svg` }],
+    ['link', { rel: 'icon', href: `${BASE}favicon.ico`, sizes: '48x48' }],
+    ['link', { rel: 'apple-touch-icon', href: `${BASE}apple-touch-icon.png` }],
     ['meta', { name: 'theme-color', content: '#5B5BF7' }],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:title', content: 'HelpPuff: your website’s AI assistant, owned by you' }],

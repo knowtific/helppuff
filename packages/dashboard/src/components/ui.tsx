@@ -1,9 +1,44 @@
-import { forwardRef, useId, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
+import { forwardRef, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import { CircleHelp, UserRound } from 'lucide-react';
 import type { LeadStatus } from '../lib/api';
-import { cn, hueOf, initials } from '../lib/utils';
+import { cn, HELPPUFF_MARK, hueOf, initials } from '../lib/utils';
 
 /** shadcn-shaped primitives, hand-written: same anatomy, no generator. */
+
+/**
+ * A modal's keyboard: focus moves into it when it opens and back to what
+ * opened it when it closes, and Escape closes it (only the topmost one, so
+ * a dialog opened from another closes first).
+ */
+export function useModal<T extends HTMLElement>(onClose: () => void) {
+  const ref = useRef<T>(null);
+  const close = useRef(onClose);
+  close.current = onClose;
+  // Read while rendering, before an autofocus inside the dialog moves focus.
+  const [opener] = useState(() => (document.activeElement instanceof HTMLElement ? document.activeElement : null));
+  useEffect(() => {
+    if (!ref.current?.contains(document.activeElement)) ref.current?.querySelector<HTMLElement>('input, select, textarea, button')?.focus();
+    const escape = (e: KeyboardEvent) => {
+      const modals = document.querySelectorAll('[aria-modal="true"]');
+      if (e.key === 'Escape' && modals[modals.length - 1] === ref.current) close.current();
+    };
+    window.addEventListener('keydown', escape);
+    return () => {
+      window.removeEventListener('keydown', escape);
+      if (opener?.isConnected) opener.focus();
+    };
+  }, [opener]);
+  return ref;
+}
+
+/** HelpPuff's mark, always in the brand's indigo (the site's own colour is for the site's things). */
+export function HelpPuffMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false" className={className}>
+      <path fill="#5B5BF7" d={HELPPUFF_MARK} />
+    </svg>
+  );
+}
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: 'default' | 'outline' | 'ghost' | 'secondary';

@@ -31,6 +31,27 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
   throw new ApiError(response.status, body.error?.message ?? `Request failed (${response.status})`, body.error?.code);
 }
 
+/**
+ * A file from the admin API (an export), saved under the name the server
+ * gives it. Fetched, not navigated to, so a failure stays on the page as an
+ * error instead of replacing the dashboard (and the demo can answer it).
+ */
+export async function download(path: string): Promise<void> {
+  const response = await fetch(`/admin/api${path}`, { credentials: 'same-origin' });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as { error?: { message?: string; code?: string } };
+    if (response.status === 401) unauthorized.forEach((listener) => listener());
+    throw new ApiError(response.status, body.error?.message ?? `Download failed (${response.status})`, body.error?.code);
+  }
+  const name = /filename="([^"]+)"/.exec(response.headers.get('Content-Disposition') ?? '')?.[1] ?? path.split('/').pop() ?? 'download';
+  const url = URL.createObjectURL(await response.blob());
+  const link = Object.assign(document.createElement('a'), { href: url, download: name });
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
 // ------------------------------------------------------------------ types
 
 export type Site = {

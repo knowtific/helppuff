@@ -1,7 +1,7 @@
 import { Check, Copy, KeyRound, Loader2, Plus, TriangleAlert } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { api } from '../lib/api';
-import { fmtRelative, useData } from '../lib/utils';
+import { copyText, fmtRelative, useData } from '../lib/utils';
 import { CopyBlock } from '../pages/Settings';
 import { HelpLink, wikiHref } from './Shell';
 import { Badge, Button, Card, CardHeader, Empty, ErrorNote, Input, Select, Skeleton } from './ui';
@@ -259,19 +259,20 @@ function CreateKey({ listed, onCancel, onMade }: { listed: Listed; onCancel: () 
 /** The one time the full key is visible. */
 function ShownOnce({ made, onDone }: { made: Key & { key: string }; onDone: () => void }) {
   const [copied, setCopied] = useState(false);
+  const keyBox = useRef<HTMLElement>(null);
   return (
     <Card className="border-[#16a34a]/50">
       <div className="space-y-3 px-4 py-4" role="status">
         <p className="text-[13px] font-medium">“{made.name}” is ready</p>
         <div className="flex items-start gap-2 rounded-md border bg-subtle p-2 pl-3">
-          <code className="min-w-0 flex-1 break-all py-1 text-xs">{made.key}</code>
+          <code ref={keyBox} className="min-w-0 flex-1 break-all py-1 text-xs">{made.key}</code>
           <Button
             variant="ghost"
             size="icon"
             className="size-7"
             aria-label="Copy the key"
             onClick={() => {
-              void navigator.clipboard.writeText(made.key).then(() => setCopied(true));
+              void copyText(made.key, keyBox.current).then(setCopied);
             }}
           >
             {copied ? <Check /> : <Copy />}

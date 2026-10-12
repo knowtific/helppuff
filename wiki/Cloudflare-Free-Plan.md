@@ -63,8 +63,8 @@ nothing) on your account.
 
 ## Signs you have outgrown the Free plan
 
-- More than a few hundred answers a day (the dashboard's Knowledge page shows
-  today's AI use, and visitors start getting the callback form in the evening).
+- More than a few hundred answers a day (Settings → Knowledge in the dashboard
+  shows today's AI use, and visitors start getting the callback form in the evening).
 - More than 5 assistants on one account.
 - Many pages that need JavaScript rendering.
 

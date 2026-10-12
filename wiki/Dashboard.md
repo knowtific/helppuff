@@ -15,6 +15,10 @@ that `deploy` prints. After that, sign in with email and password, or run
 link (the way back in if you lose your password). Teammates:
 `helppuff users add <email>`.
 
+**Your account.** Your name at the bottom of the sidebar opens a menu: who
+is signed in and their role, your [Notifications](#settings) (with live
+chat on), the light or dark theme, help, and **Sign out**.
+
 ## Home
 
 - **Try your assistant**: the real widget, full height, exactly as visitors get it.

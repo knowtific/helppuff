@@ -1,7 +1,7 @@
-import { Loader2, MessagesSquare } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
 import { api } from '../lib/api';
-import { Button, Input } from '../components/ui';
+import { Button, HelpPuffMark, Input } from '../components/ui';
 
 type Turnstile = {
   render: (el: HTMLElement, options: { sitekey: string; action?: string; callback: (token: string) => void; 'expired-callback': () => void; 'error-callback': () => void }) => string;
@@ -107,9 +107,7 @@ export function Login({ onDone }: { onDone: () => void }) {
     <div className="flex min-h-full items-center justify-center bg-subtle px-4">
       <div className="w-full max-w-[340px]">
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
-          <span className="flex size-10 items-center justify-center rounded-xl border bg-card shadow-sm">
-            <MessagesSquare className="size-5" />
-          </span>
+          <HelpPuffMark className="size-10" />
           <div>
             <h1 className="text-lg font-semibold tracking-tight">Sign in to your dashboard</h1>
             <p className="mt-1 text-[13px] text-muted-foreground">Conversations, leads and insights from your chat assistant.</p>

@@ -9,6 +9,8 @@
  * (`lib/live.ts`) asks it before a notification, a sound or a toast.
  */
 
+import { HELPPUFF_MARK } from './utils';
+
 let base = typeof document === 'undefined' ? '' : document.title.replace(/^\(\d+\) /, '');
 let waiting = 0;
 let unread = 0;
@@ -77,7 +79,7 @@ if (typeof window !== 'undefined') {
   document.addEventListener('visibilitychange', clear);
 }
 
-/** The tab's icon: a dot in the site's colour, with a red count when something waits. Drawn, so no image files. */
+/** The tab's icon: HelpPuff's mark in the site's colour, with a red count when something waits. Drawn, so no image files. */
 function drawIcon(count: number): void {
   if (typeof document === 'undefined') return;
   try {
@@ -86,9 +88,7 @@ function drawIcon(count: number): void {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.fillStyle = accent;
-    ctx.beginPath();
-    ctx.arc(28, 36, 24, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fill(new Path2D(HELPPUFF_MARK));
     if (count > 0) {
       ctx.fillStyle = '#dc2626';
       ctx.beginPath();

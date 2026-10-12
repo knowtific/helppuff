@@ -89,7 +89,7 @@ const demoSrc = computed(() => {
 const STATS = [
   { value: '$0', label: 'to start, on Cloudflare’s Workers Free plan' },
   { value: '~300', label: 'typical AI answers a day within the free allowance' },
-  { value: '6 KB', label: 'gzipped to load, the rest only when a visitor opens it' },
+  { value: '~35 KB', label: 'gzipped, loaded after your page so it never slows it' },
   { value: '1', label: 'command to set up, deploy and connect everything' },
 ];
 
@@ -132,7 +132,7 @@ const DASH_TABS = [
   { id: 'live', label: 'Live chat', caption: 'A visitor asked for a person: see who is waiting and for how long, take the chat, reply, or hand it back to the assistant.' },
   { id: 'jobs', label: 'Jobs', caption: 'Quote requests and work on a board with your own stages: drag to move, spot what has gone stale, and every update in its history.' },
   { id: 'calendar', label: 'Calendar', caption: 'Every appointment by month, week or day: booked in the chat, added by hand, or read from your synced calendar, each on its job.' },
-  { id: 'leads', label: 'Leads', caption: 'One lead per person, moved through your pipeline from new to won, with notes and CSV export.' },
+  { id: 'leads', label: 'Contacts', caption: 'One contact per person across repeat chats, moved from new to won, with notes, attributes and CSV export.' },
   { id: 'callbacks', label: 'Callbacks', caption: '“Please call me” becomes a task: tap to call, mark it done with a note, or dismiss it.' },
   { id: 'analytics', label: 'Analytics', caption: 'Conversations, leads and conversion against the previous period, top pages, countries and the latest questions.' },
   { id: 'knowledge', label: 'Knowledge', caption: 'What it learned from your site, the files you gave it, your own answers, and a box to test any question.' },

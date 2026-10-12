@@ -478,6 +478,23 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
     });
   }
 
+  if (head === 'leads.csv' && method === 'GET') {
+    // The same columns and formula guard as the Worker's export.
+    const cell = (value: unknown) => {
+      const text = value === null || value === undefined ? '' : String(value);
+      const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+      return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+    };
+    const header = ['created', 'name', 'email', 'phone', 'company', 'address', 'status', 'source', 'notes', 'attributes', 'site', 'conversation'];
+    const lines = leads.map((l) =>
+      [new Date(l.createdAt ?? NOW).toISOString(), l.name, l.email, l.phone, l.company, l.address, l.status, l.source, l.notes, l.attributes ? JSON.stringify(l.attributes) : null, SITE.id, l.lastConversationId]
+        .map(cell)
+        .join(','),
+    );
+    return new Response([header.join(','), ...lines].join('\n'), {
+      headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="leads-${new Date().toISOString().slice(0, 10)}.csv"` },
+    });
+  }
   if (head === 'leads') {
     if (!id) {
       const q = (params.get('q') ?? '').toLowerCase();

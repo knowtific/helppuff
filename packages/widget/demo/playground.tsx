@@ -565,10 +565,7 @@ function Playground() {
           <h1>
             <a class="home" href={SITE} title="HelpPuff website">
               <svg viewBox="0 0 64 64" aria-hidden="true">
-                <path d="M32 6c14.36 0 26 10.3 26 23s-11.64 23-26 23c-2.6 0-5.1-.33-7.46-.95L12.5 57.5c-1.5.8-3.2-.55-2.75-2.2l2.6-9.05C8.4 42.1 6 35.8 6 29 6 16.3 17.64 6 32 6Z" fill="#5B5BF7" />
-                <circle cx="22" cy="29.5" r="3.6" fill="#fff" />
-                <circle cx="32" cy="29.5" r="3.6" fill="#fff" />
-                <circle cx="42" cy="29.5" r="3.6" fill="#fff" />
+                <path d="M32 5.5a19 19 0 1 1 0 38a19 19 0 1 1 0-38ZM32 17a7.5 7.5 0 1 0 0 15a7.5 7.5 0 1 0 0-15ZM13 24.5H24V41.5L13 47.5ZM11 49a5 5 0 1 1 0 10a5 5 0 1 1 0-10Z" fill="#5B5BF7" />
               </svg>
               HelpPuff
             </a>{' '}

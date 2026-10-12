@@ -3,7 +3,7 @@
 Tools connect the assistant to your own systems. A tool is an HTTP request
 to one of your APIs, or an **extract** tool that saves something the visitor
 says. Tools run at three points in a chat, and each has its own section on
-the dashboard's **Prompt** page:
+the dashboard's **Prompt & tools** page (Settings → Prompt & tools):
 
 | When | What happens | Typical use |
 | --- | --- | --- |

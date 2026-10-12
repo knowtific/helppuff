@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act } from 'react';
 import { Shell } from '../src/components/Shell';
 import { AttributesEditor, NotesPanel } from '../src/components/inbox';
 import { NotificationSettings } from '../src/components/LiveChat';
@@ -124,6 +125,51 @@ describe('the shell', () => {
     </Shell>,
     );
     expect(NoSocket.made).toBe(0);
+    await unmount();
+  });
+
+  it('opens the account menu from the person at the bottom: who they are, their things, sign out', async () => {
+    fakeApi(base);
+    const onLogout = vi.fn();
+    const view = await mount(
+      <Shell me={me('member')} route={{ page: 'conversations' }} onLogout={onLogout}>
+        <div />
+      </Shell>,
+    );
+    const row = button(view, 'Your account: Mo')!;
+    expect(row.getAttribute('aria-expanded')).toBe('false');
+    expect(view.querySelector('[role="menu"]')).toBeNull();
+    await click(row);
+    const menu = view.querySelector('[role="menu"][aria-label="Your account"]')!;
+    expect(row.getAttribute('aria-expanded')).toBe('true');
+    expect(menu.textContent).toContain('mo@acme.test');
+    expect(menu.textContent).toContain('Member');
+    const items = [...menu.querySelectorAll('[role="menuitem"]')].map((el) => el.textContent?.trim());
+    expect(items).toEqual(['Notifications', expect.stringMatching(/^(Dark|Light) theme$/), 'Help and documentation', 'Sign out']);
+    expect(document.activeElement).toBe(menu.querySelector('[role="menuitem"]'));
+    // Escape closes it and gives focus back to the row.
+    await act(async () => {
+      menu.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(view.querySelector('[role="menu"]')).toBeNull();
+    expect(document.activeElement).toBe(row);
+    await click(row);
+    await click(button(view.querySelector('[role="menu"]')!, 'Sign out'));
+    expect(onLogout).toHaveBeenCalledTimes(1);
+    expect(view.querySelector('[role="menu"]')).toBeNull();
+    await unmount();
+  });
+
+  it('shows HelpPuff’s mark beside the site’s name', async () => {
+    fakeApi(base);
+    const view = await mount(
+      <Shell me={me('owner', false)} route={{ page: 'home' }} onLogout={() => {}}>
+        <div />
+      </Shell>,
+    );
+    const head = view.querySelector('aside > div')!;
+    expect(head.querySelector('svg path')?.getAttribute('fill')).toBe('#5B5BF7');
+    expect(head.textContent).toBe('AcmeHelpPuff');
     await unmount();
   });
 });

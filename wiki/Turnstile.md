@@ -66,7 +66,8 @@ the Secret Key into `helppuff secret set` yourself.
   no longer shows **Before you go live**.
 - Open your site (or the preview page from `helppuff deploy`) and start a chat:
   it works as before.
-- Sign out of the dashboard and back in: the sign-in form now shows the
+- Sign out of the dashboard (your name at the bottom of the sidebar →
+  **Sign out**) and back in: the sign-in form now shows the
   Turnstile check.
 
 From now on scripted chats are refused, including `helppuff chat` and
