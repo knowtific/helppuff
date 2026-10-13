@@ -133,7 +133,7 @@ describe('the Prompt page with tools', () => {
     expect(button(page, 'order_status')).toBeTruthy();
 
     await type(editor, `${editor.value} {{order_stauts}}`);
-    expect(byText(page, /Not a tool or a known value: \{\{order_stauts\}\}/)).toBeTruthy();
+    expect(byText(page, /Not available during the chat: \{\{order_stauts\}\}/)).toBeTruthy();
   });
 });
 
@@ -141,9 +141,8 @@ describe('the tool dialog', () => {
   it('makes an extract tool that saves what the visitor says', async () => {
     const calls = fakeApi({ 'GET /prompt': PROMPT, 'GET /tools': list([]), 'POST /tools': (c: { body: unknown }) => tool({ ...(c.body as object), id: 'tool_3' }) });
     const page = await mount(<Prompt me={me('owner')} />);
-    // From the prompt: a tool the assistant uses during the chat, in no step.
-    await openPrompt(page);
-    await openMenu(page, 'Add a tool to the prompt');
+    // Save tools run after the conversation, not before it or in the prompt.
+    await openMenu(page, 'Add a tool to after the chat');
     await click(button(page, 'New tool'));
     const dialog = lastDialog(page);
     await click(button(dialog, 'Save what the visitor says'));
@@ -159,7 +158,7 @@ describe('the tool dialog', () => {
       kind: 'extract',
       description: 'Save the order number once they give it.',
       before: false,
-      after: false,
+      after: true,
       enabled: true,
       fields: [{ name: 'order_number', description: 'Like A-1042', required: true }],
     });

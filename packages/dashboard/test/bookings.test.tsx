@@ -87,6 +87,9 @@ describe('Settings → Integrations', () => {
     });
     const page = await mount(<Integrations />);
     const card = page.querySelector('[aria-label="Cal.com"]')!;
+    // Not connected: a row with Connect, the key form opens on demand.
+    expect(card.querySelector('input[type="password"]')).toBeNull();
+    await click(button(card, 'Connect'));
     await type(card.querySelector('input[type="password"]'), 'cal_live_abc');
     await click(button(card, 'Connect'));
     expect(calls.find((c) => c.method === 'PUT')!.body).toEqual({ key: 'cal_live_abc', baseUrl: null });

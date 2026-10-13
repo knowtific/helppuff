@@ -200,33 +200,159 @@ webhooks set <id> --format helppuff` goes back to the signed JSON.
 
 ## Checking a delivery came from us
 
-The signature is the hex HMAC-SHA256, with the endpoint's signing secret, of
-the timestamp, a dot, and the raw body. Check it against the raw bytes before
-parsing, reject a timestamp more than five minutes old, and skip an `id` you
-have already handled (a retry after a timeout can repeat one).
+Anyone who finds your endpoint's address could send it a fake event. Every
+delivery is signed, so your server can check it really came from HelpPuff
+before acting on it. Each webhook has its own **signing secret**: copy it
+from that webhook's card in **Settings → Webhooks** (or `helppuff webhooks
+list --json`).
 
-```js
+The signature is:
+
+```text
+X-HelpPuff-Signature: sha256=hex(HMAC-SHA256(secret, timestamp + "." + body))
+```
+
+In words: join the `X-HelpPuff-Timestamp` header, a dot, and the request
+body exactly as it arrived. Compute an HMAC-SHA256 of that with the signing
+secret as the key, write it as lowercase hex, and put `sha256=` in front. If
+the result equals the `X-HelpPuff-Signature` header, the delivery is real.
+
+Then two more checks:
+
+- **Reject old deliveries.** If the timestamp is more than five minutes from
+  your clock, refuse it, so a copied delivery cannot be replayed later. Each
+  try, retries included, is signed with a fresh timestamp.
+- **Skip repeats.** A retry after a timeout can bring an event you already
+  handled. Keep the `X-HelpPuff-Delivery` IDs you have processed for a day
+  and ignore one you have seen.
+
+### A worked example
+
+Use these values to test your own code: it should print the same signature.
+
+| | Value |
+| --- | --- |
+| Signing secret | `whsec_3f8a1c9e7b2d4f6a8c0e2b4d6f8a1c3e5b7d9f0a2c4e6b8d` |
+| `X-HelpPuff-Timestamp` | `1791234567` |
+| Body | `{"id":"evt_4f0c2a","type":"lead.captured","createdAt":"2026-10-05T01:02:03.000Z","site":"acme","data":{"name":"Ada","email":"ada@example.com"}}` |
+
+1. The text to sign is the timestamp, a dot, then the body:
+
+   ```text
+   1791234567.{"id":"evt_4f0c2a","type":"lead.captured","createdAt":"2026-10-05T01:02:03.000Z","site":"acme","data":{"name":"Ada","email":"ada@example.com"}}
+   ```
+
+2. Its HMAC-SHA256 with the secret, in hex, with `sha256=` in front:
+
+   ```text
+   sha256=bc0ab9609836f16c5d455173aaef1cf366ba702c3452f460388e19f94d214232
+   ```
+
+You can check this in a terminal:
+
+```bash
+printf '%s' '1791234567.{"id":"evt_4f0c2a","type":"lead.captured","createdAt":"2026-10-05T01:02:03.000Z","site":"acme","data":{"name":"Ada","email":"ada@example.com"}}' \
+  | openssl dgst -sha256 -hmac 'whsec_3f8a1c9e7b2d4f6a8c0e2b4d6f8a1c3e5b7d9f0a2c4e6b8d'
+# SHA2-256(stdin)= bc0ab9609836f16c5d455173aaef1cf366ba702c3452f460388e19f94d214232
+```
+
+If you got `sha256=ef16ceb1…` instead, you signed the same JSON
+pretty-printed (re-indented by a framework). That is the most common mistake:
+see [below](#when-the-signature-does-not-match).
+
+### In your server
+
+Each example reads the raw body, checks the signature and the timestamp, and
+only then parses the JSON. Keep the secret in an environment variable, here
+`HELPPUFF_WEBHOOK_SECRET`.
+
+<!-- tabs -->
+```js [Node.js (Express)]
+import express from 'express';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
-function verify(secret, headers, rawBody) {
-  const timestamp = headers['x-helppuff-timestamp'];
+const secret = process.env.HELPPUFF_WEBHOOK_SECRET;
+const app = express();
+
+function verify(headers, rawBody) {
+  const timestamp = headers['x-helppuff-timestamp'] ?? '';
   if (Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) return false;
-  const expected = 'sha256=' + createHmac('sha256', secret).update(`${timestamp}.${rawBody}`).digest('hex');
+  const expected = 'sha256=' + createHmac('sha256', secret).update(`${timestamp}.`).update(rawBody).digest('hex');
   const given = headers['x-helppuff-signature'] ?? '';
   return given.length === expected.length && timingSafeEqual(Buffer.from(given), Buffer.from(expected));
 }
+
+// express.raw keeps the body as the bytes that arrived (not express.json).
+app.post('/helppuff', express.raw({ type: 'application/json' }), (req, res) => {
+  if (!verify(req.headers, req.body)) return res.sendStatus(401);
+  const event = JSON.parse(req.body.toString('utf8'));
+  // …handle event.type and event.data, skipping an X-HelpPuff-Delivery you have seen.
+  res.sendStatus(200);
+});
+
+app.listen(3000);
 ```
+```python [Python (Flask)]
+import hashlib, hmac, json, os, time
+from flask import Flask, request, abort
 
-```python
-import hashlib, hmac, time
+SECRET = os.environ["HELPPUFF_WEBHOOK_SECRET"].encode()
+app = Flask(__name__)
 
-def verify(secret: str, headers, raw_body: bytes) -> bool:
-    timestamp = headers["X-HelpPuff-Timestamp"]
-    if abs(time.time() - int(timestamp)) > 300:
+def verify(headers, raw_body: bytes) -> bool:
+    timestamp = headers.get("X-HelpPuff-Timestamp", "")
+    if not timestamp.isdigit() or abs(time.time() - int(timestamp)) > 300:
         return False
-    expected = "sha256=" + hmac.new(secret.encode(), f"{timestamp}.".encode() + raw_body, hashlib.sha256).hexdigest()
+    expected = "sha256=" + hmac.new(SECRET, f"{timestamp}.".encode() + raw_body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, headers.get("X-HelpPuff-Signature", ""))
+
+@app.post("/helppuff")
+def helppuff():
+    raw = request.get_data()  # the bytes that arrived, before any parsing
+    if not verify(request.headers, raw):
+        abort(401)
+    event = json.loads(raw)
+    # …handle event["type"] and event["data"]
+    return "", 200
 ```
+```php [PHP]
+<?php
+$secret = getenv('HELPPUFF_WEBHOOK_SECRET');
+$body = file_get_contents('php://input'); // the bytes that arrived
+$timestamp = $_SERVER['HTTP_X_HELPPUFF_TIMESTAMP'] ?? '';
+$given = $_SERVER['HTTP_X_HELPPUFF_SIGNATURE'] ?? '';
+
+$expected = 'sha256=' . hash_hmac('sha256', $timestamp . '.' . $body, $secret);
+if (!ctype_digit($timestamp) || abs(time() - (int) $timestamp) > 300 || !hash_equals($expected, $given)) {
+    http_response_code(401);
+    exit;
+}
+
+$event = json_decode($body, true);
+// …handle $event['type'] and $event['data']
+http_response_code(200);
+```
+<!-- /tabs -->
+
+### When the signature does not match
+
+- **The body was changed before you signed it.** Sign the raw bytes. A
+  framework that parses JSON and you then turn back into text
+  (`JSON.stringify(req.body)`, `json.dumps(request.json)`) can change spacing,
+  key order or escaping, and the signature no longer matches. Use the raw body:
+  `express.raw`, Flask's `request.get_data()`, PHP's `php://input`.
+- **The wrong secret.** Each webhook has its own. Use the whole secret,
+  `whsec_` included. After **New secret**, deliveries are signed with the new
+  one at once.
+- **The wrong timestamp.** Sign the `X-HelpPuff-Timestamp` header's value as
+  it is (seconds, not milliseconds), with a dot after it.
+- **Comparing the wrong form.** The header is `sha256=` followed by lowercase
+  hex, not base64.
+- **Your clock is off.** If every delivery fails only the five-minute check,
+  set your server's time automatically (NTP).
+
+**Send test** on the webhook's card sends a signed `test.ping` event, so you can
+try your check without waiting for a real chat.
 
 **New secret** in the dashboard (or `PATCH /admin/api/webhooks/:id` with
 `{"rotateSecret": true}`) replaces it at once.

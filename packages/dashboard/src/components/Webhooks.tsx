@@ -2,8 +2,9 @@ import { Check, ChevronRight, Copy, Eye, EyeOff, Loader2, Plus, Send, ShieldChec
 import { useRef, useState } from 'react';
 import { api, type ToolHeaderView } from '../lib/api';
 import { cn, copyText, fmtRelative, useData } from '../lib/utils';
-import { Badge, Button, Card, Empty, ErrorNote, InfoTip, Input, Segmented, Skeleton } from './ui';
+import { Badge, Button, Card, Empty, ErrorNote, Input, Segmented, Skeleton } from './ui';
 import { RequestEditor, type RequestDraft } from './RequestFields';
+import { HelpLink, HelpNote } from './Shell';
 
 /**
  * Settings → Webhooks: endpoints that receive what happens — chats, messages,
@@ -32,8 +33,7 @@ type Delivery = { id: string; event: string; ok: boolean; status: number | null;
 type TestResult = { ok: boolean; status: number | null; error: string | null };
 
 const ALL = '*';
-const SIGNED_HEADERS = ['X-HelpPuff-Event', 'X-HelpPuff-Delivery', 'X-HelpPuff-Timestamp', 'X-HelpPuff-Signature'];
-const CUSTOM_VALUES = 'Use {{event.type}}, {{event.id}}, {{event.createdAt}} and the event’s data, like {{data.name}}, {{data.phone}} or {{data.job.title}}, in the body, headers and the address’s path. A whole "{{data}}" is the object itself. An empty body sends HelpPuff’s signed JSON.';
+const CUSTOM_VALUES = 'Fill it in with the event’s values, like {{data.name}} or {{event.type}}.';
 const CUSTOM_EXAMPLE = '{\n  "channel": "#sales",\n  "text": "Call {{data.name}} on {{data.phone}}: {{data.message}}"\n}';
 
 export function Webhooks() {
@@ -73,38 +73,9 @@ export function Webhooks() {
         )
       )}
 
-      <Card className="overflow-hidden bg-subtle/60" role="note" aria-labelledby="webhook-signing-title">
-        <div className="flex items-start gap-3 border-b px-4 py-3.5">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-md border bg-card text-muted-foreground">
-            <ShieldCheck className="size-4" aria-hidden />
-          </span>
-          <div className="min-w-0">
-            <h3 id="webhook-signing-title" className="flex items-center gap-1.5 text-[13px] font-medium">
-              Verify webhook signatures
-              <InfoTip label="About signatures">Confirm each delivery came from HelpPuff before processing it.</InfoTip>
-            </h3>
-          </div>
-        </div>
-        <div className="space-y-3 px-4 py-3.5 text-xs text-muted-foreground">
-          <p className="leading-relaxed">
-            Every delivery is a JSON <code>POST</code> with these headers:
-          </p>
-          <ul className="flex flex-wrap gap-1.5" aria-label="Webhook signature headers">
-            {SIGNED_HEADERS.map((header) => (
-              <li key={header}>
-                <code className="block rounded-md border bg-card px-2 py-1 text-[11px] text-foreground">{header}</code>
-              </li>
-            ))}
-          </ul>
-          <div className="space-y-2 border-t pt-3">
-            <p className="leading-relaxed">Create the signature with the endpoint’s signing secret:</p>
-            <code className="block overflow-x-auto whitespace-nowrap rounded-md bg-muted px-2.5 py-2 text-[11px] text-foreground">
-              sha256=hex(HMAC-SHA256(secret, timestamp + "." + body))
-            </code>
-            <p className="leading-relaxed">Reject timestamps older than five minutes, and use the body’s <code>id</code> to ignore a repeated delivery.</p>
-          </div>
-        </div>
-      </Card>
+      <HelpNote page="Webhooks#checking-a-delivery-came-from-us" label="How to check it" icon={<ShieldCheck aria-hidden />}>
+        Every delivery is signed, so your server can check it came from HelpPuff.
+      </HelpNote>
     </div>
   );
 }
@@ -211,7 +182,10 @@ function WebhookForm({ events, initial, onSaved, onCancel }: { events: EventInfo
           <Input type="url" required placeholder="https://hooks.zapier.com/hooks/catch/…" value={url} onChange={(e) => setUrl(e.target.value)} />
         </label>
       ) : (
-        <RequestEditor id={`hook-${initial?.id ?? 'new'}`} value={request} onChange={setRequest} values={CUSTOM_VALUES} bodyPlaceholder={CUSTOM_EXAMPLE} />
+        <div className="space-y-1.5">
+          <RequestEditor id={`hook-${initial?.id ?? 'new'}`} value={request} onChange={setRequest} values={CUSTOM_VALUES} bodyPlaceholder={CUSTOM_EXAMPLE} />
+          <HelpLink page="Webhooks#your-own-request" label="Every value you can use" />
+        </div>
       )}
       <label className="block space-y-1.5">
         <span className="text-xs font-medium">Description (optional)</span>

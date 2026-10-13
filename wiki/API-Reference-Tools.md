@@ -2,7 +2,7 @@
 
 # Tools API
 
-Your own APIs, called before, during and after a chat (`{{name}}` in the prompt), and extract tools that save what the assistant learns. What they return is kept on the conversation (`data`) and sent to webhooks. Part of the [[API reference|API-Reference]]: setup, shared types and errors are there.
+Your own APIs, called before, during and after a chat (`{{name}}` in the prompt), and extract tools that save values from the finished conversation. What they return or save is kept on the conversation (`data`) and sent to webhooks. Part of the [[API reference|API-Reference]]: setup, shared types and errors are there.
 
 - [[List tools|API-Reference-Tools#list-tools]]: `GET /tools`
 - [[Add a tool|API-Reference-Tools#add-a-tool]]: `POST /tools`
@@ -159,13 +159,13 @@ type ListToolsResponse = {
 
 `POST /tools` · scope `prompt:write`
 
-An `http` tool calls your API: `{{args.x}}` in its URL, headers or body is filled in by the assistant, `{{prechat.email}}` from the pre-chat form, `{{data.other_tool.key}}` from what another tool returned. An `extract` tool calls nothing: the assistant saves its `fields` (as conversation attributes too). Name it in the prompt as `{{name}}` to let the assistant use it; `before` runs it when the chat starts, `after` when the conversation ends. Up to 30 per site.
+An `http` tool calls your API: `{{args.x}}` in its URL, headers or body is filled in by the assistant, `{{prechat.email}}` from the pre-chat form, `{{data.other_tool.key}}` from what another tool returned. Name an HTTP tool in the prompt as `{{name}}` to let the assistant use it; `before` runs it when the chat starts, `after` when the conversation ends. An `extract` tool reads the finished chat and saves visitor-stated `fields` as conversation attributes and data. New extract tools run after the chat by default. Up to 30 per site.
 
 | Body field | Required | Description |
 | --- | --- | --- |
 | `name` | yes | Lowercase letters, digits and `_`, starting with a letter: how the prompt and the data refer to it. |
 | `kind` | no | `http` (the default) or `extract`. |
-| `description` | yes | What it does and when to use it: the assistant reads it. |
+| `description` | yes | What the tool does; for extract tools, which visitor details to collect. |
 | `method` | no | `GET`, `POST`, `PUT`, `PATCH` or `DELETE`. |
 | `url` | no | An https URL; only its path and query may use `{{…}}`. |
 | `headers` | no | A list of `{ name, value, secret }`; secret values are stored encrypted and never returned. |
@@ -174,8 +174,8 @@ An `http` tool calls your API: `{{args.x}}` in its URL, headers or body is fille
 | `fields` | no | An extract tool's fields: `{ name, description, required }`. |
 | `pick` | no | Response paths to keep (`delivery.date`); empty keeps it all (cut to about 4 KB). |
 | `timeoutMs` | no | 1000 to 10000 (default 5000). |
-| `before` | no | Run it when the chat starts, with the pre-chat form's answers. |
-| `after` | no | Run it when the conversation ends, with the transcript, the summary, the lead and all the data. |
+| `before` | no | For an HTTP tool, run it when the chat starts, with the pre-chat form's answers. |
+| `after` | no | Run it when the conversation ends, with the transcript, summary, lead and data. New extract tools default to this timing. |
 | `when` | no | An after-chat tool runs only when this holds: `{ "path": "labels.leadQuality", "in": ["hot"] }` (a path in the conversation.completed data and the values it may have), or `{ "path": "lead.email" }` (has a value). `null` removes it. |
 
 **Request**
@@ -219,7 +219,7 @@ type AddToolRequest = {
   name: string;
   /** `http` (the default) or `extract`. */
   kind?: string;
-  /** What it does and when to use it: the assistant reads it. */
+  /** What the tool does; for extract tools, which visitor details to collect. */
   description: string;
   /** `GET`, `POST`, `PUT`, `PATCH` or `DELETE`. */
   method?: string;
@@ -257,11 +257,14 @@ type AddToolRequest = {
   pick?: string[];
   /** 1000 to 10000 (default 5000). */
   timeoutMs?: string;
-  /** Run it when the chat starts, with the pre-chat form's answers. */
+  /**
+   * For an HTTP tool, run it when the chat starts, with the pre-chat form's
+   * answers.
+   */
   before?: string;
   /**
-   * Run it when the conversation ends, with the transcript, the summary, the
-   * lead and all the data.
+   * Run it when the conversation ends, with the transcript, summary, lead and
+   * data. New extract tools default to this timing.
    */
   after?: string;
   /**

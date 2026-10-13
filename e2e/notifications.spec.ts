@@ -45,7 +45,7 @@ async function signIn(browser: Browser, who: { email: string; password: string }
   const page = await context.newPage();
   await page.goto('/admin/');
   await page.getByLabel(/email/i).fill(who.email);
-  await page.getByLabel(/password/i).fill(who.password);
+  await page.getByRole('textbox', { name: 'Password', exact: true }).fill(who.password);
   await page.getByRole('button', { name: /sign in/i }).click();
   await expect(page.getByRole('navigation', { name: 'Main' }).first()).toBeVisible();
   return page;
@@ -64,7 +64,7 @@ test('the owner connects an email service, chooses an email, and a new contact e
   await service.getByLabel('Address').fill('https://mail.e2e.test/send');
   await service.getByRole('button', { name: 'Add a header' }).click();
   await service.getByLabel('Header 2 name').fill('X-Api-Key');
-  await service.getByLabel('Header 2 value').fill('e2e-mail-key');
+  await service.getByLabel('Header 2 value', { exact: true }).fill('e2e-mail-key');
   await expect(service.getByRole('checkbox', { name: 'Secret' }).nth(1)).toBeChecked();
   await service.getByLabel('Body').fill('{"to": "{{email.to}}", "subject": "{{email.subject}}", "text": "{{email.text}}"}');
 

@@ -2,7 +2,7 @@ import { ArrowRight, CheckCircle2, ExternalLink, Loader2, ShieldAlert, Sparkles 
 import { useEffect, useState, type ReactNode } from 'react';
 import { CrawlProgress, useKnowledgeStatus } from '../components/knowledge';
 import { HelpLink, wikiHref } from '../components/Shell';
-import { Button, Card, CardHeader, ErrorNote, InfoTip } from '../components/ui';
+import { Button, Card, CardHeader, Disclosure, ErrorNote, InfoTip } from '../components/ui';
 import { api, type Me, type PipelineView, type Site } from '../lib/api';
 import { cn, href, pathOf } from '../lib/utils';
 import { CopyBlock } from './Settings';
@@ -168,11 +168,11 @@ function JobsChoice() {
  */
 function GoLiveChecklist({ production }: { production: NonNullable<Site['production']> }) {
   return (
-    <Card>
+    <Card tone="attention">
       <CardHeader title="Before you go live" tip={{ label: 'About going live', text: 'Fine to skip while you test.', href: wikiHref('Turnstile') }} />
       <ul className="space-y-4 px-4 pb-4">
         <li className="flex gap-3">
-          <ShieldAlert className="mt-0.5 size-4 shrink-0 text-[#d97706]" aria-hidden />
+          <ShieldAlert className="mt-0.5 size-4 shrink-0 text-attention-foreground" aria-hidden />
           <div className="min-w-0 flex-1 space-y-2">
             <div>
               <h2 className="text-[13px] font-medium">Turn on Turnstile</h2>
@@ -180,13 +180,12 @@ function GoLiveChecklist({ production }: { production: NonNullable<Site['product
                 Stops bots starting chats and guessing passwords. Free, about five minutes.
               </p>
             </div>
-            {production.hostnames.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-[11px] text-muted-foreground">Hostnames to add to the widget:</p>
-                <CopyBlock text={production.hostnames.join('\n')} label="hostnames" />
-              </div>
-            )}
             <HelpLink page="Turnstile" label="How to turn it on" />
+            {production.hostnames.length > 0 && (
+              <Disclosure summary="Hostnames to add">
+                <CopyBlock text={production.hostnames.join('\n')} label="hostnames" />
+              </Disclosure>
+            )}
           </div>
         </li>
       </ul>

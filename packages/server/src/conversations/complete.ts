@@ -42,6 +42,8 @@ export type ConversationParams = {
   conversationId: string;
   /** Workers AI model for the summary; null when there is no AI binding. */
   model: string | null;
+  /** Automatic summary and AI labels are off for this site. Older jobs default to on. */
+  autoSummary?: boolean;
   /** The site's daily neuron budget: no summary once it is spent. 0 = no limit. */
   budget: number;
   idleMs?: number;
@@ -109,6 +111,7 @@ export function startConversationJob(ctx: RequestCtx, siteId: string, conversati
         siteId,
         conversationId,
         model: ctx.env['AI'] ? await summaryModel(ctx, siteId) : null,
+        autoSummary: site.autoSummary,
         budget,
         instructions: assistantInstructions(site),
         knowledgeBase: ownsKnowledge(site),
@@ -151,7 +154,7 @@ export async function runConversationJob(step: StepLike, deps: ConversationJobDe
   // A summary is worth having but never worth losing the event over.
   try {
     await step.do('summarize', async () => {
-      if (!deps.ai || !params.model) return false;
+      if (params.autoSummary === false || !deps.ai || !params.model) return false;
       if (params.budget > 0) {
         const day = new Date(now()).toISOString().slice(0, 10);
         const used = (await deps.db.prepare('SELECT neurons_est AS n FROM usage_daily WHERE day = ? AND site_id = ?').bind(day, params.siteId).first<{ n: number }>())?.n ?? 0;
@@ -167,6 +170,7 @@ export async function runConversationJob(step: StepLike, deps: ConversationJobDe
   // What it could not answer, and the knowledge base does not cover: the owner's questions to answer.
   try {
     await step.do('gaps', async () => {
+      if (params.autoSummary === false) return 0;
       const row = await deps.db.prepare('SELECT summary FROM conversations WHERE id = ?').bind(params.conversationId).first<{ summary: string | null }>();
       let unanswered: string[];
       try {
@@ -187,15 +191,13 @@ export async function runConversationJob(step: StepLike, deps: ConversationJobDe
     deps.log?.('conversation.gaps_failed');
   }
 
-  // The site's after-chat tools, one step each (retried on a 5xx or a timeout), before the event, so it carries what they returned.
-  if (deps.secret) {
-    const tools = await step.do('tools', () => afterToolIds(deps.db, params.siteId, now())).catch(() => [] as string[]);
-    for (const toolId of tools) {
-      try {
-        await step.do(`tool:${toolId}`, async () => runAfterTool({ db: deps.db, fetch: deps.fetch, secret: deps.secret, now, log: deps.log }, params.siteId, toolId, await completedEvent(deps.db, params.conversationId)));
-      } catch {
-        deps.log?.('conversation.tool_failed');
-      }
+  // Extract what the visitor said first, then run after-chat requests with those saved values.
+  const tools = await step.do('tools', () => afterToolIds(deps.db, params.siteId, now())).catch(() => [] as string[]);
+  for (const toolId of tools) {
+    try {
+      await step.do(`tool:${toolId}`, async () => runAfterTool({ db: deps.db, fetch: deps.fetch, secret: deps.secret, ai: deps.ai, model: params.model, budget: params.budget, now, log: deps.log }, params.siteId, toolId, await completedEvent(deps.db, params.conversationId)));
+    } catch {
+      deps.log?.('conversation.tool_failed');
     }
   }
 

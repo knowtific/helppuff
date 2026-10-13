@@ -149,3 +149,16 @@ export function saveDataStatement(db: D1Like, siteId: string, conversationId: st
     )
     .bind(conversationId, siteId, now, now, ...params, ...params);
 }
+
+/** Keep extracted fields where the team can see and edit them. */
+export function saveAttributesStatement(db: D1Like, siteId: string, conversationId: string, values: Record<string, string>, now: number) {
+  const entries = Object.entries(values).filter(([name]) => /^[a-zA-Z_][\w]*$/.test(name));
+  const set = entries.map(() => `'$.' || ?, ?`).join(', ');
+  const params = entries.flatMap(([name, value]) => [name, value]);
+  return db
+    .prepare(
+      `INSERT INTO conversations (id, site_id, started_at, last_at, message_count, attributes) VALUES (?, ?, ?, ?, 0, json_set('{}', ${set}))
+       ON CONFLICT (id) DO UPDATE SET attributes = json_set(coalesce(conversations.attributes, '{}'), ${set})`,
+    )
+    .bind(conversationId, siteId, now, now, ...params, ...params);
+}

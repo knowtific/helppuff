@@ -1,6 +1,6 @@
 import { Loader2, ShieldCheck } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { Button, HelpPuffMark, Input } from '../components/ui';
+import { Button, HelpPuffMark, Input, PasswordInput } from '../components/ui';
 import { HelpLink } from '../components/Shell';
 import { api, ApiError } from '../lib/api';
 import { replaceHash } from '../lib/utils';
@@ -48,12 +48,29 @@ function Expired() {
   );
 }
 
+const STRENGTH_LABELS = ['Too short', 'Weak', 'Fair', 'Good', 'Strong'] as const;
+const STRENGTH_COLORS = ['', 'bg-danger', 'bg-amber-600 dark:bg-amber-400', 'bg-emerald-700 dark:bg-emerald-400', 'bg-emerald-700 dark:bg-emerald-400'] as const;
+type StrengthScore = 0 | 1 | 2 | 3 | 4;
+
+function passwordStrength(password: string): { score: StrengthScore; hint: string } {
+  if (password.length < 10) return { score: 0, hint: 'Use at least 10 characters.' };
+  if (/(password|qwerty|12345|letmein|welcome)/i.test(password) || /(.)\1{3,}/u.test(password)) {
+    return { score: 1, hint: 'Avoid common words and repeated characters.' };
+  }
+  const distinct = new Set(password.toLowerCase()).size;
+  if (password.length >= 24 && distinct >= 10) return { score: 4, hint: 'Long and varied.' };
+  if (password.length >= 18 && distinct >= 8) return { score: 3, hint: 'A longer passphrase is even better.' };
+  if (password.length >= 14 && distinct >= 6) return { score: 2, hint: 'Try adding more unrelated words.' };
+  return { score: 1, hint: 'Try a longer passphrase with unrelated words.' };
+}
+
 export function Setup({ token, onDone }: { token: string; onDone: () => void }) {
   const [state, setState] = useState<'checking' | 'ready' | 'expired'>('checking');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const strength = passwordStrength(password);
 
   useEffect(() => {
     api(`/setup?token=${encodeURIComponent(token)}`).then(
@@ -101,13 +118,33 @@ export function Setup({ token, onDone }: { token: string; onDone: () => void }) 
           <span className="text-xs font-medium">Your email</span>
           <Input type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />
         </label>
-        <label className="block space-y-1.5">
-          <span className="text-xs font-medium">Choose a password</span>
-          <Input type="password" autoComplete="new-password" required minLength={10} value={password} onChange={(e) => setPassword(e.target.value)} aria-describedby="pw-hint" />
+        <div className="space-y-1.5">
+          <label htmlFor="setup-password" className="block text-xs font-medium">Choose a password</label>
+          <PasswordInput id="setup-password" autoComplete="new-password" required minLength={10} value={password} onChange={(e) => setPassword(e.target.value)} aria-describedby="pw-hint" />
           <span id="pw-hint" className="block text-[11px] text-muted-foreground">
-            At least 10 characters.
+            At least 10 characters. A longer, unique passphrase is stronger.
           </span>
-        </label>
+          {password && (
+            <div className="space-y-1.5">
+              <div
+                role="meter"
+                aria-label="Password strength"
+                aria-valuemin={0}
+                aria-valuemax={4}
+                aria-valuenow={strength.score}
+                aria-valuetext={STRENGTH_LABELS[strength.score]}
+                className="flex gap-1"
+              >
+                {[1, 2, 3, 4].map((step) => (
+                  <span key={step} aria-hidden className={`h-1.5 flex-1 rounded-full ${step <= strength.score ? STRENGTH_COLORS[strength.score] : 'bg-muted'}`} />
+                ))}
+              </div>
+              <p role="status" className="text-[11px] text-muted-foreground">
+                <span className="font-medium text-foreground">{STRENGTH_LABELS[strength.score]}</span> · {strength.hint}
+              </p>
+            </div>
+          )}
+        </div>
         {error && (
           <p role="alert" className="text-xs text-danger">
             {error}

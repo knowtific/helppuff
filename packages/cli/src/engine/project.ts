@@ -403,6 +403,7 @@ export const projectSchema = z
     assistant: assistantConfigSchema
       .default({})
       .describe('How the assistant behaves: goal, tone, answer length. HelpPuff writes these around prompt.md on every answer, so prompt.md holds only what is specific to the business.'),
+    autoSummary: z.boolean().default(true).describe('Automatically summarise and label finished conversations. Off keeps transcripts, after-chat tools and webhooks running.'),
     security: securitySchema.default({}).describe('Rate limits, daily cap, Turnstile. The defaults are safe for a public site.'),
     live: liveConfigSchema
       .default({})

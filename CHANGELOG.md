@@ -8,6 +8,66 @@ never needs you to change anything. Upgrade with
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-13
+
+### Changed
+
+- Added `helppuff logs` to tail a deployed Worker's Cloudflare logs using the
+  existing Wrangler login or Cloudflare API token; `--json` captures a short,
+  bounded set of events for scripts.
+- Team invites open from an Add team member button. After an invite, the form
+  closes and the one-time sign-in link appears in a separate copyable box.
+- Contacts now use multiple site-defined tags, editable in Settings → Contact
+  tags and on each contact, with tag and untagged filters on the Contacts list.
+  Existing non-default statuses become clearly named legacy tags; the old
+  status API and CSV column remain for integrations. Job outcomes no longer
+  change a person's old status field.
+- Prompt & tools now has a Summary switch. It turns automatic summaries, AI
+  labels and questions to answer off or on for new chats; after-chat tools and
+  webhooks continue, and manual summaries remain available.
+- New **Save what the visitor says** tools are created under After the chat.
+  They read the finished visitor transcript, save stated values as conversation
+  attributes, then pass them to after-chat requests and webhooks. Existing
+  extract tools keep their current timing until moved.
+- Knowledge groups Website pages directly beneath the site-learning status in
+  one card.
+- Dashboard password and secret fields have an eye button to show or hide what
+  you typed, including sign-in, account setup, and settings. Account setup also
+  shows an approximate password strength indicator as you type.
+- Settings → Custom fields lists conversation and contact attribute keys and
+  the job field editor. Admins can add, rename and remove keys; changes to
+  conversation and contact keys update their saved records.
+- Dashboard pages are quieter. How-tos moved to the wiki behind a link (API
+  keys' examples, Team & security's commands, why upgrades run in the
+  terminal, creating jobs from other tools, webhook signatures), and
+  secondary details fold away (the quote questions' preview, Turnstile's
+  hostnames, an integration's key). Integrations you have not connected are a
+  row with **Connect**. **Questions to answer** shows only when there is one,
+  highlighted like **Before you go live**.
+- Jobs board: while you drag, every column shows where the job can go, and
+  the column under the pointer opens a space exactly where it will land,
+  including between jobs in the same column. Cards slide out of the way and
+  into place (no motion with reduced motion turned on).
+- The public API (`/api/v1`) can create, rename and delete contact tags
+  (`/contact-tags`) and custom fields (`/attribute-definitions`), with the
+  `settings:write` scope; `PATCH /leads/:id` takes `tags`.
+
+### Fixed
+
+- Settings → Webhooks: the signing note is one line with a link. The wiki's
+  Webhooks page now has a worked signature example to test against, and
+  Node.js, Python and PHP receivers.
+- The new tool dialog puts **Paste a curl** and **Fill it in** below the tool
+  type choices, so the two decisions appear on separate rows.
+- Bookings shows a discovered external booking URL as the Booking page field's
+  value instead of placeholder text; keeping or editing it saves an explicit
+  link.
+- The dashboard tab keeps the yellow HelpPuff favicon after loading and while
+  showing a live notification count.
+- Home screen: **Suggest from my site** skips buttons already present by label
+  or action, including duplicates within a batch of suggestions, and avoids
+  repeating useful pages.
+
 ## [0.6.1] - 2026-10-12
 
 ### Changed

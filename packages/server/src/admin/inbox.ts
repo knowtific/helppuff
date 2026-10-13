@@ -102,6 +102,115 @@ export function mergeAttributes(current: Record<string, string>, patch: unknown)
 
 export const attributesJson = (attributes: Record<string, string>) => (Object.keys(attributes).length ? JSON.stringify(attributes) : null);
 
+type AttributeScope = 'conversation' | 'contact';
+type AttributeDefinition = { name: string; used: number; defined: boolean };
+
+function attributeScope(value: unknown): AttributeScope {
+  if (value === 'conversation' || value === 'contact') return value;
+  throw new HelpPuffError('bad_request', { message: 'Choose conversation or contact attributes.', detail: 'attribute_scope' });
+}
+
+function attributeName(value: unknown): string {
+  const name = typeof value === 'string' ? value.trim() : '';
+  if (!ATTRIBUTE_KEY.test(name)) {
+    throw new HelpPuffError('bad_request', { message: 'Use 1 to 64 letters, digits, spaces, _ - or . for the attribute name.', detail: 'attribute_bad_key' });
+  }
+  return name;
+}
+
+function existingAttributeName(value: unknown): string {
+  // A JSON path label cannot hold a quote; no writer stores one.
+  if (typeof value === 'string' && value.length > 0 && value.length <= 1024 && !value.includes('"')) return value;
+  throw new HelpPuffError('bad_request', { message: 'Choose an attribute to change.', detail: 'attribute_missing_name' });
+}
+
+const attributeTable = (scope: AttributeScope) => (scope === 'conversation' ? 'conversations' : 'leads');
+const attributePath = (name: string) => `$.${JSON.stringify(name)}`;
+
+async function attributeList(d: D1Like, siteId: string, scope: AttributeScope): Promise<AttributeDefinition[]> {
+  const table = attributeTable(scope);
+  const [definitions, used] = await Promise.all([
+    d.prepare('SELECT name FROM attribute_definitions WHERE site_id = ? AND scope = ?').bind(siteId, scope).all<{ name: string }>(),
+    d.prepare(`SELECT j.key AS name, COUNT(*) AS used FROM ${table} AS record, json_each(record.attributes) AS j WHERE record.site_id = ? GROUP BY j.key`).bind(siteId).all<{ name: string; used: number }>(),
+  ]);
+  const names = new Map<string, AttributeDefinition>();
+  for (const row of definitions.results) names.set(row.name, { name: row.name, used: 0, defined: true });
+  for (const row of used.results) {
+    const entry = names.get(row.name);
+    if (entry) entry.used = Number(row.used);
+    else names.set(row.name, { name: row.name, used: Number(row.used), defined: false });
+  }
+  return [...names.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+inboxRoutes.get('/attribute-definitions', async (c) => {
+  assertAdmin(await currentAdmin(c));
+  const siteId = siteParam(c, c.req.query('site'));
+  const d = db(c);
+  const [conversations, contacts] = await Promise.all([attributeList(d, siteId, 'conversation'), attributeList(d, siteId, 'contact')]);
+  return c.json({ conversations, contacts });
+});
+
+inboxRoutes.post('/attribute-definitions', async (c) => {
+  assertSameOrigin(c);
+  assertAdmin(await currentAdmin(c));
+  const body = await jsonBody(c);
+  const siteId = siteParam(c, body['site']);
+  const scope = attributeScope(body['scope']);
+  const name = attributeName(body['name']);
+  const d = db(c);
+  const existing = await d.prepare('SELECT 1 FROM attribute_definitions WHERE site_id = ? AND scope = ? AND name = ?').bind(siteId, scope, name).first();
+  if (existing) throw new HelpPuffError('conflict', { message: `An attribute called “${name}” already exists.`, detail: 'attribute_exists' });
+  await d.prepare('INSERT INTO attribute_definitions (site_id, scope, name, created_at) VALUES (?, ?, ?, ?)').bind(siteId, scope, name, c.get('helppuff').platform.now()).run();
+  return c.json({ name, scope, defined: true }, 201);
+});
+
+inboxRoutes.patch('/attribute-definitions', async (c) => {
+  assertSameOrigin(c);
+  assertAdmin(await currentAdmin(c));
+  const body = await jsonBody(c);
+  const siteId = siteParam(c, body['site']);
+  const scope = attributeScope(body['scope']);
+  const oldName = existingAttributeName(body['oldName']);
+  const name = attributeName(body['name']);
+  if (oldName === name) return c.json({ name, scope });
+  const d = db(c);
+  const table = attributeTable(scope);
+  const oldPath = attributePath(oldName);
+  const newPath = attributePath(name);
+  const [existing, collision, source] = await Promise.all([
+    d.prepare('SELECT name FROM attribute_definitions WHERE site_id = ? AND scope = ? AND name = ?').bind(siteId, scope, name).first(),
+    d.prepare(`SELECT 1 FROM ${table} WHERE site_id = ? AND json_type(attributes, ?) IS NOT NULL LIMIT 1`).bind(siteId, newPath).first(),
+    d.prepare('SELECT name FROM attribute_definitions WHERE site_id = ? AND scope = ? AND name = ?').bind(siteId, scope, oldName).first(),
+  ]);
+  if (existing || collision) throw new HelpPuffError('conflict', { message: `An attribute called “${name}” already exists.`, detail: 'attribute_exists' });
+  const used = await d.prepare(`SELECT 1 FROM ${table} WHERE site_id = ? AND json_type(attributes, ?) IS NOT NULL LIMIT 1`).bind(siteId, oldPath).first();
+  if (!source && !used) throw new HelpPuffError('not_found', { message: `No attribute called “${oldName}”.`, detail: 'attribute_missing' });
+  await d.batch([
+    d.prepare('INSERT INTO attribute_definitions (site_id, scope, name, created_at) VALUES (?, ?, ?, ?)').bind(siteId, scope, name, c.get('helppuff').platform.now()),
+    d.prepare(`UPDATE ${table} SET attributes = json_remove(json_set(attributes, ?, json_extract(attributes, ?)), ?) WHERE site_id = ? AND json_type(attributes, ?) IS NOT NULL`).bind(newPath, oldPath, oldPath, siteId, oldPath),
+    d.prepare('DELETE FROM attribute_definitions WHERE site_id = ? AND scope = ? AND name = ?').bind(siteId, scope, oldName),
+  ]);
+  return c.json({ name, scope });
+});
+
+inboxRoutes.delete('/attribute-definitions', async (c) => {
+  assertSameOrigin(c);
+  assertAdmin(await currentAdmin(c));
+  const body = await jsonBody(c);
+  const siteId = siteParam(c, body['site']);
+  const scope = attributeScope(body['scope']);
+  const name = existingAttributeName(body['name']);
+  const d = db(c);
+  const table = attributeTable(scope);
+  const path = attributePath(name);
+  await d.batch([
+    d.prepare(`UPDATE ${table} SET attributes = NULLIF(json_remove(attributes, ?), '{}') WHERE site_id = ? AND json_type(attributes, ?) IS NOT NULL`).bind(path, siteId, path),
+    d.prepare('DELETE FROM attribute_definitions WHERE site_id = ? AND scope = ? AND name = ?').bind(siteId, scope, name),
+  ]);
+  return c.json({ name, scope, deleted: true });
+});
+
 // ------------------------------------------------------------------- labels
 
 export type Label = { id: string; name: string; color: string; description: string | null; ai: boolean };

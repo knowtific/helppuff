@@ -27,12 +27,30 @@ their email in a second chat, gets the new chat added to the lead they already
 have; new details only fill gaps, never overwrite. A lead with only a phone
 number is merged into the person as soon as their email turns up.
 
-## Contact details, attributes and notes
+## Contact tags, attributes and notes
+
+Give a contact several **tags** to describe the person or your relationship
+with them, such as `VIP`, `Wholesale` or `Repeat customer`. Create, rename,
+recolour and delete tags in **Settings → Contact tags**. Add or remove them on
+the Contacts list or a contact's page, and filter Contacts by a tag or by
+**Untagged**. Tags on contacts are separate from the labels on individual
+conversations. The old contact status is no longer edited in the dashboard;
+jobs track the progress of requests and work. Existing non-default contact
+statuses become tags named **Previously marked …** so their meaning is not
+lost. The old API `status` field remains available for integrations.
+Moving a job to Won no longer changes a contact's old status field.
+
+Over the API, `PATCH /leads/:id` accepts `tags` as the complete list of tag
+ids; an empty list removes them all. A contact can have up to 20 tags.
 
 Besides what the forms and chats collect, each contact has a **company** and
 an **address**, and **custom attributes**: any key-value pairs you want, like
 `plan: pro` or `customerId: 4021` (up to 50; keys up to 64 letters, digits,
 spaces, `_ - .`). Edit them on the contact's page, or over the API:
+
+**Settings → Custom fields** lists the attribute keys already used on
+contacts and lets an admin add, rename or remove them. Contact tags are for
+categories; attributes hold values such as a customer ID.
 
 ```bash
 curl -X PATCH "$BASE/leads/$ID" -H "Authorization: Bearer $KEY" \
@@ -47,13 +65,14 @@ attributes and notes of their own too (`PATCH /conversations/:id`).
 
 ## In the dashboard
 
-**Contacts** lists people by when they were last active, with:
+**Contacts** lists people by when their record was updated, with:
 
-- **Status**: new → contacted → qualified → won / lost (changed inline).
+- **Tags**: several per person, editable inline and filterable.
 - **Notes**, and their form answers. Open a contact for their page: details,
   attributes, the team's notes, every chat and their history.
 - **Chats**: how many, with a link to the latest transcript.
-- **Export CSV** for a spreadsheet or CRM. Cells that start with `=`, `+`, `-`
+- **Export CSV** for a spreadsheet or CRM, including tags. The old status
+  column remains for existing imports. Cells that start with `=`, `+`, `-`
   or `@` are escaped, so a lead cannot plant a formula in your spreadsheet.
 
 ## Callbacks

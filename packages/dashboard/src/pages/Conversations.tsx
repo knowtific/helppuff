@@ -1,7 +1,8 @@
 import { ArrowLeft, Bot, ExternalLink, Headset, Loader2, Lock, Mail, MessagesSquare, Phone, PhoneCall, RotateCcw, Search, Send, ShieldCheck, Sparkles, ThumbsDown, ThumbsUp, UserRound } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { PageHeader } from '../components/Shell';
-import { Avatar, Badge, Button, Card, Empty, ErrorNote, InfoTip, Input, Segmented, Select, Skeleton, StatusBadge, Textarea } from '../components/ui';
+import { Avatar, Badge, Button, Card, Empty, ErrorNote, InfoTip, Input, Segmented, Select, Skeleton, Textarea } from '../components/ui';
+import { ContactTagChip } from '../components/ContactTags';
 import { AttributesEditor, ConversationStatusBadge, LabelChip, LabelPicker, NotesPanel, SideSection, ToolData, useLabels, WaitingBadge } from '../components/inbox';
 import { RelatedAppointments } from '../components/Appointments';
 import { api, isMember, parseSummary, type ConversationDetail, type ConversationRow, type Me, type StoredMessage, type Summary, type Team } from '../lib/api';
@@ -46,7 +47,6 @@ function Row({ row, active }: { row: ConversationRow; active: boolean }) {
           {row.labels?.map((label) => <LabelChip key={label.id} label={label} />)}
           {row.intent && <Badge>{row.intent}</Badge>}
           {summary?.leadQuality === 'hot' && <Badge dot={QUALITY_DOT.hot}>hot lead</Badge>}
-          {row.leadStatus && <StatusBadge status={row.leadStatus} />}
           {row.callback === 'open' && <Badge dot="#d97706">Callback requested</Badge>}
           {row.callback === 'done' && <Badge>Called back</Badge>}
           <span className="text-[11px] text-muted-foreground">
@@ -433,9 +433,7 @@ function Detail({ id, me, team, onChanged }: { id: string; me: Me; team: Team | 
                     <Phone className="size-3.5 text-muted-foreground" /> {lead.phone}
                   </a>
                 )}
-                <div className="pt-1">
-                  <StatusBadge status={lead.status} />
-                </div>
+                {Boolean(lead.tags?.length) && <div className="flex flex-wrap gap-1 pt-1">{lead.tags?.map((tag) => <ContactTagChip key={tag.id} tag={tag} />)}</div>}
                 {data.callbacks.map((cb) => (
                   <div key={cb.id} className="mt-2 rounded-md border px-2.5 py-2">
                     <p className="flex items-center gap-1.5 text-xs font-medium">

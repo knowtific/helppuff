@@ -25,11 +25,13 @@ for everything below).
 ## How it works
 
 ```text
-Visitor asks ─▶ order_number (extract) ─▶ order_lookup (your shop) ─▶ track_shipment (Shippo) ─▶ answer
-                saves 1042 + email         carrier, tracking number     status, place, ETA
+Visitor asks ─▶ order_lookup (your shop) ─▶ track_shipment (Shippo) ─▶ answer
+                carrier, tracking number     status, place, ETA
+After the chat ─▶ order_number (extract) ─▶ saved order number and email
 ```
 
-Three tools, all **during the chat**, each named in the prompt:
+Three tools: the two HTTP lookups run **during the chat** when named in the
+prompt; the extract tool runs **after the chat** without a prompt reference.
 
 | Tool | Kind | What it does |
 | --- | --- | --- |
@@ -106,14 +108,14 @@ export default {
 
 ### `order_number`: save what the visitor says
 
-An extract tool calls nothing: it names the fields to collect, and the
-assistant saves them as the visitor gives them.
+An extract tool calls no external API. After the chat ends, it reads the
+visitor's messages and saves the number and email they actually gave.
 
 ```bash
 helppuff tools add order_number --extract \
   --field order_number='The order number from the confirmation email, like 1042.' \
   --field order_email='The email address they ordered with.' \
-  --description 'Save the order number and the email address the visitor ordered with, as soon as they give them.'
+  --description 'Find the order number and email address the visitor gave during the chat.'
 ```
 
 Saving matters even though the lookup gets the same values: the number shows
@@ -178,7 +180,7 @@ there is the same as `--pick`.
 ```text
 ## Order questions
 When someone asks where their order is, or when it will arrive:
-1. Ask for their order number and the email address they ordered with, one at a time, unless you already have them. Their email may be in the form: {{lead.email}}. Save both with {{order_number}}.
+1. Ask for their order number and the email address they ordered with, one at a time, unless you already have them. Their email may be in the form: {{lead.email}}.
 2. Look the order up with {{order_lookup}}.
    - If it is not found, say the order number and email don't match an order we can see, and ask them to check both. Never say whether an order number exists on its own.
 3. If the order has a tracking number, check the parcel with {{track_shipment}}. Then tell them, in one or two sentences, where it is and the expected delivery day if there is one ("Thursday 12 October").
@@ -218,15 +220,15 @@ helppuff ask "Where is my order 1042? I ordered with ada@example.com"
 ```
 
 Then chat on your site like a customer. On the dashboard, the conversation
-shows **Data from tools**: what each tool returned, and the saved order
-number as an attribute.
+shows **Data from tools**: what each tool returned. After the chat ends, the
+order number the visitor stated also appears as an attribute.
 
 ## When it goes wrong
 
 | What you see | Why, and what to do |
 | --- | --- |
 | "I couldn't check that right now" | A tool failed (4xx, 5xx, timeout). `helppuff tools list` shows each tool's last status; test it with the same values |
-| It asks for the order number again | The extract tool is not named in the prompt (`{{order_number}}`), or its field descriptions don't match what the visitor said |
+| It asks for the order number again | Check the `order_lookup` parameter description and the prompt's instruction to use a number the visitor already gave |
 | It never calls `track_shipment` | `order_lookup` returned no `tracking_number`, or the tool is missing from the prompt |
 | Shippo answers 401 | A test token only tracks the `shippo` test carrier; use your live token for real parcels |
 

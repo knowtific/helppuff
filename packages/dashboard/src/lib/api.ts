@@ -70,6 +70,8 @@ export type Site = {
   live?: boolean;
   /** HelpPuff writes the backend's prompt, so Instructions and Prompt & tools apply. Absent from older Workers (treated as yes). */
   prompt?: boolean;
+  /** Whether finished conversations are automatically summarised and labelled. Absent from older Workers (treated as on). */
+  autoSummary?: boolean;
   /** How visitors book: `picker` turns on the Calendar page and appointments on jobs. Absent from older Workers. */
   bookings?: 'none' | 'link' | 'picker';
 };
@@ -158,6 +160,7 @@ export type ConversationRow = {
 export type ConversationStatus = 'bot' | 'live' | 'closed';
 export type LabelRef = { id: string; name: string; color: string };
 export type Label = LabelRef & { description: string | null; ai: boolean };
+export type ContactTag = LabelRef;
 export type Note = { id: string; conversationId?: string | null; leadId?: string | null; author: string; authorName: string | null; text: string; createdAt: number; updatedAt: number };
 
 /** A conversation's AI summary and labels: written when it goes quiet (or by the Summarise button). */
@@ -197,6 +200,7 @@ export type Lead = {
   company?: string | null;
   address?: string | null;
   attributes?: Record<string, string>;
+  tags?: ContactTag[];
   fields: string | null;
   source: 'form' | 'chat' | 'ai' | 'api';
   status: LeadStatus;
@@ -508,6 +512,8 @@ export function uploadFile(file: File): Promise<{ id: string; status: FileStatus
 export type LeadField = { name: string; label: string; type: 'text' | 'email' | 'tel' | 'textarea' | 'select'; required: boolean; options?: string[] };
 
 export type Settings = {
+  /** Automatic summary and AI labels after a chat. Absent from older Workers (treated as on). */
+  autoSummary?: boolean;
   botName: string;
   businessName: string;
   welcomeMessage: string;

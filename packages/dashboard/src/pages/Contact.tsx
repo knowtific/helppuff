@@ -1,9 +1,10 @@
 import { ArrowLeft, Building2, Mail, MapPin, MessageSquare, Pencil, Phone, PhoneCall, StickyNote, Trash2, UserRound } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { AttributesEditor, ConversationStatusBadge, LabelChip, NotesPanel, SideSection } from '../components/inbox';
-import { Avatar, Badge, Button, Card, CardHeader, Empty, ErrorNote, Input, Select, Skeleton, statusLabel } from '../components/ui';
+import { ContactTagPicker } from '../components/ContactTags';
+import { Avatar, Badge, Button, Card, CardHeader, Empty, ErrorNote, Input, Skeleton } from '../components/ui';
 import { RelatedAppointments } from '../components/Appointments';
-import { api, isMember, LEAD_STATUSES, parseSummary, type ContactDetail, type LeadStatus, type Me } from '../lib/api';
+import { api, isMember, parseSummary, type ContactDetail, type ContactTag, type Me } from '../lib/api';
 import { RelatedJobs } from './Jobs';
 import { fmtDateTime, fmtRelative, href, pathOf, useData } from '../lib/utils';
 
@@ -108,15 +109,12 @@ function timeline(contact: ContactDetail): Event[] {
 
 export function Contact({ id, me }: { id: string; me: Me }) {
   const { data, error, reload } = useData(() => api<ContactDetail>(`/leads/${id}`), [id]);
+  const { data: tagData, error: tagError, reload: reloadTags } = useData(() => api<{ tags: ContactTag[] }>('/contact-tags'), []);
   const member = isMember(me);
   const [deleting, setDeleting] = useState(false);
   if (error) return <div className="p-6"><ErrorNote error={error} onRetry={reload} /></div>;
   if (!data) return <div className="space-y-3 p-6">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-24" />)}</div>;
   const name = data.name ?? data.email ?? data.phone ?? 'Unnamed';
-  const setStatus = async (status: LeadStatus) => {
-    await api(`/leads/${id}`, { method: 'PATCH', json: { status } });
-    reload();
-  };
   const remove = async () => {
     if (!window.confirm(`Delete ${name}? Their conversations stay.`)) return;
     setDeleting(true);
@@ -136,19 +134,16 @@ export function Contact({ id, me }: { id: string; me: Me }) {
             {data.company ? `${data.company} · ` : ''}Contact since {fmtDateTime(data.createdAt ?? data.created_at ?? 0)} · {data.conversations.length} conversation{data.conversations.length === 1 ? '' : 's'}
           </p>
         </div>
-        <Select value={data.status} onChange={(e) => void setStatus(e.target.value as LeadStatus)} aria-label="Status">
-          {LEAD_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {statusLabel(s)}
-            </option>
-          ))}
-        </Select>
         {!member && (
           <Button variant="outline" size="sm" onClick={() => void remove()} disabled={deleting} aria-label="Delete contact">
             <Trash2 />
           </Button>
         )}
       </header>
+      <div className="space-y-2">
+        <ContactTagPicker value={data.tags ?? []} options={tagData?.tags ?? []} onChange={async (ids) => { await api(`/leads/${id}`, { method: 'PATCH', json: { tags: ids } }); reload(); }} />
+        {tagError && <ErrorNote error={tagError} onRetry={reloadTags} />}
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
         <div className="space-y-4">

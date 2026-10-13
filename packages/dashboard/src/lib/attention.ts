@@ -17,8 +17,8 @@ let unread = 0;
 let flash: string | null = null;
 let flashOn = false;
 let timer: ReturnType<typeof setInterval> | null = null;
-let accent = '#5B5BF7';
 let icon: HTMLLinkElement | null = null;
+let baseIcon: { href: string; type: string } | null = null;
 
 /** Whether the person is looking at the dashboard right now. */
 export const looking = () => typeof document !== 'undefined' && !document.hidden && document.hasFocus();
@@ -42,11 +42,6 @@ export function setBaseTitle(title: string): void {
 /** Live chats waiting for the team: always in the count, looking or not. */
 export function setWaiting(count: number): void {
   waiting = count;
-  render();
-}
-
-export function setAccent(color: string): void {
-  if (/^#[0-9a-f]{3,8}$/i.test(color)) accent = color;
   render();
 }
 
@@ -79,16 +74,31 @@ if (typeof window !== 'undefined') {
   document.addEventListener('visibilitychange', clear);
 }
 
-/** The tab's icon: HelpPuff's mark in the site's colour, with a red count when something waits. Drawn, so no image files. */
+/** The tab's icon: the brand favicon, with a red count when something waits. */
 function drawIcon(count: number): void {
   if (typeof document === 'undefined') return;
   try {
+    icon ??= document.querySelector<HTMLLinkElement>('link[rel="icon"]') ?? Object.assign(document.head.appendChild(document.createElement('link')), { rel: 'icon' });
+    baseIcon ??= { href: icon.href, type: icon.type };
+    if (count === 0 && baseIcon.href) {
+      icon.href = baseIcon.href;
+      icon.type = baseIcon.type;
+      return;
+    }
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = 64;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.fillStyle = accent;
+    ctx.fillStyle = '#3B0D24';
+    ctx.beginPath();
+    ctx.roundRect(0, 0, 64, 64, 14);
+    ctx.fill();
+    ctx.save();
+    ctx.translate(6.4, 6.4);
+    ctx.scale(0.8, 0.8);
+    ctx.fillStyle = '#E4F568';
     ctx.fill(new Path2D(HELPPUFF_MARK));
+    ctx.restore();
     if (count > 0) {
       ctx.fillStyle = '#dc2626';
       ctx.beginPath();
@@ -100,7 +110,7 @@ function drawIcon(count: number): void {
       ctx.textBaseline = 'middle';
       ctx.fillText(count > 9 ? '9+' : String(count), 46, 19);
     }
-    icon ??= document.querySelector<HTMLLinkElement>('link[rel="icon"]') ?? Object.assign(document.head.appendChild(document.createElement('link')), { rel: 'icon' });
+    icon.type = 'image/png';
     icon.href = canvas.toDataURL('image/png');
   } catch {
     // No canvas (tests, very old browsers): the title still counts.

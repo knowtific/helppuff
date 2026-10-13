@@ -42,7 +42,7 @@ async function signIn(browser: Browser): Promise<Page> {
   });
   await page.goto('/admin/');
   await page.getByLabel(/email/i).fill(OWNER.email);
-  await page.getByLabel(/password/i).fill(OWNER.password);
+  await page.getByRole('textbox', { name: 'Password', exact: true }).fill(OWNER.password);
   await page.getByRole('button', { name: /sign in/i }).click();
   await expect(page.getByRole('navigation', { name: 'Main' }).first()).toBeVisible();
   return page;

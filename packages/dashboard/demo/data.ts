@@ -1,4 +1,4 @@
-import type { Callback, ConversationRow, Label, Lead, LeadStatus, Note, StoredMessage, Summary } from '../src/lib/api';
+import type { Callback, ContactTag, ConversationRow, Label, Lead, LeadStatus, Note, StoredMessage, Summary } from '../src/lib/api';
 
 /**
  * Sample data for the dashboard demo: a made-up plumbing business with a few
@@ -26,6 +26,12 @@ export const LABELS: Label[] = [
   { id: 'lbl_quote', name: 'Quote', color: '#3b82f6', description: 'Wants a price for a job', ai: true },
   { id: 'lbl_repeat', name: 'Repeat customer', color: '#22c55e', description: 'Has used us before', ai: true },
   { id: 'lbl_complaint', name: 'Complaint', color: '#f97316', description: 'Unhappy with a job or a visit', ai: false },
+];
+
+export const CONTACT_TAGS: ContactTag[] = [
+  { id: 'ctag_vip', name: 'VIP', color: '#eab308' },
+  { id: 'ctag_repeat', name: 'Repeat customer', color: '#22c55e' },
+  { id: 'ctag_commercial', name: 'Commercial', color: '#3b82f6' },
 ];
 
 export const notes: Note[] = [];
@@ -215,6 +221,7 @@ export const callbacks: Callback[] = [];
             phone,
             fields: JSON.stringify({ suburb: pick(['Balmain', 'Rozelle', 'Leichhardt', 'Glebe', 'Newtown', 'Annandale']) }),
             source: pick(['form', 'form', 'chat', 'ai'] as const),
+            tags: [],
             // Older leads have moved further through the pipeline.
             status: recent ? 'new' : day < 10 ? pick(['new', 'contacted', 'contacted', 'qualified'] as const) : pick(STATUSES),
             notes: recent ? null : pick(NOTES),
@@ -332,6 +339,7 @@ export const callbacks: Callback[] = [];
     answering.data = { customer_lookup: { jobs: 3, since: '2021' }, job_number: { job_number: 'HP-2041' }, job_status: { status: 'Booked', date: 'Tomorrow, 8am', plumber: 'Dan' } };
   }
   for (const lead of leads.slice(0, 6)) lead.attributes = { suburb: JSON.parse(lead.fields ?? '{}').suburb ?? 'Balmain', ...(lead.status === 'won' ? { lifetimeValue: '$640' } : {}) };
+  for (const [index, lead] of leads.slice(0, 8).entries()) lead.tags = index === 0 ? [CONTACT_TAGS[0]!, CONTACT_TAGS[1]!] : index % 3 === 0 ? [CONTACT_TAGS[2]!] : [CONTACT_TAGS[1]!];
   const first = leads[0];
   if (first) {
     first.company = 'Rozelle Cafe';
@@ -345,7 +353,7 @@ export const PROMPT_TEXT = `Harbour Plumbing is a family-run plumbing business i
 - For gas work, offer a call from Dan, our licensed gas fitter.
 - We do not do roofing or guttering: suggest a roofer.
 - Returning customers ({{customer_lookup.jobs}} past jobs) get priority booking.
-- When someone asks about a booked job, ask for the job number, save it with {{job_number}}, then check it with {{job_status}}.`;
+- When someone asks about a booked job, ask for the job number, then check it with {{job_status}}.`;
 
 export const PAGES = [
   ['/', 'Harbour Plumbing: plumbers in the inner west', 'home', 6],

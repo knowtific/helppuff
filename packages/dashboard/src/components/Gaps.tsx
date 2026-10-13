@@ -1,8 +1,8 @@
-import { Check, Loader2, MessageSquare, X } from 'lucide-react';
+import { Loader2, MessageSquare, X } from 'lucide-react';
 import { useState } from 'react';
 import { api, type Gap, type GapList } from '../lib/api';
 import { fmtNumber, fmtRelative, href, useData } from '../lib/utils';
-import { Button, Card, CardHeader, ErrorNote, Skeleton, Textarea, useModal } from './ui';
+import { Button, Card, CardHeader, ErrorNote, Textarea, useModal } from './ui';
 
 /**
  * Questions to answer: what visitors asked about the business that the
@@ -24,8 +24,10 @@ export function QuestionsToAnswer({ limit = 50, onAnswered }: { limit?: number; 
     }
   };
   const open = data?.counts.open ?? 0;
+  // Nothing waiting (or not loaded yet): no card at all, unless something failed.
+  if (!error && !failed && !data?.gaps.length) return null;
   return (
-    <Card>
+    <Card tone="attention">
       <CardHeader
         title={open ? `Questions to answer (${fmtNumber(open)})` : 'Questions to answer'}
         tip={{
@@ -39,14 +41,8 @@ export function QuestionsToAnswer({ limit = 50, onAnswered }: { limit?: number; 
           <ErrorNote error={error} onRetry={reload} />
         </div>
       )}
-      {!data && !error && <Skeleton className="mx-4 mb-4 h-16" />}
-      {data && !data.gaps.length && (
-        <p className="flex items-center gap-2 border-t px-4 py-3 text-[13px] text-muted-foreground">
-          <Check className="size-4" aria-hidden /> Nothing to answer: everything visitors asked is covered.
-        </p>
-      )}
       {data && data.gaps.length > 0 && (
-        <ul className="divide-y border-t">
+        <ul className="divide-y divide-attention-border border-t border-attention-border">
           {data.gaps.map((gap) => (
             <li key={gap.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5">
               <span className="min-w-0 flex-1">

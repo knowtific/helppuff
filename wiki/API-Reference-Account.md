@@ -72,6 +72,7 @@ const data = (await response.json()) as WhoCallingResponse;
       },
       "live": true,
       "prompt": true,
+      "autoSummary": true,
       "bookings": "picker"
     }
   ],
@@ -110,6 +111,7 @@ type WhoCallingResponse = {
     };
     live: boolean;
     prompt: boolean;
+    autoSummary: boolean;
     bookings: string;
   }>;
   summaries: boolean;

@@ -92,7 +92,7 @@ const draftOf = (tool: ToolView): Draft => ({
   keys: tool.keys,
   timeoutMs: tool.timeoutMs ?? 5000,
   before: tool.before,
-  after: tool.after,
+  after: tool.kind === 'extract' ? true : tool.after,
   when: whenChoice(tool.when),
   enabled: tool.enabled,
 });
@@ -237,27 +237,31 @@ export function ToolDialog({
           </div>
 
           {!draft.id && (
-            <Segmented
-              label="Kind of tool"
-              value={draft.kind}
-              onChange={(kind) => set({ kind, ...(kind === 'extract' ? { before: false, after: false } : {}) })}
-              options={[
-                { value: 'http', label: 'Call an API' },
-                { value: 'extract', label: 'Save what the visitor says' },
-              ]}
-            />
+            <div>
+              <Segmented
+                label="Kind of tool"
+                value={draft.kind}
+                onChange={(kind) => set({ kind, ...(kind === 'extract' ? { before: false, after: true } : {}) })}
+                options={[
+                  { value: 'http', label: 'Call an API' },
+                  ...(section === 'after' ? [{ value: 'extract' as const, label: 'Save what the visitor says' }] : []),
+                ]}
+              />
+            </div>
           )}
 
           {draft.kind === 'http' && !draft.id && (
-            <Segmented
-              label="How to set it up"
-              value={mode}
-              onChange={setMode}
-              options={[
-                { value: 'curl', label: 'Paste a curl' },
-                { value: 'manual', label: 'Fill it in' },
-              ]}
-            />
+            <div>
+              <Segmented
+                label="How to set it up"
+                value={mode}
+                onChange={setMode}
+                options={[
+                  { value: 'curl', label: 'Paste a curl' },
+                  { value: 'manual', label: 'Fill it in' },
+                ]}
+              />
+            </div>
           )}
 
           {draft.kind === 'http' && mode === 'curl' ? (
@@ -322,10 +326,11 @@ export function ToolDialog({
                   </Field>
                 )}
               </div>
+              {draft.kind === 'extract' && <p className="text-xs text-muted-foreground">After the chat ends, HelpPuff reads the visitor’s messages and saves only values they actually gave.</p>}
               <Field
-                label="What it does, for the assistant"
+                label={draft.kind === 'extract' ? 'What to collect' : 'What it does, for the assistant'}
                 htmlFor="tool-description"
-                hint={draft.kind === 'extract' ? 'When to save it, e.g. “Save the order number once the visitor gives it.”' : 'When to use it, e.g. “Look up an order’s status and delivery date by its number.”'}
+                hint={draft.kind === 'extract' ? 'Describe the details to look for in the finished conversation, e.g. “The order number the visitor gave.”' : 'When to use it, e.g. “Look up an order’s status and delivery date by its number.”'}
               >
                 <Textarea id="tool-description" value={draft.description} onChange={(e) => set({ description: e.target.value })} className="min-h-16" maxLength={1000} />
               </Field>
@@ -593,7 +598,7 @@ export type Suggestion = { value: string; detail: string };
 
 /** What `{{` can complete to: the site's tools and what they return, the form's answers, the business details. */
 export function promptSuggestions(list: ToolsList | null): Suggestion[] {
-  const tools = list?.tools ?? [];
+  const tools = (list?.tools ?? []).filter((tool) => tool.kind === 'http' || !tool.after);
   return [
     ...tools.flatMap((t) => [
       { value: t.name, detail: t.kind === 'extract' ? `Saves ${(t.fields ?? []).map((f) => f.name).join(', ')}` : `Calls ${t.method} ${hostOf(t.url)}` },
@@ -611,7 +616,7 @@ const KNOWN_ROOTS = new Set(['lead', 'context', 'site', 'business', 'user']);
 
 /** `{{name}}` that is neither a tool nor one of HelpPuff's values: probably a typo. */
 export function unknownRefs(text: string, list: ToolsList | null): string[] {
-  const names = new Set((list?.tools ?? []).map((t) => t.name));
+  const names = new Set((list?.tools ?? []).filter((t) => t.kind === 'http' || !t.after).map((t) => t.name));
   return [...new Set(promptToolRefs(text).filter((r) => !names.has(r.name) && !KNOWN_ROOTS.has(r.name)).map((r) => r.path))];
 }
 

@@ -138,6 +138,18 @@ export function leadStatements(
          WHERE site_id = ? AND email = ? AND EXISTS (SELECT 1 FROM leads WHERE id = ${current} AND email IS NULL)`,
       )
       .bind(conversationId, conversationId, now, siteId, email, conversationId),
+    // An email-less contact may already have tags. Carry them to the person
+    // with this email before removing the temporary record. A contact that
+    // already has an email keeps its tags.
+    db
+      .prepare(`INSERT OR IGNORE INTO lead_tags (lead_id, tag_id, site_id, added_at)
+        SELECT target.id, lt.tag_id, lt.site_id, lt.added_at FROM lead_tags lt
+        JOIN leads target ON target.site_id = ? AND target.email = ?
+        WHERE lt.lead_id = ${current} AND lt.site_id = ? AND EXISTS (SELECT 1 FROM leads WHERE id = ${current} AND email IS NULL)`)
+      .bind(siteId, email, conversationId, siteId, conversationId),
+    db
+      .prepare(`DELETE FROM lead_tags WHERE lead_id = ${current} AND EXISTS (SELECT 1 FROM leads WHERE id = ${current} AND email IS NULL) AND EXISTS (${taken})`)
+      .bind(conversationId, conversationId, siteId, email),
     db
       .prepare(`DELETE FROM leads WHERE id = ${current} AND email IS NULL AND EXISTS (${taken})`)
       .bind(conversationId, siteId, email),

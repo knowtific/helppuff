@@ -9,6 +9,9 @@ npx @knowtific/helppuff doctor
 It checks the config, secrets, Cloudflare access, the Worker, the database,
 the knowledge base and the widget, and prints a fix for each failing check.
 `helppuff status` shows what is deployed and today's usage.
+For live Cloudflare request logs, run `helppuff logs` in the same project folder
+and repeat the failing request. It works with the existing Wrangler login or
+the project's `CLOUDFLARE_API_TOKEN` in `.env`. See [[Logs|Deployment#logs]].
 
 ## The widget does not appear on my site
 

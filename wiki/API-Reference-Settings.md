@@ -8,6 +8,10 @@ The assistant, widget, lead form, limits and IP lists, as one object. Part of th
 - [[Suggest the home screen|API-Reference-Settings#suggest-the-home-screen]]: `POST /home/suggest`
 - [[The settings|API-Reference-Settings#the-settings]]: `GET /settings`
 - [[Change settings|API-Reference-Settings#change-settings]]: `PUT /settings`
+- [[List custom fields|API-Reference-Settings#list-custom-fields]]: `GET /attribute-definitions`
+- [[Add a custom field|API-Reference-Settings#add-a-custom-field]]: `POST /attribute-definitions`
+- [[Rename a custom field|API-Reference-Settings#rename-a-custom-field]]: `PATCH /attribute-definitions`
+- [[Remove a custom field|API-Reference-Settings#remove-a-custom-field]]: `DELETE /attribute-definitions`
 
 ## Test the model or the knowledge base
 
@@ -183,7 +187,7 @@ type SuggestHomeScreenResponse = {
 
 `GET /settings` · scope `settings:read`
 
-The assistant, widget, home screen, lead form, crawl and security settings as one object, with a hash of it. Also: `ai`, who writes the answers and what they come from (changed only with the CLI, `helppuff model` and `helppuff rag`, then a deploy); `suggestedHome`, what the widget shows on its home screen until it is set up (questions and links suggested from the website; null once the home screen was saved), and the `forms` and `flows` a shortcut can open.
+The assistant, widget, home screen, lead form, automatic summaries (`autoSummary`), crawl and security settings as one object, with a hash of it. Also: `ai`, who writes the answers and what they come from (changed only with the CLI, `helppuff model` and `helppuff rag`, then a deploy); `suggestedHome`, what the widget shows on its home screen until it is set up (questions and links suggested from the website; null once the home screen was saved), and the `forms` and `flows` a shortcut can open.
 
 | Parameter | In | Required | Description |
 | --- | --- | --- | --- |
@@ -215,6 +219,7 @@ const data = (await response.json()) as SettingsResponse;
   "site": "acme",
   "connector": "workers-ai",
   "settings": {
+    "autoSummary": true,
     "live": {
       "enabled": true,
       "waitSeconds": 120,
@@ -396,6 +401,7 @@ type SettingsResponse = {
   site: string;
   connector: string;
   settings: {
+    autoSummary: boolean;
     live: {
       enabled: boolean;
       waitSeconds: number;
@@ -538,7 +544,7 @@ A partial update: send only the sections to change (nested objects merge one lev
 
 | Body field | Required | Description |
 | --- | --- | --- |
-| `settings` | yes | Any sections of the object `GET /settings` returns: `botName`, `welcomeMessage`, `leads`, `assistant`, `behaviour`, `crawl`, `security`, `home` … `home.shortcuts` is the whole list of home-screen buttons (up to 8; each `action.kind` is `reply`, `url`, `tel`, `email`, `form` or `flow`); `home.links` the list of pages, or null for none. Saving `home` retires the suggestions from the website. `bookings` is how visitors book: `mode` `none`, `link` or `picker` (null: the website's booking link decides), the picker's calendar (`sync`), hours, duration and the rest (`helppuff.json` → `bookings` in the Configuration reference). |
+| `settings` | yes | Any sections of the object `GET /settings` returns: `botName`, `welcomeMessage`, `leads`, `assistant`, `behaviour`, `autoSummary` (false stops automatic summaries and AI labels for new chats), `crawl`, `security`, `home` … `home.shortcuts` is the whole list of home-screen buttons (up to 8; each `action.kind` is `reply`, `url`, `tel`, `email`, `form` or `flow`); `home.links` the list of pages, or null for none. Saving `home` retires the suggestions from the website. `bookings` is how visitors book: `mode` `none`, `link` or `picker` (null: the website's booking link decides), the picker's calendar (`sync`), hours, duration and the rest (`helppuff.json` → `bookings` in the Configuration reference). |
 
 **Request**
 
@@ -562,14 +568,15 @@ curl -X PUT "$HELPPUFF_URL/api/v1/settings" \
 type ChangeSettingsRequest = {
   /**
    * Any sections of the object `GET /settings` returns: `botName`,
-   * `welcomeMessage`, `leads`, `assistant`, `behaviour`, `crawl`, `security`,
-   * `home` … `home.shortcuts` is the whole list of home-screen buttons (up to
-   * 8; each `action.kind` is `reply`, `url`, `tel`, `email`, `form` or
-   * `flow`); `home.links` the list of pages, or null for none. Saving `home`
-   * retires the suggestions from the website. `bookings` is how visitors book:
-   * `mode` `none`, `link` or `picker` (null: the website's booking link
-   * decides), the picker's calendar (`sync`), hours, duration and the rest
-   * (`helppuff.json` → `bookings` in the Configuration reference).
+   * `welcomeMessage`, `leads`, `assistant`, `behaviour`, `autoSummary` (false
+   * stops automatic summaries and AI labels for new chats), `crawl`,
+   * `security`, `home` … `home.shortcuts` is the whole list of home-screen
+   * buttons (up to 8; each `action.kind` is `reply`, `url`, `tel`, `email`,
+   * `form` or `flow`); `home.links` the list of pages, or null for none.
+   * Saving `home` retires the suggestions from the website. `bookings` is how
+   * visitors book: `mode` `none`, `link` or `picker` (null: the website's
+   * booking link decides), the picker's calendar (`sync`), hours, duration and
+   * the rest (`helppuff.json` → `bookings` in the Configuration reference).
    */
   settings: {
     welcomeMessage?: string;
@@ -609,6 +616,7 @@ const data = (await response.json()) as ChangeSettingsResponse;
   "site": "acme",
   "connector": "workers-ai",
   "settings": {
+    "autoSummary": true,
     "live": {
       "enabled": true,
       "waitSeconds": 120,
@@ -757,6 +765,7 @@ type ChangeSettingsResponse = {
   site: string;
   connector: string;
   settings: {
+    autoSummary: boolean;
     live: {
       enabled: boolean;
       waitSeconds: number;
@@ -866,6 +875,278 @@ type ChangeSettingsResponse = {
     hash: string;
   };
   captcha: boolean;
+};
+```
+<!-- /tabs -->
+
+## List custom fields
+
+`GET /attribute-definitions` · scope `settings:read`
+
+The custom attribute keys on conversations and contacts (Settings → Custom fields): the ones defined there (`defined`) and the ones already in use, with how many records carry each (`used`).
+
+| Parameter | In | Required | Description |
+| --- | --- | --- | --- |
+| `site` | query | no | The site (a key always uses its own). |
+
+**Request**
+
+<!-- tabs -->
+```bash [curl]
+curl "$HELPPUFF_URL/api/v1/attribute-definitions" \
+  -H "Authorization: Bearer $HELPPUFF_API_KEY"
+```
+```ts [TypeScript]
+const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/attribute-definitions`, {
+  headers: {
+    Authorization: `Bearer ${process.env.HELPPUFF_API_KEY}`,
+  },
+});
+if (!response.ok) throw new Error(((await response.json()) as ApiError).error.message);
+const data = (await response.json()) as ListCustomFieldsResponse;
+```
+<!-- /tabs -->
+
+**Response** `200`
+
+<!-- tabs -->
+```json [Example]
+{
+  "conversations": [
+    {
+      "name": "order_number",
+      "used": 12,
+      "defined": true
+    }
+  ],
+  "contacts": [
+    {
+      "name": "plan",
+      "used": 3,
+      "defined": false
+    }
+  ]
+}
+```
+```ts [Type]
+type ListCustomFieldsResponse = {
+  conversations: Array<{
+    name: string;
+    used: number;
+    defined: boolean;
+  }>;
+  contacts: Record<string, string>[];
+};
+```
+<!-- /tabs -->
+
+## Add a custom field
+
+`POST /attribute-definitions` · scope `settings:write`
+
+| Body field | Required | Description |
+| --- | --- | --- |
+| `scope` | yes | `conversation` or `contact`. |
+| `name` | yes | 1 to 64 letters, digits, spaces, `_`, `-` or `.`. |
+
+**Request**
+
+<!-- tabs -->
+```bash [curl]
+curl -X POST "$HELPPUFF_URL/api/v1/attribute-definitions" \
+  -H "Authorization: Bearer $HELPPUFF_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "scope": "contact",
+  "name": "plan"
+}'
+```
+```ts [TypeScript]
+type AddCustomFieldRequest = {
+  /** `conversation` or `contact`. */
+  scope: string;
+  /** 1 to 64 letters, digits, spaces, `_`, `-` or `.`. */
+  name: string;
+};
+
+const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/attribute-definitions`, {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${process.env.HELPPUFF_API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    scope: 'contact',
+    name: 'plan'
+  } satisfies AddCustomFieldRequest),
+});
+if (!response.ok) throw new Error(((await response.json()) as ApiError).error.message);
+const data = (await response.json()) as AddCustomFieldResponse;
+```
+<!-- /tabs -->
+
+**Response** `201`
+
+<!-- tabs -->
+```json [Example]
+{
+  "name": "plan",
+  "scope": "contact",
+  "defined": true
+}
+```
+```ts [Type]
+type AddCustomFieldResponse = {
+  name: string;
+  scope: string;
+  defined: boolean;
+};
+```
+<!-- /tabs -->
+
+**Errors**
+
+| Status | Code | When |
+| --- | --- | --- |
+| 409 | `conflict` | A field with this name exists. |
+
+## Rename a custom field
+
+`PATCH /attribute-definitions` · scope `settings:write`
+
+Renames the key on every conversation or contact that has it.
+
+| Body field | Required | Description |
+| --- | --- | --- |
+| `scope` | yes | `conversation` or `contact`. |
+| `oldName` | yes | The current name. |
+| `name` | yes | The new name. |
+
+**Request**
+
+<!-- tabs -->
+```bash [curl]
+curl -X PATCH "$HELPPUFF_URL/api/v1/attribute-definitions" \
+  -H "Authorization: Bearer $HELPPUFF_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "scope": "contact",
+  "oldName": "plan",
+  "name": "tier"
+}'
+```
+```ts [TypeScript]
+type RenameCustomFieldRequest = {
+  /** `conversation` or `contact`. */
+  scope: string;
+  /** The current name. */
+  oldName: string;
+  /** The new name. */
+  name: string;
+};
+
+const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/attribute-definitions`, {
+  method: 'PATCH',
+  headers: {
+    Authorization: `Bearer ${process.env.HELPPUFF_API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    scope: 'contact',
+    oldName: 'plan',
+    name: 'tier'
+  } satisfies RenameCustomFieldRequest),
+});
+if (!response.ok) throw new Error(((await response.json()) as ApiError).error.message);
+const data = (await response.json()) as RenameCustomFieldResponse;
+```
+<!-- /tabs -->
+
+**Response** `200`
+
+<!-- tabs -->
+```json [Example]
+{
+  "name": "tier",
+  "scope": "contact"
+}
+```
+```ts [Type]
+type RenameCustomFieldResponse = {
+  name: string;
+  scope: string;
+};
+```
+<!-- /tabs -->
+
+**Errors**
+
+| Status | Code | When |
+| --- | --- | --- |
+| 409 | `conflict` | A field with the new name exists. |
+
+## Remove a custom field
+
+`DELETE /attribute-definitions` · scope `settings:write`
+
+Removes the key, and its value, from every conversation or contact that has it.
+
+| Body field | Required | Description |
+| --- | --- | --- |
+| `scope` | yes | `conversation` or `contact`. |
+| `name` | yes | The field to remove. |
+
+**Request**
+
+<!-- tabs -->
+```bash [curl]
+curl -X DELETE "$HELPPUFF_URL/api/v1/attribute-definitions" \
+  -H "Authorization: Bearer $HELPPUFF_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "scope": "contact",
+  "name": "tier"
+}'
+```
+```ts [TypeScript]
+type RemoveCustomFieldRequest = {
+  /** `conversation` or `contact`. */
+  scope: string;
+  /** The field to remove. */
+  name: string;
+};
+
+const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/attribute-definitions`, {
+  method: 'DELETE',
+  headers: {
+    Authorization: `Bearer ${process.env.HELPPUFF_API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    scope: 'contact',
+    name: 'tier'
+  } satisfies RemoveCustomFieldRequest),
+});
+if (!response.ok) throw new Error(((await response.json()) as ApiError).error.message);
+const data = (await response.json()) as RemoveCustomFieldResponse;
+```
+<!-- /tabs -->
+
+**Response** `200`
+
+<!-- tabs -->
+```json [Example]
+{
+  "name": "tier",
+  "scope": "contact",
+  "deleted": true
+}
+```
+```ts [Type]
+type RemoveCustomFieldResponse = {
+  name: string;
+  scope: string;
+  deleted: boolean;
 };
 ```
 <!-- /tabs -->

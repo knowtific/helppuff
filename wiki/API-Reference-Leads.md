@@ -2,8 +2,12 @@
 
 # Leads API
 
-The people who gave contact details: your CRM's contacts, with custom attributes. Keyed by email per site. Part of the [[API reference|API-Reference]]: setup, shared types and errors are there.
+The people who gave contact details: your CRM's contacts, with custom attributes and site-defined tags. Keyed by email per site. Part of the [[API reference|API-Reference]]: setup, shared types and errors are there.
 
+- [[List contact tags|API-Reference-Leads#list-contact-tags]]: `GET /contact-tags`
+- [[Create a contact tag|API-Reference-Leads#create-a-contact-tag]]: `POST /contact-tags`
+- [[Change a contact tag|API-Reference-Leads#change-a-contact-tag]]: `PATCH /contact-tags/:id`
+- [[Delete a contact tag|API-Reference-Leads#delete-a-contact-tag]]: `DELETE /contact-tags/:id`
 - [[List leads|API-Reference-Leads#list-leads]]: `GET /leads`
 - [[Create a lead|API-Reference-Leads#create-a-lead]]: `POST /leads`
 - [[Get a lead|API-Reference-Leads#get-a-lead]]: `GET /leads/:id`
@@ -11,16 +15,270 @@ The people who gave contact details: your CRM's contacts, with custom attributes
 - [[Delete a lead|API-Reference-Leads#delete-a-lead]]: `DELETE /leads/:id`
 - [[Export leads as CSV|API-Reference-Leads#export-leads-as-csv]]: `GET /leads.csv`
 
+## List contact tags
+
+`GET /contact-tags` · scope `leads:read`
+
+The site-defined tags that a contact may carry. Create, rename and remove definitions in Settings → Contact tags; assign them with `PATCH /leads/:id`.
+
+| Parameter | In | Required | Description |
+| --- | --- | --- | --- |
+| `site` | query | no | The site (a key always uses its own). |
+
+**Request**
+
+<!-- tabs -->
+```bash [curl]
+curl "$HELPPUFF_URL/api/v1/contact-tags" \
+  -H "Authorization: Bearer $HELPPUFF_API_KEY"
+```
+```ts [TypeScript]
+const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/contact-tags`, {
+  headers: {
+    Authorization: `Bearer ${process.env.HELPPUFF_API_KEY}`,
+  },
+});
+if (!response.ok) throw new Error(((await response.json()) as ApiError).error.message);
+const data = (await response.json()) as ListContactTagsResponse;
+```
+<!-- /tabs -->
+
+**Response** `200`
+
+<!-- tabs -->
+```json [Example]
+{
+  "tags": [
+    {
+      "id": "ctag_vip",
+      "name": "VIP",
+      "color": "#eab308"
+    }
+  ],
+  "colors": [
+    "#6b7280",
+    "#ef4444",
+    "#f97316",
+    "#eab308",
+    "#22c55e",
+    "#14b8a6",
+    "#3b82f6",
+    "#8b5cf6",
+    "#ec4899"
+  ]
+}
+```
+```ts [Type]
+type ListContactTagsResponse = {
+  tags: Array<{
+    id: string;
+    name: string;
+    color: string;
+  }>;
+  colors: string[];
+};
+```
+<!-- /tabs -->
+
+## Create a contact tag
+
+`POST /contact-tags` · scope `settings:write`
+
+Up to 100 per site.
+
+| Body field | Required | Description |
+| --- | --- | --- |
+| `name` | yes | Up to 40 characters, one per name (case does not matter). |
+| `color` | no | A hex colour like `#eab308`; one is picked if left out. |
+
+**Request**
+
+<!-- tabs -->
+```bash [curl]
+curl -X POST "$HELPPUFF_URL/api/v1/contact-tags" \
+  -H "Authorization: Bearer $HELPPUFF_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "name": "VIP",
+  "color": "#eab308"
+}'
+```
+```ts [TypeScript]
+type CreateContactTagRequest = {
+  /** Up to 40 characters, one per name (case does not matter). */
+  name: string;
+  /** A hex colour like `#eab308`; one is picked if left out. */
+  color?: string;
+};
+
+const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/contact-tags`, {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${process.env.HELPPUFF_API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    name: 'VIP',
+    color: '#eab308'
+  } satisfies CreateContactTagRequest),
+});
+if (!response.ok) throw new Error(((await response.json()) as ApiError).error.message);
+const data = (await response.json()) as CreateContactTagResponse;
+```
+<!-- /tabs -->
+
+**Response** `201`
+
+<!-- tabs -->
+```json [Example]
+{
+  "id": "ctag_vip",
+  "name": "VIP",
+  "color": "#eab308"
+}
+```
+```ts [Type]
+type CreateContactTagResponse = {
+  id: string;
+  name: string;
+  color: string;
+};
+```
+<!-- /tabs -->
+
+**Errors**
+
+| Status | Code | When |
+| --- | --- | --- |
+| 409 | `conflict` | A contact tag with this name exists. |
+
+## Change a contact tag
+
+`PATCH /contact-tags/:id` · scope `settings:write`
+
+Renames or recolours it on every contact that has it.
+
+| Parameter | In | Required | Description |
+| --- | --- | --- | --- |
+| `id` | path | yes | The record's id. |
+
+| Body field | Required | Description |
+| --- | --- | --- |
+| `name` | no | Up to 40 characters. |
+| `color` | no | A hex colour. |
+
+**Request**
+
+<!-- tabs -->
+```bash [curl]
+curl -X PATCH "$HELPPUFF_URL/api/v1/contact-tags/ID" \
+  -H "Authorization: Bearer $HELPPUFF_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "name": "Key account"
+}'
+```
+```ts [TypeScript]
+type ChangeContactTagRequest = {
+  /** Up to 40 characters. */
+  name?: string;
+  /** A hex colour. */
+  color?: string;
+};
+
+const id = '…';
+const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/contact-tags/${id}`, {
+  method: 'PATCH',
+  headers: {
+    Authorization: `Bearer ${process.env.HELPPUFF_API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    name: 'Key account'
+  } satisfies ChangeContactTagRequest),
+});
+if (!response.ok) throw new Error(((await response.json()) as ApiError).error.message);
+const data = (await response.json()) as ChangeContactTagResponse;
+```
+<!-- /tabs -->
+
+**Response** `200`
+
+<!-- tabs -->
+```json [Example]
+{
+  "id": "ctag_vip",
+  "name": "Key account",
+  "color": "#eab308"
+}
+```
+```ts [Type]
+type ChangeContactTagResponse = {
+  id: string;
+  name: string;
+  color: string;
+};
+```
+<!-- /tabs -->
+
+## Delete a contact tag
+
+`DELETE /contact-tags/:id` · scope `settings:write`
+
+Removes it from every contact too.
+
+| Parameter | In | Required | Description |
+| --- | --- | --- | --- |
+| `id` | path | yes | The record's id. |
+
+**Request**
+
+<!-- tabs -->
+```bash [curl]
+curl -X DELETE "$HELPPUFF_URL/api/v1/contact-tags/ID" \
+  -H "Authorization: Bearer $HELPPUFF_API_KEY"
+```
+```ts [TypeScript]
+const id = '…';
+const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/contact-tags/${id}`, {
+  method: 'DELETE',
+  headers: {
+    Authorization: `Bearer ${process.env.HELPPUFF_API_KEY}`,
+  },
+});
+if (!response.ok) throw new Error(((await response.json()) as ApiError).error.message);
+const data = (await response.json()) as DeleteContactTagResponse;
+```
+<!-- /tabs -->
+
+**Response** `200`
+
+<!-- tabs -->
+```json [Example]
+{
+  "id": "ctag_vip",
+  "deleted": true
+}
+```
+```ts [Type]
+type DeleteContactTagResponse = {
+  id: string;
+  deleted: boolean;
+};
+```
+<!-- /tabs -->
+
 ## List leads
 
 `GET /leads` · scope `leads:read`
 
-Most recently updated first, up to 500, with counts by status.
+Most recently updated first, up to 500. Each contact includes its tags. Status and status counts remain for older integrations.
 
 | Parameter | In | Required | Description |
 | --- | --- | --- | --- |
 | `q` | query | no | Search name, email, phone, company, notes and attributes. |
 | `status` | query | no | `new`, `contacted`, `qualified`, `won` or `lost`. |
+| `tag` | query | no | A contact tag id, or `untagged`. Finds contacts with that tag; a contact may have several. |
 | `site` | query | no | The site (a key always uses its own). |
 
 **Request**
@@ -60,6 +318,13 @@ const data = (await response.json()) as ListLeadsResponse;
       "attributes": {
         "plan": "pro"
       },
+      "tags": [
+        {
+          "id": "ctag_vip",
+          "name": "VIP",
+          "color": "#eab308"
+        }
+      ],
       "source": "form",
       "status": "new",
       "notes": null,
@@ -90,6 +355,11 @@ type ListLeadsResponse = {
     attributes: {
       plan: string;
     };
+    tags: Array<{
+      id: string;
+      name: string;
+      color: string;
+    }>;
     source: string;
     status: string;
     notes: string | null;
@@ -209,7 +479,14 @@ const data = (await response.json()) as CreateLeadResponse;
   "address": null,
   "attributes": {
     "plan": "pro"
-  }
+  },
+  "tags": [
+    {
+      "id": "ctag_vip",
+      "name": "VIP",
+      "color": "#eab308"
+    }
+  ]
 }
 ```
 ```ts [Type]
@@ -231,6 +508,11 @@ type CreateLeadResponse = {
   attributes: {
     plan: string;
   };
+  tags: Array<{
+    id: string;
+    name: string;
+    color: string;
+  }>;
 };
 ```
 <!-- /tabs -->
@@ -245,7 +527,7 @@ type CreateLeadResponse = {
 
 `GET /leads/:id` · scope `leads:read`
 
-The contact with their conversations (status, labels and attributes), the team's dated notes (`teamNotes`; `notes` is the contact's own notes field) and their callback requests: their history.
+The contact and its tags, with conversations (status, labels and attributes), the team's dated notes (`teamNotes`; `notes` is the contact's own notes field) and callback requests.
 
 | Parameter | In | Required | Description |
 | --- | --- | --- | --- |
@@ -292,6 +574,13 @@ const data = (await response.json()) as GetLeadResponse;
   "attributes": {
     "plan": "pro"
   },
+  "tags": [
+    {
+      "id": "ctag_vip",
+      "name": "VIP",
+      "color": "#eab308"
+    }
+  ],
   "conversations": [
     {
       "id": "1b0f6a52-3c1e-4c55-9f0e-2d1c7a9e5b10",
@@ -368,6 +657,11 @@ type GetLeadResponse = {
   attributes: {
     plan: string;
   };
+  tags: Array<{
+    id: string;
+    name: string;
+    color: string;
+  }>;
   conversations: Array<{
     id: string;
     startedAt: number;
@@ -423,7 +717,7 @@ type GetLeadResponse = {
 
 `PATCH /leads/:id` · scope `leads:write`
 
-Changes the status, details, notes or custom attributes. `attributes` merges: sent keys are set, `null` removes one. Sends `lead.updated`.
+Changes details, notes, custom attributes or tags. `tags` replaces the complete list of tag ids; `attributes` merges: sent keys are set, `null` removes one. The old `status` field remains for integrations. Sends `lead.updated`.
 
 | Parameter | In | Required | Description |
 | --- | --- | --- | --- |
@@ -438,6 +732,7 @@ Changes the status, details, notes or custom attributes. `attributes` merges: se
 | `company` | no | Up to 200 characters; empty or null clears it. |
 | `address` | no | Up to 500 characters; empty or null clears it. |
 | `attributes` | no | An object of strings; `null` removes a key. |
+| `tags` | no | Complete list of contact tag ids from Settings → Contact tags; use `[]` to remove all tags. |
 | `notes` | no | Replaces the notes field (up to 5000 characters). For a dated note, use `POST /leads/:id/notes`. |
 
 **Request**
@@ -448,8 +743,8 @@ curl -X PATCH "$HELPPUFF_URL/api/v1/leads/ID" \
   -H "Authorization: Bearer $HELPPUFF_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-  "status": "contacted",
   "company": "Analytical Engines",
+  "tags": [],
   "attributes": {
     "plan": "pro",
     "trial": null
@@ -476,6 +771,11 @@ type UpdateLeadRequest = {
     trial?: string | null;
   };
   /**
+   * Complete list of contact tag ids from Settings → Contact tags; use `[]` to
+   * remove all tags.
+   */
+  tags?: string[];
+  /**
    * Replaces the notes field (up to 5000 characters). For a dated note, use
    * `POST /leads/:id/notes`.
    */
@@ -490,8 +790,8 @@ const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/leads/${id}`, {
     'Content-Type': 'application/json',
   },
   body: JSON.stringify({
-    status: 'contacted',
     company: 'Analytical Engines',
+    tags: [],
     attributes: {
       plan: 'pro',
       trial: null
@@ -524,7 +824,14 @@ const data = (await response.json()) as UpdateLeadResponse;
   "address": null,
   "attributes": {
     "plan": "pro"
-  }
+  },
+  "tags": [
+    {
+      "id": "ctag_vip",
+      "name": "VIP",
+      "color": "#eab308"
+    }
+  ]
 }
 ```
 ```ts [Type]
@@ -546,6 +853,11 @@ type UpdateLeadResponse = {
   attributes: {
     plan: string;
   };
+  tags: Array<{
+    id: string;
+    name: string;
+    color: string;
+  }>;
 };
 ```
 <!-- /tabs -->
@@ -604,7 +916,7 @@ type DeleteLeadResponse = {
 
 `GET /leads.csv` · scope `leads:read`
 
-Every lead, newest first. Cells that could run as a spreadsheet formula are prefixed with `'`.
+Every lead, newest first, with a tags column. The status column remains for older integrations. Cells that could run as a spreadsheet formula are prefixed with `'`.
 
 | Parameter | In | Required | Description |
 | --- | --- | --- | --- |
@@ -632,8 +944,8 @@ const data: ExportLeadsAsCSVResponse = await response.text();
 
 <!-- tabs -->
 ```csv [Example]
-created,name,email,phone,company,address,status,source,notes,attributes,site,conversation
-2025-10-09T08:53:20.000Z,Ada Lovelace,ada@example.com,0400 111 222,Analytical Engines,,new,form,,"{""plan"":""pro""}",acme,1b0f6a52-…
+created,name,email,phone,company,address,status,source,notes,attributes,site,conversation,tags
+2025-10-09T08:53:20.000Z,Ada Lovelace,ada@example.com,0400 111 222,Analytical Engines,,new,form,,"{""plan"":""pro""}",acme,1b0f6a52-…,
 ```
 ```ts [Type]
 /** CSV text. */

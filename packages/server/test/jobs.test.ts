@@ -109,7 +109,7 @@ describe('jobs', () => {
 
     const won = await json(await w.owner.send('POST', `/jobs/${job['id']}/move`, { stageId: stage('Done') }));
     expect(won).toMatchObject({ status: 'won', closedAt: expect.any(Number) });
-    expect((await json(await w.owner.get(`/leads/${job['contact'].id}`)))['status']).toBe('won');
+    expect((await json(await w.owner.get(`/leads/${job['contact'].id}`)))['status']).toBe('new');
     expect(((await json(await w.owner.get('/jobs')))['items'] as Json[]).some((j) => j.id === job['id'])).toBe(false);
     expect(((await json(await w.owner.get('/jobs?status=won')))['items'] as Json[]).map((j) => j.id)).toEqual([job['id']]);
 

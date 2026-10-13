@@ -168,7 +168,7 @@ async function addTools(w: Awaited<ReturnType<typeof world>>) {
     parameters: [{ name: 'order_number', description: 'Like A-1042.' }],
     pick: ['status', 'eta'],
   });
-  await add({ name: 'order_number', kind: 'extract', description: 'Save the order number the visitor gives.', fields: [{ name: 'order_number', description: 'Like A-1042.', required: true }] });
+  await add({ name: 'order_number', kind: 'extract', description: 'Save the order number the visitor gives.', after: false, fields: [{ name: 'order_number', description: 'Like A-1042.', required: true }] });
   await add({ name: 'crm_update', description: 'Send the finished conversation to the CRM.', method: 'POST', url: 'https://crm.acme.test/after', after: true });
   forgetTools('demo');
 }

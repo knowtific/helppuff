@@ -1,6 +1,6 @@
-import { Check, Copy, Loader2, Sparkles, Trash2 } from 'lucide-react';
+import { Check, Copy, Loader2, Plus, Sparkles, Trash2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { PageHeader, settingsSections, SettingsTabs, type SettingsSection } from '../components/Shell';
+import { HelpNote, PageHeader, settingsSections, SettingsTabs, type SettingsSection } from '../components/Shell';
 import { Avatar, Badge, Button, Card, CardHeader, Input, Select, Skeleton } from '../components/ui';
 import { api, isMember, type Me, type Team as TeamList } from '../lib/api';
 import { LabelsSettings, LiveChatSettings, NotificationSettings } from '../components/LiveChat';
@@ -18,6 +18,8 @@ import { JobsSettings } from '../components/JobsSettings';
 import { HomeScreenSettings } from '../components/HomeScreenSettings';
 import { BookingsSettings } from '../components/BookingsSettings';
 import { Integrations } from '../components/Integrations';
+import { CustomFieldsSettings } from '../components/CustomFieldsSettings';
+import { ContactTagsSettings } from '../components/ContactTags';
 
 /** What to ask a coding agent, per page: it reads the settings with the CLI, asks, then changes them. */
 const AGENT_TOPICS: Partial<Record<SettingsSection | 'prompt' | 'knowledge', string>> = {
@@ -105,6 +107,8 @@ const DESCRIPTIONS: Record<SettingsSection, string> = {
   integrations: 'Keys for other services, used by any feature: Composio for Google Calendar and Outlook, Cal.com and Calendly.',
   live: 'Let visitors talk to a person on your team, from the dashboard or Telegram.',
   labels: 'Tag conversations, by hand or by the AI, and filter by them.',
+  contact_tags: 'Create and manage tags for categorising contacts.',
+  fields: 'See and manage the data fields on conversations, contacts and jobs.',
   jobs: 'Requests, quotes and work: the stages they go through, what you need to know, and the quote questions on the widget.',
   notifications: 'The emails you get, and your own alerts for live chats. Everyone on the team chooses their own.',
   advanced: 'The model, how often your site is re-read, rate limits, blocked IPs and sign-in protection.',
@@ -126,6 +130,8 @@ const HELP: Record<SettingsSection, string> = {
   integrations: 'Integrations',
   live: 'Live-Chat',
   labels: 'Dashboard#labels',
+  contact_tags: 'Leads#contact-tags-attributes-and-notes',
+  fields: 'Dashboard#custom-fields',
   jobs: 'Jobs',
   notifications: 'Email-Notifications',
   advanced: 'AI-Models',
@@ -142,7 +148,7 @@ export function Settings({ me, section }: { me: Me; section: string | undefined 
   const current = sections.find((s) => s.id === section) ?? sections[0]!;
   return (
     <>
-      <PageHeader title={current.label} description={DESCRIPTIONS[current.id]} help={HELP[current.id]} actions={!isMember(me) && current.id !== 'notifications' && <AskAgent request={agentRequest(current.id, current.label)} />} />
+      <PageHeader title={current.label} description={DESCRIPTIONS[current.id]} help={HELP[current.id]} actions={!isMember(me) && current.id !== 'notifications' && current.id !== 'fields' && current.id !== 'contact_tags' && <AskAgent request={agentRequest(current.id, current.label)} />} />
       <SettingsTabs me={me} route={{ page: 'settings', id: current.id }} />
       <div className={cn('p-4 md:p-6', current.id === 'home' || current.id === 'bookings' ? 'max-w-6xl' : 'max-w-3xl')}>
         {(current.id === 'chat' || current.id === 'appearance' || current.id === 'leads' || current.id === 'advanced') && (
@@ -173,6 +179,8 @@ export function Settings({ me, section }: { me: Me; section: string | undefined 
         {current.id === 'bookings' && <BookingsSettings />}
         {current.id === 'integrations' && <Integrations />}
         {current.id === 'labels' && <LabelsSettings />}
+        {current.id === 'contact_tags' && <ContactTagsSettings />}
+        {current.id === 'fields' && site && <CustomFieldsSettings site={site.id} />}
         {current.id === 'jobs' && <JobsSettings />}
         {current.id === 'notifications' && (
           <div className="space-y-4">
@@ -202,8 +210,16 @@ function Team({ me }: { me: Me }) {
   const [role, setRole] = useState<'admin' | 'member'>('member');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [link, setLink] = useState<{ email: string; url: string } | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [links, setLinks] = useState<{ email: string; url: string }[]>([]);
   const admin = !isMember(me);
+  const closeInvite = () => {
+    setAdding(false);
+    setEmail('');
+    setName('');
+    setRole('member');
+    setError(null);
+  };
   const run = async (work: () => Promise<unknown>) => {
     setBusy(true);
     setError(null);
@@ -221,7 +237,15 @@ function Team({ me }: { me: Me }) {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader title="Team" tip={{ label: 'About the team', text: `People who can sign in to this dashboard. ${ROLE_HINT}` }} />
+        <CardHeader
+          title="Team"
+          tip={{ label: 'About the team', text: `People who can sign in to this dashboard. ${ROLE_HINT}` }}
+          action={admin && (
+            <Button variant="outline" size="sm" aria-expanded={adding} aria-controls={adding ? 'team-invite-form' : undefined} onClick={() => adding ? closeInvite() : setAdding(true)}>
+              {adding ? <X /> : <Plus />} {adding ? 'Cancel' : 'Add team member'}
+            </Button>
+          )}
+        />
         <ul className="divide-y border-t">
           {!data && <Skeleton className="m-4 h-8" />}
           {data?.owner && (
@@ -268,22 +292,40 @@ function Team({ me }: { me: Me }) {
             </li>
           ))}
         </ul>
-        {admin && (
+        {error && <p role="alert" className="border-t px-4 py-2 text-xs text-danger">{error}</p>}
+        {links.length > 0 && (
+          <div className="space-y-2 border-t px-4 py-3">
+            {links.map((invite) => (
+              <div key={invite.email} className="space-y-2 rounded-md border bg-subtle p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p role="status" className="text-xs font-medium">Invitation link ready for {invite.email}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">Copy and send this one-time sign-in link. It expires in 7 days.</p>
+                  </div>
+                  <Button variant="ghost" size="icon" className="size-7" aria-label={`Dismiss invitation link for ${invite.email}`} onClick={() => setLinks((current) => current.filter((item) => item.email !== invite.email))}><X /></Button>
+                </div>
+                <CopyBlock text={invite.url} label={`sign-in link for ${invite.email}`} />
+              </div>
+            ))}
+          </div>
+        )}
+        {admin && adding && (
           <form
+            id="team-invite-form"
             className="space-y-2 border-t px-4 py-3"
             onSubmit={(e) => {
               e.preventDefault();
               void run(async () => {
                 const made = await api<{ email: string; signInLink: string | null }>('/admins', { method: 'POST', json: { email, name: name || undefined, role } });
-                if (made.signInLink) setLink({ email: made.email, url: made.signInLink });
-                setEmail('');
-                setName('');
+                const url = made.signInLink;
+                if (url) setLinks((current) => [{ email: made.email, url }, ...current.filter((item) => item.email !== made.email)]);
+                closeInvite();
               });
             }}
           >
             <p className="text-xs font-medium">Invite someone</p>
             <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
-              <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="teammate@example.com" aria-label="Email" />
+              <Input autoFocus type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="teammate@example.com" aria-label="Email" />
               <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="First name (visitors see it)" aria-label="Name" maxLength={100} />
               <Select value={role} onChange={(e) => setRole(e.target.value as 'admin' | 'member')} aria-label="Role">
                 <option value="member">Member</option>
@@ -293,38 +335,13 @@ function Team({ me }: { me: Me }) {
                 {busy && <Loader2 className="animate-spin" />} Invite
               </Button>
             </div>
-            {link && (
-              <div className="space-y-1.5 pt-1">
-                <p className="text-xs text-muted-foreground">Send {link.email} this one-time sign-in link (valid 7 days):</p>
-                <CopyBlock text={link.url} label="sign-in link" />
-              </div>
-            )}
-            {error && (
-              <p role="alert" className="text-xs text-danger">
-                {error}
-              </p>
-            )}
           </form>
         )}
-        <div className="space-y-2 border-t px-4 py-3">
-          <p className="text-xs text-muted-foreground">Or from the command line:</p>
-          <CopyBlock text={'helppuff users add teammate@example.com --role member\nhelppuff users remove teammate@example.com\nhelppuff users reset teammate@example.com'} label="commands" />
-        </div>
       </Card>
 
-      <Card>
-        <CardHeader title="Security" tip={{ label: 'About security', text: 'Keys live only in your project’s .env and as Worker secrets on your Cloudflare account.' }} />
-        <div className="space-y-2 border-t px-4 py-3 text-[13px]">
-          <p>
-            <span className="font-medium">Locked out?</span> <span className="text-muted-foreground">A one-time sign-in link, from the folder you set up in:</span>
-          </p>
-          <CopyBlock text="npx @knowtific/helppuff dashboard" label="command" />
-          <p className="pt-2">
-            <span className="font-medium">Rotate the admin key</span>{' '}
-            <span className="text-muted-foreground">(what the CLI and agents use): delete ADMIN_API_KEY from .env and redeploy — a new one is made and set.</span>
-          </p>
-        </div>
-      </Card>
+      <HelpNote page="Dashboard#locked-out-or-changing-the-admin-key" label="What to do">
+        Locked out, or changing the admin key?
+      </HelpNote>
     </div>
   );
 }

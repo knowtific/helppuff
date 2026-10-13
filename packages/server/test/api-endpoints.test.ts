@@ -196,6 +196,31 @@ describe('every area, end to end through /api/v1', () => {
     expectDocumented('DELETE', `/leads/${id}`, deleted.json);
   });
 
+  it('contact tags: defined, put on a contact, filtered, renamed and removed', async () => {
+    const w = await world();
+    const admin = await w.key(['settings:write', 'leads:write']);
+    const made = await w.call('POST', '/contact-tags', admin, { name: 'VIP', color: '#eab308' });
+    expect(made.status, JSON.stringify(made.json)).toBe(201);
+    expectDocumented('POST', '/contact-tags', made.json);
+    const tagId = made.json['id'] as string;
+    expect((await w.call('POST', '/contact-tags', admin, { name: 'vip' })).status).toBe(409);
+    expectDocumented('GET', '/contact-tags', (await w.call('GET', '/contact-tags', admin)).json);
+
+    const lead = (await w.call('POST', '/leads', admin, { name: 'Grace', email: 'grace@example.com' })).json['id'] as string;
+    const tagged = await w.call('PATCH', `/leads/${lead}`, admin, { tags: [tagId] });
+    expect(tagged.json['tags']).toEqual([{ id: tagId, name: 'VIP', color: '#eab308' }]);
+    expect((await w.call('PATCH', `/leads/${lead}`, admin, { tags: ['ctag_other'] })).status).toBe(400);
+    expect((await w.call('GET', `/leads?tag=${tagId}`, admin)).json['items'].map((l: Json) => l['id'])).toEqual([lead]);
+    expect((await w.call('GET', '/leads?tag=untagged', admin)).json['items']).toEqual([]);
+
+    const renamed = await w.call('PATCH', `/contact-tags/${tagId}`, admin, { name: 'Key account' });
+    expectDocumented('PATCH', `/contact-tags/${tagId}`, renamed.json);
+    expect((await w.call('GET', `/leads/${lead}`, admin)).json['tags'][0]['name']).toBe('Key account');
+    const removed = await w.call('DELETE', `/contact-tags/${tagId}`, admin);
+    expectDocumented('DELETE', `/contact-tags/${tagId}`, removed.json);
+    expect((await w.call('GET', `/leads/${lead}`, admin)).json['tags']).toEqual([]);
+  });
+
   it('jobs: the pipeline, a job from another tool, moved, updated, noted, won and deleted', async () => {
     const w = await world();
     const owner = await w.key(['settings:write', 'jobs:write']);
@@ -309,6 +334,24 @@ describe('every area, end to end through /api/v1', () => {
     expectDocumented('PUT', '/settings', saved.json);
     const again = await w.call('GET', '/settings', key);
     expect(again.json['settings']).toMatchObject({ welcomeMessage: 'Hi from the API', security: { limits: { messagesPerSitePerDay: 800 } } });
+  });
+
+  it('custom fields: defined, renamed on every record that has it, and removed', async () => {
+    const w = await world();
+    const key = await w.key(['settings:write', 'leads:write']);
+    const lead = (await w.call('POST', '/leads', key, { email: 'ada@example.com', attributes: { plan: 'pro' } })).json['id'] as string;
+    const added = await w.call('POST', '/attribute-definitions', key, { scope: 'contact', name: 'region' });
+    expect(added.status, JSON.stringify(added.json)).toBe(201);
+    expectDocumented('POST', '/attribute-definitions', added.json);
+    const list = await w.call('GET', '/attribute-definitions', key);
+    expectDocumented('GET', '/attribute-definitions', list.json);
+    expect(list.json['contacts']).toEqual([{ name: 'plan', used: 1, defined: false }, { name: 'region', used: 0, defined: true }]);
+    const renamed = await w.call('PATCH', '/attribute-definitions', key, { scope: 'contact', oldName: 'plan', name: 'tier' });
+    expectDocumented('PATCH', '/attribute-definitions', renamed.json);
+    expect((await w.call('GET', `/leads/${lead}`, key)).json['attributes']).toEqual({ tier: 'pro' });
+    const removed = await w.call('DELETE', '/attribute-definitions', key, { scope: 'contact', name: 'tier' });
+    expectDocumented('DELETE', '/attribute-definitions', removed.json);
+    expect((await w.call('GET', `/leads/${lead}`, key)).json['attributes']).toEqual({});
   });
 
   it('prompt: reads, publishes, reads a version and restores it', async () => {
@@ -522,7 +565,7 @@ describe('the agent file, end to end through /api/v1', () => {
       helppuff: 'agent',
       version: 1,
       name: 'Order tracking',
-      prompt: 'If they ask about an order, ask for its number, save it with {{order_number}}, then look it up with {{order_status}}.',
+      prompt: 'If they ask about an order, ask for its number, then look it up with {{order_status}}.',
       settings: { behaviour: { goal: 'answers' }, leads: { enabled: false } },
       tools: [
         {
@@ -534,7 +577,7 @@ describe('the agent file, end to end through /api/v1', () => {
           parameters: [{ name: 'order_number', description: 'Like 1042', required: true }],
           pick: ['status', 'tracking.number'],
         },
-        { name: 'order_number', kind: 'extract', description: 'Save the order number.', fields: [{ name: 'order_number', description: 'Like 1042', required: true }] },
+        { name: 'order_number', kind: 'extract', description: 'Find the order number the visitor gave.', after: true, fields: [{ name: 'order_number', description: 'Like 1042', required: true }] },
       ],
       needs: [{ name: 'SHOP_API_KEY', description: 'Your shop’s API key' }],
     };

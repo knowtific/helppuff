@@ -2,7 +2,7 @@ import { ArrowUpCircle, Bell, Bot, Briefcase, CalendarDays, ChartColumn, Chevron
 import { useEffect, useRef, useState, type ComponentProps, type KeyboardEvent, type ReactNode } from 'react';
 import { api, isMember, roleOf, type CallbackList, type LiveStatus, type Me, type Prefs, type Site } from '../lib/api';
 import { onToast, setAvailable, unlockAudio, useLiveConnection, useLiveEvents, type Toast } from '../lib/live';
-import { setAccent, setWaiting } from '../lib/attention';
+import { setWaiting } from '../lib/attention';
 import { cn, href, useTheme, type Route } from '../lib/utils';
 import { Avatar, Button, HelpPuffMark, InfoTip } from './ui';
 import { useVersion } from './Updates';
@@ -30,6 +30,17 @@ export function HelpLink({ page, label = 'Learn more', className }: { page: stri
   );
 }
 
+/** One quiet line under a page or card, with the wiki holding the detail. */
+export function HelpNote({ page, label, icon, children }: { page: string; label: string; icon?: ReactNode; children: ReactNode }) {
+  return (
+    <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 px-1 text-xs text-muted-foreground [&>svg]:size-3.5 [&>svg]:shrink-0">
+      {icon}
+      {children}
+      <HelpLink page={page} label={label} className="text-foreground" />
+    </p>
+  );
+}
+
 const ALL_NAV: {
   page: Route['page'];
   label: string;
@@ -51,7 +62,7 @@ const ALL_NAV: {
 ];
 
 /** Settings, one page per topic; the sidebar opens them as a sub-menu. */
-export type SettingsSection = 'chat' | 'home' | 'appearance' | 'leads' | 'instructions' | 'agent' | 'business' | 'bookings' | 'advanced' | 'live' | 'labels' | 'jobs' | 'notifications' | 'webhooks' | 'integrations' | 'api' | 'team' | 'updates';
+export type SettingsSection = 'chat' | 'home' | 'appearance' | 'leads' | 'instructions' | 'agent' | 'business' | 'bookings' | 'advanced' | 'live' | 'labels' | 'contact_tags' | 'fields' | 'jobs' | 'notifications' | 'webhooks' | 'integrations' | 'api' | 'team' | 'updates';
 
 /** The Prompt page (the owner's prompt, its versions, and the site's tools) in the Settings menu, after Instructions. */
 export const PROMPT_LABEL = 'Prompt & tools';
@@ -62,7 +73,7 @@ export type SettingsGroup = { label: string; icon: ReactNode; items: SettingsLin
 const GROUPS: { label: string; icon: ReactNode; keys: string[] }[] = [
   { label: 'Assistant', icon: <Bot />, keys: ['instructions', 'prompt', 'knowledge', 'business', 'bookings', 'agent'] },
   { label: 'Widget', icon: <PanelsTopLeft />, keys: ['chat', 'home', 'appearance', 'leads'] },
-  { label: 'Team', icon: <Users />, keys: ['live', 'labels', 'jobs', 'notifications'] },
+  { label: 'Team', icon: <Users />, keys: ['live', 'labels', 'contact_tags', 'fields', 'jobs', 'notifications'] },
   { label: 'System', icon: <Server />, keys: ['advanced', 'webhooks', 'integrations', 'api', 'team', 'updates'] },
 ];
 
@@ -121,6 +132,8 @@ export function settingsSections(site: Site | undefined, me?: Me): { id: Setting
     ...(site?.prompt !== false ? [{ id: 'agent' as const, label: 'Import & export' }] : []),
     { id: 'live' as const, label: 'Live chat' },
     { id: 'labels' as const, label: 'Labels' },
+    { id: 'contact_tags' as const, label: 'Contact tags' },
+    { id: 'fields' as const, label: 'Custom fields' },
     { id: 'jobs' as const, label: 'Jobs' },
     { id: 'notifications' as const, label: 'Notifications' },
     ...(site?.knowledge || site?.connector === 'workers-ai' ? [{ id: 'advanced' as const, label: 'Advanced' }] : []),
@@ -165,7 +178,6 @@ function useLive(me: Me) {
   }, []);
   const waiting = status ? status.unassigned + status.mine : 0;
   // The tab's title and icon count what waits (lib/attention.ts).
-  useEffect(() => setAccent(me.sites[0]?.accent ?? ''), [me]);
   useEffect(() => setWaiting(waiting), [waiting]);
   const toggle = async () => {
     unlockAudio();

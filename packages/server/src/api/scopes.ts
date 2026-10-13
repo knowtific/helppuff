@@ -17,7 +17,7 @@ export const SCOPES = {
   'prompt:read': 'Read the prompt, its versions and its tools.',
   'prompt:write': 'Publish and restore prompt versions; add, change, test and remove tools.',
   'settings:read': 'Read the settings and Telegram\'s status.',
-  'settings:write': 'Change the settings, labels and Telegram.',
+  'settings:write': 'Change the settings, labels, contact tags, custom fields and Telegram.',
   'webhooks:read': 'Read webhook endpoints, deliveries and the email service.',
   'webhooks:write': 'Add, change, test and remove webhook endpoints and the email service.',
   'analytics:read': 'Read the overview, usage and version.',

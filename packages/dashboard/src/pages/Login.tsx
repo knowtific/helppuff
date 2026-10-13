@@ -1,7 +1,7 @@
 import { Loader2 } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
 import { api } from '../lib/api';
-import { Button, HelpPuffMark, Input } from '../components/ui';
+import { Button, HelpPuffMark, Input, PasswordInput } from '../components/ui';
 
 type Turnstile = {
   render: (el: HTMLElement, options: { sitekey: string; action?: string; callback: (token: string) => void; 'expired-callback': () => void; 'error-callback': () => void }) => string;
@@ -118,10 +118,10 @@ export function Login({ onDone }: { onDone: () => void }) {
             <span className="text-xs font-medium">Email</span>
             <Input type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />
           </label>
-          <label className="block space-y-1.5">
-            <span className="text-xs font-medium">Password</span>
-            <Input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
-          </label>
+          <div className="space-y-1.5">
+            <label htmlFor="login-password" className="block text-xs font-medium">Password</label>
+            <PasswordInput id="login-password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+          </div>
           {captcha.needed && <div ref={captcha.slot} className="min-h-[65px]" />}
           {(error ?? captcha.error) && (
             <p role="alert" className="text-xs text-danger">

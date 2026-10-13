@@ -628,8 +628,8 @@ export async function updateJob(db: D1Like, job: JobRow, patch: JobPatch, actor:
 }
 
 /**
- * Move a job: another stage (a history event; into won or lost closes it, and
- * a won job's contact becomes won), and/or another place in its column
+ * Move a job: another stage (a history event; into won or lost closes it),
+ * and/or another place in its column
  * (`before`: the job it now sits above; none: the bottom).
  */
 export async function moveJob(
@@ -661,7 +661,6 @@ export async function moveJob(
         .bind(to.id, position, now, to.kind === 'open' ? null : now, reason, now, job.id),
       eventStatement(db, job.id, now, actor, 'stage', { from: from.name, to: to.name, kind: to.kind, ...(reason ? { reason } : {}) }),
     );
-    if (to.kind === 'won' && job.lead_id) statements.push(db.prepare("UPDATE leads SET status = 'won', updated_at = ? WHERE id = ?").bind(now, job.lead_id));
   } else {
     statements.push(db.prepare('UPDATE jobs SET position = ? WHERE id = ?').bind(position, job.id));
   }

@@ -5,7 +5,7 @@ import { api, type EmailService, type NotificationsInfo, type Prefs } from '../l
 import { cn, fmtRelative, useData } from '../lib/utils';
 import { RequestEditor, type RequestDraft } from './RequestFields';
 import { WikiLink } from './Shell';
-import { Badge, Button, Card, CardHeader, ErrorNote, Input, Select, Skeleton } from './ui';
+import { Badge, Button, Card, CardHeader, ErrorNote, Input, PasswordInput, Select, Skeleton } from './ui';
 
 /**
  * Settings → Notifications, the email part. Everyone picks the emails they
@@ -257,11 +257,11 @@ function ServiceForm({ service, onSaved, onCancel }: { service: EmailService | n
             <Input type="email" placeholder="assistant@yourdomain.com" value={draft.from} onChange={(e) => setDraft({ ...draft, from: e.target.value })} autoComplete="off" />
             <span className="block text-xs text-muted-foreground">An address on a domain you verified in {preset.name}.</span>
           </label>
-          <label className="block space-y-1.5">
-            <span className="block text-xs font-medium">{preset.key.label}</span>
-            <Input type="password" placeholder={service ? 'Stored: leave empty to keep it' : ''} value={draft.key} onChange={(e) => setDraft({ ...draft, key: e.target.value })} autoComplete="off" />
+          <div className="space-y-1.5">
+            <label htmlFor="email-service-key" className="block text-xs font-medium">{preset.key.label}</label>
+            <PasswordInput id="email-service-key" visibilityLabel="key" placeholder={service ? 'Stored: leave empty to keep it' : ''} value={draft.key} onChange={(e) => setDraft({ ...draft, key: e.target.value })} autoComplete="off" />
             <span className="block text-xs text-muted-foreground">Stored encrypted and never shown again.</span>
-          </label>
+          </div>
         </div>
       )}
       {preset && (

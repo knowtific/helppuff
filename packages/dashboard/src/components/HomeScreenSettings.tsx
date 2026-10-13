@@ -47,6 +47,52 @@ function actionFor(kind: ShortcutAction['kind'], id: string, label: string, form
 
 const question = (text: string, id: string): Shortcut => ({ id, label: text, icon: 'chat', action: { id, kind: 'reply', label: text, value: text } });
 
+const comparableText = (value: string) => value.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+
+function comparableUrl(value: string): string {
+  try {
+    const url = new URL(value);
+    url.pathname = url.pathname.replace(/\/$/, '') || '/';
+    return url.href;
+  } catch {
+    return value.trim();
+  }
+}
+
+function shortcutTarget(shortcut: Shortcut): string | null {
+  const action = shortcut.action;
+  switch (action.kind) {
+    case 'reply': return comparableText(action.value);
+    case 'url': return `url:${comparableUrl(action.url)}`;
+    case 'tel': return `tel:${action.phone.replace(/\D/g, '')}`;
+    case 'email': return `email:${action.email.trim().toLowerCase()}`;
+    case 'form': return `form:${action.formId}`;
+    case 'flow': return `flow:${action.flowId}`;
+  }
+}
+
+/** Keep existing buttons in order and use each suggested label or action only once. */
+function addSuggestedButtons(existing: Shortcut[], suggested: Shortcut[], limit: number, quoteLabel: string | null): Shortcut[] {
+  const buttons = [...existing];
+  const text = new Set([quoteLabel ?? '', ...existing.flatMap((s) => [s.label, s.action.kind === 'reply' ? s.action.value : ''])].map(comparableText).filter(Boolean));
+  const targets = new Set(existing.map(shortcutTarget).filter((value): value is string => Boolean(value)));
+  const contactKinds = new Set(existing.filter((s) => s.action.kind === 'tel' || s.action.kind === 'email').map((s) => s.action.kind));
+
+  for (const candidate of suggested) {
+    if (buttons.length >= limit) break;
+    const label = comparableText(candidate.label);
+    const target = shortcutTarget(candidate);
+    const isContact = candidate.action.kind === 'tel' || candidate.action.kind === 'email';
+    if ((label && text.has(label)) || (target && (targets.has(target) || (candidate.action.kind === 'reply' && text.has(target)))) || (isContact && contactKinds.has(candidate.action.kind))) continue;
+    buttons.push(candidate);
+    if (label) text.add(label);
+    if (candidate.action.kind === 'reply' && target) text.add(target);
+    if (target) targets.add(target);
+    if (isContact) contactKinds.add(candidate.action.kind);
+  }
+  return buttons;
+}
+
 function move<T>(list: T[], index: number, by: -1 | 1): T[] {
   const next = [...list];
   const to = index + by;
@@ -288,16 +334,28 @@ export function HomeScreenSettings({ knowledge }: { knowledge: boolean }) {
     setSaveError(null);
     try {
       const s = await api<HomeSuggestion>('/home/suggest', { method: 'POST', json: {} });
-      const asked = new Set(draft.shortcuts.filter((x) => x.action.kind === 'reply').map((x) => x.label.toLowerCase()));
-      const kinds = new Set(draft.shortcuts.map((x) => x.action.kind));
-      // A way to reach the business first: more questions only fill the room left.
-      const added = [
-        ...s.contact.filter((c) => !kinds.has(c.action.kind)).map((c) => ({ ...c, id: newId(c.action.kind), action: { ...c.action, id: newId(c.action.kind) } })),
-        ...s.questions.filter((q) => !asked.has(q.toLowerCase())).map((q) => question(q, newId('ask'))),
+      const candidates = [
+        ...s.contact.map((c) => {
+          const id = newId(c.action.kind);
+          return { ...c, id, action: { ...c.action, id } };
+        }),
+        ...s.questions.map((q) => question(q, newId('ask'))),
       ];
-      const shortcuts = [...draft.shortcuts, ...added].slice(0, room);
-      const known = new Set((draft.links?.items ?? []).map((l) => l.url));
-      const links = s.links ? { title: draft.links?.title ?? s.links.title, items: [...(draft.links?.items ?? []), ...s.links.items.filter((l) => !known.has(l.url))].slice(0, MAX_LINKS) } : draft.links;
+      const shortcuts = addSuggestedButtons(draft.shortcuts, candidates, room, quoteLabel);
+      const existingLinks = draft.links?.items ?? [];
+      const knownUrls = new Set([...existingLinks.map((l) => comparableUrl(l.url)), ...shortcuts.flatMap((s) => s.action.kind === 'url' ? [comparableUrl(s.action.url)] : [])]);
+      const knownLabels = new Set(existingLinks.map((l) => comparableText(l.label)));
+      const items = [...existingLinks];
+      for (const link of s.links?.items ?? []) {
+        if (items.length >= MAX_LINKS) break;
+        const url = comparableUrl(link.url);
+        const label = comparableText(link.label);
+        if (knownUrls.has(url) || (label && knownLabels.has(label))) continue;
+        items.push(link);
+        knownUrls.add(url);
+        if (label) knownLabels.add(label);
+      }
+      const links = s.links && (items.length > existingLinks.length || draft.links) ? { title: draft.links?.title ?? s.links.title, items } : draft.links;
       setDraft({ ...draft, shortcuts, links });
       setNote(shortcuts.length - draft.shortcuts.length + (links?.items.length ?? 0) - (draft.links?.items.length ?? 0) > 0 ? 'Added suggestions from your website. Keep what you like, then Save.' : 'Nothing new to suggest.');
     } catch (thrown) {

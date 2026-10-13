@@ -113,6 +113,34 @@ Every command takes `--json`. See [[the CLI reference|CLI-Reference]].
 
 ## Webhooks and the API
 
+### From your own forms, Zapier or Make
+
+Anything that can send an HTTP request can create a job: your website's
+quote form, a CRM, a Zapier or Make step. Make an API key with the
+`jobs:write` scope in **Settings → API keys**, then send:
+
+```bash
+curl -X POST "https://<your-worker>/api/v1/jobs" \
+  -H "Authorization: Bearer $HELPPUFF_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contact": { "name": "Sam Lee", "email": "sam@example.com", "phone": "0400 111 222" },
+    "fields": { "service": "Blocked drains", "urgency": "This week" },
+    "details": "From the quote form on our website"
+  }'
+```
+
+- `contact` is matched by email, then phone, or created.
+- `fields` use your field names (Settings → Jobs → Fields). A choice field
+  takes one of its options; an unknown field is refused. A missing required
+  field is fine: the team fills it in.
+- The job lands in the first stage (or the one `stageId` names) and sends
+  `job.created`.
+
+Every option, with a TypeScript example: [[Create a job|API-Reference-Jobs]].
+
+### Telling other tools
+
 `job.created`, `job.updated`, `job.stage_changed`, `job.won` and `job.lost`
 are sent to your [[Webhooks]], each with the whole job. Every route the
 dashboard uses is in the public API with the `jobs:read` and `jobs:write`

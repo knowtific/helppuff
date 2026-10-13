@@ -9,7 +9,7 @@ the dashboard's **Prompt & tools** page (Settings → Prompt & tools):
 | --- | --- | --- |
 | **1. Before the chat** | Called when a chat starts, with the pre-chat form's answers. The first answer can already use what it returned. | Look the visitor up in your CRM or shop by their email |
 | **2. During the chat** | Name a tool in the prompt as `{{order_status}}`. The assistant calls it when it needs to, filling in what the request asks for, and answers from the result. | Check an order, a booking, stock, a delivery date |
-| **3. After the chat** | Called when the conversation ends, with the transcript, the summary, the contact and every tool's data. | Send the conversation to your CRM, help desk or a sheet |
+| **3. After the chat** | Save details the visitor stated, then call your API with the transcript, summary, contact and every tool's data. | Keep an order number; send the conversation to your CRM, help desk or a sheet |
 
 Everything a tool returns or saves is kept on the conversation under the
 tool's name:
@@ -19,9 +19,10 @@ tool's name:
 ```
 
 This data shows on the conversation in the dashboard (**Data from tools**). It
-goes to [[webhooks|Webhooks]] as `data` (in `conversation.started` and
-`conversation.completed`), and to your after-chat tools. The assistant also
-sees it on every answer, so it can use a value again later in the chat.
+goes to [[webhooks|Webhooks]] as `data` in `conversation.completed`, and to
+your later after-chat tools. Data from before and during the chat is also
+available to the assistant while it answers; details saved after the chat
+appear only when it ends.
 
 **Learn by example:** four [[tutorials|Tutorials]] (order tracking, sending
 chats to a CRM, the nearest store, verified account changes), each with a
@@ -36,7 +37,9 @@ whole conversation itself (Retell, or your own API), only after-chat tools run.
 On the **Prompt & tools** page (Settings → Prompt & tools), use **+ Add** on
 **Before the chat** or **After the chat**, or **+ Add** in the prompt (click
 **Prompt** in the diagram) for a tool the assistant calls during the chat;
-each menu lists the tools you already have, then **New tool**. Then either:
+each menu lists the tools you already have, then **New tool**. **Save what the
+visitor says** is offered only under **After the chat**. Choose **Call an
+API**, then choose a setup method on the next line:
 
 - **Paste a curl** copied from your API's docs or from Postman
   (Code → cURL). The method, URL, headers and body are filled in.
@@ -124,14 +127,12 @@ In the prompt, `{{` opens a list of what you can use:
 | --- | --- |
 | `{{order_status}}` | The tool's name, and the tool to call. A tool is offered to the assistant only when the prompt names it this way |
 | `{{crm_lookup.tier}}` | What that tool returned, quoted (`"gold"`), or `(not known yet)` |
-| `{{order_number}}` (an extract tool) | The extract tool to save with |
 
 For example:
 
 ```text
 Gold customers ({{crm_lookup.tier}}) get free delivery.
-If they ask about an order, ask for its number, save it with {{order_number}},
-then look it up with {{order_status}}.
+If they ask about an order, ask for its number, then look it up with {{order_status}}.
 ```
 
 Below the prompt, the page lists the tools the prompt uses. It also flags a
@@ -149,23 +150,28 @@ the result.
 
 ## Extract tools
 
-An extract tool calls nothing. It names the fields the assistant should
-collect, such as `order_number` ("The order number, like A-1042"). When the
-visitor gives one, the assistant saves it:
+An extract tool calls no external API. After the chat ends, HelpPuff reads
+what the visitor said and saves fields it can find, such as `order_number`
+("The order number, like A-1042"). It copies only values stated by the visitor:
 
 - on the conversation's data, under the tool's name;
 - as a **custom attribute** on the conversation (`order_number: A-1042`), so
   the team sees it, can filter by it, and webhooks and exports have it.
 
-Name the extract tool in the prompt (`save it with {{order_number}}`). A
-later tool can use the saved value as `{{data.order_number.order_number}}`.
+Create it from **After the chat** (or `helppuff tools add … --extract`). New
+extract tools run there by default. Do not name it in the prompt: the
+assistant does not call it during the conversation. An after-chat HTTP tool
+can use the saved value as `{{data.order_number.order_number}}`. Existing
+extract tools previously named in a prompt keep their during-chat behavior
+until you move them to **After the chat**.
 
 ## 3. After the chat
 
 Add a tool to **After the chat** (or `--after`) and it runs when the
 conversation ends: five quiet minutes after the last message, or when a live
 chat closes. This is the same moment as the `conversation.completed`
-webhook. It gets everything: `{{transcript}}`, `{{summary}}` (when summaries
+webhook. Extract tools save visitor details first, so HTTP tools can use them.
+An HTTP tool gets everything: `{{transcript}}`, `{{summary}}` (when summaries
 are on), `{{lead}}`, `{{attributes}}` and `{{data}}`. A `POST` with no body
 sends the whole conversation as JSON:
 

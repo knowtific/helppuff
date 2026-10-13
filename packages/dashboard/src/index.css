@@ -30,6 +30,11 @@
   /* Prompt diffs: a tint behind the line, the text stays foreground. */
   --added: #dcfce7;
   --removed: #fee2e2;
+  /* Something waiting for you (questions to answer, before you go live): a warm
+     tint, used sparingly, so it stands out from the neutral cards around it. */
+  --attention: #fffbeb;
+  --attention-border: #fde68a;
+  --attention-foreground: #b45309;
   color-scheme: light;
 }
 
@@ -55,6 +60,9 @@
   --grid: #2a2b30;
   --added: #14532d66;
   --removed: #7f1d1d66;
+  --attention: #f59e0b14;
+  --attention-border: #f59e0b4d;
+  --attention-foreground: #fbbf24;
   color-scheme: dark;
 }
 
@@ -76,6 +84,9 @@
   --color-series-2: var(--series-2);
   --color-added: var(--added);
   --color-removed: var(--removed);
+  --color-attention: var(--attention);
+  --color-attention-border: var(--attention-border);
+  --color-attention-foreground: var(--attention-foreground);
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 

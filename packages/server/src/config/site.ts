@@ -62,6 +62,7 @@ async function resolveConfigured(ctx: Ctx, siteId: string): Promise<SiteConfig> 
     ...bundled,
     ...(overrides.connector ? { connector: overrides.connector } : {}),
     ...(overrides.sinks ? { sinks: overrides.sinks } : {}),
+    ...(overrides.autoSummary !== undefined ? { autoSummary: overrides.autoSummary } : {}),
     ...(overrides.security ? { security: overrides.security } : {}),
     ...(overrides.widget ? { widget: overrides.widget } : {}),
     ...(overrides.knowledge ? { knowledge: overrides.knowledge } : {}),

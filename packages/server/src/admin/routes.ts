@@ -35,6 +35,7 @@ import { liveRoutes } from './live.js';
 import { jobRoutes, maybeSetup } from './jobs.js';
 import { homeRoutes, maybeSuggestHome } from './home.js';
 import { assistantRoutes } from './assistant.js';
+import { contactTagRoutes, contactTagsSql, contactTagStatements, parseContactTags } from './contact-tags.js';
 import { liveAvailable } from '../live/service.js';
 import { versionRoutes } from './version.js';
 import { dbFrom, ensureSchema, type D1Like } from '../db/d1.js';
@@ -163,6 +164,8 @@ adminRoutes.get('/me', async (c) => {
         live: liveAvailable(ctx.env, site, id),
         /** HelpPuff writes this backend's prompt: the Instructions and Prompt & tools pages apply. */
         prompt: promptField(site.connector).option !== null,
+        /** Whether finished conversations are automatically summarised and labelled. */
+        autoSummary: site.autoSummary,
         /** How visitors book (Settings → Bookings): `picker` shows the Calendar page and appointments on jobs. */
         bookings: effectiveBooking(site, site.bookingFound ?? null).mode,
       };
@@ -399,7 +402,7 @@ async function loadConversation(d: D1Like, id: string, cutoff = 0) {
       .prepare('SELECT id, role, type, text, payload, ts, feedback, author FROM messages WHERE conversation_id = ? ORDER BY ts, id')
       .bind(id)
       .all<{ id: string; role: string; type: string; text: string | null; payload: string | null; ts: number }>(),
-    conversation['lead_id'] ? d.prepare('SELECT * FROM leads WHERE id = ?').bind(conversation['lead_id']).first<Record<string, unknown>>() : null,
+    conversation['lead_id'] ? d.prepare(`SELECT *, ${contactTagsSql('leads')} AS tags FROM leads WHERE id = ?`).bind(conversation['lead_id']).first<Record<string, unknown>>() : null,
     d.prepare('SELECT * FROM callbacks WHERE conversation_id = ? ORDER BY requested_at DESC').bind(id).all<Parameters<typeof callbackView>[0]>(),
     conversationExtras(d, id),
   ]);
@@ -417,7 +420,7 @@ async function loadConversation(d: D1Like, id: string, cutoff = 0) {
 
 /** A lead row as answered: attributes parsed. */
 export function leadOut(row: Record<string, unknown>): Record<string, unknown> {
-  return { ...row, attributes: parseJsonObject(row['attributes']) };
+  return { ...row, attributes: parseJsonObject(row['attributes']), tags: parseContactTags(row['tags']) };
 }
 
 /** A conversation's signed-in visitor (the column is JSON), or null. */
@@ -461,6 +464,7 @@ adminRoutes.get('/leads', async (c) => {
   // D1 refuses LIKE patterns over 50 bytes: `%q%` must fit.
   const q = (c.req.query('q') ?? '').trim().slice(0, 48);
   const status = c.req.query('status');
+  const tag = c.req.query('tag');
   const f = siteFilter(c);
   const where: string[] = ['1=1'];
   const params: unknown[] = [];
@@ -472,9 +476,14 @@ adminRoutes.get('/leads', async (c) => {
     where.push('status = ?');
     params.push(status);
   }
+  if (tag === 'untagged') where.push('NOT EXISTS (SELECT 1 FROM lead_tags lt WHERE lt.lead_id = leads.id AND lt.site_id = leads.site_id)');
+  else if (tag) {
+    where.push('EXISTS (SELECT 1 FROM lead_tags lt WHERE lt.lead_id = leads.id AND lt.site_id = leads.site_id AND lt.tag_id = ?)');
+    params.push(tag);
+  }
   const rows = await db(c)
     .prepare(
-      `SELECT id, site_id AS site, conversation_id AS conversationId, name, email, phone, company, address, fields, attributes, source, status, notes,
+      `SELECT id, site_id AS site, conversation_id AS conversationId, name, email, phone, company, address, fields, attributes, source, status, notes, ${contactTagsSql('leads')} AS tags,
               created_at AS createdAt, updated_at AS updatedAt,
               (SELECT COUNT(*) FROM conversations c WHERE c.lead_id = leads.id) AS conversations,
               (SELECT c.id FROM conversations c WHERE c.lead_id = leads.id ORDER BY c.last_at DESC LIMIT 1) AS lastConversationId,
@@ -509,6 +518,7 @@ function leadView(row: Record<string, unknown>) {
     source: row['source'],
     fields,
     attributes: parseJsonObject(row['attributes']),
+    tags: parseContactTags(row['tags']),
   };
 }
 
@@ -554,19 +564,19 @@ adminRoutes.patch('/leads/:id', async (c) => {
     sets.push('name = ?');
     params.push(body.name.slice(0, 200));
   }
-  if (!sets.length) throw new HelpPuffError('bad_request', { message: 'Nothing to update.' });
+  if (!sets.length && body['tags'] === undefined) throw new HelpPuffError('bad_request', { message: 'Nothing to update.' });
+  const d = db(c);
+  const now = c.get('helppuff').platform.now();
+  const tagStatements = body['tags'] === undefined ? [] : await contactTagStatements(d, existing.site_id, c.req.param('id'), body['tags'], now);
   sets.push('updated_at = ?');
-  params.push(c.get('helppuff').platform.now());
-  await db(c)
-    .prepare(`UPDATE leads SET ${sets.join(', ')} WHERE id = ?`)
-    .bind(...params, c.req.param('id'))
-    .run();
-  const lead = await db(c).prepare('SELECT * FROM leads WHERE id = ?').bind(c.req.param('id')).first<Record<string, unknown>>();
+  params.push(now);
+  await d.batch([d.prepare(`UPDATE leads SET ${sets.join(', ')} WHERE id = ?`).bind(...params, c.req.param('id')), ...tagStatements]);
+  const lead = await d.prepare(`SELECT *, ${contactTagsSql('leads')} AS tags FROM leads WHERE id = ?`).bind(c.req.param('id')).first<Record<string, unknown>>();
   if (lead) {
     const changed = Object.fromEntries(
-      (['status', 'notes', 'name', 'email', 'phone', 'company', 'address', 'attributes'] as const)
+      (['status', 'notes', 'name', 'email', 'phone', 'company', 'address', 'attributes', 'tags'] as const)
         .filter((k) => body[k] !== undefined)
-        .map((k) => [k, k === 'attributes' ? parseJsonObject(lead[k]) : (lead[k] ?? null)]),
+        .map((k) => [k, k === 'attributes' ? parseJsonObject(lead[k]) : k === 'tags' ? parseContactTags(lead[k]) : (lead[k] ?? null)]),
     );
     emit(c.get('helppuff'), String(lead['site_id']), 'lead.updated', { leadId: lead['id'], conversationId: lead['conversation_id'] ?? null, changed, lead: leadView(lead) });
   }
@@ -614,7 +624,7 @@ adminRoutes.post('/leads', async (c) => {
     )
     .bind(id, siteId, name, email, phone, company, address, Object.keys(fields).length ? JSON.stringify(fields) : null, attributesJson(attributes), status, notes, now, now)
     .run();
-  const lead = (await d.prepare('SELECT * FROM leads WHERE id = ?').bind(id).first<Record<string, unknown>>())!;
+  const lead = (await d.prepare(`SELECT *, ${contactTagsSql('leads')} AS tags FROM leads WHERE id = ?`).bind(id).first<Record<string, unknown>>())!;
   emit(c.get('helppuff'), siteId, 'lead.captured', { conversationId: null, source: 'api', name, email, phone, fields });
   return c.json(leadOut(lead), 201);
 });
@@ -623,7 +633,7 @@ adminRoutes.post('/leads', async (c) => {
 adminRoutes.get('/leads/:id', async (c) => {
   await currentAdmin(c);
   const d = db(c);
-  const lead = await d.prepare('SELECT * FROM leads WHERE id = ?').bind(c.req.param('id')).first<Record<string, unknown>>();
+  const lead = await d.prepare(`SELECT *, ${contactTagsSql('leads')} AS tags FROM leads WHERE id = ?`).bind(c.req.param('id')).first<Record<string, unknown>>();
   if (!lead) throw new HelpPuffError('not_found', { message: 'No such lead.', detail: 'admin_lead_missing' });
   assertSiteAccess(c, lead['site_id'], 'lead');
   const cutoff = await closeCutoff(c, String(lead['site_id']));
@@ -673,6 +683,7 @@ adminRoutes.delete('/leads/:id', async (c) => {
     d.prepare('UPDATE conversations SET lead_id = NULL WHERE lead_id = ?').bind(id),
     d.prepare('UPDATE callbacks SET lead_id = NULL WHERE lead_id = ?').bind(id),
     d.prepare('DELETE FROM notes WHERE lead_id = ? AND conversation_id IS NULL').bind(id),
+    d.prepare('DELETE FROM lead_tags WHERE lead_id = ?').bind(id),
     d.prepare('DELETE FROM leads WHERE id = ?').bind(id),
   ]);
   return c.json({ id, deleted: true, conversationsDeleted: linked.length });
@@ -689,12 +700,12 @@ adminRoutes.get('/leads.csv', async (c) => {
   await currentAdmin(c);
   const f = siteFilter(c);
   const rows = await db(c)
-    .prepare(`SELECT created_at, name, email, phone, company, address, status, source, notes, attributes, site_id, conversation_id FROM leads WHERE 1=1${f.sql} ORDER BY created_at DESC`)
+    .prepare(`SELECT created_at, name, email, phone, company, address, status, source, notes, attributes, site_id, conversation_id, ${contactTagsSql('leads')} AS tags FROM leads WHERE 1=1${f.sql} ORDER BY created_at DESC`)
     .bind(...f.params)
     .all<Record<string, unknown>>();
-  const header = ['created', 'name', 'email', 'phone', 'company', 'address', 'status', 'source', 'notes', 'attributes', 'site', 'conversation'];
+  const header = ['created', 'name', 'email', 'phone', 'company', 'address', 'status', 'source', 'notes', 'attributes', 'site', 'conversation', 'tags'];
   const lines = rows.results.map((r) =>
-    [new Date(Number(r['created_at'])).toISOString(), r['name'], r['email'], r['phone'], r['company'], r['address'], r['status'], r['source'], r['notes'], r['attributes'], r['site_id'], r['conversation_id']]
+    [new Date(Number(r['created_at'])).toISOString(), r['name'], r['email'], r['phone'], r['company'], r['address'], r['status'], r['source'], r['notes'], r['attributes'], r['site_id'], r['conversation_id'], parseContactTags(r['tags']).map((tag) => tag.name).join('; ')]
       .map(csvCell)
       .join(','),
   );
@@ -843,6 +854,7 @@ adminRoutes.route('/', versionRoutes);
 adminRoutes.route('/', chatRoutes);
 adminRoutes.route('/', accessRoutes);
 adminRoutes.route('/', inboxRoutes);
+adminRoutes.route('/', contactTagRoutes);
 adminRoutes.route('/', liveRoutes);
 adminRoutes.route('/', jobRoutes);
 adminRoutes.route('/', homeRoutes);

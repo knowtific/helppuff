@@ -56,6 +56,7 @@ COMMANDS
     chat [message]       Talk to the deployed assistant through the real API (--local for dev)
     status               What is deployed, where, the embed snippet, and the knowledge base
     doctor               Check every piece (config, secrets, token, index, knowledge, Worker) with fixes
+    logs                 Tail the deployed Worker's Cloudflare logs in this terminal (Ctrl-C to stop)
     embed                Print the <script> snippet for the site
 
   Change
@@ -115,7 +116,8 @@ CLOUDFLARE ACCESS
   Easiest: \`npx wrangler login\` once (opens a browser) — helppuff reuses that login.
   Or an API token (https://dash.cloudflare.com/profile/api-tokens → Custom Token) with: Workers Scripts:Edit,
   Workers KV Storage:Edit, D1:Edit, Vectorize:Edit, Account Settings:Read (+ AI Search:Edit and :Run for the
-  cloudflare backend) — as CLOUDFLARE_API_TOKEN (env or .env) or --cf-token. CLOUDFLARE_ACCOUNT_ID or
+  cloudflare backend) — as CLOUDFLARE_API_TOKEN (env or .env) or --cf-token. A logs-only token needs
+  Workers Tail:Read. CLOUDFLARE_ACCOUNT_ID or
   --account-id picks the account when the token sees several.
 
 DASHBOARD
@@ -322,6 +324,20 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   schema: { usage: 'helppuff schema', summary: 'Print the JSON Schema for helppuff.json.' },
   status: { usage: 'helppuff status [--json]', summary: 'Show the site, backend, deployment URL, preview and embed snippet; for workers-ai also the crawl, the passages and today\'s usage against the free budget.' },
   doctor: { usage: 'helppuff doctor [--json]', summary: 'Run every check and print a fix for each failure. Exit code 1 if any check fails.' },
+  logs: {
+    usage: 'helppuff logs [--method POST] [--search text] [--json --seconds 15]',
+    summary: 'Tail the deployed Worker\'s Cloudflare logs in this terminal until Ctrl-C. Uses the existing wrangler login or CLOUDFLARE_API_TOKEN from .env. --json collects a bounded snapshot (15 seconds by default) as one JSON result.',
+    options: [
+      ['--method <method>', 'Only requests with this HTTP method (for example POST)'],
+      ['--search <text>', 'Filter console log messages by text'],
+      ['--seconds <1–300>', 'With --json, how long to collect events (default 15)'],
+      ['--cf-account, --account-id <id>', 'Cloudflare account, if the token can access several'],
+      ['--cf-token <token>', 'Cloudflare API token; prefer CLOUDFLARE_API_TOKEN in .env to avoid shell history'],
+      ['--json', 'Return one JSON object with events collected for the chosen duration'],
+    ],
+    examples: ['helppuff logs', 'helppuff logs --method POST', 'helppuff logs --json --seconds 10'],
+    notes: 'A Cloudflare API token needs Workers Tail Read (or Workers Scripts Write) on the Worker. The tail shows new requests only; older stored logs are in Cloudflare Workers Observability. The audit API records successful changes, not failed sign-ins or rejected API keys.',
+  },
   embed: { usage: 'helppuff embed', summary: 'Print the <script> tag to paste into the site.' },
   users: {
     usage: 'helppuff users list | add <email> [--role admin|member] | role <email> admin|member | remove <email> | reset <email> [--password <p>]',
@@ -370,11 +386,11 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   tools: {
     usage: 'helppuff tools list | show <name> | add <name> (--curl \'…\' | --url <https://…> [--method POST] [--header "Name: value"] [--body …] | --extract --field name="what it is") --description "…" [--param name="what it is"] [--pick a,b] [--before] [--after [--when path=value,…]] [--timeout ms] | set <name> [the same flags, --no-before, --no-after] | test <name> [--arg name=value] [--prechat field=value] [--data tool.key=value] | enable <name> | disable <name> | remove <name>',
     summary:
-      'The site\'s own tools, the same as on the dashboard\'s Prompt page (stored on the Worker). An http tool calls your API: `{{args.x}}` in its URL, headers or body is filled in by the assistant, `{{prechat.email}}` from the pre-chat form, `{{data.other_tool.key}}` from another tool. `--before` runs it when a chat starts, `--after` when the conversation ends (with the transcript, summary, contact and all the data; an empty body sends all of it as JSON); `--when labels.leadQuality=hot` runs an after-chat tool only for those conversations (`--when lead.email`: only with an email; `--when none`: always). An extract tool (`--extract`) saves what the visitor says, like an order number, as conversation attributes. Name a tool in the prompt as {{name}} to let the assistant use it, and {{name.key}} to put in what it returned. What tools return is kept on the conversation, shown in the dashboard and sent to webhooks. Credential headers (Authorization, X-Api-Key…) are stored encrypted and never read back; write `${NAME}` in a header to take the value from .env (a missing one answers needs_input). Up to 30 per site; https only.',
+      'The site\'s own tools, the same as on the dashboard\'s Prompt page (stored on the Worker). An http tool calls your API: `{{args.x}}` in its URL, headers or body is filled in by the assistant, `{{prechat.email}}` from the pre-chat form, `{{data.other_tool.key}}` from another tool. `--before` runs it when a chat starts, `--after` when the conversation ends (with the transcript, summary, contact and all the data; an empty body sends all of it as JSON); `--when labels.leadQuality=hot` runs an after-chat tool only for those conversations (`--when lead.email`: only with an email; `--when none`: always). An extract tool (`--extract`) reads the finished conversation and saves values the visitor stated as conversation attributes; new extract tools run after the chat by default. Name an HTTP tool in the prompt as {{name}} to let the assistant use it, and {{name.key}} to put in what it returned. What tools return or save is kept on the conversation, shown in the dashboard and sent to webhooks. Credential headers (Authorization, X-Api-Key…) are stored encrypted and never read back; write `${NAME}` in a header to take the value from .env (a missing one answers needs_input). Up to 30 per site; https only.',
     examples: [
       "helppuff tools add order_status --curl 'curl https://api.acme.com/orders/{{args.order_number}} -H \"Authorization: Bearer ${ACME_API_KEY}\"' --description 'Look up an order by its number' --param order_number='Like A-1042' --json",
       "helppuff tools add crm_lookup --url https://crm.acme.com/lookup --method POST --body '{\"email\":\"{{prechat.email}}\"}' --header 'X-Api-Key: ${CRM_KEY}' --before --description 'The customer in our CRM'",
-      "helppuff tools add order_number --extract --field order_number='Like A-1042' --description 'Save the order number once the visitor gives it'",
+      "helppuff tools add order_number --extract --field order_number='Like A-1042' --description 'Find the order number the visitor gave during the chat'",
       'helppuff tools test order_status --arg order_number=A-1042 --json',
       'helppuff tools test track_shipment --data order_lookup.carrier=shippo --data order_lookup.tracking_number=SHIPPO_TRANSIT',
     ],

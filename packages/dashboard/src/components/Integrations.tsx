@@ -1,9 +1,10 @@
-import { ExternalLink, KeyRound, Loader2, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { KeyRound, Loader2, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { api, type IntegrationView } from '../lib/api';
 import { fmtRelative, useData } from '../lib/utils';
 import { CopyBlock } from '../pages/Settings';
-import { Badge, Button, Card, CardHeader, ErrorNote, Input, Skeleton } from './ui';
+import { HelpNote } from './Shell';
+import { Badge, Button, Card, CardHeader, Disclosure, ErrorNote, Input, PasswordInput, Skeleton } from './ui';
 
 /**
  * Settings → Integrations: the site's keys for other services, each usable
@@ -21,12 +22,14 @@ const USED_BY: Record<IntegrationView['kind'], string> = {
   calendly: 'Bookings: free times and appointments in Calendly.',
 };
 
-function KeyForm({ item, help, onSaved }: { item: IntegrationView; help: { key: string; help: string }; onSaved: () => void }) {
+type Check = { ok: boolean; detail: string } | null;
+
+/** `result` lives in the card, so it survives the form moving into the fold once connected. */
+function KeyForm({ item, help, onSaved, result, setResult, inset = false }: { item: IntegrationView; help: { key: string; help: string }; onSaved: () => void; result: Check; setResult: (result: Check) => void; inset?: boolean }) {
   const [key, setKey] = useState('');
   const [baseUrl, setBaseUrl] = useState(item.baseUrl ?? '');
   const [selfHosted, setSelfHosted] = useState(Boolean(item.baseUrl));
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ ok: boolean; detail: string } | null>(null);
   const run = async (work: () => Promise<{ ok: boolean; detail: string }>) => {
     setBusy(true);
     setResult(null);
@@ -49,13 +52,13 @@ function KeyForm({ item, help, onSaved }: { item: IntegrationView; help: { key: 
       return saved.check;
     });
   return (
-    <div className="space-y-3 border-t p-4">
+    <div className={inset ? 'space-y-3' : 'space-y-3 border-t p-4'}>
       <p className="text-xs text-muted-foreground">{help.help}</p>
       <div className="flex flex-wrap items-end gap-2">
-        <label className="min-w-64 flex-1 space-y-1">
-          <span className="text-xs font-medium text-muted-foreground">{help.key}</span>
-          <Input type="password" autoComplete="off" value={key} onChange={(e) => setKey(e.target.value)} placeholder={item.connected ? 'Saved (hidden). Paste a new one to replace it.' : 'Paste it here'} />
-        </label>
+        <div className="min-w-64 flex-1 space-y-1">
+          <label htmlFor={`integration-key-${item.kind}`} className="block text-xs font-medium text-muted-foreground">{help.key}</label>
+          <PasswordInput id={`integration-key-${item.kind}`} visibilityLabel="key" autoComplete="off" value={key} onChange={(e) => setKey(e.target.value)} placeholder={item.connected ? 'Saved (hidden). Paste a new one to replace it.' : 'Paste it here'} />
+        </div>
         <Button type="button" onClick={() => void save()} disabled={busy || (!key && !(item.kind === 'calcom' && item.connected))}>
           {busy ? <Loader2 className="animate-spin" /> : <KeyRound />} {item.connected ? 'Save' : 'Connect'}
         </Button>
@@ -157,55 +160,67 @@ export function Integrations() {
   if (!data) return <Skeleton className="h-64" />;
   return (
     <div className="space-y-4">
-      {data.items.map((item) => (
-        <Card key={item.kind} role="region" aria-label={item.name}>
-          <CardHeader
-            title={item.name}
-            description={USED_BY[item.kind]}
-            action={
-              <div className="flex items-center gap-2">
-                {item.connected ? (
-                  <Badge dot={item.status === 'error' ? '#ef4444' : item.status === 'ok' ? '#22c55e' : '#a1a1aa'}>
-                    {item.status === 'error' ? 'Error' : 'Connected'}
-                    {item.lastAt ? ` · ${fmtRelative(item.lastAt)}` : ''}
-                  </Badge>
-                ) : (
-                  <Badge>Not connected</Badge>
-                )}
-                {item.connected && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-7"
-                    aria-label={`Remove ${item.name}`}
-                    onClick={() => {
-                      if (window.confirm(`Remove ${item.name}? A calendar synced through it stops syncing; appointments stay.`)) void api(`/integrations/${item.kind}`, { method: 'DELETE' }).then(reload, reload);
-                    }}
-                  >
-                    <Trash2 />
-                  </Button>
-                )}
-              </div>
-            }
-          />
-          {item.status === 'error' && item.lastError && <p className="border-t bg-danger/5 px-4 py-1.5 text-xs text-danger">{item.lastError}</p>}
-          {(item.account || item.plan) && (
-            <p className="border-t px-4 py-1.5 text-xs text-muted-foreground">
-              {item.account}
-              {item.plan ? ` · ${item.plan} plan${item.plan === 'free' ? ': visitors finish booking on Calendly’s page, and it is read back' : ''}` : ''}
-            </p>
-          )}
-          <KeyForm item={item} help={data.help[item.kind]!} onSaved={reload} />
-          {item.kind === 'composio' && item.connected && <ComposioAccounts />}
-          {item.kind === 'calcom' && item.connected && <CalcomWebhook />}
-        </Card>
-      ))}
-      <p className="flex items-center gap-1 text-xs text-muted-foreground">
-        Keys are stored encrypted with your Worker’s secret and never shown again.
-        <a className="inline-flex items-center gap-1 underline-offset-2 hover:underline" href="https://github.com/knowtific/helppuff/wiki/Integrations" target="_blank" rel="noreferrer">
-          Learn more <ExternalLink className="size-3" />
-        </a>
-      </p>
+      {data.items.map((item) => <IntegrationCard key={item.kind} item={item} help={data.help[item.kind]!} onChanged={reload} />)}
+      <HelpNote page="Integrations" label="Learn more">
+        Keys are stored encrypted and never shown again.
+      </HelpNote>
     </div>
+  );
+}
+
+/** One service: a row with Connect until it is connected; then its status, with the key folded away. */
+function IntegrationCard({ item, help, onChanged }: { item: IntegrationView; help: { key: string; help: string }; onChanged: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [result, setResult] = useState<Check>(null);
+  return (
+    <Card role="region" aria-label={item.name}>
+      <CardHeader
+        title={item.name}
+        description={USED_BY[item.kind]}
+        action={
+          <div className="flex items-center gap-2">
+            {item.connected ? (
+              <Badge dot={item.status === 'error' ? '#ef4444' : item.status === 'ok' ? '#22c55e' : '#a1a1aa'}>
+                {item.status === 'error' ? 'Error' : 'Connected'}
+                {item.lastAt ? ` · ${fmtRelative(item.lastAt)}` : ''}
+              </Badge>
+            ) : (
+              <Button variant="outline" size="sm" aria-expanded={open} onClick={() => setOpen(!open)}>
+                {open ? 'Cancel' : 'Connect'}
+              </Button>
+            )}
+            {item.connected && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                aria-label={`Remove ${item.name}`}
+                onClick={() => {
+                  if (window.confirm(`Remove ${item.name}? A calendar synced through it stops syncing; appointments stay.`)) void api(`/integrations/${item.kind}`, { method: 'DELETE' }).then(onChanged, onChanged);
+                }}
+              >
+                <Trash2 />
+              </Button>
+            )}
+          </div>
+        }
+      />
+      {item.status === 'error' && item.lastError && <p className="border-t bg-danger/5 px-4 py-1.5 text-xs text-danger">{item.lastError}</p>}
+      {(item.account || item.plan) && (
+        <p className="border-t px-4 py-1.5 text-xs text-muted-foreground">
+          {item.account}
+          {item.plan ? ` · ${item.plan} plan${item.plan === 'free' ? ': visitors finish booking on Calendly’s page, and it is read back' : ''}` : ''}
+        </p>
+      )}
+      {item.connected ? (
+        <Disclosure summary="Key and check" className="border-t px-4 py-3" open={open || item.status === 'error'}>
+          <KeyForm item={item} help={help} onSaved={onChanged} result={result} setResult={setResult} inset />
+        </Disclosure>
+      ) : (
+        open && <KeyForm item={item} help={help} onSaved={onChanged} result={result} setResult={setResult} />
+      )}
+      {item.kind === 'composio' && item.connected && <ComposioAccounts />}
+      {item.kind === 'calcom' && item.connected && <CalcomWebhook />}
+    </Card>
   );
 }

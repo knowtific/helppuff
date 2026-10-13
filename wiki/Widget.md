@@ -102,7 +102,9 @@ shows them straight away, until you set the home screen up yourself: your
 own buttons and links always win, and saving the page once makes it yours
 (nothing is suggested again). **Suggest from my site** on the page adds more
 at any time (with call and email buttons from your business details) for you
-to keep or drop.
+to keep or drop. It checks the buttons already on the page and skips suggested
+buttons with the same label or action. It also skips useful pages already
+listed or already opened by a button.
 
 In `helppuff.json` it is `widget.home` (`title`, `subtitle`, `shortcuts`,
 `links`), and `helppuff config pull` brings dashboard changes into it. Over the

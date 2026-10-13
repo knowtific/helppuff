@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { hashPassword, verifyPassword } from '../src/admin/auth.js';
@@ -234,7 +236,7 @@ describe('the dashboard API', () => {
     });
     expect(((await patched.json()) as { status: string }).status).toBe('contacted');
     const csv = await (await get(w.admin, '/admin/api/leads.csv', w.cookie)).text();
-    expect(csv.split('\n')[0]).toBe('created,name,email,phone,company,address,status,source,notes,attributes,site,conversation');
+    expect(csv.split('\n')[0]).toBe('created,name,email,phone,company,address,status,source,notes,attributes,site,conversation,tags');
     expect(csv).toContain(`"'=HYPERLINK(""x"")"`);
     const bad = await w.admin.fetch(`/admin/api/leads/${id}`, {
       method: 'PATCH',
@@ -528,6 +530,17 @@ describe('webhooks', () => {
     expect(log.deliveries.every((d) => d.ok)).toBe(true);
   });
 
+  it('signs the wiki\'s worked example to the signature the wiki shows', async () => {
+    const page = readFileSync(fileURLToPath(import.meta.url).replace(/packages\/server\/test\/[^/]+$/, 'wiki/Webhooks.md'), 'utf8');
+    const value = (label: string) => new RegExp(`^\\| ${label.replace(/[()]/g, '\\$&')} \\| \`(.+)\` \\|$`, 'm').exec(page)?.[1];
+    const secret = value('Signing secret')!;
+    const timestamp = Number(value('`X-HelpPuff-Timestamp`'));
+    const body = value('Body')!;
+    const shown = /^ {3}(sha256=[0-9a-f]{64})$/m.exec(page)?.[1];
+    expect([secret, timestamp, body]).toEqual([expect.stringMatching(/^whsec_/), 1791234567, expect.stringContaining('"lead.captured"')]);
+    expect(await signDelivery(secret, timestamp, body)).toBe(shown);
+  });
+
   it('sends only the chosen events, none once disabled, and tests on demand', async () => {
     const w = await withHook(['lead.captured']);
     await startSession(w.h, startBody);
@@ -665,7 +678,7 @@ describe('background jobs', () => {
     const params = created[0]!.params as Parameters<typeof runConversationJob>[2];
     expect(await runConversationJob(steps, { db: w.db, ai, fetch: globalThis.fetch, now: () => clock.now }, params)).toEqual({ status: 'completed' });
     // It slept until five minutes after the last message, then checked again.
-    expect(steps.names).toEqual(['check:0', 'idle:0', 'check:1', 'summarize', 'gaps', 'complete']);
+    expect(steps.names).toEqual(['check:0', 'idle:0', 'check:1', 'summarize', 'gaps', 'tools', 'complete']);
     expect(clock.now).toBe(lastAt + 5 * 60_000);
 
     const stored = w.db.raw.prepare('SELECT summary, intent, completed_at FROM conversations WHERE id = ?').get(started.sessionId) as Record<string, unknown>;

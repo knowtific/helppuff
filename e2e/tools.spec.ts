@@ -48,7 +48,7 @@ async function signIn(browser: Browser): Promise<Page> {
   });
   await page.goto('/admin/');
   await page.getByLabel(/email/i).fill(OWNER.email);
-  await page.getByLabel(/password/i).fill(OWNER.password);
+  await page.getByRole('textbox', { name: 'Password', exact: true }).fill(OWNER.password);
   await page.getByRole('button', { name: /sign in/i }).click();
   await expect(page.getByRole('navigation', { name: 'Main' }).first()).toBeVisible();
   return page;
@@ -70,7 +70,7 @@ test('a tool made from a curl answers a visitor’s question about their order',
   await dialog.getByLabel('curl command').fill(`curl https://tools.e2e.test/orders/{{args.order_number}} -H 'Authorization: Bearer e2e-tool-key'`);
   await dialog.getByRole('button', { name: /Read the curl/ }).click();
   await expect(dialog.getByLabel('URL')).toHaveValue('https://tools.e2e.test/orders/{{args.order_number}}');
-  await expect(dialog.getByLabel('Header 1 value')).toHaveAttribute('type', 'password');
+  await expect(dialog.getByLabel('Header 1 value', { exact: true })).toHaveAttribute('type', 'password');
   await dialog.getByLabel('Name', { exact: true }).fill('order_status');
   await dialog.getByLabel('What it does, for the assistant').fill('Look up an order by its number: status and delivery day.');
   await dialog.getByLabel('What order_number is').fill('Like A-1042');
@@ -135,7 +135,8 @@ test('a before-chat tool looks the visitor up by the form’s email, and an extr
     pick: ['tier', 'id'],
     before: true,
   });
-  await add({ name: 'order_number', kind: 'extract', description: 'Save the order number.', fields: [{ name: 'order_number', description: 'Like B-77.', required: true }] });
+  // A during-chat extract tool (older ones keep this timing; new ones default to after the chat).
+  await add({ name: 'order_number', kind: 'extract', description: 'Save the order number.', after: false, fields: [{ name: 'order_number', description: 'Like B-77.', required: true }] });
 
   const visitor = await (await browser.newContext()).newPage();
   await visitor.goto(`${WORKER}/tools.html`);

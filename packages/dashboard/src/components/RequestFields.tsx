@@ -1,7 +1,7 @@
 import { Plus, X } from 'lucide-react';
 import { TOOL_METHODS, isSecretHeader } from '@helppuff/protocol/tools';
 import type { ToolHeaderView } from '../lib/api';
-import { Button, Input, Select, Textarea } from './ui';
+import { Button, Input, PasswordInput, Select, Textarea } from './ui';
 
 /**
  * A request HelpPuff sends for you: a tool's call, a webhook in its own
@@ -26,15 +26,26 @@ export function HeaderList({ headers, onChange }: { headers: ToolHeaderView[]; o
             aria-label={`Header ${i + 1} name`}
             className="font-mono text-xs"
           />
-          <Input
-            value={h.value}
-            type={h.secret ? 'password' : 'text'}
-            onChange={(e) => update(i, { value: e.target.value })}
-            placeholder={h.secret && h.set ? 'Stored: leave empty to keep it' : 'Value'}
-            aria-label={`Header ${i + 1} value`}
-            className="font-mono text-xs"
-            autoComplete="off"
-          />
+          {h.secret ? (
+            <PasswordInput
+              value={h.value}
+              visibilityLabel={`header ${i + 1} value`}
+              onChange={(e) => update(i, { value: e.target.value })}
+              placeholder={h.set ? 'Stored: leave empty to keep it' : 'Value'}
+              aria-label={`Header ${i + 1} value`}
+              className="font-mono text-xs"
+              autoComplete="off"
+            />
+          ) : (
+            <Input
+              value={h.value}
+              onChange={(e) => update(i, { value: e.target.value })}
+              placeholder="Value"
+              aria-label={`Header ${i + 1} value`}
+              className="font-mono text-xs"
+              autoComplete="off"
+            />
+          )}
           <label className="flex items-center gap-1 text-xs text-muted-foreground" title="Stored encrypted and never shown again">
             <input type="checkbox" checked={h.secret} onChange={(e) => update(i, { secret: e.target.checked })} /> Secret
           </label>

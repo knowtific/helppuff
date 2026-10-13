@@ -340,7 +340,7 @@ const data = (await response.json()) as ExportAgentFileResponse;
   "version": 1,
   "name": "Acme Plumbing assistant",
   "description": "Exported from acme on 2025-10-09.",
-  "prompt": "If they ask about an order, ask for its number, save it with {{order_number}}, then look it up with {{order_status}}.",
+  "prompt": "If they ask about an order, ask for its number, then look it up with {{order_status}}.",
   "settings": {
     "behaviour": {
       "goal": "callbacks",
@@ -364,7 +364,8 @@ const data = (await response.json()) as ExportAgentFileResponse;
     {
       "name": "order_number",
       "kind": "extract",
-      "description": "Save the order number once the visitor gives it.",
+      "description": "Find the order number the visitor gave during the chat.",
+      "after": true,
       "enabled": true,
       "fields": [
         {
@@ -444,6 +445,7 @@ type ExportAgentFileResponse = {
     name: string;
     kind: string;
     description: string;
+    after: boolean;
     enabled: boolean;
     fields?: Array<{
       name: string;
@@ -466,7 +468,6 @@ type ExportAgentFileResponse = {
     keys?: string[];
     timeoutMs?: number;
     before?: boolean;
-    after?: boolean;
   }>;
   needs: Array<{
     name: string;
@@ -501,7 +502,7 @@ curl -X POST "$HELPPUFF_URL/api/v1/agent/import" \
     "version": 1,
     "name": "Acme Plumbing assistant",
     "description": "Exported from acme on 2025-10-09.",
-    "prompt": "If they ask about an order, ask for its number, save it with {{order_number}}, then look it up with {{order_status}}.",
+    "prompt": "If they ask about an order, ask for its number, then look it up with {{order_status}}.",
     "settings": {
       "behaviour": {
         "goal": "callbacks",
@@ -525,7 +526,8 @@ curl -X POST "$HELPPUFF_URL/api/v1/agent/import" \
       {
         "name": "order_number",
         "kind": "extract",
-        "description": "Save the order number once the visitor gives it.",
+        "description": "Find the order number the visitor gave during the chat.",
+        "after": true,
         "enabled": true,
         "fields": [
           {
@@ -615,6 +617,7 @@ type ImportAgentFileRequest = {
       name?: string;
       kind?: string;
       description?: string;
+      after?: boolean;
       enabled?: boolean;
       fields?: Array<{
         name?: string;
@@ -637,7 +640,6 @@ type ImportAgentFileRequest = {
       keys?: string[];
       timeoutMs?: number;
       before?: boolean;
-      after?: boolean;
     }>;
     needs?: Array<{
       name?: string;
@@ -668,7 +670,7 @@ const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/agent/import`, 
       version: 1,
       name: 'Acme Plumbing assistant',
       description: 'Exported from acme on 2025-10-09.',
-      prompt: 'If they ask about an order, ask for its number, save it with {{order_number}}, then look it up with {{order_status}}.',
+      prompt: 'If they ask about an order, ask for its number, then look it up with {{order_status}}.',
       settings: {
         behaviour: {
           goal: 'callbacks',
@@ -692,7 +694,8 @@ const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/agent/import`, 
         {
           name: 'order_number',
           kind: 'extract',
-          description: 'Save the order number once the visitor gives it.',
+          description: 'Find the order number the visitor gave during the chat.',
+          after: true,
           enabled: true,
           fields: [
             {

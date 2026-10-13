@@ -741,6 +741,54 @@ export const MIGRATIONS: readonly Migration[] = [
       'CREATE INDEX IF NOT EXISTS knowledge_gaps_open ON knowledge_gaps (site_id, status, count DESC)',
     ],
   },
+  {
+    id: 17,
+    name: 'attribute_definitions',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS attribute_definitions (
+        site_id TEXT NOT NULL,
+        scope TEXT NOT NULL,
+        name TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (site_id, scope, name)
+      )`,
+    ],
+  },
+  {
+    id: 18,
+    name: 'contact_tags',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS contact_tags (
+        id TEXT PRIMARY KEY,
+        site_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        color TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      )`,
+      'CREATE UNIQUE INDEX IF NOT EXISTS contact_tags_site_name ON contact_tags (site_id, name COLLATE NOCASE)',
+      `CREATE TABLE IF NOT EXISTS lead_tags (
+        lead_id TEXT NOT NULL,
+        tag_id TEXT NOT NULL,
+        site_id TEXT NOT NULL,
+        added_at INTEGER NOT NULL,
+        PRIMARY KEY (lead_id, tag_id)
+      )`,
+      'CREATE INDEX IF NOT EXISTS lead_tags_tag ON lead_tags (site_id, tag_id, lead_id)',
+      // Keep contact statuses that people set before tags existed, without
+      // pretending a contact's old won/lost value describes any one job.
+      `INSERT OR IGNORE INTO contact_tags (id, site_id, name, color, created_at)
+       SELECT 'ctag_' || lower(hex(randomblob(16))), site_id,
+         CASE status WHEN 'contacted' THEN 'Previously marked Contacted' WHEN 'qualified' THEN 'Previously marked Qualified'
+           WHEN 'won' THEN 'Previously marked Won' ELSE 'Previously marked Lost' END,
+         '#6b7280', MIN(created_at)
+       FROM leads WHERE status IN ('contacted', 'qualified', 'won', 'lost') GROUP BY site_id, status`,
+      `INSERT OR IGNORE INTO lead_tags (lead_id, tag_id, site_id, added_at)
+       SELECT l.id, t.id, l.site_id, l.updated_at FROM leads l JOIN contact_tags t ON t.site_id = l.site_id
+       AND t.name = CASE l.status WHEN 'contacted' THEN 'Previously marked Contacted' WHEN 'qualified' THEN 'Previously marked Qualified'
+         WHEN 'won' THEN 'Previously marked Won' WHEN 'lost' THEN 'Previously marked Lost' END
+       WHERE l.status IN ('contacted', 'qualified', 'won', 'lost')`,
+    ],
+  },
 ];
 
 export const LATEST_MIGRATION = MIGRATIONS[MIGRATIONS.length - 1]!.id;

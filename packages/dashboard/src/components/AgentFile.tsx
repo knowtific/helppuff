@@ -4,7 +4,7 @@ import { AGENT_TEMPLATES, type AgentFile } from '@helppuff/protocol/agents';
 import { api, type AgentPlan } from '../lib/api';
 import { href } from '../lib/utils';
 import { wikiHref } from './Shell';
-import { Badge, Button, Card, CardHeader, ErrorNote, Input } from './ui';
+import { Badge, Button, Card, CardHeader, ErrorNote, PasswordInput } from './ui';
 
 /**
  * Settings → Import & export: the agent file, the whole assistant's setup in
@@ -190,11 +190,11 @@ function ImportDialog({ site, agent, source, onClose }: { site: string; agent: A
               {!done && missing.length > 0 && (
                 <div className="space-y-2 border-t pt-3">
                   <p className="text-xs font-medium text-muted-foreground">Keys its tools need (stored encrypted, never shown again)</p>
-                  {missing.map((m) => (
-                    <label key={m.name} className="block space-y-1">
-                      <span className="block font-mono text-xs">{m.name}</span>
-                      <Input type="password" autoComplete="off" placeholder={m.description} value={secrets[m.name] ?? ''} onChange={(e) => setSecrets({ ...secrets, [m.name]: e.target.value })} />
-                    </label>
+                  {missing.map((m, i) => (
+                    <div key={m.name} className="space-y-1">
+                      <label htmlFor={`agent-secret-${i}`} className="block font-mono text-xs">{m.name}</label>
+                      <PasswordInput id={`agent-secret-${i}`} visibilityLabel="key" autoComplete="off" placeholder={m.description} value={secrets[m.name] ?? ''} onChange={(e) => setSecrets({ ...secrets, [m.name]: e.target.value })} />
+                    </div>
                   ))}
                 </div>
               )}

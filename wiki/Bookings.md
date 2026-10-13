@@ -17,7 +17,9 @@ times there are made up and the booking stays in the page.
 If you haven't chosen, HelpPuff looks at your website: a booking link it
 finds there (a Calendly, Cal.com, Acuity, SavvyCal, HubSpot meetings or
 similar link, or a "Book a call" page on your site) is offered as
-**External booking link**. Once you choose, the website never changes it.
+**External booking link**. The Booking page field shows the URL currently in
+use; **Keep this link** saves that exact URL. Once you choose and save, the
+website never changes it.
 
 ![The date picker in the chat](https://knowtific.github.io/helppuff/shots/booking-picker.png)
 

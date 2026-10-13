@@ -50,14 +50,14 @@ export const TAGS: { name: string; description: string }[] = [
   { name: 'Conversations', description: 'Read, summarise and delete conversations, from the widget and the API alike.' },
   { name: 'Live chat', description: 'A person on the team answers instead of the assistant: reply, take, give, close and hand back a live chat, and see who is available.' },
   { name: 'Labels and notes', description: 'Labels a site defines and puts on conversations (the AI can too), and the team\'s private notes on conversations and contacts.' },
-  { name: 'Leads', description: 'The people who gave contact details: your CRM\'s contacts, with custom attributes. Keyed by email per site.' },
+  { name: 'Leads', description: 'The people who gave contact details: your CRM\'s contacts, with custom attributes and site-defined tags. Keyed by email per site.' },
   { name: 'Jobs', description: 'Requests, quotes, projects or tickets on the site\'s pipeline: create them from your own forms and systems, move them through the stages, read their history.' },
   { name: 'Appointments', description: 'Booking in the chat (Settings → Bookings: date picker): what is in force, the free times, appointments on jobs (from the chat, the dashboard, your systems or the synced calendar), and the sync. On only with the date picker; the assistant never books.' },
   { name: 'Integrations', description: 'Keys for other services (Composio, Cal.com, Calendly), sealed and live at once, and Composio\'s connected calendar accounts.' },
   { name: 'Callbacks', description: 'Visitors who asked to be called back, as tasks.' },
   { name: 'Knowledge', description: 'What the assistant knows: the website it learned, uploaded files, hand-written knowledge and business details.' },
   { name: 'Prompt', description: 'The business-specific instructions, versioned, and the agent file: the prompt, tools and behaviour settings as one file to export and import.' },
-  { name: 'Tools', description: 'Your own APIs, called before, during and after a chat (`{{name}}` in the prompt), and extract tools that save what the assistant learns. What they return is kept on the conversation (`data`) and sent to webhooks.' },
+  { name: 'Tools', description: 'Your own APIs, called before, during and after a chat (`{{name}}` in the prompt), and extract tools that save values from the finished conversation. What they return or save is kept on the conversation (`data`) and sent to webhooks.' },
   { name: 'Settings', description: 'The assistant, widget, lead form, limits and IP lists, as one object.' },
   { name: 'Webhooks', description: 'Endpoints that receive events as signed JSON, or as a request in their own format; and the email service that sends the team\'s email notifications.' },
   { name: 'Analytics', description: 'Totals, usage and the running version.' },
@@ -86,6 +86,7 @@ const leadRow = {
   company: 'Analytical Engines',
   address: null,
   attributes: { plan: 'pro' },
+  tags: [{ id: 'ctag_vip', name: 'VIP', color: '#eab308' }],
 };
 const labelRow = { id: 'lbl_3f2a1b0c9d8e', name: 'Urgent', color: '#ef4444', description: 'Needs an answer today', ai: true };
 const noteRow = { id: 'note_mfx2k1a9b3c4', conversationId, leadId, author: 'sam@acme.example', authorName: 'Sam', text: 'Called her back, booked for Tuesday.', createdAt: T, updatedAt: T };
@@ -153,13 +154,13 @@ const agentFile = {
   version: 1,
   name: 'Acme Plumbing assistant',
   description: 'Exported from acme on 2025-10-09.',
-  prompt: 'If they ask about an order, ask for its number, save it with {{order_number}}, then look it up with {{order_status}}.',
+  prompt: 'If they ask about an order, ask for its number, then look it up with {{order_status}}.',
   settings: {
     behaviour: { goal: 'callbacks', tone: 'friendly', length: 'short', prices: 'share' },
     leads: { enabled: true, fields: [{ name: 'name', label: 'Name', type: 'text', required: true }] },
   },
   tools: [
-    { name: 'order_number', kind: 'extract', description: 'Save the order number once the visitor gives it.', enabled: true, fields: [{ name: 'order_number', description: 'The order number, like A-1042.', required: true }] },
+    { name: 'order_number', kind: 'extract', description: 'Find the order number the visitor gave during the chat.', after: true, enabled: true, fields: [{ name: 'order_number', description: 'The order number, like A-1042.', required: true }] },
     {
       name: 'order_status',
       kind: 'http',
@@ -221,6 +222,7 @@ const keyView = {
 };
 const usage = { day: '2025-10-09', neurons: 1240.5, messages: 64, budget: 9000, freeAllocation: 10000, messagesLeft: 400, state: 'ok' };
 const settings = {
+  autoSummary: true,
   live: { enabled: true, waitSeconds: 120, closeAfterMinutes: 60, showAgentName: true, aiWhileWaiting: false },
   botName: 'Sam',
   businessName: 'Acme Plumbing',
@@ -342,7 +344,7 @@ export const ENDPOINTS: Endpoint[] = [
     response: {
       admin: { email: 'key:k7m3p9q2r4s8', owner: false, role: 'admin', name: 'Website backend', via: 'key' },
       key: { id: 'k7m3p9q2r4s8', name: 'Website backend', scopes: ['chat', 'leads:read'], site: 'acme', expiresAt: null },
-      sites: [{ id: 'acme', name: 'Acme Plumbing', accent: '#5B5BF7', avatar: null, embed: '<script src="https://helppuff.example.workers.dev/loader.js" data-site="acme" async></script>', connector: 'workers-ai', knowledge: true, website: 'https://acme.example', production: { turnstile: true, hostnames: ['acme.example', 'helppuff.example.workers.dev'], dailyCap: 500 }, live: true, prompt: true, bookings: 'picker' }],
+      sites: [{ id: 'acme', name: 'Acme Plumbing', accent: '#5B5BF7', avatar: null, embed: '<script src="https://helppuff.example.workers.dev/loader.js" data-site="acme" async></script>', connector: 'workers-ai', knowledge: true, website: 'https://acme.example', production: { turnstile: true, hostnames: ['acme.example', 'helppuff.example.workers.dev'], dailyCap: 500 }, live: true, prompt: true, autoSummary: true, bookings: 'picker' }],
       summaries: true,
     },
   },
@@ -752,7 +754,7 @@ export const ENDPOINTS: Endpoint[] = [
     scope: 'conversations:write',
     tag: 'Conversations',
     summary: 'Summarise a conversation',
-    description: 'Writes (or rewrites) its AI summary and labels, and sends `conversation.summarized`. Uses Workers AI (a few neurons). Conversations are also summarised automatically 5 minutes after they go quiet.',
+    description: 'Writes (or rewrites) its AI summary and labels, and sends `conversation.summarized`. Uses Workers AI (a few neurons). When `autoSummary` is on, conversations are also summarised automatically 5 minutes after they go quiet.',
     response: {
       summary: 'Ada asked about a blocked drain and booked a callback for tomorrow morning.',
       intent: 'Blocked drain',
@@ -777,14 +779,64 @@ export const ENDPOINTS: Endpoint[] = [
   // -------------------------------------------------------------------- leads
   {
     method: 'GET',
+    path: '/contact-tags',
+    scope: 'leads:read',
+    tag: 'Leads',
+    summary: 'List contact tags',
+    description: 'The site-defined tags that a contact may carry. Create, rename and remove definitions in Settings → Contact tags; assign them with `PATCH /leads/:id`.',
+    query: [siteQuery],
+    response: { tags: [{ id: 'ctag_vip', name: 'VIP', color: '#eab308' }], colors: ['#6b7280', '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#3b82f6', '#8b5cf6', '#ec4899'] },
+  },
+  {
+    method: 'POST',
+    path: '/contact-tags',
+    scope: 'settings:write',
+    tag: 'Leads',
+    summary: 'Create a contact tag',
+    description: 'Up to 100 per site.',
+    fields: [
+      { name: 'name', description: 'Up to 40 characters, one per name (case does not matter).', required: true },
+      { name: 'color', description: 'A hex colour like `#eab308`; one is picked if left out.' },
+    ],
+    body: { name: 'VIP', color: '#eab308' },
+    status: 201,
+    response: { id: 'ctag_vip', name: 'VIP', color: '#eab308' },
+    errors: [{ status: 409, code: 'conflict', when: 'A contact tag with this name exists.' }],
+  },
+  {
+    method: 'PATCH',
+    path: '/contact-tags/:id',
+    scope: 'settings:write',
+    tag: 'Leads',
+    summary: 'Change a contact tag',
+    description: 'Renames or recolours it on every contact that has it.',
+    fields: [
+      { name: 'name', description: 'Up to 40 characters.' },
+      { name: 'color', description: 'A hex colour.' },
+    ],
+    body: { name: 'Key account' },
+    response: { id: 'ctag_vip', name: 'Key account', color: '#eab308' },
+  },
+  {
+    method: 'DELETE',
+    path: '/contact-tags/:id',
+    scope: 'settings:write',
+    tag: 'Leads',
+    summary: 'Delete a contact tag',
+    description: 'Removes it from every contact too.',
+    response: { id: 'ctag_vip', deleted: true },
+  },
+  {
+    method: 'GET',
     path: '/leads',
     scope: 'leads:read',
     tag: 'Leads',
     summary: 'List leads',
-    description: 'Most recently updated first, up to 500, with counts by status.',
+    description: 'Most recently updated first, up to 500. Each contact includes its tags. Status and status counts remain for older integrations.',
     query: [
       { name: 'q', description: 'Search name, email, phone, company, notes and attributes.', example: 'ada' },
       { name: 'status', description: '`new`, `contacted`, `qualified`, `won` or `lost`.', example: 'new' },
+      { name: 'tag', description: 'A contact tag id, or `untagged`. Finds contacts with that tag; a contact may have several.', example: 'ctag_vip' },
       siteQuery,
     ],
     response: {
@@ -800,6 +852,7 @@ export const ENDPOINTS: Endpoint[] = [
           address: null,
           fields: '{"company":"Analytical Engines"}',
           attributes: { plan: 'pro' },
+          tags: [{ id: 'ctag_vip', name: 'VIP', color: '#eab308' }],
           source: 'form',
           status: 'new',
           notes: null,
@@ -843,7 +896,7 @@ export const ENDPOINTS: Endpoint[] = [
     scope: 'leads:read',
     tag: 'Leads',
     summary: 'Get a lead',
-    description: 'The contact with their conversations (status, labels and attributes), the team\'s dated notes (`teamNotes`; `notes` is the contact\'s own notes field) and their callback requests: their history.',
+    description: 'The contact and its tags, with conversations (status, labels and attributes), the team\'s dated notes (`teamNotes`; `notes` is the contact\'s own notes field) and callback requests.',
     response: {
       ...leadRow,
       conversations: [
@@ -887,7 +940,7 @@ export const ENDPOINTS: Endpoint[] = [
     scope: 'leads:write',
     tag: 'Leads',
     summary: 'Update a lead',
-    description: 'Changes the status, details, notes or custom attributes. `attributes` merges: sent keys are set, `null` removes one. Sends `lead.updated`.',
+    description: 'Changes details, notes, custom attributes or tags. `tags` replaces the complete list of tag ids; `attributes` merges: sent keys are set, `null` removes one. The old `status` field remains for integrations. Sends `lead.updated`.',
     fields: [
       { name: 'status', description: '`new`, `contacted`, `qualified`, `won` or `lost`.' },
       { name: 'name', description: 'Up to 200 characters.' },
@@ -896,9 +949,10 @@ export const ENDPOINTS: Endpoint[] = [
       { name: 'company', description: 'Up to 200 characters; empty or null clears it.' },
       { name: 'address', description: 'Up to 500 characters; empty or null clears it.' },
       { name: 'attributes', description: 'An object of strings; `null` removes a key.' },
+      { name: 'tags', description: 'Complete list of contact tag ids from Settings → Contact tags; use `[]` to remove all tags.' },
       { name: 'notes', description: 'Replaces the notes field (up to 5000 characters). For a dated note, use `POST /leads/:id/notes`.' },
     ],
-    body: { status: 'contacted', company: 'Analytical Engines', attributes: { plan: 'pro', trial: null } },
+    body: { company: 'Analytical Engines', tags: [], attributes: { plan: 'pro', trial: null } },
     response: { ...leadRow, status: 'contacted' },
   },
   {
@@ -917,9 +971,9 @@ export const ENDPOINTS: Endpoint[] = [
     scope: 'leads:read',
     tag: 'Leads',
     summary: 'Export leads as CSV',
-    description: 'Every lead, newest first. Cells that could run as a spreadsheet formula are prefixed with `\'`.',
+    description: 'Every lead, newest first, with a tags column. The status column remains for older integrations. Cells that could run as a spreadsheet formula are prefixed with `\'`.',
     query: [siteQuery],
-    csv: 'created,name,email,phone,company,address,status,source,notes,attributes,site,conversation\n2025-10-09T08:53:20.000Z,Ada Lovelace,ada@example.com,0400 111 222,Analytical Engines,,new,form,,"{""plan"":""pro""}",acme,1b0f6a52-…',
+    csv: 'created,name,email,phone,company,address,status,source,notes,attributes,site,conversation,tags\n2025-10-09T08:53:20.000Z,Ada Lovelace,ada@example.com,0400 111 222,Analytical Engines,,new,form,,"{""plan"":""pro""}",acme,1b0f6a52-…,',
   },
   // --------------------------------------------------------------------- jobs
   {
@@ -1830,11 +1884,11 @@ export const ENDPOINTS: Endpoint[] = [
     tag: 'Tools',
     summary: 'Add a tool',
     description:
-      'An `http` tool calls your API: `{{args.x}}` in its URL, headers or body is filled in by the assistant, `{{prechat.email}}` from the pre-chat form, `{{data.other_tool.key}}` from what another tool returned. An `extract` tool calls nothing: the assistant saves its `fields` (as conversation attributes too). Name it in the prompt as `{{name}}` to let the assistant use it; `before` runs it when the chat starts, `after` when the conversation ends. Up to 30 per site.',
+      'An `http` tool calls your API: `{{args.x}}` in its URL, headers or body is filled in by the assistant, `{{prechat.email}}` from the pre-chat form, `{{data.other_tool.key}}` from what another tool returned. Name an HTTP tool in the prompt as `{{name}}` to let the assistant use it; `before` runs it when the chat starts, `after` when the conversation ends. An `extract` tool reads the finished chat and saves visitor-stated `fields` as conversation attributes and data. New extract tools run after the chat by default. Up to 30 per site.',
     fields: [
       { name: 'name', description: 'Lowercase letters, digits and `_`, starting with a letter: how the prompt and the data refer to it.', required: true },
       { name: 'kind', description: '`http` (the default) or `extract`.' },
-      { name: 'description', description: 'What it does and when to use it: the assistant reads it.', required: true },
+      { name: 'description', description: 'What the tool does; for extract tools, which visitor details to collect.', required: true },
       { name: 'method', description: '`GET`, `POST`, `PUT`, `PATCH` or `DELETE`.' },
       { name: 'url', description: 'An https URL; only its path and query may use `{{…}}`.' },
       { name: 'headers', description: 'A list of `{ name, value, secret }`; secret values are stored encrypted and never returned.' },
@@ -1843,8 +1897,8 @@ export const ENDPOINTS: Endpoint[] = [
       { name: 'fields', description: 'An extract tool\'s fields: `{ name, description, required }`.' },
       { name: 'pick', description: 'Response paths to keep (`delivery.date`); empty keeps it all (cut to about 4 KB).' },
       { name: 'timeoutMs', description: '1000 to 10000 (default 5000).' },
-      { name: 'before', description: 'Run it when the chat starts, with the pre-chat form\'s answers.' },
-      { name: 'after', description: 'Run it when the conversation ends, with the transcript, the summary, the lead and all the data.' },
+      { name: 'before', description: 'For an HTTP tool, run it when the chat starts, with the pre-chat form\'s answers.' },
+      { name: 'after', description: 'Run it when the conversation ends, with the transcript, summary, lead and data. New extract tools default to this timing.' },
       { name: 'when', description: 'An after-chat tool runs only when this holds: `{ "path": "labels.leadQuality", "in": ["hot"] }` (a path in the conversation.completed data and the values it may have), or `{ "path": "lead.email" }` (has a value). `null` removes it.' },
     ],
     body: {
@@ -1905,7 +1959,7 @@ export const ENDPOINTS: Endpoint[] = [
     scope: 'settings:read',
     tag: 'Settings',
     summary: 'The settings',
-    description: 'The assistant, widget, home screen, lead form, crawl and security settings as one object, with a hash of it. Also: `ai`, who writes the answers and what they come from (changed only with the CLI, `helppuff model` and `helppuff rag`, then a deploy); `suggestedHome`, what the widget shows on its home screen until it is set up (questions and links suggested from the website; null once the home screen was saved), and the `forms` and `flows` a shortcut can open.',
+    description: 'The assistant, widget, home screen, lead form, automatic summaries (`autoSummary`), crawl and security settings as one object, with a hash of it. Also: `ai`, who writes the answers and what they come from (changed only with the CLI, `helppuff model` and `helppuff rag`, then a deploy); `suggestedHome`, what the widget shows on its home screen until it is set up (questions and links suggested from the website; null once the home screen was saved), and the `forms` and `flows` a shortcut can open.',
     query: [siteQuery],
     response: {
       site: 'acme',
@@ -1932,12 +1986,67 @@ export const ENDPOINTS: Endpoint[] = [
       {
         name: 'settings',
         description:
-          'Any sections of the object `GET /settings` returns: `botName`, `welcomeMessage`, `leads`, `assistant`, `behaviour`, `crawl`, `security`, `home` … `home.shortcuts` is the whole list of home-screen buttons (up to 8; each `action.kind` is `reply`, `url`, `tel`, `email`, `form` or `flow`); `home.links` the list of pages, or null for none. Saving `home` retires the suggestions from the website. `bookings` is how visitors book: `mode` `none`, `link` or `picker` (null: the website\'s booking link decides), the picker\'s calendar (`sync`), hours, duration and the rest (`helppuff.json` → `bookings` in the Configuration reference).',
+          'Any sections of the object `GET /settings` returns: `botName`, `welcomeMessage`, `leads`, `assistant`, `behaviour`, `autoSummary` (false stops automatic summaries and AI labels for new chats), `crawl`, `security`, `home` … `home.shortcuts` is the whole list of home-screen buttons (up to 8; each `action.kind` is `reply`, `url`, `tel`, `email`, `form` or `flow`); `home.links` the list of pages, or null for none. Saving `home` retires the suggestions from the website. `bookings` is how visitors book: `mode` `none`, `link` or `picker` (null: the website\'s booking link decides), the picker\'s calendar (`sync`), hours, duration and the rest (`helppuff.json` → `bookings` in the Configuration reference).',
         required: true,
       },
     ],
     body: { settings: { welcomeMessage: 'Hi! Ask me anything about our plumbing services.', security: { limits: { messagesPerSitePerDay: 800 } } } },
     response: { site: 'acme', connector: 'workers-ai', settings: { ...settings, welcomeMessage: 'Hi! Ask me anything about our plumbing services.' }, hash: '7d2a…', meta: { at: T, by: 'key:k7m3p9q2r4s8', hash: '7d2a…' }, captcha: false },
+  },
+  {
+    method: 'GET',
+    path: '/attribute-definitions',
+    scope: 'settings:read',
+    tag: 'Settings',
+    summary: 'List custom fields',
+    description: 'The custom attribute keys on conversations and contacts (Settings → Custom fields): the ones defined there (`defined`) and the ones already in use, with how many records carry each (`used`).',
+    query: [siteQuery],
+    response: { conversations: [{ name: 'order_number', used: 12, defined: true }], contacts: [{ name: 'plan', used: 3, defined: false }] },
+  },
+  {
+    method: 'POST',
+    path: '/attribute-definitions',
+    scope: 'settings:write',
+    tag: 'Settings',
+    summary: 'Add a custom field',
+    fields: [
+      { name: 'scope', description: '`conversation` or `contact`.', required: true },
+      { name: 'name', description: '1 to 64 letters, digits, spaces, `_`, `-` or `.`.', required: true },
+    ],
+    body: { scope: 'contact', name: 'plan' },
+    status: 201,
+    response: { name: 'plan', scope: 'contact', defined: true },
+    errors: [{ status: 409, code: 'conflict', when: 'A field with this name exists.' }],
+  },
+  {
+    method: 'PATCH',
+    path: '/attribute-definitions',
+    scope: 'settings:write',
+    tag: 'Settings',
+    summary: 'Rename a custom field',
+    description: 'Renames the key on every conversation or contact that has it.',
+    fields: [
+      { name: 'scope', description: '`conversation` or `contact`.', required: true },
+      { name: 'oldName', description: 'The current name.', required: true },
+      { name: 'name', description: 'The new name.', required: true },
+    ],
+    body: { scope: 'contact', oldName: 'plan', name: 'tier' },
+    response: { name: 'tier', scope: 'contact' },
+    errors: [{ status: 409, code: 'conflict', when: 'A field with the new name exists.' }],
+  },
+  {
+    method: 'DELETE',
+    path: '/attribute-definitions',
+    scope: 'settings:write',
+    tag: 'Settings',
+    summary: 'Remove a custom field',
+    description: 'Removes the key, and its value, from every conversation or contact that has it.',
+    fields: [
+      { name: 'scope', description: '`conversation` or `contact`.', required: true },
+      { name: 'name', description: 'The field to remove.', required: true },
+    ],
+    body: { scope: 'contact', name: 'tier' },
+    response: { name: 'tier', scope: 'contact', deleted: true },
   },
   // ----------------------------------------------------------------- webhooks
   {

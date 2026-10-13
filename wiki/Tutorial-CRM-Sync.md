@@ -37,9 +37,9 @@ to match in HubSpot.
 ## How it works
 
 ```text
-During the chat                         When it ends (5 quiet minutes)
-project_details (extract) ──saves──▶    crm_sync (after) ──POST──▶ n8n / Zapier ──▶ HubSpot
-service, suburb, budget, start          contact + details + summary     contact + note
+During the chat             When it ends (5 quiet minutes)
+Ask about the project  ──▶  project_details (extract) ──▶ crm_sync (after) ──POST──▶ n8n / Zapier ──▶ HubSpot
+                           saves visitor details         contact + summary         contact + note
 ```
 
 ## 1. Collect the details: an extract tool
@@ -50,15 +50,15 @@ helppuff tools add project_details --extract \
   --field suburb='Where the work is.' \
   --field budget='Their budget range, as they said it.' \
   --field start='When they would like to start.' \
-  --description 'Save the details of the renovation the visitor wants, as soon as they give each one.'
+  --description 'Find the renovation details the visitor gave during the chat.'
 ```
 
-Each field is saved as the visitor gives it, on the conversation and as a
+After the chat ends, each stated field is saved on the conversation and as a
 **custom attribute** (`service: kitchen`). Your team sees them on the
 conversation, and they are in the after-chat payload as `attributes`.
 
-Only `service` is required in the template: the assistant saves what it has
-and asks for the rest, but a visitor who won't say a budget is still a lead.
+HelpPuff saves only details the visitor actually gave, so a visitor who will
+not say a budget is still a lead.
 
 ## 2. The prompt
 
@@ -69,7 +69,7 @@ When a visitor describes a renovation they want done, find out, one question at 
 - the suburb;
 - their budget range;
 - when they would like to start.
-Save each answer with {{project_details}} as soon as they give it. Then sum it up in one sentence and offer a free measure and quote from the team.
+Then sum it up in one sentence and offer a free measure and quote from the team.
 
 If they ask for a price, say every renovation is quoted after a free measure, and offer to book one.
 ```
@@ -77,13 +77,13 @@ If they ask for a price, say every renovation is quoted after a free measure, an
 - **"One question at a time and only what you don't know yet"**: a visitor
   who opens with "a kitchen in Brunswick" is asked about the budget next,
   not the suburb again.
-- **"As soon as they give it"**: details are saved even if the visitor leaves
-  halfway.
+- **After the chat ends**, the extract tool reads the visitor's messages and
+  saves the details they gave, even if they left halfway through.
 - **Sum it up, then the next step**: the summary lets the visitor correct a
   detail before it reaches your CRM.
 
-The after-chat tool is not named in the prompt: it runs by itself when the
-chat ends.
+The extract and CRM tools are not named in the prompt: they run by themselves
+when the chat ends, in that order.
 
 ## 3. Send it when the chat ends: an after-chat tool
 

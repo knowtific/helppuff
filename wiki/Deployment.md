@@ -95,8 +95,15 @@ app file anywhere, and point the script at the Worker with `data-api`:
 ## Logs
 
 Workers observability is turned on. In the Cloudflare dashboard, open the
-Worker → **Logs** to see requests, errors and the events HelpPuff logs (event
-names, ids, counts and timings; never message text or contact details).
+Worker → **Observability** to see stored request logs, or **Logs → Live** for new
+requests. From the folder containing `helppuff.json`, run `helppuff logs` to
+tail new requests in the terminal; press Ctrl-C to stop. `helppuff logs --json
+--seconds 15` returns one JSON object with events collected during those 15
+seconds. The command uses your `wrangler login` session or
+`CLOUDFLARE_API_TOKEN` from `.env`; a logging-only token needs **Workers Tail
+Read** for the Worker. Cloudflare's invocation logs show request and response
+status. HelpPuff's detailed structured events are off on production Workers;
+the audit API records successful changes, not rejected API keys.
 
 ## Removing it
 

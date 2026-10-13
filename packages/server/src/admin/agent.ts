@@ -135,7 +135,8 @@ agentRoutes.get('/agent/export', async (c) => {
   const tools = rows.results.map((row) => {
     const view = toolView(row);
     const common = { name: view.name, kind: view.kind, description: view.description, enabled: view.enabled };
-    if (!('headers' in view)) return { ...common, fields: 'fields' in view ? view.fields : [] };
+    // An extract tool runs during or after the chat, never before it.
+    if (!('headers' in view)) return { ...common, after: view.after, fields: 'fields' in view ? view.fields : [] };
     const headers = view.headers.map((h) => {
       if (!h.secret) return { name: h.name, value: h.value };
       const name = `${view.name}_${h.name}`.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 64);

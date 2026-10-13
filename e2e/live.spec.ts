@@ -37,7 +37,7 @@ async function signIn(browser: Browser, who: { email: string; password: string }
   const page = await context.newPage();
   await page.goto('/admin/');
   await page.getByLabel(/email/i).fill(who.email);
-  await page.getByLabel(/password/i).fill(who.password);
+  await page.getByRole('textbox', { name: 'Password', exact: true }).fill(who.password);
   await page.getByRole('button', { name: /sign in/i }).click();
   await expect(page.getByRole('navigation', { name: 'Main' }).first()).toBeVisible();
   return page;

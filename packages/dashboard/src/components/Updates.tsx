@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { useData } from '../lib/utils';
 import { CopyBlock } from '../pages/Settings';
-import { WikiLink } from './Shell';
+import { HelpNote, WikiLink } from './Shell';
 import { Card, ErrorNote, InfoTip, Skeleton } from './ui';
 
 /**
@@ -95,17 +95,9 @@ export function Updates() {
           )}
         </Card>
       )}
-      <Card className="space-y-2 px-4 py-3 text-xs text-muted-foreground">
-        <p className="text-[13px] font-medium text-foreground">Why upgrading happens in the terminal</p>
-        <p>
-          An upgrade deploys new code to your Cloudflare account, which needs your Cloudflare login. This dashboard never holds it, by design: nobody who gets
-          into the dashboard can change what runs on your account.
-        </p>
-        <p>
-          Something wrong after an upgrade? Go back with <code>npx @knowtific/helppuff@&lt;previous version&gt; deploy --allow-downgrade</code>; the upgrade also
-          printed a command to put the database back as it was.
-        </p>
-      </Card>
+      <HelpNote page="Upgrading#why-it-runs-in-the-terminal" label="Why, and how to roll back">
+        Upgrades run in your terminal, with your Cloudflare login.
+      </HelpNote>
     </div>
   );
 }

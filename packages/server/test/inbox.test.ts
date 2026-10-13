@@ -3,7 +3,8 @@ import { HANDOVER_ACTION } from '@helppuff/protocol';
 import { memberMay } from '../src/admin/guard.js';
 import { mergeAttributes } from '../src/admin/inbox.js';
 import { open, seal } from '../src/core/secretbox.js';
-import { resetSchemaMemo } from '../src/db/d1.js';
+import { leadStatements } from '../src/admin/record.js';
+import { ensureSchema, resetSchemaMemo } from '../src/db/d1.js';
 import { HubCore } from '../src/live/hub.js';
 import { LIVE_CALLBACK_FORM } from '../src/live/service.js';
 import { readUpdate, type Telegram } from '../src/live/telegram.js';
@@ -73,6 +74,36 @@ describe('attributes, labels and notes', () => {
     expect(() => mergeAttributes({}, Object.fromEntries(Array.from({ length: 51 }, (_, i) => [`k${i}`, 'v'])))).toThrow(/50/);
   });
 
+  it('lists, defines, renames and removes attribute keys across saved records', async () => {
+    const w = await world();
+    const { id } = await chat(w.h);
+    await w.settle();
+    await w.owner.send('PATCH', `/conversations/${id}`, { attributes: { 'order.id': 'A-1042' } });
+    const contact = (await (await w.owner.send('POST', '/leads', { name: 'Ada', email: 'ada@example.com', attributes: { tier: 'gold' } })).json()) as { id: string };
+
+    const inventory = (await (await w.owner.get('/attribute-definitions')).json()) as { conversations: unknown[]; contacts: unknown[] };
+    expect(inventory.conversations).toContainEqual({ name: 'order.id', used: 1, defined: false });
+    expect(inventory.contacts).toContainEqual({ name: 'tier', used: 1, defined: false });
+    expect((await w.owner.send('POST', '/attribute-definitions', { scope: 'conversation', name: 'follow_up' })).status).toBe(201);
+    expect((await w.owner.send('POST', '/attribute-definitions', { scope: 'conversation', name: 'follow_up' })).status).toBe(409);
+    expect((await w.owner.send('PATCH', '/attribute-definitions', { scope: 'conversation', oldName: 'order.id', name: 'order_id' })).status).toBe(200);
+    expect((await w.owner.send('PATCH', '/attribute-definitions', { scope: 'conversation', oldName: 'order_id', name: 'follow_up' })).status).toBe(409);
+    const conversation = (await (await w.owner.get(`/conversations/${id}`)).json()) as { conversation: { attributes: Record<string, string> } };
+    expect(conversation.conversation.attributes).toEqual({ order_id: 'A-1042' });
+
+    expect((await w.owner.send('PATCH', '/attribute-definitions', { scope: 'contact', oldName: 'tier', name: 'customer_tier' })).status).toBe(200);
+    const lead = (await (await w.owner.get(`/leads/${contact.id}`)).json()) as { attributes: Record<string, string> };
+    expect(lead.attributes).toEqual({ customer_tier: 'gold' });
+    expect((await w.owner.send('DELETE', '/attribute-definitions', { scope: 'conversation', name: 'order_id' })).status).toBe(200);
+    expect((await w.owner.send('DELETE', '/attribute-definitions', { scope: 'contact', name: 'customer_tier' })).status).toBe(200);
+    const after = (await (await w.owner.get('/attribute-definitions')).json()) as { conversations: { name: string }[]; contacts: { name: string }[] };
+    expect(after.conversations.map((attribute) => attribute.name)).toEqual(['follow_up']);
+    expect(after.contacts).toEqual([]);
+    expect((await (await w.owner.get(`/conversations/${id}`)).json()) as { conversation: { attributes: Record<string, string> } }).toMatchObject({ conversation: { attributes: {} } });
+    const member = await w.member();
+    expect((await member.get('/attribute-definitions')).status).toBe(403);
+  });
+
   it('labels a conversation, filters by label, and keeps attributes and notes on it', async () => {
     const w = await world();
     const { id } = await chat(w.h);
@@ -133,6 +164,47 @@ describe('attributes, labels and notes', () => {
     expect(result?.summary.labels).toEqual(['Refund']);
     const list = (await (await w.owner.get('/conversations')).json()) as { items: { labels: { name: string }[] }[] };
     expect(list.items[0]!.labels.map((l) => l.name)).toEqual(['Refund']);
+  });
+});
+
+describe('contact tags when a lead is captured again', () => {
+  const tagRows = (db: ReturnType<typeof d1>) => db.raw.prepare('SELECT lead_id, tag_id FROM lead_tags ORDER BY lead_id').all() as { lead_id: string; tag_id: string }[];
+  const leadOf = (db: ReturnType<typeof d1>, conversation: string) => (db.raw.prepare('SELECT lead_id FROM conversations WHERE id = ?').get(conversation) as { lead_id: string }).lead_id;
+  const setup = async () => {
+    resetSchemaMemo();
+    const db = d1();
+    await ensureSchema(db);
+    db.raw.prepare("INSERT INTO contact_tags (id, site_id, name, color, created_at) VALUES ('t1', 'demo', 'VIP', '#eab308', 1)").run();
+    for (const id of ['c1', 'c2']) db.raw.prepare("INSERT INTO conversations (id, site_id, started_at, last_at, message_count) VALUES (?, 'demo', 1, 1, 0)").run(id);
+    return db;
+  };
+
+  it('keeps them when the same email is captured again (the summary, a second form)', async () => {
+    const db = await setup();
+    await db.batch(leadStatements(db, 'demo', 'c1', { email: 'ada@example.com', name: 'Ada' }, 'form', 1));
+    db.raw.prepare("INSERT INTO lead_tags (lead_id, tag_id, site_id, added_at) VALUES (?, 't1', 'demo', 1)").run(leadOf(db, 'c1'));
+    await db.batch(leadStatements(db, 'demo', 'c1', { email: 'ada@example.com' }, 'ai', 2));
+    expect(tagRows(db)).toEqual([{ lead_id: leadOf(db, 'c1'), tag_id: 't1' }]);
+  });
+
+  it('keeps them on a contact with another email, without copying them', async () => {
+    const db = await setup();
+    await db.batch(leadStatements(db, 'demo', 'c2', { email: 'grace@example.com' }, 'form', 1));
+    await db.batch(leadStatements(db, 'demo', 'c1', { email: 'ada@example.com' }, 'form', 1));
+    const ada = leadOf(db, 'c1');
+    db.raw.prepare("INSERT INTO lead_tags (lead_id, tag_id, site_id, added_at) VALUES (?, 't1', 'demo', 1)").run(ada);
+    await db.batch(leadStatements(db, 'demo', 'c1', { email: 'grace@example.com' }, 'ai', 2));
+    expect(tagRows(db)).toEqual([{ lead_id: ada, tag_id: 't1' }]);
+  });
+
+  it('moves an email-less contact\'s tags to the person with that email', async () => {
+    const db = await setup();
+    await db.batch(leadStatements(db, 'demo', 'c2', { email: 'ada@example.com' }, 'form', 1));
+    await db.batch(leadStatements(db, 'demo', 'c1', { name: 'Ada', phone: '0400 111 222' }, 'chat', 1));
+    db.raw.prepare("INSERT INTO lead_tags (lead_id, tag_id, site_id, added_at) VALUES (?, 't1', 'demo', 1)").run(leadOf(db, 'c1'));
+    await db.batch(leadStatements(db, 'demo', 'c1', { email: 'ada@example.com' }, 'form', 2));
+    expect(leadOf(db, 'c1')).toBe(leadOf(db, 'c2'));
+    expect(tagRows(db)).toEqual([{ lead_id: leadOf(db, 'c2'), tag_id: 't1' }]);
   });
 });
 

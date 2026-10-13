@@ -175,7 +175,9 @@ export async function toolsCommand(ctx: Ctx): Promise<number> {
       const tool = await api.send<Tool>('POST', '/admin/api/tools', { name: need(), ...body });
       ctx.out.result(tool, () => {
         ctx.out.success(`Added ${tool.name}.`);
-        const hint = tool.kind === 'extract' || (!tool.before && !tool.after) ? `Put {{${tool.name}}} in the prompt (helppuff prompt, or the dashboard) so the assistant uses it.\n` : '';
+        const hint = tool.kind === 'extract'
+          ? 'It reads the visitor’s messages after the chat and saves the fields it finds.\n'
+          : !tool.before && !tool.after ? `Put {{${tool.name}}} in the prompt (helppuff prompt, or the dashboard) so the assistant uses it.\n` : '';
         process.stdout.write(c.dim(`${hint}Try it: helppuff tools test ${tool.name}${toolArgs(tool).map((a) => ` --arg ${a}=…`).join('')}\n`));
       });
       return 0;

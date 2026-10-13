@@ -217,7 +217,14 @@ const data = (await response.json()) as GetConversationResponse;
     "address": null,
     "attributes": {
       "plan": "pro"
-    }
+    },
+    "tags": [
+      {
+        "id": "ctag_vip",
+        "name": "VIP",
+        "color": "#eab308"
+      }
+    ]
   },
   "callbacks": [
     {
@@ -342,6 +349,11 @@ type GetConversationResponse = {
     attributes: {
       plan: string;
     };
+    tags: Array<{
+      id: string;
+      name: string;
+      color: string;
+    }>;
   };
   callbacks: Array<{
     id: string;
@@ -503,7 +515,7 @@ type LabelConversationSetItsAttributesResponse = {
 
 `POST /conversations/:id/summary` · scope `conversations:write`
 
-Writes (or rewrites) its AI summary and labels, and sends `conversation.summarized`. Uses Workers AI (a few neurons). Conversations are also summarised automatically 5 minutes after they go quiet.
+Writes (or rewrites) its AI summary and labels, and sends `conversation.summarized`. Uses Workers AI (a few neurons). When `autoSummary` is on, conversations are also summarised automatically 5 minutes after they go quiet.
 
 | Parameter | In | Required | Description |
 | --- | --- | --- | --- |

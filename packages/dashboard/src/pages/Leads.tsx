@@ -1,21 +1,22 @@
 import { Download, MessageSquare, Search, Users } from 'lucide-react';
-import { Fragment, useState } from 'react';
+import { useState } from 'react';
 import { PageHeader } from '../components/Shell';
-import { Avatar, Badge, Button, Card, Empty, ErrorNote, Input, Select, Skeleton, statusLabel } from '../components/ui';
-import { api, download, LEAD_STATUSES, type Lead, type LeadStatus } from '../lib/api';
-import { cn, fmtRelative, href, useData, useDebounced } from '../lib/utils';
+import { ContactTagPicker } from '../components/ContactTags';
+import { Avatar, Badge, Button, Card, Empty, ErrorNote, Input, Select, Skeleton } from '../components/ui';
+import { api, download, type ContactTag, type Lead } from '../lib/api';
+import { fmtRelative, href, useData, useDebounced } from '../lib/utils';
 
 const SOURCE: Record<Lead['source'], string> = { form: 'Form', chat: 'Typed in chat', ai: 'Found by AI', api: 'Added over the API' };
 
 export function Leads() {
   const [query, setQuery] = useState('');
-  const [status, setStatus] = useState<LeadStatus | ''>('');
+  const [tag, setTag] = useState('');
   const q = useDebounced(query);
   const { data, error, loading, reload } = useData(
-    () => api<{ items: Lead[]; counts: Record<string, number> }>(`/leads?q=${encodeURIComponent(q)}${status ? `&status=${status}` : ''}`),
-    [q, status],
+    () => api<{ items: Lead[]; counts: Record<string, number> }>(`/leads?q=${encodeURIComponent(q)}${tag ? `&tag=${encodeURIComponent(tag)}` : ''}`),
+    [q, tag],
   );
-  const [edits, setEdits] = useState<Record<string, Lead>>({});
+  const { data: tagData, error: tagError, reload: reloadTags } = useData(() => api<{ tags: ContactTag[] }>('/contact-tags'), []);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<Error | null>(null);
   const exportCsv = () => {
@@ -25,20 +26,14 @@ export function Leads() {
       .catch((e: unknown) => setExportError(e instanceof Error ? e : new Error(String(e))))
       .finally(() => setExporting(false));
   };
-  const leads = (data?.items ?? []).map((lead) => edits[lead.id] ?? lead);
+  const leads = data?.items ?? [];
   const total = Object.values(data?.counts ?? {}).reduce((a, b) => a + b, 0);
-
-  const setLeadStatus = async (lead: Lead, next: LeadStatus) => {
-    setEdits((e) => ({ ...e, [lead.id]: { ...lead, status: next } }));
-    const saved = await api<Lead>(`/leads/${lead.id}`, { method: 'PATCH', json: { status: next } });
-    setEdits((e) => ({ ...e, [lead.id]: { ...lead, ...saved, status: saved.status } }));
-  };
 
   return (
     <>
       <PageHeader
         title="Contacts"
-        description="People who left their details. Open one for their history, notes and attributes."
+        description="People who left their details. Organise them with tags, then open one for their history, notes and attributes."
         help="Leads"
         actions={
           <Button variant="outline" onClick={exportCsv} disabled={exporting}>
@@ -52,56 +47,46 @@ export function Leads() {
             <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name, email, company, notes…" className="pl-8" aria-label="Search contacts" />
           </div>
-          <div className="flex flex-wrap gap-1" role="group" aria-label="Filter by status">
-            {(['', ...LEAD_STATUSES] as const).map((s) => (
-              <button
-                key={s || 'all'}
-                onClick={() => setStatus(s)}
-                className={cn(
-                  'h-7 rounded-md border px-2.5 text-xs transition-colors',
-                  status === s ? 'bg-primary text-primary-foreground border-transparent' : 'hover:bg-muted',
-                )}
-              >
-                {s ? statusLabel(s) : 'All'}
-                <span className="ml-1.5 tabular-nums opacity-60">{s ? (data?.counts[s] ?? 0) : total}</span>
-              </button>
-            ))}
-          </div>
+          <Select value={tag} onChange={(event) => setTag(event.target.value)} aria-label="Filter contacts by tag" className="h-9 w-auto min-w-36 text-xs">
+            <option value="">All contacts ({total})</option>
+            <option value="untagged">Untagged</option>
+            {(tagData?.tags ?? []).map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
+          </Select>
         </div>
 
         {error && <ErrorNote error={error} onRetry={reload} />}
+        {tagError && <ErrorNote error={tagError} onRetry={reloadTags} />}
         {exportError && <ErrorNote error={exportError} onRetry={exportCsv} />}
 
         <Card className="overflow-hidden">
           {loading && !data && [0, 1, 2, 3].map((i) => <Skeleton key={i} className="m-3 h-10" />)}
           {data && leads.length === 0 && (
-            <Empty icon={<Users />} title={q || status ? 'No leads match' : 'No leads yet'}>
-              {q || status
-                ? 'Try another search or status.'
-                : 'A lead is created when a visitor fills in the form, types an email or phone number, or when an AI summary finds one.'}
+            <Empty icon={<Users />} title={q || tag ? 'No contacts match' : 'No contacts yet'}>
+              {q || tag
+                ? 'Try another search or tag.'
+                : 'A contact is created when a visitor fills in the form, types an email or phone number, or when an AI summary finds one.'}
             </Empty>
           )}
           {leads.length > 0 && (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] text-[13px]">
+              <table className="w-full min-w-[760px] text-[13px]">
                 <thead className="border-b bg-subtle text-left text-xs text-muted-foreground">
                   <tr>
                     <th className="px-4 py-2 font-medium">Name</th>
                     <th className="px-4 py-2 font-medium">Contact</th>
-                    <th className="px-4 py-2 font-medium">Status</th>
+                    <th className="px-4 py-2 font-medium">Tags</th>
                     <th className="px-4 py-2 font-medium">Source</th>
-                    <th className="px-4 py-2 font-medium">Last active</th>
+                    <th className="px-4 py-2 font-medium">Updated</th>
                     <th className="px-2 py-2" aria-label="Conversations" />
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {leads.map((lead) => {
                     const conversation = lead.lastConversationId ?? lead.conversationId ?? lead.conversation_id;
-                    const active = lead.updatedAt ?? lead.createdAt ?? lead.created_at ?? 0;
+                    const updated = lead.updatedAt ?? lead.createdAt ?? lead.created_at ?? 0;
                     const chats = lead.conversations ?? 1;
                     return (
-                      <Fragment key={lead.id}>
-                        <tr className="cursor-pointer hover:bg-subtle" onClick={() => (window.location.hash = href({ page: 'contact', id: lead.id }))}>
+                      <tr key={lead.id} className="cursor-pointer hover:bg-subtle" onClick={() => (window.location.hash = href({ page: 'contact', id: lead.id }))}>
                           <td className="px-4 py-2.5">
                             <span className="flex items-center gap-2.5">
                               <Avatar name={lead.name ?? lead.email} />
@@ -121,23 +106,12 @@ export function Leads() {
                             {lead.email && lead.phone && <span className="block text-xs text-muted-foreground">{lead.phone}</span>}
                           </td>
                           <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                            <Select
-                              value={lead.status}
-                              onChange={(e) => void setLeadStatus(lead, e.target.value as LeadStatus)}
-                              aria-label={`Status for ${lead.name ?? lead.email ?? 'lead'}`}
-                              className="h-7 text-xs"
-                            >
-                              {LEAD_STATUSES.map((s) => (
-                                <option key={s} value={s}>
-                                  {statusLabel(s)}
-                                </option>
-                              ))}
-                            </Select>
+                            <ContactTagPicker value={lead.tags ?? []} options={tagData?.tags ?? []} onChange={async (ids) => { await api(`/leads/${lead.id}`, { method: 'PATCH', json: { tags: ids } }); reload(); }} />
                           </td>
                           <td className="px-4 py-2.5">
                             <Badge>{SOURCE[lead.source] ?? lead.source}</Badge>
                           </td>
-                          <td className="px-4 py-2.5 text-muted-foreground">{fmtRelative(active)}</td>
+                          <td className="px-4 py-2.5 text-muted-foreground">{fmtRelative(updated)}</td>
                           <td className="px-2 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                             {conversation && (
                               <a
@@ -151,7 +125,6 @@ export function Leads() {
                             )}
                           </td>
                         </tr>
-                      </Fragment>
                     );
                   })}
                 </tbody>

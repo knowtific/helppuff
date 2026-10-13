@@ -330,7 +330,7 @@ export function compile(
     ? { ...project.security, limits: { ...project.security.limits, messagesPerIpPerMinute: 600, messagesPerIpPerDay: 100_000, sessionsPerIpPerHour: 1000, sessionsPerIpPerDay: 10_000 } }
     : project.security;
   const knowledge = knowledgeFor(project);
-  const stored = { connector, sinks, security, widget, assistant: project.assistant, live: project.live, bookings: project.bookings, ...(knowledge ? { knowledge } : {}) };
+  const stored = { connector, sinks, security, widget, assistant: project.assistant, autoSummary: project.autoSummary, live: project.live, bookings: project.bookings, ...(knowledge ? { knowledge } : {}) };
   const site = { origins, ...stored };
   const serverConfig = { sites: { [project.site]: site } };
 

@@ -239,7 +239,7 @@ export async function validTool(body: Record<string, unknown>, current: ToolRow 
   if (!(TOOL_KINDS as readonly unknown[]).includes(rawKind)) throw bad('The kind is http or extract.', 'tool_kind');
   const kind = rawKind as ToolKind;
   const description = pick('description', (v) => text(v, 1000), was?.description ?? '');
-  if (!description) throw bad('Describe what the tool does and when to use it: the assistant reads it.', 'tool_description');
+  if (!description) throw bad(kind === 'extract' ? 'Describe the visitor details to save after the chat.' : 'Describe what the tool does and when to use it: the assistant reads it.', 'tool_description');
 
   const timeoutMs = pick(
     'timeoutMs',
@@ -253,6 +253,7 @@ export async function validTool(body: Record<string, unknown>, current: ToolRow 
   };
 
   if (kind === 'extract') {
+    if (body['before'] === true) throw bad('Save what the visitor says runs after the chat, not before it.', 'tool_extract_before');
     const fields = pick('fields', (v) => params(v, 'Fields'), was?.fields ?? []);
     if (!fields.length) throw bad('Add at least one field to save, like order_number.', 'tool_fields');
     return {
@@ -269,9 +270,10 @@ export async function validTool(body: Record<string, unknown>, current: ToolRow 
       keys: null,
       timeout_ms: timeoutMs,
       ...flags,
-      // An extract tool calls nothing: it only runs in the chat.
+      // New extract tools run after the chat; an existing during-chat tool
+      // keeps its timing until the owner changes it.
       run_before: 0,
-      run_after: 0,
+      run_after: !current && body['after'] === undefined ? 1 : flags.run_after,
       run_when: null,
     };
   }

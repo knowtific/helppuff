@@ -1,6 +1,5 @@
 import { forwardRef, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
-import { CircleHelp, UserRound } from 'lucide-react';
-import type { LeadStatus } from '../lib/api';
+import { ChevronRight, CircleHelp, Eye, EyeOff, UserRound } from 'lucide-react';
 import { cn, HELPPUFF_MARK, hueOf, initials } from '../lib/utils';
 
 /** shadcn-shaped primitives, hand-written: same anatomy, no generator. */
@@ -76,6 +75,27 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
 ));
 Input.displayName = 'Input';
 
+type PasswordInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> & { visibilityLabel?: string };
+
+export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(({ className, visibilityLabel = 'password', ...props }, ref) => {
+  const [visible, setVisible] = useState(false);
+  return (
+    <span className="relative block">
+      <Input ref={ref} {...props} type={visible ? 'text' : 'password'} className={cn('pr-10', className)} />
+      <button
+        type="button"
+        aria-label={`${visible ? 'Hide' : 'Show'} ${visibilityLabel}`}
+        disabled={props.disabled}
+        className="absolute inset-y-0 right-0 flex w-9 items-center justify-center rounded-r-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-50"
+        onClick={() => setVisible((value) => !value)}
+      >
+        {visible ? <EyeOff className="size-4" aria-hidden /> : <Eye className="size-4" aria-hidden />}
+      </button>
+    </span>
+  );
+});
+PasswordInput.displayName = 'PasswordInput';
+
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(({ className, ...props }, ref) => (
   <textarea
     ref={ref}
@@ -97,8 +117,22 @@ export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectE
   );
 }
 
-export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('rounded-lg border bg-card', className)} {...props} />;
+/** Secondary detail, closed until asked for: a chevron and a short label. */
+export function Disclosure({ summary, children, className, open }: { summary: ReactNode; children: ReactNode; className?: string; open?: boolean }) {
+  return (
+    <details className={cn('group', className)} open={open}>
+      <summary className="flex w-fit cursor-pointer list-none items-center gap-1.5 rounded text-xs font-medium text-muted-foreground marker:hidden hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 [&::-webkit-details-marker]:hidden">
+        <ChevronRight className="size-3.5 transition-transform group-open:rotate-90" aria-hidden />
+        {summary}
+      </summary>
+      <div className="mt-2">{children}</div>
+    </details>
+  );
+}
+
+/** `attention`: something waiting for you. Use it for one or two cards a page at most. */
+export function Card({ className, tone, ...props }: HTMLAttributes<HTMLDivElement> & { tone?: 'attention' }) {
+  return <div className={cn('rounded-lg border', tone === 'attention' ? 'border-attention-border bg-attention' : 'bg-card', className)} {...props} />;
 }
 
 export function CardHeader({ title, description, action, tip }: { title: ReactNode; description?: ReactNode; action?: ReactNode; tip?: { label: string; text: ReactNode; align?: 'start' | 'end'; href?: string } }) {
@@ -128,20 +162,6 @@ export function Badge({ className, children, dot }: { className?: string; childr
     </span>
   );
 }
-
-/** Lead status, always with its word — never colour alone. */
-const STATUS: Record<LeadStatus, { label: string; dot: string }> = {
-  new: { label: 'New', dot: '#3b82f6' },
-  contacted: { label: 'Contacted', dot: '#f59e0b' },
-  qualified: { label: 'Qualified', dot: '#8b5cf6' },
-  won: { label: 'Won', dot: '#16a34a' },
-  lost: { label: 'Lost', dot: '#a1a1aa' },
-};
-export function StatusBadge({ status }: { status: LeadStatus }) {
-  const s = STATUS[status] ?? STATUS.new;
-  return <Badge dot={s.dot}>{s.label}</Badge>;
-}
-export const statusLabel = (status: LeadStatus) => STATUS[status]?.label ?? status;
 
 export function Avatar({ name, className }: { name: string | null | undefined; className?: string }) {
   if (!name || !initials(name)) {

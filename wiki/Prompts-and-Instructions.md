@@ -66,14 +66,21 @@ prompt for those).
 
 ### Tools
 
-Your own APIs, and extract tools, appear in the prompt by name: `{{order_status}}`
-lets the assistant call that tool, and `{{crm_lookup.tier}}` puts in what it
-returned. The **Prompt & tools** page (Settings → Prompt & tools) shows a chat as a
+Your own API tools appear in the prompt by name: `{{order_status}}` lets the
+assistant call that tool, and `{{crm_lookup.tier}}` puts in what it returned.
+Extract tools save visitor details after the chat and are set under **After the
+chat**. The **Prompt & tools** page (Settings → Prompt & tools) shows a chat as a
 diagram, left to right: tools called before the chat, the **Prompt** (with
 **Knowledge** above it and **Webhooks** below), then the summary and labels
 and the tools called after it. Click **Prompt** to edit it, add tools to it
 and see its history; **+ Add** on a step adds a tool there. Type `{{` in the
 prompt for a list of everything you can use. See [[Tools]].
+
+The **Summary** switch in that diagram turns automatic summaries and AI
+labels on or off for new chats. Turning it off also stops automatic questions
+to answer; transcripts, after-chat tools and webhooks still run. You can still
+choose **Summarise** on an individual conversation. The same setting is
+`autoSummary` in `helppuff.json` and `GET /settings`.
 
 ### Changes during a conversation
 

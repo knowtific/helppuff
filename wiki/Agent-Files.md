@@ -67,7 +67,7 @@ header (`${ORDER_LOOKUP_AUTHORIZATION}`), standing for the whole header value.
     "leads": { "enabled": true, "fields": [{ "name": "email", "label": "Email", "type": "email", "required": true }] }
   },
   "tools": [
-    { "name": "order_number", "kind": "extract", "description": "…", "fields": [{ "name": "order_number", "description": "…", "required": true }] },
+    { "name": "order_number", "kind": "extract", "description": "…", "after": true, "fields": [{ "name": "order_number", "description": "…", "required": true }] },
     { "name": "order_lookup", "description": "…", "method": "GET", "url": "https://shop.example.com/orders/{{args.order_number}}", "headers": [], "parameters": [], "pick": ["status"] }
   ],
   "needs": []

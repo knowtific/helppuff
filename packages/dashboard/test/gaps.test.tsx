@@ -8,7 +8,7 @@ import { button, byText, click, fakeApi, mount, type, unmount } from './helpers'
 const GAP = { id: 'gap_1', question: 'Do you convert cooktops to LPG?', count: 3, firstAskedAt: Date.now() - 86_400_000, lastAskedAt: Date.now() - 3_600_000, conversationId: 'c_9', status: 'open', answerId: null, answeredBy: null };
 
 describe('questions to answer', () => {
-  it('answers one in a dialog, which saves it and empties the list', async () => {
+  it('answers one in a dialog, which saves it; with nothing left the card goes away', async () => {
     let open = [GAP];
     const calls = fakeApi({
       'GET /knowledge/gaps?status=open&limit=50': () => ({ gaps: open, counts: { open: open.length, answered: 3 - open.length, dismissed: 0 } }),
@@ -29,7 +29,7 @@ describe('questions to answer', () => {
     await click(button(dialog, 'Save answer'));
     expect(calls).toContainEqual({ method: 'POST', path: '/knowledge/gaps/gap_1/answer', body: { answer: 'No: natural gas only.' } });
     expect(view.querySelector('[role="dialog"]')).toBeNull();
-    expect(byText(view, /Nothing to answer/)).toBeTruthy();
+    expect(byText(view, /Questions to answer/)).toBeFalsy();
     expect(answered).toBe(1);
     await unmount();
   });

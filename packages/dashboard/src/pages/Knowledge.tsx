@@ -126,8 +126,53 @@ export function Knowledge({ me }: { me: Me }) {
       <div className="space-y-4 p-4 md:p-6">
         {error && <ErrorNote error={error} />}
         {crawl.error && <ErrorNote error={crawl.error} onRetry={crawl.reload} />}
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card className="px-4 py-3">{crawl.status ? <CrawlProgress run={crawl.status.run} chunks={crawl.status.chunks} /> : <Skeleton className="h-14" />}</Card>
+        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+          <Card>
+            <div className="px-4 py-3">{crawl.status ? <CrawlProgress run={crawl.status.run} chunks={crawl.status.chunks} /> : <Skeleton className="h-14" />}</div>
+            <Collapsible
+              id="pages"
+              title="Website pages"
+              embedded
+              summary={pages.data ? `${list.filter((p) => matches(p, 'learned')).length} learned${list.some((p) => matches(p, 'problems')) ? ` · ${list.filter((p) => matches(p, 'problems')).length} with problems` : ''}` : undefined}
+              tip={crawl.status ? `Re-learned ${crawl.status.schedule === 'off' ? 'only when you ask' : crawl.status.schedule} (Settings → Advanced). Unchanged pages cost nothing.` : undefined}
+              action={
+                <div className="flex flex-wrap items-center gap-2">
+                  {failed.length > 0 && (
+                    <Button variant="outline" size="sm" onClick={() => void retry()} disabled={busy || running} title={running ? 'Learning is running now' : undefined}>
+                      <RotateCcw /> Try {failed.length === 1 ? 'the failed page' : `${failed.length} failed pages`} again
+                    </Button>
+                  )}
+                  <Segmented
+                    label="Filter pages"
+                    value={filter}
+                    onChange={setFilter}
+                    options={[
+                      { value: 'all', label: 'All' },
+                      { value: 'learned', label: 'Learned' },
+                      { value: 'problems', label: 'Problems' },
+                      { value: 'off', label: 'Not used' },
+                    ]}
+                  />
+                </div>
+              }
+            >
+              {pages.loading && !pages.data && <Skeleton className="mx-4 mb-4 h-32" />}
+              {pages.data && list.length === 0 && (
+                <Empty icon={<BookOpen />} title="No pages yet">
+                  Choose the pages to learn from to get started.
+                </Empty>
+              )}
+              <ul className="divide-y border-t">
+                {list.filter((p) => matches(p, filter)).map((page) => (
+                  <PageRow
+                    key={page.id}
+                    page={page}
+                    {...(page.selected && (page.status === 'error' || page.status === 'blocked') ? { onRetry: () => void retry([page.url]), retryDisabled: busy || running } : {})}
+                  />
+                ))}
+              </ul>
+            </Collapsible>
+          </Card>
           <Card className="px-4 py-3">{crawl.status ? <UsageMeter usage={crawl.status.usage} /> : <Skeleton className="h-14" />}</Card>
         </div>
 
@@ -141,49 +186,6 @@ export function Knowledge({ me }: { me: Me }) {
             </div>
           </Card>
         )}
-
-        <Collapsible
-          id="pages"
-          title="Website pages"
-          summary={pages.data ? `${list.filter((p) => matches(p, 'learned')).length} learned${list.some((p) => matches(p, 'problems')) ? ` · ${list.filter((p) => matches(p, 'problems')).length} with problems` : ''}` : undefined}
-          tip={crawl.status ? `Re-learned ${crawl.status.schedule === 'off' ? 'only when you ask' : crawl.status.schedule} (Settings → Advanced). Unchanged pages cost nothing.` : undefined}
-          action={
-            <div className="flex flex-wrap items-center gap-2">
-              {failed.length > 0 && (
-                <Button variant="outline" size="sm" onClick={() => void retry()} disabled={busy || running} title={running ? 'Learning is running now' : undefined}>
-                  <RotateCcw /> Try {failed.length === 1 ? 'the failed page' : `${failed.length} failed pages`} again
-                </Button>
-              )}
-              <Segmented
-                label="Filter pages"
-                value={filter}
-                onChange={setFilter}
-                options={[
-                  { value: 'all', label: 'All' },
-                  { value: 'learned', label: 'Learned' },
-                  { value: 'problems', label: 'Problems' },
-                  { value: 'off', label: 'Not used' },
-                ]}
-              />
-            </div>
-          }
-        >
-          {pages.loading && !pages.data && <Skeleton className="mx-4 mb-4 h-32" />}
-          {pages.data && list.length === 0 && (
-            <Empty icon={<BookOpen />} title="No pages yet">
-              Choose the pages to learn from to get started.
-            </Empty>
-          )}
-          <ul className="divide-y border-t">
-            {list.filter((p) => matches(p, filter)).map((page) => (
-              <PageRow
-                key={page.id}
-                page={page}
-                {...(page.selected && (page.status === 'error' || page.status === 'blocked') ? { onRetry: () => void retry([page.url]), retryDisabled: busy || running } : {})}
-              />
-            ))}
-          </ul>
-        </Collapsible>
 
         <Files />
 
@@ -228,6 +230,7 @@ function Collapsible({
   tip,
   action,
   defaultOpen = false,
+  embedded = false,
   children,
 }: {
   id: string;
@@ -237,11 +240,12 @@ function Collapsible({
   tip?: string | undefined;
   action?: ReactNode;
   defaultOpen?: boolean;
+  embedded?: boolean;
   children: ReactNode;
 }) {
   const [open, setOpen] = useOpen(id, defaultOpen);
-  return (
-    <Card>
+  const content = (
+    <>
       <div className="flex flex-wrap items-center gap-3 px-4 py-3">
         <button type="button" className={cn('flex min-w-0 items-center gap-2 text-left', !tip && 'flex-1')} aria-expanded={open} aria-controls={`section-${id}`} onClick={() => setOpen(!open)}>
           <ChevronDown className={cn('size-4 shrink-0 text-muted-foreground transition-transform', !open && '-rotate-90')} aria-hidden />
@@ -260,8 +264,9 @@ function Collapsible({
         {open && action}
       </div>
       {open && <div id={`section-${id}`}>{children}</div>}
-    </Card>
+    </>
   );
+  return embedded ? <div className="border-t">{content}</div> : <Card>{content}</Card>;
 }
 
 const FILE_STATUS: Record<FileStatus, { label: string; dot: string }> = {

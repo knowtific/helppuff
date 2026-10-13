@@ -1,5 +1,5 @@
 import { AlertTriangle, ArrowLeft, Briefcase, CalendarDays, ExternalLink, Loader2, MessageSquare, Plus, Search, Trash2, UserRound, X } from 'lucide-react';
-import { useEffect, useRef, useState, type DragEvent, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type DragEvent, type FormEvent, type ReactNode, type RefObject } from 'react';
 import { PageHeader } from '../components/Shell';
 import { NotesPanel, SideSection } from '../components/inbox';
 import { Avatar, Badge, Button, Card, Empty, ErrorNote, InfoTip, Input, Segmented, Select, Skeleton, Textarea, useModal } from '../components/ui';
@@ -34,23 +34,25 @@ function cardFields(job: Job, fields: JobField[]): string[] {
     .map((f) => job.fields[f.name]!);
 }
 
-function JobCard({ job, fields, stages, onMove, onDragStart, onDropBefore }: { job: Job; fields: JobField[]; stages: JobStage[]; onMove: (job: Job, stageId: string) => void; onDragStart: (job: Job) => void; onDropBefore: (job: Job) => void }) {
+function JobCard({ job, fields, stages, lifted, onMove, onDragStart, onDragEnd }: { job: Job; fields: JobField[]; stages: JobStage[]; lifted: boolean; onMove: (job: Job, stageId: string) => void; onDragStart: (job: Job, height: number) => void; onDragEnd: () => void }) {
   const isNew = Date.now() - job.createdAt < 86_400_000 && job.stage?.id === stages.find((s) => s.kind === 'open')?.id;
   return (
     <div
       draggable
+      data-card={job.id}
+      data-flip={job.id}
       onDragStart={(e) => {
         e.dataTransfer.setData('text/plain', job.id);
         e.dataTransfer.effectAllowed = 'move';
-        onDragStart(job);
+        onDragStart(job, e.currentTarget.getBoundingClientRect().height);
       }}
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        onDropBefore(job);
-      }}
-      className={cn('group rounded-md border bg-card p-2.5 text-[13px] shadow-xs transition-colors hover:border-foreground/20', job.stale && 'border-[#dc2626]/50')}
+      onDragEnd={onDragEnd}
+      className={cn(
+        'group cursor-grab rounded-md border bg-card p-2.5 text-[13px] shadow-xs transition-[border-color,box-shadow] hover:border-foreground/20 hover:shadow-sm active:cursor-grabbing',
+        job.stale && 'border-[#dc2626]/50',
+        // The slot stands in for it while it is lifted.
+        lifted && 'hidden',
+      )}
     >
       <a href={href({ page: 'jobs', id: job.id })} className="block">
         <div className="flex items-start justify-between gap-2">
@@ -93,30 +95,128 @@ function JobCard({ job, fields, stages, onMove, onDragStart, onDropBefore }: { j
   );
 }
 
+type Drag = { job: Job; height: number };
+type Target = { stageId: string; index: number };
+
+const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+/** A drop slot fades in where it appears. */
+function appear(el: HTMLElement | null) {
+  if (el && !reducedMotion()) el.animate([{ opacity: 0, transform: 'scale(0.98)' }, { opacity: 1, transform: 'none' }], { duration: 140, easing: 'cubic-bezier(0.2, 0, 0, 1)' });
+}
+
+/**
+ * Cards glide instead of jumping: after each render, anything marked
+ * `data-flip` that moved within its column is animated from where it was
+ * (FLIP). Positions are measured inside each column's list, so scrolling
+ * never counts as moving.
+ */
+function useGlide(root: RefObject<HTMLElement | null>) {
+  const last = useRef(new Map<string, { column: string; top: number }>());
+  useLayoutEffect(() => {
+    const next = new Map<string, { column: string; top: number }>();
+    const still = reducedMotion();
+    root.current?.querySelectorAll<HTMLElement>('[data-column]').forEach((column) => {
+      const id = column.dataset['column']!;
+      const base = column.getBoundingClientRect().top - column.scrollTop;
+      column.querySelectorAll<HTMLElement>('[data-flip]').forEach((el) => {
+        if (el.offsetParent === null) return;
+        const key = el.dataset['flip']!;
+        const top = el.getBoundingClientRect().top - base;
+        next.set(key, { column: id, top });
+        const before = last.current.get(key);
+        if (still || !before) return;
+        if (before.column !== id) {
+          el.animate([{ opacity: 0.4, transform: 'scale(0.97)' }, { opacity: 1, transform: 'none' }], { duration: 200, easing: 'cubic-bezier(0.2, 0, 0, 1)' });
+        } else if (Math.abs(before.top - top) > 1) {
+          el.animate([{ transform: `translateY(${before.top - top}px)` }, { transform: 'none' }], { duration: 200, easing: 'cubic-bezier(0.2, 0, 0, 1)' });
+        }
+      });
+    });
+    last.current = next;
+  });
+}
+
 function Board({ list, fields, onMove }: { list: JobList; fields: JobField[]; onMove: (job: Job, stageId: string, before?: string | null) => void }) {
-  const dragging = useRef<Job | null>(null);
-  const [active, setActive] = useState(false);
+  const [drag, setDrag] = useState<Drag | null>(null);
+  const [target, setTarget] = useState<Target | null>(null);
+  // Set at once on dragstart (drops can come quickly); `drag` follows for the visuals.
+  const lifted = useRef<Job | null>(null);
+  const root = useRef<HTMLDivElement>(null);
+  useGlide(root);
   const open = list.stages.filter((s) => s.kind === 'open');
   const closed = list.stages.filter((s) => s.kind !== 'open');
-  const drop = (stageId: string, before: string | null) => (e: DragEvent) => {
-    e.preventDefault();
-    const job = dragging.current;
-    setActive(false);
-    dragging.current = null;
-    if (job) onMove(job, stageId, before);
+  const jobsIn = (stageId: string) => list.items.filter((j) => j.stage?.id === stageId && j.id !== drag?.job.id);
+  const end = () => {
+    lifted.current = null;
+    setDrag(null);
+    setTarget(null);
   };
+  const aim = (next: Target | null) => setTarget((current) => (current?.stageId === next?.stageId && current?.index === next?.index ? current : next));
+
+  /** Where in this column the pointer is: before the first card whose middle is below it. */
+  const over = (stageId: string) => (e: DragEvent<HTMLElement>) => {
+    if (!lifted.current) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const cards = [...e.currentTarget.querySelectorAll<HTMLElement>('[data-card]')].filter((el) => el.offsetParent !== null);
+    const index = cards.filter((el) => {
+      const r = el.getBoundingClientRect();
+      return r.top + r.height / 2 < e.clientY;
+    }).length;
+    aim({ stageId, index });
+  };
+  const drop = (stageId: string, open: boolean) => (e: DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    const moving = lifted.current;
+    const index = target?.stageId === stageId ? target.index : Number.POSITIVE_INFINITY;
+    end();
+    if (!moving) return;
+    if (!open) return onMove(moving, stageId);
+    const others = list.items.filter((j) => j.stage?.id === stageId && j.id !== moving.id);
+    const before = others[index]?.id ?? null;
+    // Dropped where it already was: nothing to do.
+    if (moving.stage?.id === stageId) {
+      const all = list.items.filter((j) => j.stage?.id === stageId);
+      if (all.findIndex((j) => j.id === moving.id) === Math.min(index, others.length)) return;
+    }
+    onMove(moving, stageId, before);
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="scroll-thin flex min-h-0 flex-1 gap-3 overflow-x-auto p-4">
+      <div
+        ref={root}
+        className="scroll-thin flex min-h-0 flex-1 gap-3 overflow-x-auto p-4"
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) aim(null);
+        }}
+      >
         {open.map((stage) => {
-          const jobs = list.items.filter((j) => j.stage?.id === stage.id);
+          const jobs = jobsIn(stage.id);
+          const here = target?.stageId === stage.id;
+          const slotAt = here ? target.index : jobs.length;
+          const slot = drag && (
+            <div
+              key="slot"
+              ref={appear}
+              data-flip={`slot:${stage.id}`}
+              style={{ height: here ? drag.height : 40 }}
+              className={cn(
+                'flex shrink-0 items-center justify-center rounded-md border-2 border-dashed text-[11px] transition-[height,border-color,background-color,color] duration-150 ease-out',
+                here ? 'border-foreground/30 bg-background/70 text-foreground' : 'border-border text-muted-foreground',
+              )}
+            >
+              Drop here
+            </div>
+          );
           return (
             <section
               key={stage.id}
               aria-label={stage.name}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={drop(stage.id, null)}
-              className="flex w-72 shrink-0 flex-col rounded-lg bg-muted/40"
+              onDragOver={over(stage.id)}
+              onDrop={drop(stage.id, true)}
+              className={cn('flex w-72 shrink-0 flex-col rounded-lg bg-muted/40 ring-inset transition-[background-color,box-shadow] duration-150', here && 'bg-muted/80 ring-1 ring-foreground/10')}
             >
               <header className="flex items-center gap-2 px-3 py-2.5">
                 <span className="size-2 rounded-full" style={{ background: stage.color }} aria-hidden />
@@ -124,27 +224,33 @@ function Board({ list, fields, onMove }: { list: JobList; fields: JobField[]; on
                 <span className="text-xs tabular-nums text-muted-foreground">{stage.count}</span>
               </header>
               {stage.valueCents > 0 && <p className="-mt-1.5 px-3 pb-1.5 text-[11px] text-muted-foreground">{money(stage.valueCents, jobs.find((j) => j.currency)?.currency ?? null)}</p>}
-              <div className="scroll-thin flex min-h-16 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-2">
-                {jobs.map((job) => (
-                  <JobCard
-                    key={job.id}
-                    job={job}
-                    fields={fields}
-                    stages={list.stages}
-                    onMove={(j, stageId) => onMove(j, stageId)}
-                    onDragStart={(j) => {
-                      dragging.current = j;
-                      setActive(true);
-                    }}
-                    onDropBefore={(target) => {
-                      const j = dragging.current;
-                      setActive(false);
-                      dragging.current = null;
-                      if (j && j.id !== target.id) onMove(j, stage.id, target.id);
-                    }}
-                  />
-                ))}
-                {jobs.length === 0 && <p className="px-1 py-3 text-center text-xs text-muted-foreground">Nothing here</p>}
+              <div data-column={stage.id} className="scroll-thin flex min-h-16 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-2">
+                {(() => {
+                  const cards = list.items
+                    .filter((j) => j.stage?.id === stage.id)
+                    .map((job) => (
+                      <JobCard
+                        key={job.id}
+                        job={job}
+                        fields={fields}
+                        stages={list.stages}
+                        lifted={drag?.job.id === job.id}
+                        onMove={(j, stageId) => onMove(j, stageId)}
+                        // After the browser has taken its picture of the card.
+                        onDragStart={(j, height) => {
+                          lifted.current = j;
+                          setTimeout(() => lifted.current?.id === j.id && setDrag({ job: j, height }));
+                        }}
+                        onDragEnd={end}
+                      />
+                    ));
+                  if (!slot) return cards;
+                  // The slot goes before the card now at `slotAt` among the others (the lifted card is hidden).
+                  const anchor = jobs[slotAt]?.id;
+                  const at = anchor ? cards.findIndex((c) => c.key === anchor) : cards.length;
+                  return [...cards.slice(0, at), slot, ...cards.slice(at)];
+                })()}
+                {!drag && jobs.length === 0 && <p className="px-1 py-3 text-center text-xs text-muted-foreground">Nothing here</p>}
               </div>
             </section>
           );
@@ -152,25 +258,30 @@ function Board({ list, fields, onMove }: { list: JobList; fields: JobField[]; on
         {/* The last steps: how a job ends. Drop zones with a count, not lists (closed jobs are in the List view). */}
         {closed.length > 0 && (
           <div className="flex w-56 shrink-0 flex-col gap-3">
-            {closed.map((stage) => (
-              <section
-                key={stage.id}
-                aria-label={stage.name}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={drop(stage.id, null)}
-                className={cn(
-                  'flex flex-1 flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed px-3 py-6 text-center transition-colors',
-                  stage.kind === 'won' ? 'border-[#16a34a]/40 text-[#16a34a]' : 'border-[#dc2626]/40 text-[#dc2626]',
-                  active && (stage.kind === 'won' ? 'bg-[#16a34a]/5' : 'bg-[#dc2626]/5'),
-                )}
-              >
-                <h2 className="text-[13px] font-medium">
-                  {stage.kind === 'won' ? '✓' : '✗'} {stage.name}
-                </h2>
-                <p className="text-xs tabular-nums opacity-80">{stage.count}</p>
-                {active && <p className="text-[11px] text-muted-foreground">Drop here</p>}
-              </section>
-            ))}
+            {closed.map((stage) => {
+              const here = target?.stageId === stage.id;
+              const tint = stage.kind === 'won' ? '#16a34a' : '#dc2626';
+              return (
+                <section
+                  key={stage.id}
+                  aria-label={stage.name}
+                  onDragOver={(e) => {
+                    if (!lifted.current) return;
+                    e.preventDefault();
+                    aim({ stageId: stage.id, index: 0 });
+                  }}
+                  onDrop={drop(stage.id, false)}
+                  style={{ color: tint, borderColor: `${tint}${here ? 'b3' : '66'}`, backgroundColor: drag ? `${tint}${here ? '1f' : '0a'}` : undefined }}
+                  className={cn('flex flex-1 flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed px-3 py-6 text-center transition-[background-color,border-color,transform] duration-150', here && 'scale-[1.02]')}
+                >
+                  <h2 className="text-[13px] font-medium">
+                    {stage.kind === 'won' ? '✓' : '✗'} {stage.name}
+                  </h2>
+                  <p className="text-xs tabular-nums opacity-80">{stage.count}</p>
+                  {drag && <p className="text-[11px] text-muted-foreground">Drop here</p>}
+                </section>
+              );
+            })}
           </div>
         )}
       </div>
@@ -650,7 +761,16 @@ export function Jobs({ id, me }: { id?: string | undefined; me: Me }) {
     const stage = p?.stages.find((s) => s.id === stageId);
     const lostReason = stage?.kind === 'lost' && stageId !== job.stage?.id ? (window.prompt('Why was it lost? (optional)') ?? '') : undefined;
     // Shown at once; the server's order follows.
-    if (list && stage) setItems(list.items.map((j) => (j.id === job.id ? { ...j, stage: { id: stage.id, name: stage.name, kind: stage.kind }, status: stage.kind } : j)).filter((j) => stage.kind === 'open' || j.id !== job.id));
+    if (list && stage) {
+      const moved = { ...job, stage: { id: stage.id, name: stage.name, kind: stage.kind }, status: stage.kind };
+      const rest = list.items.filter((j) => j.id !== job.id);
+      if (stage.kind !== 'open') setItems(rest);
+      else {
+        // Where it was dropped: above `before`, else after the column's last card.
+        const at = before ? rest.findIndex((j) => j.id === before) : rest.map((j) => j.stage?.id).lastIndexOf(stage.id) + 1;
+        setItems(at <= 0 && !before ? [...rest, moved] : [...rest.slice(0, Math.max(at, 0)), moved, ...rest.slice(Math.max(at, 0))]);
+      }
+    }
     await api(`/jobs/${job.id}/move`, { method: 'POST', json: { ...(stageId !== job.stage?.id ? { stageId } : {}), ...(before !== undefined ? { before } : {}), ...(lostReason ? { lostReason } : {}) } }).catch(() => {});
     reload();
   };

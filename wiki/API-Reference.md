@@ -107,8 +107,12 @@ Labels a site defines and puts on conversations (the AI can too), and the team's
 
 ### [[Leads|API-Reference-Leads]]
 
-The people who gave contact details: your CRM's contacts, with custom attributes. Keyed by email per site.
+The people who gave contact details: your CRM's contacts, with custom attributes and site-defined tags. Keyed by email per site.
 
+- [[List contact tags|API-Reference-Leads#list-contact-tags]]: `GET /contact-tags`
+- [[Create a contact tag|API-Reference-Leads#create-a-contact-tag]]: `POST /contact-tags`
+- [[Change a contact tag|API-Reference-Leads#change-a-contact-tag]]: `PATCH /contact-tags/:id`
+- [[Delete a contact tag|API-Reference-Leads#delete-a-contact-tag]]: `DELETE /contact-tags/:id`
 - [[List leads|API-Reference-Leads#list-leads]]: `GET /leads`
 - [[Create a lead|API-Reference-Leads#create-a-lead]]: `POST /leads`
 - [[Get a lead|API-Reference-Leads#get-a-lead]]: `GET /leads/:id`
@@ -205,7 +209,7 @@ The business-specific instructions, versioned, and the agent file: the prompt, t
 
 ### [[Tools|API-Reference-Tools]]
 
-Your own APIs, called before, during and after a chat (`{{name}}` in the prompt), and extract tools that save what the assistant learns. What they return is kept on the conversation (`data`) and sent to webhooks.
+Your own APIs, called before, during and after a chat (`{{name}}` in the prompt), and extract tools that save values from the finished conversation. What they return or save is kept on the conversation (`data`) and sent to webhooks.
 
 - [[List tools|API-Reference-Tools#list-tools]]: `GET /tools`
 - [[Add a tool|API-Reference-Tools#add-a-tool]]: `POST /tools`
@@ -221,6 +225,10 @@ The assistant, widget, lead form, limits and IP lists, as one object.
 - [[Suggest the home screen|API-Reference-Settings#suggest-the-home-screen]]: `POST /home/suggest`
 - [[The settings|API-Reference-Settings#the-settings]]: `GET /settings`
 - [[Change settings|API-Reference-Settings#change-settings]]: `PUT /settings`
+- [[List custom fields|API-Reference-Settings#list-custom-fields]]: `GET /attribute-definitions`
+- [[Add a custom field|API-Reference-Settings#add-a-custom-field]]: `POST /attribute-definitions`
+- [[Rename a custom field|API-Reference-Settings#rename-a-custom-field]]: `PATCH /attribute-definitions`
+- [[Remove a custom field|API-Reference-Settings#remove-a-custom-field]]: `DELETE /attribute-definitions`
 
 ### [[Webhooks|API-Reference-Webhooks]]
 

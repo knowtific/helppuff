@@ -25,7 +25,7 @@ export type AgentTemplate = { id: string; title: string; summary: string; tutori
 
 const ORDER_PROMPT = `## Order questions
 When someone asks where their order is, or when it will arrive:
-1. Ask for their order number and the email address they ordered with, one at a time, unless you already have them. Their email may be in the form: {{lead.email}}. Save both with {{order_number}}.
+1. Ask for their order number and the email address they ordered with, one at a time, unless you already have them. Their email may be in the form: {{lead.email}}.
 2. Look the order up with {{order_lookup}}.
    - If it is not found, say the order number and email don't match an order we can see, and ask them to check both. Never say whether an order number exists on its own.
 3. If the order has a tracking number, check the parcel with {{track_shipment}}. Then tell them, in one or two sentences, where it is and the expected delivery day if there is one ("Thursday 12 October").
@@ -46,7 +46,7 @@ When a visitor describes a renovation they want done, find out, one question at 
 - the suburb;
 - their budget range;
 - when they would like to start.
-Save each answer with {{project_details}} as soon as they give it. Then sum it up in one sentence and offer a free measure and quote from the team.
+Then sum it up in one sentence and offer a free measure and quote from the team.
 
 If they ask for a price, say every renovation is quoted after a free measure, and offer to book one.`;
 
@@ -106,7 +106,8 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
         {
           name: 'order_number',
           kind: 'extract',
-          description: 'Save the order number and the email address the visitor ordered with, as soon as they give them.',
+          description: 'Find the order number and email address the visitor gave during the chat.',
+          after: true,
           fields: [
             { name: 'order_number', description: 'The order number from the confirmation email, like 1042.', required: true },
             { name: 'order_email', description: 'The email address they ordered with.', required: false },
@@ -144,7 +145,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
   {
     id: 'crm-sync',
     title: 'Send chats to your CRM',
-    summary: 'Collects the project details during the chat; when it ends, sends them with the summary to n8n or Zapier, which updates HubSpot.',
+    summary: 'Asks for project details; when the chat ends, saves them and sends the summary to n8n or Zapier, which updates HubSpot.',
     tutorial: 'Tutorial-CRM-Sync',
     agent: {
       helppuff: 'agent',
@@ -167,7 +168,8 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
         {
           name: 'project_details',
           kind: 'extract',
-          description: 'Save the details of the renovation the visitor wants, as soon as they give each one.',
+          description: 'Find the renovation details the visitor gave during the chat.',
+          after: true,
           fields: [
             { name: 'service', description: 'Kitchen, bathroom, laundry, extension or other.', required: true },
             { name: 'suburb', description: 'Where the work is.', required: false },

@@ -1,6 +1,6 @@
 import { EMAIL_NOTIFICATIONS, EMAIL_PRESETS, WEBHOOK_EVENTS } from '@helppuff/protocol';
-import type { Callback, CallbackStatus, EmailService, Gap, Headline, Insights, KnowledgePage, Label, Lead, LeadStatus, Note, Overview, Prefs, PromptVersion, Settings, StoredMessage, Summary, ToolView } from '../src/lib/api';
-import { FACTS, LABELS, PAGES, PROMPT_TEXT, SITE, callbacks, conversations, leads, notes } from './data';
+import type { Callback, CallbackStatus, ContactTag, EmailService, Gap, Headline, Insights, KnowledgePage, Label, Lead, LeadStatus, Note, Overview, Prefs, PromptVersion, Settings, StoredMessage, Summary, TeamMember, ToolView } from '../src/lib/api';
+import { CONTACT_TAGS, FACTS, LABELS, PAGES, PROMPT_TEXT, SITE, callbacks, conversations, leads, notes } from './data';
 import { jobsRoute } from './jobs';
 import { bookingsRoute, bookingsSettings } from './bookings';
 
@@ -25,6 +25,7 @@ const notFound = () => json({ error: { code: 'not_found', message: 'Not in the d
 // ------------------------------------------------------------------ state
 
 let settings: Settings = {
+  autoSummary: true,
   botName: 'Sam',
   businessName: SITE.name,
   welcomeMessage: 'Hi, I’m Sam from Harbour Plumbing. How can I help today?',
@@ -99,6 +100,9 @@ let emailService: EmailService | null = {
 type Header = { name: string; value: string; secret: boolean; set?: boolean };
 const masked = (headers: unknown): Header[] => (Array.isArray(headers) ? (headers as Header[]) : []).map((h) => ({ name: h.name, value: h.secret ? '' : h.value, secret: Boolean(h.secret), set: true }));
 const labels: Label[] = LABELS.map((l) => ({ ...l }));
+const contactTags: ContactTag[] = CONTACT_TAGS.map((tag) => ({ ...tag }));
+const teamMembers: TeamMember[] = [{ email: 'office@harbourplumbing.example', name: 'Priya', role: 'member', createdAt: NOW - 30 * DAY, lastLoginAt: NOW - DAY }];
+const attributeDefinitions = { conversation: new Set(['orderId']), contact: new Set(['plan']) };
 let settingsAt = NOW - 6 * DAY;
 const DEMO_KEY = {
   id: 'k7m3p9q2r4s8',
@@ -158,7 +162,7 @@ const tools: ToolView[] = [
     parameters: [{ name: 'job_number', description: 'Like HP-2041.', required: true }],
     keys: ['status', 'date', 'plumber'],
   },
-  { ...toolBase, id: 'tool_number', name: 'job_number', kind: 'extract', description: 'Save the job number once the customer gives it.', fields: [{ name: 'job_number', description: 'Like HP-2041.', required: true }], keys: ['job_number'], lastAt: null, lastStatus: null },
+  { ...toolBase, id: 'tool_number', name: 'job_number', kind: 'extract', description: 'Find the job number the customer gave during the chat.', fields: [{ name: 'job_number', description: 'Like HP-2041.', required: true }], keys: ['job_number'], after: true, lastAt: null, lastStatus: null },
   {
     ...toolBase,
     id: 'tool_crm',
@@ -442,7 +446,7 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
   if (jobs) return jobs;
   const bookings = bookingsRoute(method, parts, params, body);
   if (bookings) return bookings;
-  if (path === '/me') return json({ admin: { email: OWNER, owner: true, role: 'owner', name: 'Dan' }, sites: [{ ...SITE, live: SITE.live || liveShown(), bookings: settings.bookings?.mode ?? 'none' }], summaries: true });
+  if (path === '/me') return json({ admin: { email: OWNER, owner: true, role: 'owner', name: 'Dan' }, sites: [{ ...SITE, live: SITE.live || liveShown(), bookings: settings.bookings?.mode ?? 'none', autoSummary: settings.autoSummary !== false }], summaries: true });
   if (path === '/notifications') {
     return json({
       email: { configured: Boolean(emailService), enabled: Boolean(emailService?.enabled), lastStatus: emailService?.lastStatus ?? null, lastError: null, lastAt: emailService?.lastAt ?? null },
@@ -500,6 +504,56 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
     if (id && method === 'PATCH' && at >= 0) return json(Object.assign(labels[at]!, body));
     return json({ labels, colors: ['#6b7280', '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#3b82f6', '#8b5cf6', '#ec4899'] });
   }
+  if (head === 'contact-tags') {
+    if (!id && method === 'GET') return json({ tags: [...contactTags].sort((a, b) => a.name.localeCompare(b.name)), colors: ['#6b7280', '#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#3b82f6', '#8b5cf6', '#ec4899'] });
+    if (!id && method === 'POST') {
+      const tag: ContactTag = { id: `ctag_${Date.now()}`, name: String(body['name'] ?? ''), color: String(body['color'] ?? '#6b7280') };
+      contactTags.push(tag);
+      return json(tag, 201);
+    }
+    const at = contactTags.findIndex((tag) => tag.id === id);
+    if (at < 0) return notFound();
+    if (method === 'PATCH') {
+      Object.assign(contactTags[at]!, body);
+      for (const lead of leads) lead.tags = (lead.tags ?? []).map((tag) => tag.id === id ? { ...contactTags[at]! } : tag);
+      return json(contactTags[at]);
+    }
+    if (method === 'DELETE') {
+      contactTags.splice(at, 1);
+      for (const lead of leads) lead.tags = (lead.tags ?? []).filter((tag) => tag.id !== id);
+      return json({ id, deleted: true });
+    }
+  }
+  if (path === '/attribute-definitions') {
+    const scopes = { conversation: conversations, contact: leads };
+    const list = (scope: 'conversation' | 'contact') => {
+      const used = new Map<string, number>();
+      for (const record of scopes[scope]) for (const name of Object.keys(record.attributes ?? {})) used.set(name, (used.get(name) ?? 0) + 1);
+      return [...new Set([...attributeDefinitions[scope], ...used.keys()])].sort().map((name) => ({ name, used: used.get(name) ?? 0, defined: attributeDefinitions[scope].has(name) }));
+    };
+    if (method === 'GET') return json({ conversations: list('conversation'), contacts: list('contact') });
+    const scope = body['scope'];
+    const name = String(body['name'] ?? '').trim();
+    if (scope !== 'conversation' && scope !== 'contact') return json({ error: { message: 'Choose conversation or contact attributes.' } }, 400);
+    if (!name) return json({ error: { message: 'Enter an attribute name.' } }, 400);
+    if (method === 'POST') attributeDefinitions[scope].add(name);
+    if (method === 'PATCH') {
+      const oldName = String(body['oldName'] ?? '');
+      if (list(scope).some((attribute) => attribute.name === name)) return json({ error: { message: 'That attribute already exists.' } }, 409);
+      attributeDefinitions[scope].delete(oldName);
+      attributeDefinitions[scope].add(name);
+      for (const record of scopes[scope]) {
+        if (record.attributes?.[oldName] === undefined) continue;
+        record.attributes[name] = record.attributes[oldName];
+        delete record.attributes[oldName];
+      }
+    }
+    if (method === 'DELETE') {
+      attributeDefinitions[scope].delete(name);
+      for (const record of scopes[scope]) if (record.attributes) delete record.attributes[name];
+    }
+    return json({ name, scope });
+  }
   if (head === 'notes' && id) {
     const at = notes.findIndex((n) => n.id === id);
     if (method === 'DELETE' && at >= 0) notes.splice(at, 1);
@@ -532,7 +586,29 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
   if (path === '/version') {
     return json({ current: __HELPPUFF_VERSION__, latest: __HELPPUFF_VERSION__, upgradeAvailable: false, schema: { applied: 9, expected: 9 }, command: 'npx @knowtific/helppuff upgrade', releaseNotes: '' });
   }
-  if (path === '/admins') return json({ me: OWNER, owner: OWNER, admins: [{ email: 'office@harbourplumbing.example', name: 'Priya', role: 'member', createdAt: NOW - 30 * DAY, lastLoginAt: NOW - DAY }] });
+  if (path === '/admins') {
+    if (method === 'POST') {
+      const email = String(body['email'] ?? '').trim().toLowerCase();
+      if (teamMembers.some((person) => person.email === email)) return json({ error: { message: `${email} can already sign in.` } }, 409);
+      const person: TeamMember = { email, name: String(body['name'] ?? '').trim() || null, role: body['role'] === 'admin' ? 'admin' : 'member', createdAt: Date.now(), lastLoginAt: null };
+      teamMembers.push(person);
+      return json({ ...person, signInLink: `https://harbourplumbing.example/admin/invite/demo-${encodeURIComponent(email)}`, signInLinkExpiresAt: Date.now() + 7 * DAY }, 201);
+    }
+    return json({ me: OWNER, owner: OWNER, admins: teamMembers });
+  }
+  if (head === 'admins' && id) {
+    const email = decodeURIComponent(id).toLowerCase();
+    const at = teamMembers.findIndex((person) => person.email === email);
+    if (at < 0) return notFound();
+    if (method === 'DELETE') {
+      teamMembers.splice(at, 1);
+      return json({ email, removed: true });
+    }
+    if (method === 'PATCH') {
+      teamMembers[at] = { ...teamMembers[at]!, role: body['role'] === 'admin' ? 'admin' : 'member' };
+      return json(teamMembers[at]);
+    }
+  }
   if (path === '/install-check') return json({ installed: true, url: SITE.website, reason: null });
   if (path === '/overview') return json(overview(Number(params.get('days') ?? 30)));
 
@@ -646,9 +722,9 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
       const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
       return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
     };
-    const header = ['created', 'name', 'email', 'phone', 'company', 'address', 'status', 'source', 'notes', 'attributes', 'site', 'conversation'];
+    const header = ['created', 'name', 'email', 'phone', 'company', 'address', 'status', 'source', 'notes', 'attributes', 'site', 'conversation', 'tags'];
     const lines = leads.map((l) =>
-      [new Date(l.createdAt ?? NOW).toISOString(), l.name, l.email, l.phone, l.company, l.address, l.status, l.source, l.notes, l.attributes ? JSON.stringify(l.attributes) : null, SITE.id, l.lastConversationId]
+      [new Date(l.createdAt ?? NOW).toISOString(), l.name, l.email, l.phone, l.company, l.address, l.status, l.source, l.notes, l.attributes ? JSON.stringify(l.attributes) : null, SITE.id, l.lastConversationId, (l.tags ?? []).map((tag) => tag.name).join('; ')]
         .map(cell)
         .join(','),
     );
@@ -660,7 +736,8 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
     if (!id) {
       const q = (params.get('q') ?? '').toLowerCase();
       const status = params.get('status');
-      const items = leads.filter((l) => (!status || l.status === status) && (!q || `${l.name} ${l.email} ${l.phone} ${l.notes}`.toLowerCase().includes(q)));
+      const tag = params.get('tag');
+      const items = leads.filter((l) => (!status || l.status === status) && (!tag || (tag === 'untagged' ? !l.tags?.length : l.tags?.some((value) => value.id === tag))) && (!q || `${l.name} ${l.email} ${l.phone} ${l.notes}`.toLowerCase().includes(q)));
       const counts: Record<string, number> = {};
       for (const l of leads) counts[l.status] = (counts[l.status] ?? 0) + 1;
       return json({ items, counts });
@@ -682,6 +759,7 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
       });
     }
     if (typeof body['status'] === 'string') lead.status = body['status'] as LeadStatus;
+    if (Array.isArray(body['tags'])) lead.tags = (body['tags'] as string[]).map((tagId) => contactTags.find((tag) => tag.id === tagId)).filter((tag): tag is ContactTag => Boolean(tag));
     if (typeof body['notes'] === 'string') lead.notes = body['notes'];
     for (const key of ['name', 'email', 'phone', 'company', 'address'] as const) if (key in body) (lead as Record<string, unknown>)[key] = body[key] ?? null;
     if (body['attributes'] && typeof body['attributes'] === 'object') {

@@ -6,7 +6,7 @@ import { hostOf, PromptEditor, promptSuggestions, ToolDialog, unknownRefs, type 
 import { AddMenu, Canvas, Edge, Node, NodeButton, Stem, type Tint } from '../components/Flow';
 import { useKnowledgeStatus } from '../components/knowledge';
 import { Badge, Button, Card, CardHeader, Empty, ErrorNote, InfoTip, Input, Segmented, Select, Skeleton } from '../components/ui';
-import { api, ApiError, type Me, type PromptVersion, type PromptView, type PublishResult, type ToolsList, type ToolView } from '../lib/api';
+import { api, ApiError, type Me, type PromptVersion, type PromptView, type PublishResult, type SettingsView, type ToolsList, type ToolView } from '../lib/api';
 import { promptToolRefs } from '@helppuff/protocol/tools';
 import { diffLines } from '../lib/diff';
 import { cn, fmtDateTime, fmtNumber, fmtRelative, href, useData } from '../lib/utils';
@@ -35,6 +35,9 @@ function sourceLabel(v: Pick<PromptVersion, 'source' | 'restoredFrom'>): string 
 
 type Notice = { tone: 'ok' | 'warn'; text: string } | null;
 
+/** Keep a saved switch choice while the dashboard navigates; /me may be cached for up to a minute. */
+const summaryChoiceCache = new Map<string, boolean>();
+
 /** How to write it, shown while the prompt is empty: a situation, then roughly what to say. */
 const PROMPT_PLACEHOLDER = `## Prices
 When you give a plan price, always say "from", "+ GST" and the 12-month minimum term.
@@ -60,6 +63,9 @@ export function Prompt({ me }: { me: Me }) {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
+  const [summaryBusy, setSummaryBusy] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [summaryChoices, setSummaryChoices] = useState<Record<string, boolean>>(() => Object.fromEntries(summaryChoiceCache));
   const [selected, setSelected] = useState<number | null>(null);
   /** The prompt's modal. */
   const [open, setOpen] = useState(false);
@@ -113,12 +119,29 @@ export function Prompt({ me }: { me: Me }) {
     );
 
   const siteInfo = me.sites.find((s) => s.id === site);
+  const autoSummary = summaryChoices[site] ?? siteInfo?.autoSummary ?? true;
+  const summaryOn = me.summaries && autoSummary;
+  const toggleSummary = async () => {
+    if (!me.summaries || summaryBusy) return;
+    setSummaryBusy(true);
+    setSummaryError(null);
+    try {
+      const saved = await api<SettingsView>('/settings', { method: 'PUT', json: { site, settings: { autoSummary: !autoSummary } } });
+      const enabled = saved.settings.autoSummary !== false;
+      summaryChoiceCache.set(site, enabled);
+      setSummaryChoices((current) => ({ ...current, [site]: enabled }));
+    } catch (thrown) {
+      setSummaryError((thrown as Error).message);
+    } finally {
+      setSummaryBusy(false);
+    }
+  };
   const knowledge = useKnowledgeStatus(Boolean(siteInfo?.knowledge));
   const hooks = useData(() => api<{ webhooks: { id: string; enabled: boolean }[] }>('/webhooks').catch(() => null), []);
   const labels = useData(() => api<{ labels: { id: string }[] }>('/labels').catch(() => null), []);
   const list = tools.data;
   const named = new Set(promptToolRefs(text).map((r) => r.name));
-  const inPrompt = list?.tools.filter((t) => named.has(t.name)) ?? [];
+  const inPrompt = list?.tools.filter((t) => named.has(t.name) && (t.kind === 'http' || !t.after)) ?? [];
   const learned = (knowledge.status?.pages.indexed ?? 0) + (knowledge.status?.pages.unchanged ?? 0);
   const hookCount = hooks.data?.webhooks.filter((h) => h.enabled).length ?? 0;
   const labelCount = labels.data?.labels.length ?? 0;
@@ -134,7 +157,7 @@ export function Prompt({ me }: { me: Me }) {
       <div inert={open}>
         <PageHeader
           title="Prompt & tools"
-          description="What happens around every chat: tools before it, your prompt and knowledge during it, a summary, tools and webhooks after it. Click any step to change it."
+          description="What happens around every chat: tools before it, your prompt and knowledge during it, then an optional summary, tools and webhooks after it. Click any step to change it."
           help="Prompts-and-Instructions"
           actions={
             <>
@@ -149,6 +172,7 @@ export function Prompt({ me }: { me: Me }) {
                     setSite(e.target.value);
                     setDraft(null);
                     setSelected(null);
+                    setSummaryError(null);
                   }}
                   aria-label="Site"
                 >
@@ -221,12 +245,27 @@ export function Prompt({ me }: { me: Me }) {
                     tint="teal"
                     icon={<Sparkles />}
                     title="Summary & labels"
-                    tip="Five quiet minutes after the last message, the AI writes a summary and adds labels. Both are on the conversation and in the conversation.completed webhook."
+                    tip={me.summaries ? 'When on, five quiet minutes after the last message, AI writes a summary and labels. Turning it off stops both for new chats; after-chat tools and webhooks still run.' : 'Automatic summaries need a Workers AI binding.'}
                   >
                     <div className="flex items-center justify-between text-[13px]">
                       <span>Summary</span>
-                      <span className="text-xs text-muted-foreground">{me.summaries ? 'On' : 'Off'}</span>
+                      <span className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">{summaryOn ? 'On' : 'Off'}</span>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-label="Automatic summaries"
+                          aria-checked={summaryOn}
+                          aria-busy={summaryBusy}
+                          disabled={!me.summaries || summaryBusy}
+                          onClick={() => void toggleSummary()}
+                          className={cn('relative h-5 w-9 shrink-0 rounded-full border border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50', summaryOn ? 'bg-primary' : 'bg-muted-foreground/30')}
+                        >
+                          <span className={cn('absolute top-px left-px size-4 rounded-full bg-background shadow-sm transition-transform motion-reduce:transition-none', summaryOn ? 'translate-x-4' : 'translate-x-0')} />
+                        </button>
+                      </span>
                     </div>
+                    {summaryError && <p role="alert" className="text-xs text-danger">{summaryError}</p>}
                     <a href={href({ page: 'settings', id: 'labels' })} className="flex items-center justify-between text-[13px] hover:underline">
                       <span>Labels</span>
                       <span className="text-xs text-muted-foreground">{labelCount ? `${labelCount} →` : 'Add →'}</span>
@@ -324,7 +363,7 @@ function ToolsNode({
 }) {
   const copy = SECTION[section];
   const inSection = list.tools.filter((t) => t[section]);
-  const others = list.tools.filter((t) => t.kind === 'http' && !t[section]);
+  const others = list.tools.filter((t) => !t[section] && (t.kind === 'http' || section === 'after'));
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const toggle = async (tool: ToolView, on: boolean) => {
@@ -349,7 +388,7 @@ function ToolsNode({
               <button type="button" onClick={() => onOpen(tool)} className="min-w-0 flex-1 text-left">
                 <span className={cn('block truncate font-mono text-[12.5px]', !tool.enabled && 'text-muted-foreground line-through')}>{tool.name}</span>
                 <span className="block truncate text-[11px] text-muted-foreground">
-                  {tool.method} {hostOf(tool.url)}
+                  {tool.kind === 'extract' ? 'Saves visitor details' : `${tool.method} ${hostOf(tool.url)}`}
                   {tool.lastStatus !== null && tool.lastStatus >= 400 && <span className="text-danger"> · last {tool.lastStatus}</span>}
                 </span>
               </button>
@@ -362,7 +401,7 @@ function ToolsNode({
       )}
       <AddMenu
         label={`Add a tool to ${copy.title.toLowerCase()}`}
-        items={others.map((t) => ({ key: t.id, label: t.name, detail: `${t.method} ${hostOf(t.url)}`, onSelect: () => void toggle(t, true) }))}
+        items={others.map((t) => ({ key: t.id, label: t.name, detail: t.kind === 'extract' ? 'Saves visitor details' : `${t.method} ${hostOf(t.url)}`, onSelect: () => void toggle(t, true) }))}
         newLabel="New tool"
         onNew={onNew}
         disabled={list.tools.length >= list.limits.tools && others.length === 0}
@@ -428,7 +467,7 @@ function PromptModal({
     return () => window.removeEventListener('keydown', escape);
   }, [nested, onClose]);
   const named = new Set(promptToolRefs(text).map((r) => r.name));
-  const notNamed = list?.tools.filter((t) => !named.has(t.name)) ?? [];
+  const notNamed = list?.tools.filter((t) => t.kind === 'http' && !named.has(t.name)) ?? [];
   const lines = new Set(text.split('\n').map((l) => l.trim()));
   const repeats = data.overlaps.filter((o) => lines.has(o.text));
 
@@ -589,7 +628,7 @@ function Versions({ data, onSelect }: { data: PromptView; onSelect: (version: nu
 function PromptTools({ text, list, onOpen }: { text: string; list: ToolsList | null; onOpen: (tool: ToolView) => void }) {
   if (!list?.assistant) return null;
   const named = new Set(promptToolRefs(text).map((r) => r.name));
-  const used = list.tools.filter((t) => named.has(t.name));
+  const used = list.tools.filter((t) => named.has(t.name) && (t.kind === 'http' || !t.after));
   const unknown = unknownRefs(text, list);
   // Nothing to show until the prompt names a tool (or a name that is not one).
   if (!used.length && !unknown.length) return null;
@@ -603,7 +642,7 @@ function PromptTools({ text, list, onOpen }: { text: string; list: ToolsList | n
       ))}
       {unknown.length > 0 && (
         <span className="w-full text-danger" role="note">
-          Not a tool or a known value: {unknown.map((u) => `{{${u}}}`).join(', ')}. Check the spelling, or add the tool.
+          Not available during the chat: {unknown.map((u) => `{{${u}}}`).join(', ')}. Check the spelling, or add a tool to the prompt.
         </span>
       )}
     </div>

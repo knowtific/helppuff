@@ -275,6 +275,8 @@ export function pullSettings(loaded: LoadedProject, live: Settings): LoadedProje
     Object.assign(obj(widget, 'launcher'), { position: applied.widget.launcher.position, icon: applied.widget.launcher.icon });
     obj(widget, 'chat')['initialMessages'] = applied.widget.chat.initialMessages ?? [];
     raw['assistant'] = { ...applied.assistant };
+    if (applied.autoSummary) delete raw['autoSummary'];
+    else raw['autoSummary'] = false;
     const home = obj(widget, 'home');
     home['shortcuts'] = applied.widget.home.shortcuts ?? [];
     if (live.home) {

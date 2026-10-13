@@ -191,6 +191,7 @@ export const siteConfigSchema = z.object({
   origins: z.array(z.string().min(1).max(300)).min(1),
   connector: connectorConfigSchema,
   sinks: z.array(sinkConfigSchema).max(10).default([]),
+  autoSummary: z.boolean().default(true).describe('Automatically summarise and label finished conversations. Off keeps transcripts, after-chat tools and webhooks running.'),
   security: securitySchema.default({}),
   widget: widgetConfigSchema.default({}),
   knowledge: knowledgeConfigSchema.default({}),
@@ -236,6 +237,7 @@ export const storedSiteConfigSchema = z
   .object({
     connector: connectorConfigSchema.optional(),
     sinks: z.array(sinkConfigSchema).max(10).optional(),
+    autoSummary: z.boolean().optional(),
     security: securitySchema.optional(),
     widget: widgetConfigSchema.optional(),
     knowledge: knowledgeConfigSchema.optional(),

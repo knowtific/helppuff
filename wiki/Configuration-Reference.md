@@ -67,6 +67,7 @@ variable, e.g. `{ "env": "OPENAI_API_KEY" }`, whose value lives in `.env` and on
 | `assistant.length` | `"short"` \| `"detailed"` | `"short"` | `short`: a few sentences; `detailed`: complete answers with short lists. |
 | `assistant.prices` | `"share"` \| `"quote"` | `"share"` | `share`: give prices exactly as the site and documents state them; `quote`: never give a price or estimate, offer a quote from the team instead. |
 | `assistant.bookingUrl` | string |  | The page the `bookings` goal sends visitors to: booking, sign-up or a quote form. · ≤ 2000 chars, URL |
+| `autoSummary` | boolean | `true` | Automatically summarise and label finished conversations. Off keeps transcripts, after-chat tools and webhooks running. |
 | `live` | object | `{}` | Live chat: visitors can talk to a person on your team, who answers from the dashboard or Telegram. Off by default. `helppuff live on` turns it on. |
 | `live.enabled` | boolean | `false` | Let visitors talk to a person on the team. When nobody is available they get the callback form instead. |
 | `live.waitSeconds` | integer | `120` | How long a visitor waits for someone to take the chat before they are offered the callback form (they can keep waiting). · 15–3600 |

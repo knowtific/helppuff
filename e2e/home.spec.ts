@@ -40,7 +40,7 @@ test('the owner sets the home screen up and the widget shows it', async ({ brows
   });
   await team.goto('/admin/');
   await team.getByLabel(/email/i).fill(OWNER.email);
-  await team.getByLabel(/password/i).fill(OWNER.password);
+  await team.getByRole('textbox', { name: 'Password', exact: true }).fill(OWNER.password);
   await team.getByRole('button', { name: /sign in/i }).click();
   await expect(team.getByRole('navigation', { name: 'Main' }).first()).toBeVisible();
 

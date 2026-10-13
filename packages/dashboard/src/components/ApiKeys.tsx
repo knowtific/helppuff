@@ -3,7 +3,7 @@ import { useRef, useState } from 'react';
 import { api } from '../lib/api';
 import { copyText, fmtRelative, useData } from '../lib/utils';
 import { CopyBlock } from '../pages/Settings';
-import { HelpLink, wikiHref } from './Shell';
+import { HelpLink } from './Shell';
 import { Badge, Button, Card, CardHeader, Empty, ErrorNote, Input, Select, Skeleton } from './ui';
 
 /**
@@ -84,24 +84,13 @@ export function ApiKeys() {
         </Card>
       )}
 
-      <Card>
-        <CardHeader title="Use it" tip={{ label: 'About using a key', text: 'Every request sends the key as a Bearer token.', href: wikiHref('API') }} />
-        <div className="space-y-3 border-t px-4 py-3">
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Base URL</p>
-            <CopyBlock text={base} label="base URL" />
-          </div>
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Start a conversation</p>
-            <CopyBlock
-              text={`curl -X POST "${base}/conversations" \\\n  -H "Authorization: Bearer $HELPPUFF_API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '{"message": "Do you work weekends?"}'`}
-              label="example"
-            />
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Every endpoint, with examples: <HelpLink page="API-Reference" label="API reference" className="align-middle" /> · machine-readable: <code className="rounded bg-muted px-1">{base}/openapi.json</code>
-          </p>
-        </div>
+      <Card className="space-y-2 px-4 py-3">
+        <p className="text-xs font-medium">Base URL</p>
+        <CopyBlock text={base} label="base URL" />
+        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
+          Send the key as a Bearer token.
+          <HelpLink page="API" label="Quickstart and every endpoint" className="text-foreground" />
+        </p>
       </Card>
     </div>
   );

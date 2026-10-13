@@ -98,6 +98,7 @@ export type HomeSettings = z.infer<typeof homeSettingsSchema>;
 
 export const settingsSchema = z
   .object({
+    autoSummary: z.boolean().default(true),
     botName: z.string().trim().min(1).max(60),
     businessName: z.string().trim().min(1).max(60),
     welcomeMessage: z.string().trim().max(2000),
@@ -205,6 +206,7 @@ export function readSettings(site: SiteConfig): Settings {
   }));
   const o = obj(site.connector.options);
   return {
+    autoSummary: site.autoSummary,
     botName: w.brand.agentName,
     businessName: w.brand.name,
     welcomeMessage: w.chat.initialMessages?.[0] ?? '',
@@ -252,7 +254,7 @@ const compact = (value: Record<string, unknown>) =>
   Object.fromEntries(Object.entries(value).filter(([, v]) => v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)));
 
 /** The site config sections that carry these settings, rewritten. */
-export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<SiteConfig, 'widget' | 'connector' | 'knowledge' | 'assistant' | 'security' | 'live' | 'bookings'> {
+export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<SiteConfig, 'widget' | 'connector' | 'knowledge' | 'assistant' | 'security' | 'live' | 'bookings' | 'autoSummary'> {
   const current = readSettings(site);
   const s: Settings = {
     ...current,
@@ -315,7 +317,7 @@ export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<Site
   }
   const knowledge = { ...site.knowledge, ...s.crawl };
   const live = liveConfigSchema.parse({ ...site.live, ...(patch.live ?? {}) });
-  return { widget, connector, knowledge, assistant: s.behaviour, security: mergeSecurity(site, patch.security), live, bookings: mergeBookings(site.bookings, patch.bookings) };
+  return { widget, connector, knowledge, assistant: s.behaviour, security: mergeSecurity(site, patch.security), live, bookings: mergeBookings(site.bookings, patch.bookings), autoSummary: s.autoSummary };
 }
 
 /** The bookings section with a patch applied: a null clears a field (`mode: null`: the website decides again). Throws a ZodError for a bad value. */
@@ -432,6 +434,7 @@ export async function saveSettings(c: Context<HonoEnv>, siteId: string, patch: u
     security: next.security,
     live: next.live,
     bookings: next.bookings,
+    autoSummary: next.autoSummary,
     settings: { at: ctx.platform.now(), by, hash },
   });
   await kv.put(siteConfigKey(siteId), JSON.stringify(record));

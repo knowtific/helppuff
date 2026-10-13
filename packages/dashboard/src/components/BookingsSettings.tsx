@@ -242,20 +242,25 @@ export function BookingsSettings() {
   const effective = status.data?.effective;
   const found = status.data?.found ?? null;
   const mode = draft.mode ?? effective?.mode ?? 'none';
+  const bookingPage = draft.mode === undefined ? effective?.link ?? found?.url ?? draft.link ?? '' : draft.link ?? effective?.link ?? found?.url ?? '';
   const set = (patch: Partial<Bookings>) => setDraft({ ...draft, ...patch });
   const providerSlots = sync === 'calcom' || sync === 'calendly';
   const integrationKind = SYNCS.find((s) => s.value === sync)?.needs;
   const integration = status.data?.calendar.sync === sync ? status.data.calendar.integration : null;
 
   const save = async () => {
+    if (draft.mode === 'link' && !bookingPage.trim()) {
+      setSaveError('Enter your booking page URL.');
+      return;
+    }
     setBusy(true);
     setNote(null);
     setSaveError(null);
     try {
       const previous = JSON.parse(base) as Bookings;
       // Fields removed in the draft are sent as null, so they clear.
-      const patch: BookingsPatch = { ...draft };
-      for (const key of Object.keys(previous) as (keyof Bookings)[]) if (draft[key] === undefined) (patch as Record<string, unknown>)[key] = null;
+      const patch: BookingsPatch = { ...draft, ...(draft.mode === 'link' ? { link: bookingPage } : {}) };
+      for (const key of Object.keys(previous) as (keyof Bookings)[]) if (patch[key] === undefined) (patch as Record<string, unknown>)[key] = null;
       const result = await api<SettingsView>('/settings', { method: 'PUT', json: { settings: { bookings: patch } } });
       const saved = result.settings.bookings!;
       setDraft(saved);
@@ -276,26 +281,27 @@ export function BookingsSettings() {
         <Card role="region" aria-label="Appointments">
           <CardHeader title="Appointments" tip={{ label: 'About appointments', text: 'How visitors book from the chat. You can change it any time; appointments already made are kept.', href: wikiHref('Bookings') }} />
           <div className="space-y-3 border-t p-4">
-            <Choice name="How visitors book" value={mode} options={MODES} onChange={(value) => set({ mode: value })} />
+            <Choice name="How visitors book" value={mode} options={MODES} onChange={(value) => set(value === 'link' ? { mode: value, link: bookingPage || undefined } : { mode: value })} />
             {!draft.mode && (
-              <p className="text-xs text-muted-foreground">
-                {found ? (
-                  <>
+              found ? (
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span>
                     In use now: <span className="font-medium text-foreground">the booking link found on your website</span>
-                    {found.provider ? ` (${found.provider})` : ''}. Choose to keep it or change it.
-                  </>
-                ) : (
-                  'Nothing found on your website, so nothing is offered until you choose.'
-                )}
-              </p>
+                    {found.provider ? ` (${found.provider})` : ''}. Keep this link, then Save to use this URL even if your website changes.
+                  </span>
+                  <Button type="button" variant="outline" size="sm" onClick={() => set({ mode: 'link', link: bookingPage })}>Keep this link</Button>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Nothing found on your website, so nothing is offered until you choose.</p>
+              )
             )}
             {mode === 'link' && (
               <div className="flex flex-wrap items-end gap-2">
                 <Labeled label="Booking page" className="min-w-64 flex-1">
-                  <Input type="url" value={draft.link ?? ''} placeholder={found?.url ?? 'https://calendly.com/you/consultation'} onChange={(e) => set({ link: e.target.value || undefined })} />
+                  <Input type="url" value={bookingPage} placeholder="https://calendly.com/you/consultation" onChange={(e) => set({ mode: 'link', link: e.target.value })} />
                 </Labeled>
-                {(draft.link || found?.url) && (
-                  <a href={draft.link || found!.url} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                {bookingPage && (
+                  <a href={bookingPage} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
                     Open it <ExternalLink className="size-3.5" />
                   </a>
                 )}
@@ -467,7 +473,7 @@ export function BookingsSettings() {
         <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
           Preview {dirty && <Badge>Not saved</Badge>}
         </p>
-        <PickerPreview accent={view.data.settings.accent} mode={dirty ? mode : (effective?.mode ?? mode)} link={draft.link ?? found?.url ?? null} label={draft.label} version={version} />
+        <PickerPreview accent={view.data.settings.accent} mode={dirty ? mode : (effective?.mode ?? mode)} link={bookingPage || null} label={draft.label} version={version} />
         {mode === 'picker' && dirty && <p className="text-[11px] text-muted-foreground">Times show the saved settings: save to see changes.</p>}
         <p className="text-[11px] text-muted-foreground">
           Why the AI never books: <WikiLink page="AI-Booking-Tests" className="underline">our tests</WikiLink>.

@@ -1,14 +1,14 @@
 import { ArrowDown, ArrowUp, Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { api, type JobField, type JobFieldType, type Pipeline, type PipelineView, type StageKind } from '../lib/api';
-import { cn, href, useData } from '../lib/utils';
-import { CopyBlock } from '../pages/Settings';
-import { Badge, Button, Card, CardHeader, ErrorNote, InfoTip, Input, Select, Skeleton } from './ui';
+import { cn, useData } from '../lib/utils';
+import { HelpNote } from './Shell';
+import { Badge, Button, Card, CardHeader, Disclosure, ErrorNote, InfoTip, Input, Select, Skeleton } from './ui';
 
 /**
  * Settings → Jobs: the template (and letting the AI choose again), what a job
  * is called, the stages, the fields, the quote questions the widget asks, and
- * how to send jobs from other tools. Each card saves on its own.
+ * a link to sending jobs from other tools. Each card saves on its own.
  */
 
 const TYPES: { value: JobFieldType; label: string }[] = [
@@ -439,9 +439,8 @@ function QuoteCard({ pipeline, onSaved }: { pipeline: Pipeline; onSaved: (view: 
             Ask for a name, email and phone
           </Check>
           {pipeline.quotePreview.length > 0 && !dirty && (
-            <div className="rounded-md bg-subtle p-3 text-xs">
-              <p className="mb-1.5 font-medium">What the visitor sees</p>
-              <ol className="list-decimal space-y-0.5 pl-4 text-muted-foreground">
+            <Disclosure summary="Preview what the visitor sees">
+              <ol className="list-decimal space-y-0.5 rounded-md bg-subtle py-2.5 pr-3 pl-7 text-xs text-muted-foreground">
                 {pipeline.quotePreview.map((step) => (
                   <li key={step.field}>
                     {step.ask}
@@ -449,7 +448,7 @@ function QuoteCard({ pipeline, onSaved }: { pipeline: Pipeline; onSaved: (view: 
                   </li>
                 ))}
               </ol>
-            </div>
+            </Disclosure>
           )}
         </div>
       </div>
@@ -461,34 +460,6 @@ function QuoteCard({ pipeline, onSaved }: { pipeline: Pipeline; onSaved: (view: 
         onReset={() => setValue(quoteDraft(pipeline))}
         onSave={() => void save({ quote: value.fields, quoteEnabled: value.enabled, quoteLabel: value.label, quoteContact: value.askContact })}
       />
-    </Card>
-  );
-}
-
-// ----------------------------------------------------- from other tools
-
-function ElsewhereCard({ pipeline }: { pipeline: Pipeline }) {
-  const base = `${window.location.origin}/api/v1`;
-  const fields = Object.fromEntries(
-    pipeline.fields
-      .filter((f) => !f.archived)
-      .slice(0, 4)
-      .map((f) => [f.name, f.type === 'select' ? (f.options[0] ?? '…') : f.type === 'number' ? '2' : f.type === 'date' ? '2026-11-03' : '…']),
-  );
-  const body = JSON.stringify({ contact: { name: 'Sam Lee', email: 'sam@example.com' }, fields, details: 'From the booking form' }, null, 2);
-  return (
-    <Card role="region" aria-label="Send them from other tools">
-      <CardHeader title="Send them from other tools" tip={{ label: 'About send them from other tools', text: 'Your own forms, Zapier or Make: create one with the API. Webhooks tell other tools when one is created, moves or is won.' }} />
-      <div className="space-y-3 border-t p-4 text-[13px]">
-        <CopyBlock label="curl example" text={`curl -X POST "${base}/jobs" \\\n  -H "Authorization: Bearer $HELPPUFF_API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '${body}'`} />
-        <p className="text-xs text-muted-foreground">
-          Needs an API key with <code className="rounded bg-muted px-1">jobs:write</code>: <a className="underline" href={href({ page: 'settings', id: 'api' })}>API keys</a>. Events:{' '}
-          <a className="underline" href={href({ page: 'settings', id: 'webhooks' })}>
-            webhooks
-          </a>{' '}
-          (<code className="rounded bg-muted px-1">job.created</code>, <code className="rounded bg-muted px-1">job.stage_changed</code>, <code className="rounded bg-muted px-1">job.won</code>…).
-        </p>
-      </div>
     </Card>
   );
 }
@@ -506,7 +477,19 @@ export function JobsSettings() {
       <StagesCard pipeline={view.pipeline} onSaved={setView} />
       <FieldsCard pipeline={view.pipeline} onSaved={setView} />
       <QuoteCard pipeline={view.pipeline} onSaved={setView} />
-      <ElsewhereCard pipeline={view.pipeline} />
+      <HelpNote page="Jobs#from-your-own-forms-zapier-or-make" label="How">
+        Create them from your own forms, Zapier or Make too.
+      </HelpNote>
     </div>
   );
+}
+
+/** The same job field editor on Settings → Custom fields. */
+export function JobFieldsSettings() {
+  const { data, error, reload } = useData(() => api<PipelineView>('/jobs/pipeline'), []);
+  const [view, setView] = useState<PipelineView | null>(null);
+  useEffect(() => setView(data ?? null), [data]);
+  if (error) return <ErrorNote error={error} onRetry={reload} />;
+  if (!view) return <Skeleton className="h-40" />;
+  return <FieldsCard pipeline={view.pipeline} onSaved={setView} />;
 }
