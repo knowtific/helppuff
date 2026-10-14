@@ -2,7 +2,8 @@
 
 **Settings → Integrations** keeps the keys HelpPuff uses to talk to other
 services, once for the whole site. Any feature can use them; today that is
-[[Bookings]]' calendar sync. The page shows while the date picker is on.
+[[Bookings]]' calendar sync. You can connect a calendar before turning on the
+date picker.
 
 | Integration | What it holds | Used for |
 | --- | --- | --- |

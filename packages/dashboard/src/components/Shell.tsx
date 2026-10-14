@@ -139,8 +139,8 @@ export function settingsSections(site: Site | undefined, me?: Me): { id: Setting
     // Every site: photos and files and the limits apply whatever writes the answers; the model's settings show only for Workers AI.
     { id: 'advanced' as const, label: 'Advanced' },
     { id: 'webhooks' as const, label: 'Webhooks' },
-    // Keys for other services: shown while a feature can use one (bookings' calendar sync, for now).
-    ...(site?.bookings === 'picker' ? [{ id: 'integrations' as const, label: 'Integrations' }] : []),
+    // Keys can be connected before the date picker is saved, including from its calendar sync link.
+    { id: 'integrations' as const, label: 'Integrations' },
     { id: 'api' as const, label: 'API keys' },
     { id: 'team' as const, label: 'Team & security' },
     { id: 'updates' as const, label: 'Updates' },

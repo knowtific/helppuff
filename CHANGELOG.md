@@ -8,6 +8,13 @@ never needs you to change anything. Upgrade with
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-10-14
+
+### Fixed
+
+- Settings → Integrations now opens from the booking calendar sync link before
+  the date picker has been saved.
+
 ## [0.9.0] - 2026-10-14
 
 ### Added

@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { BookingsSettings } from '../src/components/BookingsSettings';
 import { Integrations } from '../src/components/Integrations';
+import { Settings } from '../src/pages/Settings';
 import { Calendar } from '../src/pages/Calendar';
 import type { Appointment, BookingsSettings as Bookings, Me } from '../src/lib/api';
-import { button, byText, click, fakeApi, flush, mount, type, unmount } from './helpers';
+import { button, byText, click, fakeApi, flush, me, mount, type, unmount } from './helpers';
 
 /** Appointments in the dashboard: Settings → Bookings, Settings → Integrations, and the Calendar. */
 
@@ -77,6 +78,19 @@ describe('Settings → Bookings', () => {
 });
 
 describe('Settings → Integrations', () => {
+  it('opens before the date picker is enabled', async () => {
+    fakeApi({
+      'GET /integrations': {
+        items: [{ kind: 'calcom', name: 'Cal.com', connected: false, baseUrl: null, status: 'none', lastError: null, lastAt: null, account: null, plan: null, createdAt: null, updatedAt: null }],
+        help: { calcom: { name: 'Cal.com', key: 'API key', help: 'Cal.com API key' } },
+      },
+    });
+    const page = await mount(<Settings me={me('owner', false)} section="integrations" />);
+    expect(page.querySelector('h1')?.textContent).toContain('Integrations');
+    expect(page.querySelector('[aria-label="Cal.com"]')).toBeTruthy();
+    expect(page.querySelector('a[href="#/settings/integrations"]')).toBeTruthy();
+  });
+
   it('saves a key without showing it again, and says what the check found', async () => {
     const calls = fakeApi({
       'GET /integrations': {
