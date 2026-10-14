@@ -8,6 +8,44 @@ never needs you to change anything. Upgrade with
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-14
+
+### Added
+
+- **Photos and files**, kept in your own Cloudflare R2 bucket (private; every
+  link is signed and expires). Both are off by default and turned on
+  separately, in Settings → Advanced → *Photos and files* or with the new
+  `helppuff files` command:
+  - **In the chat** (`files.chat`): visitors send photos and PDFs with a
+    paperclip next to the message box, only while a person has the chat
+    (`live`, the usual choice) or any time (`always`). Photos are made smaller
+    in the browser and lose their location data. The team sees them in the
+    conversation and the live chat, and as links on Telegram. The assistant
+    is told a file arrived but never opens it, unless **the assistant sees
+    photos** is on: then a Workers AI vision model (Llama 4 Scout by default)
+    describes each photo once and the assistant reads that.
+  - **On jobs** (`files.jobs`): a Files section on every job (drop or attach
+    photos, PDFs, Office documents, text, CSV, MP4/MOV), with the photos the
+    visitor sent in the job's conversation. Members attach and remove their
+    own. `helppuff jobs attach|files|detach`, and `GET/POST /jobs/:id/files`,
+    `DELETE /jobs/:id/files/:fileId` in the API.
+  - Limits on Settings → Advanced and in `helppuff.json`: the largest file
+    from visitors and on jobs, files per chat, how long chat files are kept
+    (90 days; job files stay until removed), and
+    `security.limits.uploadsPerIpPerHour`.
+- `helppuff deploy` makes the R2 bucket (`knowtific-helppuff-<site>`) whenever
+  the Cloudflare account has R2 on, so turning files on needs no redeploy.
+  Without R2 the deploy goes on, and says how to turn it on only when files
+  are on. `helppuff doctor` checks it.
+
+### Upgrading
+
+- Run `helppuff upgrade`: it adds the `files` table to the database and makes
+  the bucket. To use files, R2 must be turned on once for the Cloudflare
+  account (the dashboard asks a person to accept the plan, free up to 10 GB).
+  An API token (instead of `wrangler login`) needs **Workers R2 Storage ›
+  Edit** too.
+
 ## [0.8.0] - 2026-10-14
 
 ### Changed

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'preact/hooks';
 import { Icon } from './Icon.js';
 import { isTouch } from '../lib/env.js';
 import type { StringKey } from '../app/strings.js';
+import { CHAT_ACCEPT } from '@helppuff/protocol/files';
 
 const MAX_LENGTH = 1000;
 /** The counter appears only in the last 100 characters. */
@@ -16,6 +17,7 @@ export function Composer({
   t,
   onInput,
   onSend,
+  onAttach,
 }: {
   value: string;
   disabled: boolean;
@@ -24,6 +26,8 @@ export function Composer({
   t: (key: StringKey) => string;
   onInput: (text: string) => void;
   onSend: () => void;
+  /** Present while the visitor may send a file (`capabilities.files`). Given the input; the upload chunk reads it. */
+  onAttach?: ((input: HTMLInputElement) => void) | undefined;
 }) {
   const textarea = useRef<HTMLTextAreaElement>(null);
   const touch = isTouch();
@@ -51,6 +55,14 @@ export function Composer({
   return (
     <div class="hp-composer-wrap">
       <div class="hp-composer">
+        {onAttach ? (
+          <label class="hp-attach">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m19 12-7 7a5 5 0 0 1-7-7l8-8a3 3 0 0 1 5 5l-8 8a1.5 1.5 0 0 1-2-2l7-7" />
+            </svg>
+            <input type="file" accept={CHAT_ACCEPT} aria-label={t('attach')} disabled={disabled || offline} onChange={(event) => onAttach(event.target as HTMLInputElement)} />
+          </label>
+        ) : null}
         <textarea
           ref={textarea}
           rows={1}

@@ -11,6 +11,9 @@ Requests, quotes, projects or tickets on the site's pipeline: create them from y
 - [[Move a job|API-Reference-Jobs#move-a-job]]: `POST /jobs/:id/move`
 - [[Add an update|API-Reference-Jobs#add-an-update]]: `POST /jobs/:id/updates`
 - [[Add a note to a job|API-Reference-Jobs#add-a-note-to-a-job]]: `POST /jobs/:id/notes`
+- [[A job's files|API-Reference-Jobs#a-jobs-files]]: `GET /jobs/:id/files`
+- [[Attach a file to a job|API-Reference-Jobs#attach-a-file-to-a-job]]: `POST /jobs/:id/files`
+- [[Remove a file from a job|API-Reference-Jobs#remove-a-file-from-a-job]]: `DELETE /jobs/:id/files/:fileId`
 - [[Delete a job|API-Reference-Jobs#delete-a-job]]: `DELETE /jobs/:id`
 - [[The pipeline|API-Reference-Jobs#the-pipeline]]: `GET /jobs/pipeline`
 - [[Change the pipeline|API-Reference-Jobs#change-the-pipeline]]: `PUT /jobs/pipeline`
@@ -912,6 +915,222 @@ type AddNoteToJobResponse = {
   text: string;
   createdAt: number;
   updatedAt: number;
+};
+```
+<!-- /tabs -->
+
+## A job's files
+
+`GET /jobs/:id/files` · scope `jobs:read`
+
+The photos and files attached to the job, and (`fromChat`) the ones the visitor sent in the job's conversation. Each `url` is a signed link that works for 12 hours: list again for a fresh one. `enabled` is `files.jobs`; `storage` whether the deployment has its R2 bucket.
+
+| Parameter | In | Required | Description |
+| --- | --- | --- | --- |
+| `id` | path | yes | The record's id. |
+
+**Request**
+
+<!-- tabs -->
+```bash [curl]
+curl "$HELPPUFF_URL/api/v1/jobs/ID/files" \
+  -H "Authorization: Bearer $HELPPUFF_API_KEY"
+```
+```ts [TypeScript]
+const id = '…';
+const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/jobs/${id}/files`, {
+  headers: {
+    Authorization: `Bearer ${process.env.HELPPUFF_API_KEY}`,
+  },
+});
+if (!response.ok) throw new Error(((await response.json()) as ApiError).error.message);
+const data = (await response.json()) as JobSFilesResponse;
+```
+<!-- /tabs -->
+
+**Response** `200`
+
+<!-- tabs -->
+```json [Example]
+{
+  "enabled": true,
+  "storage": true,
+  "maxMb": 25,
+  "files": [
+    {
+      "id": "f_mfx2k1a9b2c3d4e5f6a7",
+      "name": "after-install.jpg",
+      "type": "image/jpeg",
+      "size": 284113,
+      "url": "https://helppuff.acme.workers.dev/v1/files/acme/job/f_mfx2k1a9b2c3d4e5f6a7?e=t3k2p0&s=Xk…",
+      "createdAt": 1760000000000,
+      "uploadedBy": "sam@acme.com",
+      "uploadedByName": "Sam"
+    }
+  ],
+  "fromChat": [
+    {
+      "id": "f_mfx2k0a1b2c3d4e5f6a7",
+      "name": "leak.jpg",
+      "type": "image/jpeg",
+      "size": 182044,
+      "url": "https://helppuff.acme.workers.dev/v1/files/acme/chat/f_mfx2k0a1b2c3d4e5f6a7?e=t3k2p0&s=Zq…",
+      "uploadedBy": "visitor",
+      "uploadedByName": "Sam",
+      "createdAt": 1760000000000
+    }
+  ]
+}
+```
+```ts [Type]
+type JobSFilesResponse = {
+  enabled: boolean;
+  storage: boolean;
+  maxMb: number;
+  files: Array<{
+    id: string;
+    name: string;
+    type: string;
+    size: number;
+    url: string;
+    createdAt: number;
+    uploadedBy: string;
+    uploadedByName: string | null;
+  }>;
+  fromChat: Array<{
+    id: string;
+    name: string;
+    type: string;
+    size: number;
+    url: string;
+    uploadedBy: string;
+    uploadedByName: string | null;
+    createdAt: number;
+  }>;
+};
+```
+<!-- /tabs -->
+
+## Attach a file to a job
+
+`POST /jobs/:id/files` · scope `jobs:write`
+
+The raw bytes as the body, the file name as `?name=`. Photos (JPEG, PNG, WebP, GIF, HEIC), PDF, Word, Excel, PowerPoint, text, CSV, MP4 or MOV, up to `files.maxJobMb` (25 MB unless changed). The type is read from the bytes. Needs files on jobs on (`files.jobs`) and the deployment's R2 bucket. Recorded in the job's history.
+
+| Parameter | In | Required | Description |
+| --- | --- | --- | --- |
+| `id` | path | yes | The record's id. |
+| `name` | query | yes | The file name, with its extension. |
+
+**Request**
+
+<!-- tabs -->
+```bash [curl]
+curl -X POST "$HELPPUFF_URL/api/v1/jobs/ID/files?name=after-install.jpg" \
+  -H "Authorization: Bearer $HELPPUFF_API_KEY" \
+  -H "Content-Type: application/octet-stream" \
+  --data-binary @price-list.pdf
+```
+```ts [TypeScript]
+const id = '…';
+import { readFile } from 'node:fs/promises';
+
+const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/jobs/${id}/files?${new URLSearchParams({ name: 'after-install.jpg' })}`, {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${process.env.HELPPUFF_API_KEY}`,
+    'Content-Type': 'application/octet-stream',
+  },
+  body: await readFile('price-list.pdf'),
+});
+if (!response.ok) throw new Error(((await response.json()) as ApiError).error.message);
+const data = (await response.json()) as AttachFileToJobResponse;
+```
+<!-- /tabs -->
+
+The body is the file's bytes.
+
+**Response** `201`
+
+<!-- tabs -->
+```json [Example]
+{
+  "id": "f_mfx2k1a9b2c3d4e5f6a7",
+  "name": "after-install.jpg",
+  "type": "image/jpeg",
+  "size": 284113,
+  "url": "https://helppuff.acme.workers.dev/v1/files/acme/job/f_mfx2k1a9b2c3d4e5f6a7?e=t3k2p0&s=Xk…",
+  "createdAt": 1760000000000,
+  "uploadedBy": "key:k7m3p9q2r4s8",
+  "uploadedByName": "Website backend"
+}
+```
+```ts [Type]
+type AttachFileToJobResponse = {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  url: string;
+  createdAt: number;
+  uploadedBy: string;
+  uploadedByName: string | null;
+};
+```
+<!-- /tabs -->
+
+**Errors**
+
+| Status | Code | When |
+| --- | --- | --- |
+| 400 | `bad_request` | Files on jobs are off, the file is empty, too large, or not a kind HelpPuff keeps. |
+| 404 | `not_found` | No such job, or the deployment has no file storage (turn on R2, then `helppuff deploy`). |
+
+## Remove a file from a job
+
+`DELETE /jobs/:id/files/:fileId` · scope `jobs:write`
+
+Deletes the file. Recorded in the job's history.
+
+| Parameter | In | Required | Description |
+| --- | --- | --- | --- |
+| `id` | path | yes | The record's id. |
+| `fileId` | path | yes | The fileId. |
+
+**Request**
+
+<!-- tabs -->
+```bash [curl]
+curl -X DELETE "$HELPPUFF_URL/api/v1/jobs/ID/files/FILEID" \
+  -H "Authorization: Bearer $HELPPUFF_API_KEY"
+```
+```ts [TypeScript]
+const id = '…';
+const fileId = '2';
+const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/jobs/${id}/files/FILEID`, {
+  method: 'DELETE',
+  headers: {
+    Authorization: `Bearer ${process.env.HELPPUFF_API_KEY}`,
+  },
+});
+if (!response.ok) throw new Error(((await response.json()) as ApiError).error.message);
+const data = (await response.json()) as RemoveFileFromJobResponse;
+```
+<!-- /tabs -->
+
+**Response** `200`
+
+<!-- tabs -->
+```json [Example]
+{
+  "id": "f_mfx2k1a9b2c3d4e5f6a7",
+  "deleted": true
+}
+```
+```ts [Type]
+type RemoveFileFromJobResponse = {
+  id: string;
+  deleted: boolean;
 };
 ```
 <!-- /tabs -->

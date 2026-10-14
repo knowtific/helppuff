@@ -68,6 +68,7 @@ async function resolveConfigured(ctx: Ctx, siteId: string): Promise<SiteConfig> 
     ...(overrides.knowledge ? { knowledge: overrides.knowledge } : {}),
     ...(overrides.live ? { live: overrides.live } : {}),
     ...(overrides.bookings ? { bookings: overrides.bookings } : {}),
+    ...(overrides.files ? { files: overrides.files } : {}),
     ...(overrides.assistant ? { assistant: overrides.assistant } : legacyAssistant(overrides.profile)),
   };
 }

@@ -1,5 +1,5 @@
 import { CALLBACK_FORM, messageId } from '@helppuff/connector-types';
-import { cleanText, type HandoverStatus, type Message } from '@helppuff/protocol';
+import { cleanText, type FileRef, type HandoverStatus, type Message } from '@helppuff/protocol';
 import type { LiveConfig, SiteConfig } from '../config/schema.js';
 import type { RequestCtx } from '../core/request.js';
 import { dbFrom, type D1Like, type D1Statement } from '../db/d1.js';
@@ -310,9 +310,14 @@ async function threadIntro(db: D1Like, conversationId: string, card: Record<stri
  * dashboards, with whose chat it is and who wrote it (each dashboard decides
  * whether to alert its person), and to Telegram.
  */
-export function relayVisitorMessage(deps: LiveDeps, siteId: string, conversationId: string, text: string): void {
+/** What the visitor wrote, to the team. With `files`, `text` is only what they wrote with them (perhaps nothing). */
+export function relayVisitorMessage(deps: LiveDeps, siteId: string, conversationId: string, text: string, files?: Required<FileRef>[]): void {
   const now = deps.now();
-  const message: Message = { id: messageId('u'), ts: now, role: 'user', type: 'text', text: text.slice(0, 8000) || '…' };
+  const message: Message = files?.length
+    ? { id: messageId('u'), ts: now, role: 'user', type: 'file', files, ...(text ? { text: text.slice(0, 2000) } : {}) }
+    : { id: messageId('u'), ts: now, role: 'user', type: 'text', text: text.slice(0, 8000) || '…' };
+  // Telegram gets the links (signed for a week): it cannot reach the dashboard.
+  const telegramText = files?.length ? [text, ...files.map((f) => `📎 ${f.name}: ${f.url}`)].filter(Boolean).join('\n') : text;
   deps.waitUntil(
     (async () => {
       const row = await deps.db
@@ -322,7 +327,7 @@ export function relayVisitorMessage(deps: LiveDeps, siteId: string, conversation
         .catch(() => null);
       await publish(deps, siteId, { type: 'visitor', conversationId, message, assignedTo: row?.assignedTo ?? null, who: row?.name ?? row?.email ?? null });
       const telegram = await telegramOf(deps, siteId);
-      if (telegramReady(telegram)) await postToThread({ db: deps.db, fetch: deps.fetch, now }, telegram, siteId, conversationId, `👤 ${text}`);
+      if (telegramReady(telegram)) await postToThread({ db: deps.db, fetch: deps.fetch, now }, telegram, siteId, conversationId, `👤 ${telegramText}`);
     })().catch(() => deps.log('live.relay_failed')),
   );
 }

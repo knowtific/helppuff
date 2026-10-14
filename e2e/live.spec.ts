@@ -271,3 +271,56 @@ test('with live chat off (the default), nothing of it shows: no button, no switc
   await page.context().close();
   await team.context().close();
 });
+
+test('photos during live chat: the paperclip shows once a person has the chat; the photo is made smaller and the team sees it', async ({ browser, request }) => {
+  expect((await admin(request, 'PUT', '/settings', { settings: { live: { enabled: true }, files: { chat: 'live' } } })).status()).toBe(200);
+  const attach = (page: Page) => page.locator('helppuff-widget .hp-attach');
+  const team = await signIn(browser, OWNER);
+  await team.goto('/admin/#/conversations');
+  // A visitor with a name of their own, so the team opens this chat and not one an earlier test left waiting.
+  const name = `Pat ${Date.now()}`;
+  const page = await (await browser.newContext()).newPage();
+  await page.goto(`http://localhost:5173/fixtures/live.html?api=${WORKER}`);
+  await openWidget(page);
+  await startConversation(page, { name });
+  // The assistant has the chat: no paperclip.
+  await expect(composer(page)).toBeVisible();
+  await expect(attach(page)).toHaveCount(0);
+
+  await personButton(page).click();
+  await expect(thread(page)).toContainText('Connecting you with someone from the team');
+  await team.getByPlaceholder(/Search messages/).fill(name);
+  await expect(team.locator('a[href^="#/conversations/"]', { hasText: /Waiting/ })).toHaveCount(1);
+  await team.locator('a[href^="#/conversations/"]').click();
+  await team.getByRole('button', { name: 'Take chat' }).click();
+  await expect(thread(page)).toContainText('Olivia joined the chat');
+  await expect(attach(page)).toBeVisible();
+
+  // A 2400×1800 phone photo, made in the page.
+  const photo = await page.evaluate(async () => {
+    const canvas = Object.assign(document.createElement('canvas'), { width: 2400, height: 1800 });
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = '#7aa';
+    ctx.fillRect(0, 0, 2400, 1800);
+    ctx.fillStyle = '#123';
+    ctx.fillRect(600, 400, 900, 700);
+    return canvas.toDataURL('image/jpeg', 0.95).split(',')[1]!;
+  });
+  await attach(page).locator('input[type="file"]').setInputFiles({ name: 'leak.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(photo, 'base64') });
+
+  // The visitor sees it at once, sent at 1600 pixels across.
+  const sent = page.locator('helppuff-widget img[alt="leak.jpg"]');
+  await expect(sent).toBeVisible();
+  await expect.poll(() => sent.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(1600);
+  // No reply from the assistant; the team sees the photo in the conversation, live.
+  await expect(team.locator('img[alt="leak.jpg"]')).toBeVisible();
+
+  // Back to the assistant: the paperclip goes.
+  await team.getByRole('button', { name: 'Back to assistant' }).click();
+  await expect(thread(page)).toContainText('back with the assistant');
+  await expect(attach(page)).toHaveCount(0);
+
+  expect((await admin(request, 'PUT', '/settings', { settings: { files: { chat: 'off' } } })).status()).toBe(200);
+  await page.context().close();
+  await team.context().close();
+});

@@ -789,6 +789,30 @@ export const MIGRATIONS: readonly Migration[] = [
        WHERE l.status IN ('contacted', 'qualified', 'won', 'lost')`,
     ],
   },
+  {
+    id: 19,
+    name: 'files',
+    statements: [
+      // Photos and documents on R2 (files/store.ts): sent in the chat, or attached to a job.
+      `CREATE TABLE IF NOT EXISTS files (
+        id TEXT PRIMARY KEY,
+        site_id TEXT NOT NULL,
+        scope TEXT NOT NULL,
+        conversation_id TEXT,
+        job_id TEXT,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        size INTEGER NOT NULL,
+        uploaded_by TEXT NOT NULL,
+        uploaded_by_name TEXT,
+        description TEXT,
+        created_at INTEGER NOT NULL
+      )`,
+      'CREATE INDEX IF NOT EXISTS files_conversation ON files (conversation_id, created_at)',
+      'CREATE INDEX IF NOT EXISTS files_job ON files (job_id, created_at)',
+      'CREATE INDEX IF NOT EXISTS files_site_scope ON files (site_id, scope, created_at)',
+    ],
+  },
 ];
 
 export const LATEST_MIGRATION = MIGRATIONS[MIGRATIONS.length - 1]!.id;

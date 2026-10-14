@@ -8,6 +8,7 @@ import { HelpPuffError } from '../core/errors.js';
 import type { HonoEnv } from '../core/request.js';
 import { prepareConnector } from '../core/run.js';
 import { assertSameOrigin, assertSiteAccess, currentAdmin, db, jsonBody, siteParam } from './guard.js';
+import { deleteFiles, filesBucket, type FileRow, type FilesBucket } from '../files/store.js';
 
 /**
  * Talking to the assistant over the API: the same pipeline as the widget
@@ -201,14 +202,16 @@ chatRoutes.delete('/conversations/:id', async (c) => {
   const row = await d.prepare('SELECT site_id FROM conversations WHERE id = ?').bind(id).first<{ site_id: string }>();
   if (!row) throw new HelpPuffError('not_found', { message: 'No such conversation.', detail: 'admin_conversation_missing' });
   assertSiteAccess(c, row.site_id, 'conversation');
-  await deleteConversations(d, [id]);
+  await deleteConversations(d, [id], filesBucket(c.get('helppuff').env));
   return c.json({ id, deleted: true });
 });
 
-/** Remove conversations and what hangs off them. Leads are separate (a lead outlives a conversation). */
-export async function deleteConversations(d: ReturnType<typeof db>, ids: string[]): Promise<void> {
+/** Remove conversations and what hangs off them, the photos and files the visitor sent too. Leads are separate (a lead outlives a conversation). */
+export async function deleteConversations(d: ReturnType<typeof db>, ids: string[], bucket: FilesBucket | null): Promise<void> {
   if (!ids.length) return;
   const marks = ids.map(() => '?').join(', ');
+  const files = await d.prepare(`SELECT id, site_id, scope FROM files WHERE scope = 'chat' AND conversation_id IN (${marks})`).bind(...ids).all<Pick<FileRow, 'id' | 'site_id' | 'scope'>>();
+  await deleteFiles({ db: d, bucket }, files.results);
   await d.batch([
     d.prepare(`DELETE FROM messages WHERE conversation_id IN (${marks})`).bind(...ids),
     d.prepare(`DELETE FROM callbacks WHERE conversation_id IN (${marks})`).bind(...ids),

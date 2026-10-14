@@ -2,8 +2,9 @@ import { useEffect, useRef } from 'preact/hooks';
 import type { Message } from '@helppuff/protocol';
 
 /**
- * Where the booking chunk draws the picker or the appointment card. The
- * chunk (`booking-*.js`) is loaded by the app only when one is shown.
+ * Where a chunk draws a message: the booking chunk the picker or the
+ * appointment card, the upload chunk a file message's photos. Each chunk is
+ * loaded by the app only when one is shown.
  */
 export function BookingView({ message, consumed, mount }: { message: Message; consumed: boolean; mount: (el: HTMLElement, message: Message, consumed: boolean) => () => void }) {
   const ref = useRef<HTMLDivElement>(null);

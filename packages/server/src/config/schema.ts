@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BOOKING_MODES, CALENDAR_SYNCS, widgetConfigSchema } from '@helppuff/protocol';
+import { BOOKING_MODES, CALENDAR_SYNCS, FILE_CHAT_MODES, widgetConfigSchema } from '@helppuff/protocol';
 import { isIpOrRange } from '../core/ip.js';
 
 /**
@@ -46,6 +46,7 @@ export const limitsSchema = z.object({
   liveSocketsPerIp: z.number().int().min(1).max(100).default(3).describe('Live chat connections one visitor (IP) may hold open at once.'),
   slotLookupsPerIpPerMinute: z.number().int().min(1).max(600).default(30).describe('Times one visitor (IP) may load free times in the booking calendar a minute.'),
   bookingsPerIpPerHour: z.number().int().min(1).max(100).default(5).describe('Appointments one visitor (IP) may book, move or cancel an hour, from the chat.'),
+  uploadsPerIpPerHour: z.number().int().min(1).max(1000).default(20).describe('Photos and files one visitor (IP) may send an hour, when visitors can send files (`files.chat`).'),
 });
 export type Limits = z.infer<typeof limitsSchema>;
 
@@ -143,6 +144,27 @@ export const liveConfigSchema = z
   .strict();
 export type LiveConfig = z.infer<typeof liveConfigSchema>;
 
+/**
+ * Files (photos, documents) on R2: visitors sending them in the chat, and
+ * the team attaching them to jobs. Both off by default, turned on separately.
+ * Needs the site's bucket, which `helppuff deploy` makes when R2 is on for
+ * the Cloudflare account.
+ */
+export const DEFAULT_VISION_MODEL = '@cf/meta/llama-4-scout-17b-16e-instruct';
+export const filesConfigSchema = z
+  .object({
+    chat: z.enum(FILE_CHAT_MODES).default('off').describe('Visitors send photos and PDFs in the chat: `off`, `live` (only while a person has the chat) or `always` (to the assistant too).'),
+    jobs: z.boolean().default(false).describe('The team attaches photos and files to jobs (installation photos, plans, quotes).'),
+    maxChatMb: z.number().min(1).max(25).default(10).describe('The largest file a visitor may send, in MB. Photos are made smaller in the browser first, so most are well under 1 MB.'),
+    maxJobMb: z.number().min(1).max(95).default(25).describe('The largest file the team may attach to a job, in MB.'),
+    perConversation: z.number().int().min(1).max(100).default(10).describe('Files one conversation may send.'),
+    keepChatDays: z.number().int().min(1).max(3650).default(90).describe('Days a file sent in the chat is kept, then deleted. Files on jobs are kept until they are removed.'),
+    aiSeesPhotos: z.boolean().default(false).describe('The assistant learns what is in photos visitors send (`files.chat: always`): a vision model describes each one once. Costs more AI usage per photo.'),
+    visionModel: z.string().min(1).max(200).default(DEFAULT_VISION_MODEL).describe('The Workers AI model that describes photos for the assistant (`aiSeesPhotos`). It must accept images.'),
+  })
+  .strict();
+export type FilesConfig = z.infer<typeof filesConfigSchema>;
+
 /** `HH:MM-HH:MM`, 24-hour, local to the bookings time zone. */
 const hoursRange = z
   .string()
@@ -198,6 +220,7 @@ export const siteConfigSchema = z.object({
   assistant: assistantConfigSchema.default({}),
   live: liveConfigSchema.default({}),
   bookings: bookingsConfigSchema.default({}),
+  files: filesConfigSchema.default({}),
   /** Runtime only: the booking link learned from the website (`bookings/found.ts`), while `bookings.mode` is unset. Never configured. */
   bookingFound: z.object({ url: z.string().url(), provider: z.string().nullable(), page: z.string().nullable(), at: z.number() }).optional(),
 });
@@ -244,6 +267,7 @@ export const storedSiteConfigSchema = z
     assistant: assistantConfigSchema.optional(),
     live: liveConfigSchema.optional(),
     bookings: bookingsConfigSchema.optional(),
+    files: filesConfigSchema.optional(),
     prompt: promptMetaSchema.optional(),
     /** Retired: the instructions form's choices, from when it wrote them into the prompt. Read as `assistant` when that is missing. */
     profile: z.record(z.string(), z.unknown()).optional(),

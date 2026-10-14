@@ -260,6 +260,7 @@ const settings = {
     location: 'Our office, 12 Smith St',
     syncMinutes: 15,
   },
+  files: { chat: 'live', jobs: true, maxChatMb: 10, maxJobMb: 25, perConversation: 10, keepChatDays: 90, aiSeesPhotos: false, visionModel: '@cf/meta/llama-4-scout-17b-16e-instruct' },
 };
 const homeLinks = { title: 'Useful pages', items: [{ label: 'Prices', url: 'https://acme.example/prices', description: 'Callouts, drains and hot water' }, { label: 'Book a plumber', url: 'https://acme.example/book' }] };
 const stageRow = { id: 'stg_3f2a1b0c9d8e7f6a', name: 'New request', kind: 'open' };
@@ -303,6 +304,14 @@ const pipelineRow = {
   quotePreview: [{ field: 'service', ask: 'Which service do you need?', input: 'choice', choices: ['Blocked drains', 'Hot water'] }],
 };
 const templateRow = { id: 'service-quote', name: 'Service quote', description: 'Trades and home or business services that quote before the work.', stages: [{ name: 'New request', kind: 'open', color: '#3b82f6', rotDays: 1 }], fields: [{ name: 'service', label: 'Service', type: 'select', options: [], question: 'Which service do you need?', quote: true }] };
+const exampleFile = {
+  id: 'f_mfx2k1a9b2c3d4e5f6a7',
+  name: 'after-install.jpg',
+  type: 'image/jpeg',
+  size: 284113,
+  url: 'https://helppuff.acme.workers.dev/v1/files/acme/job/f_mfx2k1a9b2c3d4e5f6a7?e=t3k2p0&s=Xk…',
+  createdAt: T,
+};
 const siteQuery: Param = { name: 'site', description: 'The site (a key always uses its own).', example: 'acme' };
 const appointmentRow = {
   id: 'apt_4f1c2b9e8d7a6c5b4a3f',
@@ -1099,6 +1108,48 @@ export const ENDPOINTS: Endpoint[] = [
     status: 201,
     response: { id: 'note_mfx2k1a9', jobId: jobRow.id, author: 'key:k7m3p9q2r4s8', authorName: 'Website backend', text: 'Gate code 4471.', createdAt: T, updatedAt: T },
     nullable: ['authorName'],
+  },
+  {
+    method: 'GET',
+    path: '/jobs/:id/files',
+    scope: 'jobs:read',
+    tag: 'Jobs',
+    summary: 'A job\'s files',
+    description: 'The photos and files attached to the job, and (`fromChat`) the ones the visitor sent in the job\'s conversation. Each `url` is a signed link that works for 12 hours: list again for a fresh one. `enabled` is `files.jobs`; `storage` whether the deployment has its R2 bucket.',
+    response: {
+      enabled: true,
+      storage: true,
+      maxMb: 25,
+      files: [{ ...exampleFile, uploadedBy: 'sam@acme.com', uploadedByName: 'Sam' }],
+      fromChat: [{ id: 'f_mfx2k0a1b2c3d4e5f6a7', name: 'leak.jpg', type: 'image/jpeg', size: 182044, url: 'https://helppuff.acme.workers.dev/v1/files/acme/chat/f_mfx2k0a1b2c3d4e5f6a7?e=t3k2p0&s=Zq…', uploadedBy: 'visitor', uploadedByName: 'Sam', createdAt: T }],
+    },
+    nullable: ['uploadedByName'],
+  },
+  {
+    method: 'POST',
+    path: '/jobs/:id/files',
+    scope: 'jobs:write',
+    tag: 'Jobs',
+    summary: 'Attach a file to a job',
+    description: 'The raw bytes as the body, the file name as `?name=`. Photos (JPEG, PNG, WebP, GIF, HEIC), PDF, Word, Excel, PowerPoint, text, CSV, MP4 or MOV, up to `files.maxJobMb` (25 MB unless changed). The type is read from the bytes. Needs files on jobs on (`files.jobs`) and the deployment\'s R2 bucket. Recorded in the job\'s history.',
+    query: [{ name: 'name', description: 'The file name, with its extension.', required: true, example: 'after-install.jpg' }],
+    raw: { contentType: 'application/octet-stream', description: 'The file\'s bytes.' },
+    status: 201,
+    response: { ...exampleFile, uploadedBy: 'key:k7m3p9q2r4s8', uploadedByName: 'Website backend' },
+    nullable: ['uploadedByName'],
+    errors: [
+      { status: 400, code: 'bad_request', when: 'Files on jobs are off, the file is empty, too large, or not a kind HelpPuff keeps.' },
+      { status: 404, code: 'not_found', when: 'No such job, or the deployment has no file storage (turn on R2, then `helppuff deploy`).' },
+    ],
+  },
+  {
+    method: 'DELETE',
+    path: '/jobs/:id/files/:fileId',
+    scope: 'jobs:write',
+    tag: 'Jobs',
+    summary: 'Remove a file from a job',
+    description: 'Deletes the file. Recorded in the job\'s history.',
+    response: { id: exampleFile.id, deleted: true },
   },
   {
     method: 'DELETE',
@@ -1959,7 +2010,7 @@ export const ENDPOINTS: Endpoint[] = [
     scope: 'settings:read',
     tag: 'Settings',
     summary: 'The settings',
-    description: 'The assistant, widget, home screen, lead form, automatic summaries (`autoSummary`), crawl and security settings as one object, with a hash of it. Also: `ai`, who writes the answers and what they come from (changed only with the CLI, `helppuff model` and `helppuff rag`, then a deploy); `suggestedHome`, what the widget shows on its home screen until it is set up (questions and links suggested from the website; null once the home screen was saved), and the `forms` and `flows` a shortcut can open.',
+    description: 'The assistant, widget, home screen, lead form, automatic summaries (`autoSummary`), crawl and security settings as one object, with a hash of it. Also: `ai`, who writes the answers and what they come from (changed only with the CLI, `helppuff model` and `helppuff rag`, then a deploy); `suggestedHome`, what the widget shows on its home screen until it is set up (questions and links suggested from the website; null once the home screen was saved), the `forms` and `flows` a shortcut can open; and `storage`, whether the deployment has its R2 bucket for files (`files`: photos in the chat, files on jobs; both off until turned on).',
     query: [siteQuery],
     response: {
       site: 'acme',
@@ -1968,6 +2019,7 @@ export const ENDPOINTS: Endpoint[] = [
       hash: '5c1e…',
       meta: null,
       captcha: false,
+      storage: true,
       suggestedHome: { questions: ['How much is a blocked drain?'], links: homeLinks, at: T },
       ai: { provider: 'workers-ai', model: '@cf/zai-org/glm-4.7-flash', knowledge: 'helppuff' },
       forms: [{ id: 'booking', title: 'Book a visit' }],
@@ -1991,7 +2043,7 @@ export const ENDPOINTS: Endpoint[] = [
       },
     ],
     body: { settings: { welcomeMessage: 'Hi! Ask me anything about our plumbing services.', security: { limits: { messagesPerSitePerDay: 800 } } } },
-    response: { site: 'acme', connector: 'workers-ai', settings: { ...settings, welcomeMessage: 'Hi! Ask me anything about our plumbing services.' }, hash: '7d2a…', meta: { at: T, by: 'key:k7m3p9q2r4s8', hash: '7d2a…' }, captcha: false },
+    response: { site: 'acme', connector: 'workers-ai', settings: { ...settings, welcomeMessage: 'Hi! Ask me anything about our plumbing services.' }, hash: '7d2a…', meta: { at: T, by: 'key:k7m3p9q2r4s8', hash: '7d2a…' }, captcha: false, storage: true },
   },
   {
     method: 'GET',

@@ -37,6 +37,8 @@ export const validMessages: Message[] = [
   { ...base, role: 'system', type: 'handover', status: 'joined', text: 'Sam joined the chat.', agentName: 'Sam' },
   { ...base, type: 'booking', text: 'Pick a time', from: '2026-10-15', to: '2026-10-16', part: 'morning', prefill: { name: 'Ada', email: 'ada@example.com' } },
   { ...base, type: 'booking', reschedule: 'apt_1' },
+  { ...base, role: 'user', type: 'file', files: [{ id: 'f_1', name: 'leak.jpg', type: 'image/jpeg', size: 182044, url: 'https://example.com/v1/files/acme/chat/f_1?e=1&s=x' }], text: 'Under the sink' },
+  { ...base, type: 'file', files: [{ id: 'f_2', name: 'quote.pdf', type: 'application/pdf', size: 1024 }] },
   { ...base, type: 'booking', booked: { id: 'apt_1', title: 'Consultation', start: 1760500800000, end: 1760502600000, timezone: 'Australia/Perth', status: 'confirmed', location: 'Our office', cancel: true, change: false } },
   { ...base, type: 'card', title: 'Pick a time', actions: [{ id: 'booking', kind: 'booking', label: 'Book a time' }] },
 ];

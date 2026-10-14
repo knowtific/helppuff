@@ -242,7 +242,7 @@ export const WIDGET_CSS = `
 }
 .hp-rate-btn svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .hp-rate-btn:hover, .hp-rate-btn:focus-visible { opacity: 1; background: var(--hp-surface-2); color: var(--hp-text); }
-.hp-rate-btn:focus-visible { outline: 2px solid var(--hp-accent); outline-offset: 1px; }
+.hp-rate-btn:focus-visible, .hp-attach:has(:focus-visible) { outline: 2px solid var(--hp-accent); outline-offset: 1px; }
 .hp-rate-btn[aria-pressed="true"] { opacity: 1; color: var(--hp-accent); }
 .hp-rate-btn[aria-pressed="true"] svg { fill: currentColor; fill-opacity: .15; }
 .hp-agent p + p { margin-top: 10px; }
@@ -550,8 +550,12 @@ a.hp-chip { text-decoration: none; display: inline-flex; align-items: center; ga
   animation: hp-pop var(--hp-dur) var(--hp-ease-spring) both;
 }
 .hp-send[disabled] { opacity: .4; cursor: default; }
-.hp-send svg { width: 17px; height: 17px; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.hp-send svg, .hp-attach svg { width: 17px; height: 17px; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 @keyframes hp-pop { from { transform: scale(0); } to { transform: scale(1); } }
+
+.hp-attach { position: relative; display: grid; place-items: center; width: 32px; height: 44px; color: var(--hp-text-2); cursor: pointer; fill: none; }
+.hp-attach input { position: absolute; opacity: 0; width: 1px; }
+.hp-attach[data-busy], .hp-row[data-pending] .hp-booking { opacity: .5; pointer-events: none; }
 
 .hp-counter { font-size: var(--hp-text-xs); color: var(--hp-text-3); text-align: end; padding: 4px 8px 0; }
 .hp-offline { font-size: var(--hp-text-xs); color: var(--hp-text-3); padding: 6px 8px 0; text-align: center; }

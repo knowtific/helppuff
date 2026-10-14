@@ -28,6 +28,7 @@ import { toolsCommand } from './commands/tools.js';
 import { agentCommand } from './commands/agent.js';
 import { identityCommand } from './commands/identity.js';
 import { jobsCommand } from './commands/jobs.js';
+import { filesCommand } from './commands/files.js';
 import { modelCommand, ragCommand, scaffoldCommand } from './commands/models.js';
 import { apiCommand, keysCommand } from './commands/keys.js';
 import { callbacksCommand } from './commands/callbacks.js';
@@ -71,6 +72,7 @@ const COMMANDS: Record<string, (ctx: Ctx) => Promise<number>> = {
   appointments: appointmentsCommand,
   integrations: integrationsCommand,
   jobs: jobsCommand,
+  files: filesCommand,
   model: modelCommand,
   rag: ragCommand,
   scaffold: scaffoldCommand,

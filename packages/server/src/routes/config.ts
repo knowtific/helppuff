@@ -4,6 +4,7 @@ import { resolveSite } from '../config/site.js';
 import { getConnector } from '../core/registry.js';
 import { dbFrom } from '../db/d1.js';
 import { capabilitiesOf, prepareConnector } from '../core/run.js';
+import { chatFilesMode } from '../files/chat.js';
 import { liveAvailable } from '../live/service.js';
 import { readQuote, withQuote } from '../jobs/widget.js';
 import { readSuggestedHome, withSuggestedHome } from '../home/suggest.js';
@@ -49,7 +50,7 @@ function captchaFor(
  */
 function capabilitiesFor(ctx: RequestCtx, site: SiteConfig, siteId: string): ConfigResponse['capabilities'] {
   try {
-    return capabilitiesOf(prepareConnector(ctx, site), Boolean(dbFrom(ctx.env)), liveAvailable(ctx.env, site, siteId));
+    return capabilitiesOf(prepareConnector(ctx, site), Boolean(dbFrom(ctx.env)), liveAvailable(ctx.env, site, siteId), chatFilesMode(ctx.env, site, siteId));
   } catch {
     return { ...getConnector(site.connector.type).capabilities, stream: false };
   }

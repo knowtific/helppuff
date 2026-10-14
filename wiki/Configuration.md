@@ -133,8 +133,10 @@ Tried in this order:
    - Account › D1 › Edit
    - Account › Vectorize › Edit
    - Account › Account Settings › Read
+   - Account › Workers R2 Storage › Edit (for [[photos and files|Files]]; optional)
    - Account › AI Search › Edit and Run (only for the Cloudflare AI Search backend)
-2. **Your `wrangler login`**: its OAuth token already carries these scopes.
+2. **Your `wrangler login`**: its OAuth token already carries these scopes
+   (R2 included).
    HelpPuff reads it and lets wrangler refresh it.
 
 If the token can see several accounts, pass `--account-id` or set

@@ -6,7 +6,7 @@ import { c } from '../output.js';
 import { chat, type ChatTurn } from '../engine/chat.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { applySettings, bookingsConfigSchema, helppuffConfigSchema, liveConfigSchema, securitySchema, settingsSchema, upgradeSettings, type Settings } from '@helppuff/server';
+import { applySettings, bookingsConfigSchema, filesConfigSchema, helppuffConfigSchema, liveConfigSchema, securitySchema, settingsSchema, upgradeSettings, type Settings } from '@helppuff/server';
 import { adminApi } from '../engine/admin-api.js';
 import { readState, writeState } from '../engine/state.js';
 import { compile, DEV_PORT, devOrigin, embedSnippet } from '../engine/compile.js';
@@ -346,6 +346,13 @@ export function pullSettings(loaded: LoadedProject, live: Settings): LoadedProje
       const changed = Object.fromEntries(Object.entries(applied.bookings).filter(([key, v]) => JSON.stringify(v) !== JSON.stringify(defaults[key as keyof typeof defaults])));
       if (Object.keys(changed).length) raw['bookings'] = changed;
       else delete raw['bookings'];
+    }
+    // Files: only what differs from the defaults.
+    if (live.files) {
+      const defaults = filesConfigSchema.parse({});
+      const changed = Object.fromEntries(Object.entries(applied.files).filter(([key, v]) => v !== defaults[key as keyof typeof defaults]));
+      if (Object.keys(changed).length) raw['files'] = changed;
+      else delete raw['files'];
     }
     const knowledge = obj(raw, 'knowledge');
     if (knowledge['website'] !== false || live.crawl.schedule !== 'off') {

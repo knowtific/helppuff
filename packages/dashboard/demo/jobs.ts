@@ -1,4 +1,4 @@
-import type { Job, JobEvent, JobField, JobStage, JobTemplate, Note, Pipeline } from '../src/lib/api';
+import type { Job, JobEvent, JobField, JobStage, JobTemplate, Note, Pipeline, StoredFile } from '../src/lib/api';
 import { SITE, conversations, leads } from './data';
 
 /**
@@ -86,7 +86,10 @@ const view = () => ({ pipeline: { ...pipeline, quotePreview: preview() }, templa
 
 // --------------------------------------------------------------- the jobs
 
-type Stored = Omit<Job, 'stage' | 'status' | 'stale' | 'contact' | 'value'> & { stageId: string; leadId: string | null; history: JobEvent[]; notes: Note[] };
+type Stored = Omit<Job, 'stage' | 'status' | 'stale' | 'contact' | 'value'> & { stageId: string; leadId: string | null; history: JobEvent[]; notes: Note[]; files: StoredFile[] };
+
+/** The demo keeps what the browser said: only photos are shown as pictures. */
+const guessType = (name: string, type: string) => (/^image\/(jpeg|png|gif|webp)$/.test(type) ? type : /\.pdf$/i.test(name) ? 'application/pdf' : type || 'application/octet-stream');
 const jobs: Stored[] = [];
 let events = 0;
 const event = (kind: string, at: number, data: Record<string, unknown>, actor = ME): JobEvent => ({ id: `evt_${++events}`, at, actor: actor.id, actorName: actor.name, kind, data });
@@ -143,6 +146,7 @@ const event = (kind: string, at: number, data: Record<string, unknown>, actor = 
       updatedAt: Math.max(...history.map((h) => h.at)),
       history,
       notes: [],
+      files: [],
     });
   });
 }
@@ -150,7 +154,7 @@ const event = (kind: string, at: number, data: Record<string, unknown>, actor = 
 function toJob(j: Stored): Job {
   const st = pipeline.stages.find((s) => s.id === j.stageId) ?? null;
   const lead = j.leadId ? leads.find((l) => l.id === j.leadId) : undefined;
-  const { stageId: _s, leadId: _l, history: _h, notes: _n, ...rest } = j;
+  const { stageId: _s, leadId: _l, history: _h, notes: _n, files: _f, ...rest } = j;
   return {
     ...rest,
     stage: st && { id: st.id, name: st.name, kind: st.kind },
@@ -259,6 +263,7 @@ export function jobsRoute(method: string, parts: string[], params: URLSearchPara
         updatedAt: Date.now(),
         history: [event('created', Date.now(), { source: 'manual', stage: pipeline.stages[0]!.name })],
         notes: [],
+      files: [],
       };
       jobs.push(job);
       return json(toJob(job), 201);
@@ -296,6 +301,23 @@ export function jobsRoute(method: string, parts: string[], params: URLSearchPara
     }
     job.updatedAt = Date.now();
     return json(toJob(job));
+  }
+  if (sub === 'files') {
+    const fileId = parts[3];
+    if (method === 'GET') return json({ enabled: true, storage: true, maxMb: 25, files: job.files, fromChat: [] });
+    if (method === 'POST') {
+      const name = params.get('name') ?? 'file';
+      const file: StoredFile = { id: `f_demo${Date.now().toString(36)}`, name, type: guessType(name, String(body['blobType'] ?? '')), size: Number(body['blobSize'] ?? 0), url: String(body['blobUrl'] ?? '#'), uploadedBy: ME.id, uploadedByName: ME.name, createdAt: Date.now() };
+      job.files.push(file);
+      job.history.push(event('file', Date.now(), { name }));
+      return json(file, 201);
+    }
+    if (method === 'DELETE' && fileId) {
+      const gone = job.files.find((f) => f.id === fileId);
+      job.files = job.files.filter((f) => f.id !== fileId);
+      if (gone) job.history.push(event('file_removed', Date.now(), { name: gone.name }));
+      return json({ id: fileId, deleted: true });
+    }
   }
   if (sub === 'updates') {
     const e = event('update', Date.now(), { text: String(body['text'] ?? '') });

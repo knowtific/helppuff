@@ -578,10 +578,10 @@ helppuff callbacks list --status done
 ### `helppuff jobs`
 
 ```
-helppuff jobs list [--status open|won|lost|all] [--search …] | show <job> | create [--title …] [--fields '{…}'] [--name …] [--email …] [--phone …] [--details …] [--value N] | move <job> <stage> [--reason …] | update <job> <text> | pipeline | template <id> | setup
+helppuff jobs list [--status open|won|lost|all] [--search …] | show <job> | create [--title …] [--fields '{…}'] [--name …] [--email …] [--phone …] [--details …] [--value N] | move <job> <stage> [--reason …] | update <job> <text> | files <job> | attach <job> <path…> | detach <job> <file> | pipeline | template <id> | setup
 ```
 
-Requests, quotes and work on the site's pipeline, the same as the dashboard's Jobs page and Settings → Jobs. They come from the assistant (when a visitor asks for a quote or work done), the widget's quote questions, the API, and by hand. A job is named by its number (1042) or id; a stage by its name or id. `pipeline` shows the stages, fields and quote questions; `template` starts again from one (service-quote, projects, support, sales-demo, bookings, custom-orders, basic); `setup` lets the AI read the website and choose. Each change sends the job.* webhooks.
+Requests, quotes and work on the site's pipeline, the same as the dashboard's Jobs page and Settings → Jobs. They come from the assistant (when a visitor asks for a quote or work done), the widget's quote questions, the API, and by hand. A job is named by its number (1042) or id; a stage by its name or id. `pipeline` shows the stages, fields and quote questions; `template` starts again from one (service-quote, projects, support, sales-demo, bookings, custom-orders, basic); `setup` lets the AI read the website and choose. `files` lists a job's photos and files (and the ones the visitor sent in its conversation) with links that work for 12 hours; `attach` uploads files (photos, PDF, Office documents, text, CSV, MP4/MOV, up to files.maxJobMb), `detach` removes one by id or name: files on jobs must be on (`helppuff files jobs on`). Each change sends the job.* webhooks.
 
 ```bash
 helppuff jobs --json
@@ -589,6 +589,23 @@ helppuff jobs create --name "Ada Lovelace" --email ada@example.com --fields '{"s
 helppuff jobs move 1042 "Quote sent"
 helppuff jobs move 1042 Lost --reason "Went with another quote"
 helppuff jobs setup --json
+helppuff jobs attach 1042 ./after-install.jpg ./compliance.pdf
+```
+
+### `helppuff files`
+
+```
+helppuff files status | chat live|always|off | jobs on|off | ai on|off [--model <id>] | limits [--max-chat-mb N] [--max-job-mb N] [--per-conversation N] [--keep-days N]
+```
+
+Photos and files, kept in the deployment's own R2 bucket (private; every link is signed and expires). Both off by default, turned on separately, the same as Settings → Advanced → Files. `chat live` lets visitors send photos and PDFs while a person has the chat (live chat must be on); `chat always` also to the assistant, which is told a file arrived but never opens it, unless `ai on`: then a vision model (Workers AI, `--model`, default Llama 4 Scout) describes each photo once and the assistant reads that (more AI usage per photo). `jobs on` lets the team attach files to jobs (`helppuff jobs attach`). `limits` sets the largest file from visitors and on jobs (MB), files per chat, and how many days chat files are kept (job files stay until removed). Needs R2 turned on once for the Cloudflare account (the dashboard asks a person to accept the plan; free up to 10 GB); `helppuff deploy` then makes the bucket. Saved live and in helppuff.json (`files`).
+
+```bash
+helppuff files status --json
+helppuff files chat live
+helppuff files jobs on
+helppuff files ai on
+helppuff files limits --max-chat-mb 5 --keep-days 30
 ```
 
 ### `helppuff model`

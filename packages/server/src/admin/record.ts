@@ -1,4 +1,4 @@
-import { cleanText, type Message, type SendRequest, type VerifiedUser, type VisitorContext } from '@helppuff/protocol';
+import { cleanText, type FileRef, type Message, type SendRequest, type VerifiedUser, type VisitorContext } from '@helppuff/protocol';
 import { usageDay } from '@helppuff/rag';
 import type { RequestCtx } from '../core/request.js';
 import { dbFrom, ensureSchema, type D1Like, type D1Statement } from '../db/d1.js';
@@ -44,8 +44,8 @@ function messageRows(db: D1Like, conversationId: string, messages: Message[], at
   });
 }
 
-/** A visitor's message. An action keeps its value (a chip's, a form's fields): the model's history reads it. */
-function visitorMessage(conversationId: string, text: string, ts: number, db: D1Like, value?: string): D1Statement {
+/** A visitor's message. An action keeps its value (a chip's, a form's fields): the model's history reads it. Files keep their references. */
+function visitorMessage(conversationId: string, text: string, ts: number, db: D1Like, payload?: { value: string } | { files: FileRef[]; caption: string }): D1Statement {
   return db
     .prepare('INSERT OR IGNORE INTO messages (id, conversation_id, role, type, text, payload, ts) VALUES (?, ?, ?, ?, ?, ?, ?)')
     .bind(
@@ -54,7 +54,7 @@ function visitorMessage(conversationId: string, text: string, ts: number, db: D1
       'user',
       'text',
       text,
-      value === undefined ? null : JSON.stringify({ value }),
+      payload === undefined ? null : JSON.stringify(payload),
       ts,
     );
 }
@@ -420,9 +420,10 @@ const STATUS_SET: Record<TurnStatus, string> = {
 
 export function recordTurn(
   ctx: RequestCtx,
-  input: { siteId: string; sessionId: string; request: SendRequest; messages: Message[]; status?: TurnStatus },
+  input: { siteId: string; sessionId: string; request: SendRequest; messages: Message[]; status?: TurnStatus; text?: string; files?: FileRef[] },
 ): void {
-  const text = input.request.kind === 'text' ? input.request.text : input.request.label || input.request.value;
+  // With files, `text` is what was written plus a line per file (`files/chat.ts`); the files themselves ride in the payload.
+  const text = input.text ?? (input.request.kind === 'text' ? input.request.text : input.request.label || input.request.value);
   const typed = input.request.kind === 'text' ? contactIn(text) : {};
   turn(ctx, { ...input, text, typed });
   schedule(ctx, async (db) => {
@@ -435,7 +436,7 @@ export function recordTurn(
            VALUES (?, ?, ?, ?, ?, 0)`,
         )
         .bind(input.sessionId, input.siteId, now, now, text.slice(0, 500)),
-      visitorMessage(input.sessionId, text, now - 1, db, input.request.kind === 'action' ? input.request.value : undefined),
+      visitorMessage(input.sessionId, text, now - 1, db, input.request.kind === 'action' ? { value: input.request.value } : input.files?.length ? { files: input.files, caption: input.request.text } : undefined),
       ...messageRows(db, input.sessionId, input.messages, now),
       countMessage(db, input.siteId, now),
       db

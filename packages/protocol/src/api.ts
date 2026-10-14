@@ -105,6 +105,8 @@ export const capabilitiesSchema = z.object({
   feedback: z.boolean().optional(),
   /** Whether the visitor can ask for a person (live chat is on for the site). */
   live: z.boolean().optional(),
+  /** When the visitor can send photos and files (`files.chat`): only while a person has the chat, or any time. Absent: never. */
+  files: z.enum(['live', 'always']).optional(),
 });
 export type Capabilities = z.infer<typeof capabilitiesSchema>;
 
@@ -120,8 +122,11 @@ export type StartSessionResponse = z.infer<typeof startSessionResponseSchema>;
 export const sendRequestSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('text'),
-    text: z.string().min(1).max(4000),
+    /** May be empty when `files` carries the message. */
+    text: z.string().max(4000),
     clientId: z.string().min(1).max(64),
+    /** Files this conversation uploaded (`POST /v1/sessions/files`), sent with the text. */
+    files: z.array(z.string().min(1).max(64)).min(1).max(4).optional(),
   }),
   z.object({
     kind: z.literal('action'),

@@ -136,7 +136,8 @@ export function settingsSections(site: Site | undefined, me?: Me): { id: Setting
     { id: 'fields' as const, label: 'Custom fields' },
     { id: 'jobs' as const, label: 'Jobs' },
     { id: 'notifications' as const, label: 'Notifications' },
-    ...(site?.knowledge || site?.connector === 'workers-ai' ? [{ id: 'advanced' as const, label: 'Advanced' }] : []),
+    // Every site: photos and files and the limits apply whatever writes the answers; the model's settings show only for Workers AI.
+    { id: 'advanced' as const, label: 'Advanced' },
     { id: 'webhooks' as const, label: 'Webhooks' },
     // Keys for other services: shown while a feature can use one (bookings' calendar sync, for now).
     ...(site?.bookings === 'picker' ? [{ id: 'integrations' as const, label: 'Integrations' }] : []),

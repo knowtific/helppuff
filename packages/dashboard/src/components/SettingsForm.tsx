@@ -4,6 +4,7 @@ import { api, type LeadField, type Settings, type SettingsView } from '../lib/ap
 import { href } from '../lib/utils';
 import { Button, ErrorNote, InfoTip, Input, Select, Skeleton, Textarea } from './ui';
 import { SecurityForm } from './SecurityForm';
+import { FilesSettings } from './FilesSettings';
 
 /**
  * The settings object, one topic at a time: what the chat says, how it looks,
@@ -295,7 +296,7 @@ export function SettingsForm({ knowledge, section }: { knowledge: boolean; secti
         </Section>
       )}
 
-      {section === 'advanced' && (
+      {section === 'advanced' && (draft.assistant || knowledge) && (
         <Section title="Advanced">
           <div className="grid gap-3 sm:grid-cols-2">
             {draft.assistant && <AiPanel assistant={draft.assistant} ai={view?.ai ?? null} />}
@@ -332,6 +333,14 @@ export function SettingsForm({ knowledge, section }: { knowledge: boolean; secti
             )}
           </div>
         </Section>
+      )}
+      {section === 'advanced' && draft.files && (
+        <div className="border-t">
+          <Section title="Photos and files">
+            <h3 className="text-xs font-medium text-muted-foreground">Photos and files</h3>
+            <FilesSettings value={draft.files} storage={view.storage ?? false} live={draft.live?.enabled ?? false} onChange={(files) => set({ files })} />
+          </Section>
+        </div>
       )}
       {section === 'advanced' && draft.security && (
         <div className="border-t">

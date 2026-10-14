@@ -27,6 +27,7 @@ const MORE: { key: LimitKey; label: string; hint: string; min?: number; max: num
   { key: 'feedbackPerIpPerMinute', label: 'Ratings a minute, per visitor', hint: 'Thumbs up or down.', max: 600 },
   { key: 'slotLookupsPerIpPerMinute', label: 'Calendar loads a minute, per visitor', hint: 'Free times in the booking calendar.', max: 600 },
   { key: 'bookingsPerIpPerHour', label: 'Bookings an hour, per visitor', hint: 'Booking, moving or cancelling from the chat.', max: 100 },
+  { key: 'uploadsPerIpPerHour', label: 'Photos and files an hour, per visitor', hint: 'When visitors can send files.', max: 1000, fallback: 20 },
   { key: 'pollsPerIpPerMinute', label: 'Checks for replies a minute, per visitor', hint: 'Backends that answer later, like Retell.', max: 600 },
   { key: 'endsPerIpPerMinute', label: 'Chats closed a minute, per visitor', hint: 'Each close can send a webhook.', max: 600 },
   { key: 'retellLookupsPerMinute', label: 'Retell knowledge lookups a minute', hint: 'For the whole site.', max: 6000 },
@@ -37,7 +38,7 @@ const MORE: { key: LimitKey; label: string; hint: string; min?: number; max: num
   { key: 'liveSocketsPerIp', label: 'Live chat connections, per visitor', hint: 'Open at once (tabs).', max: 100, fallback: 3 },
 ];
 
-function NumberField({ label, hint, value, min = 1, max, onChange }: { label: string; hint: string; value: number; min?: number; max: number; onChange: (value: number) => void }) {
+function NumberField({ label, hint, value, min = 1, max, step = 1, onChange }: { label: string; hint: string; value: number; min?: number; max: number; step?: number; onChange: (value: number) => void }) {
   const id = useId();
   return (
     <div className="space-y-1.5">
@@ -47,7 +48,7 @@ function NumberField({ label, hint, value, min = 1, max, onChange }: { label: st
         </label>
         <InfoTip label={`About ${label.toLowerCase()}`}>{hint}</InfoTip>
       </div>
-      <Input id={id} type="number" inputMode="numeric" min={min} max={max} step={1} required value={Number.isFinite(value) ? value : ''} onChange={(e) => onChange(e.target.valueAsNumber)} />
+      <Input id={id} type="number" inputMode="numeric" min={min} max={max} step={step} required value={Number.isFinite(value) ? value : ''} onChange={(e) => onChange(e.target.valueAsNumber)} />
     </div>
   );
 }
@@ -118,6 +119,8 @@ export function SecurityForm({ value, captcha, onChange }: { value: SecuritySett
             hint="The widget keeps a chat across pages and reloads for this long."
             min={0.25}
             max={720}
+            // In quarter hours from 0.25, so whole hours (24) are valid too: a step of 1 from 0.25 refused them and the page would not save.
+            step={0.25}
             value={value.sessionTtlHours}
             onChange={(n) => onChange({ ...value, sessionTtlHours: n })}
           />

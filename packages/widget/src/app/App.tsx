@@ -21,6 +21,7 @@ import { JOB_FLOW_PREFIX, QUOTE_CONTACT_FIELDS } from '@helppuff/protocol/jobs';
 import { BOOKING_PICKER_PREFIX } from '@helppuff/protocol/bookings';
 import type { mountBooking } from '../booking/index.js';
 import type { connectLive, LiveConnection } from '../live/index.js';
+import type { drawFiles, Uploaded, uploadFrom } from '../upload/index.js';
 import { parseMessage, parseMessages } from './validate.js';
 import type { Runtime } from '../loader.js';
 import { toWidgetError, type Api } from './api.js';
@@ -33,6 +34,8 @@ import { GREETING_PREFIX } from './store.js';
 declare const __HELPPUFF_LIVE_FILE__: string | undefined;
 /** The booking chunk's file (the date picker and the appointment card), set at build time. */
 declare const __HELPPUFF_BOOKING_FILE__: string | undefined;
+/** The upload chunk's file (a visitor's photos and files), set at build time. */
+declare const __HELPPUFF_UPLOAD_FILE__: string | undefined;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-/i;
 /** Ids the widget made itself (greetings, flow steps, local notes) never reach the server's records. */
@@ -467,7 +470,7 @@ export function App({
   );
 
   const doSend = useCallback(
-    async (input: SendInput) => {
+    async (input: SendInput, file?: Uploaded) => {
       const session = stateRef.current.session;
       if (!session) return;
 
@@ -476,7 +479,7 @@ export function App({
       const pending: Pending = {
         clientId: id,
         input,
-        message: { id, ts: Date.now(), role: 'user', type: 'text', text },
+        message: file ? { id, ts: Date.now(), role: 'user', type: 'file', files: [file] } : { id, ts: Date.now(), role: 'user', type: 'text', text },
       };
 
       dispatch({ type: 'send', pending });
@@ -610,6 +613,37 @@ export function App({
   const localMessage = useCallback(
     (body: MessageBody): Message => ({ id: clientId(), ts: Date.now(), role: 'agent', ...body }) as Message,
     [],
+  );
+
+  /**
+   * A photo or file (`capabilities.files`): the upload chunk makes a photo
+   * smaller and sends it, then a message carries it. A failure is a notice.
+   * The same chunk draws file messages, restored ones too.
+   */
+  const uploadChunk = useRef<Promise<{ uploadFrom: typeof uploadFrom; drawFiles: typeof drawFiles }> | null>(null);
+  const loadUpload = () => (uploadChunk.current ??= import(/* @vite-ignore */ new URL(/* @vite-ignore */ __HELPPUFF_UPLOAD_FILE__!, import.meta.url).href));
+  // Drawing into an element that has since left the thread is harmless: nothing to cancel.
+  const mountFiles = useCallback((el: HTMLElement, message: Message) => {
+    loadUpload()
+      .then((mod) => mod.drawFiles(el, message as Parameters<typeof mod.drawFiles>[1]))
+      .catch(() => {});
+    return () => {};
+  }, []);
+  const filesMode = runtime.capabilities.files;
+  const canAttach = typeof __HELPPUFF_UPLOAD_FILE__ === 'string' && Boolean(state.session) && (filesMode === 'always' || (filesMode === 'live' && handedOver));
+  const onAttach = useCallback(
+    (input: HTMLInputElement) => {
+      const token = stateRef.current.session?.token;
+      if (!token) return;
+      loadUpload()
+        .then((mod) => mod.uploadFrom(input, { apiBase: runtime.apiBase, token, fallback: config.strings?.['fileFailed'] }))
+        .then((up) => up && doSend({ kind: 'text', text: '', files: [up.id] }, up))
+        .catch((thrown: Error) => {
+          uploadChunk.current = null;
+          addLocal(localMessage({ type: 'notice', text: thrown.message }));
+        });
+    },
+    [runtime, config, doSend, addLocal, localMessage],
   );
 
   /**
@@ -763,6 +797,7 @@ export function App({
       isConsumed: (message: Message) => state.consumedActions.includes(message.id),
 
       booking: typeof __HELPPUFF_BOOKING_FILE__ === 'string' ? mountBookingView : undefined,
+      files: typeof __HELPPUFF_UPLOAD_FILE__ === 'string' ? mountFiles : undefined,
 
       // Only replies the server recorded can be rated: not the greeting, a flow step, or a local note.
       rating:
@@ -994,6 +1029,7 @@ export function App({
                 t={t}
                 onInput={onDraft}
                 onSend={onComposerSend}
+                onAttach={canAttach ? onAttach : undefined}
               />
             </div>
           )}

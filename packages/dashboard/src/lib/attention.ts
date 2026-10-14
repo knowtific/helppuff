@@ -132,7 +132,7 @@ const SOURCES: Record<string, string> = { chat: 'from the chat', quote: 'from th
  * the API): everyone.
  */
 export function concerns(
-  event: { t: string; conversationId?: string; conversation?: Record<string, unknown>; message?: { role?: string; text?: string }; assignedTo?: string | null; who?: string | null; to?: string | null; by?: string | null; name?: string | null; jobId?: string; number?: number; title?: string; source?: string },
+  event: { t: string; conversationId?: string; conversation?: Record<string, unknown>; message?: { role?: string; text?: string; files?: { name: string }[] }; assignedTo?: string | null; who?: string | null; to?: string | null; by?: string | null; name?: string | null; jobId?: string; number?: number; title?: string; source?: string },
   me: string,
   available: boolean,
 ): Concern | null {
@@ -151,7 +151,7 @@ export function concerns(
   if (event.t === 'message' && event.message?.role === 'user') {
     const mine = event.assignedTo === me;
     if (!mine && !(event.assignedTo == null && available)) return null;
-    return { kind: 'message', conversationId: id, link: `#/conversations/${id}`, title: event.who ? `${event.who}` : 'New message', body: event.message.text ?? '' };
+    return { kind: 'message', conversationId: id, link: `#/conversations/${id}`, title: event.who ? `${event.who}` : 'New message', body: event.message.text ?? (event.message.files?.length ? `📎 ${event.message.files.map((f) => f.name).join(', ')}` : '') };
   }
   if (event.t === 'assigned' && event.to === me && event.by && event.by !== me) {
     return { kind: 'assigned', conversationId: id, link: `#/conversations/${id}`, title: 'A chat was given to you', body: `${event.by.replace(/^telegram:/, 'Telegram ')} assigned you a live chat.` };

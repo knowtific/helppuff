@@ -31,6 +31,7 @@
 - [[The playground|Playground]]
 - [[Leads and callbacks|Leads]]
 - [[Jobs]]
+- [[Photos and files|Files]]
 - [[Bookings and the calendar|Bookings]]
 - [[Integrations]]
 - [[Live chat|Live-Chat]]

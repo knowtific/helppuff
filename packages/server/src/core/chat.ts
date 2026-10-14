@@ -27,6 +27,10 @@ import { conversationFacts, enabledTools, runBeforeTools, toolsHandle } from '..
 import { pickerMessage, suggestedBooking } from '../bookings/chat.js';
 import { effectiveBooking } from '../bookings/found.js';
 import { isAssistant } from './assistant.js';
+import { assistantText, chatFilesMode, describePhotos, fileRef, messageFiles, visitorLine } from '../files/chat.js';
+import { filesBucket, signedFileUrl, type FileRow } from '../files/store.js';
+import type { AiRunner } from '../conversations/summary.js';
+import { requireSecret } from './request.js';
 
 /**
  * A conversation with the assistant, whoever holds it: the widget (a browser
@@ -300,9 +304,10 @@ export async function sendChat<T>(c: Context<HonoEnv>, options: { session: ChatS
   const { session, channel } = options;
   const { site, siteId, sessionId, prepared } = session;
   const input = cleanSend(options.input);
+  const fileIds = input.kind === 'text' ? (input.files ?? []) : [];
 
   const length = input.kind === 'text' ? input.text.length : input.value.length;
-  if (length === 0 || (input.kind === 'action' && !input.label)) throw new HelpPuffError('bad_request', { message: 'That message is empty.', detail: 'message_empty' });
+  if ((length === 0 && !fileIds.length) || (input.kind === 'action' && !input.label)) throw new HelpPuffError('bad_request', { message: 'That message is empty.', detail: 'message_empty' });
   if (length > site.security.limits.maxMessageLength) {
     throw new HelpPuffError('bad_request', { message: 'That message is a little too long.', detail: 'message_too_long' });
   }
@@ -310,6 +315,15 @@ export async function sendChat<T>(c: Context<HonoEnv>, options: { session: ChatS
   const live = site.live.enabled ? liveDeps(ctx) : null;
   const liveRead = live ? readLiveState(live.db, sessionId) : Promise.resolve(null);
   liveRead.catch(() => {});
+  // Photos and files the visitor sent with the message: their own uploads (one read, started now).
+  const filesRead: Promise<FileRow[]> = fileIds.length
+    ? (async () => {
+        const records = dbFrom(ctx.env);
+        if (!records || !chatFilesMode(ctx.env, site, siteId)) throw new HelpPuffError('bad_request', { message: 'Sending files is not on for this chat.', detail: 'files_off' });
+        return messageFiles(records, sessionId, fileIds);
+      })()
+    : Promise.resolve([]);
+  filesRead.catch(() => {});
   // A form is answered only if this chat was shown it (see core/forms.ts). The callback form offered
   // over the live socket (nobody took the chat in time) is for a conversation that was handed over.
   // The quote questions' answers (a `job` flow) are checked against the site's quote questions below.
@@ -396,7 +410,9 @@ export async function sendChat<T>(c: Context<HonoEnv>, options: { session: ChatS
   gate.catch(() => {});
   const submitted = formLead(input, limits);
   const callbackLead = submitted && input.kind === 'action' && isCallbackForm(input.actionId) ? { ...submitted, request: 'callback' } : submitted;
-  const visitorText = input.kind === 'text' ? input.text : input.label || input.value;
+  const sentFiles = await filesRead;
+  const visitorText = input.kind === 'text' ? visitorLine(input.text, sentFiles) : input.label || input.value;
+  const recorded = sentFiles.length ? { text: visitorText, files: sentFiles.map(fileRef) } : {};
 
   // A person has this chat: the message goes to the team, not the assistant (unless the
   // site lets the assistant answer until someone takes it). No reply now; it comes over the live socket.
@@ -406,8 +422,8 @@ export async function sendChat<T>(c: Context<HonoEnv>, options: { session: ChatS
     const count = await verdict;
     if (callbackLead) reportLead(callbackLead, 'form');
     const messages = callbackLead ? [notice(COPY.thanks)] : [];
-    recordTurn(ctx, { siteId, sessionId, request: input, messages, status: 'live' });
-    relayVisitorMessage(live, siteId, sessionId, visitorText);
+    recordTurn(ctx, { siteId, sessionId, request: input, messages, status: 'live', ...recorded });
+    relayVisitorMessage(live, siteId, sessionId, sentFiles.length && input.kind === 'text' ? input.text : visitorText, await teamFiles(c, sentFiles));
     ctx.platform.log('message.live', { siteId, sessionId, count });
     return answer(c, ctx, false, relay, Promise.resolve({ sessionId, messages, state: session.state, forms: [...(session.forms ?? [])], count }), options.respond);
   }
@@ -469,7 +485,14 @@ export async function sendChat<T>(c: Context<HonoEnv>, options: { session: ChatS
       const handle = own ? toolsHandle(ctx, { siteId, sessionId, prepared, tools: own.tools, facts: own.facts }) : undefined;
       if (handle) cctx.tools = handle;
     }
-    const result = await ctx.timing.span('connector', () => runConnector(ctx, 'send', () => prepared.connector.send(cctx, session.state, input)));
+    // The assistant reads a note per file (and, with `aiSeesPhotos`, what each photo shows); never the file.
+    let toConnector: SendRequest = input;
+    if (input.kind === 'text' && sentFiles.length) {
+      const { files: _files, ...text } = input;
+      const seen = site.files.aiSeesPhotos ? await seePhotos(ctx, site, sentFiles) : sentFiles;
+      toConnector = { ...text, text: assistantText(input.text, seen) };
+    }
+    const result = await ctx.timing.span('connector', () => runConnector(ctx, 'send', () => prepared.connector.send(cctx, session.state, toConnector)));
     const count = await verdict;
     const handed = handover as HandoverResult | null;
     const replies = [
@@ -481,8 +504,8 @@ export async function sendChat<T>(c: Context<HonoEnv>, options: { session: ChatS
     const messages = liveNow || handed ? replies : withBookingSuggestion(ctx, site, input.kind === 'text' ? input.text : undefined, replies);
     ctx.platform.log('message.sent', { siteId, sessionId, count });
     const status: TurnStatus = handed?.status === 'started' || liveNow ? 'keep' : 'bot';
-    recordTurn(ctx, { siteId, sessionId, request: input, messages, status });
-    if (liveNow && live) relayVisitorMessage(live, siteId, sessionId, visitorText);
+    recordTurn(ctx, { siteId, sessionId, request: input, messages, status, ...recorded });
+    if (liveNow && live) relayVisitorMessage(live, siteId, sessionId, sentFiles.length && input.kind === 'text' ? input.text : visitorText, await teamFiles(c, sentFiles));
     return { sessionId, messages, state: result.state === undefined ? session.state : result.state, forms: offeredForms(session.forms, messages), count };
   };
 
@@ -490,6 +513,26 @@ export async function sendChat<T>(c: Context<HonoEnv>, options: { session: ChatS
   // The callback form is itself the request: recorded once, here, whatever the model says next.
   if (callbackLead) reportLead(callbackLead, 'form');
   return answer(c, ctx, streaming, relay, work, options.respond);
+}
+
+/** Links the team can open from the live chat and Telegram: a week, longer than any live chat. */
+async function teamFiles(c: Context<HonoEnv>, rows: FileRow[]) {
+  if (!rows.length) return undefined;
+  const ctx = c.get('helppuff');
+  const origin = new URL(c.req.url).origin;
+  const until = ctx.platform.now() + 7 * 86_400_000;
+  return Promise.all(rows.map(async (row) => ({ ...fileRef(row), url: await signedFileUrl(requireSecret(ctx), origin, row, until) })));
+}
+
+/** The photos described for the assistant (`files.aiSeesPhotos`), each once. Without Workers AI or the bucket: as they are. */
+async function seePhotos(ctx: RequestCtx, site: SiteConfig, rows: FileRow[]): Promise<FileRow[]> {
+  const ai = ctx.env['AI'] as Partial<AiRunner> | undefined;
+  const bucket = filesBucket(ctx.env);
+  const db = dbFrom(ctx.env);
+  if (!ai || typeof ai.run !== 'function' || !bucket || !db) return rows;
+  const seen = await ctx.timing.span('vision', () => describePhotos({ db, bucket, ai: ai as AiRunner, model: site.files.visionModel, log: ctx.platform.log }, rows));
+  ctx.platform.waitUntil(seen.save().catch(() => ctx.platform.log('file.describe_save_failed')));
+  return seen.rows;
 }
 
 /** Close a conversation: the connector's own end, then `conversation.ended` once (decided by the database). */

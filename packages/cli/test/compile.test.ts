@@ -86,6 +86,20 @@ describe('compile', () => {
     expect(compile(loaded({ type: 'openai' })).wrangler['d1_databases']).toBeUndefined();
   });
 
+  it('binds the R2 bucket for photos and files when deploy made one, with the cron that clears old chat files', () => {
+    const project = loaded({ type: 'openai' }, { dashboard: { adminEmail: 'owner@acme.com' }, files: { chat: 'live' } });
+    const compiled = compile(project, { d1DatabaseId: 'db-1', filesBucket: 'knowtific-helppuff-acme' });
+    expect(compiled.wrangler['r2_buckets']).toEqual([{ binding: 'HELPPUFF_FILES', bucket_name: 'knowtific-helppuff-acme' }]);
+    expect(compiled.wrangler['triggers']).toEqual({ crons: ['*/15 * * * *'] });
+    expect((compiled.serverConfig as { sites: Record<string, { files: { chat: string } }> }).sites['acme']!.files.chat).toBe('live');
+    // No bucket (R2 off for the account): no binding, and the deploy still works.
+    const without = compile(project, { d1DatabaseId: 'db-1' });
+    expect(without.wrangler['r2_buckets']).toBeUndefined();
+    expect(without.wrangler['triggers']).toBeUndefined();
+    // Locally, simulated.
+    expect(compile(project, { dev: true }).wrangler['r2_buckets']).toEqual([{ binding: 'HELPPUFF_FILES', bucket_name: 'helppuff-files-local' }]);
+  });
+
   it('matches the Worker\'s password format exactly', async () => {
     const { hashPassword } = await import('../src/engine/admins.js');
     const { verifyPassword } = await import('@helppuff/server');

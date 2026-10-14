@@ -675,6 +675,11 @@ export async function addUpdate(db: D1Like, job: JobRow, text: string, actor: Ac
   await db.batch([eventStatement(db, job.id, now, actor, 'update', { text: clean }), db.prepare('UPDATE jobs SET updated_at = ? WHERE id = ?').bind(now, job.id)]);
 }
 
+/** One entry in a job's history (a file attached or removed), and the job counts as changed. */
+export async function recordJobEvent(db: D1Like, jobId: string, now: number, actor: Actor, kind: string, data: Record<string, unknown>): Promise<void> {
+  await db.batch([eventStatement(db, jobId, now, actor, kind, data), db.prepare('UPDATE jobs SET updated_at = ? WHERE id = ?').bind(now, jobId)]);
+}
+
 export async function deleteJob(db: D1Like, job: JobRow): Promise<void> {
   await db.batch([
     db.prepare('DELETE FROM job_events WHERE job_id = ?').bind(job.id),

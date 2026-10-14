@@ -111,6 +111,15 @@ export const bookingMessageSchema = z.object({
     .optional(),
 });
 
+/** A file in a message (`@helppuff/protocol/files`): `url` is a signed link the server made. */
+export const fileRefSchema = z.object({
+  id: z.string().min(1).max(64),
+  name: z.string().min(1).max(200),
+  type: z.string().min(1).max(100),
+  size: z.number().int().nonnegative(),
+  url: httpUrl.optional(),
+});
+
 export const messageSchema = z.discriminatedUnion('type', [
   z.object({ ...base, type: z.literal('text'), text: z.string().min(1).max(8000) }),
   z.object({
@@ -156,6 +165,8 @@ export const messageSchema = z.discriminatedUnion('type', [
     agentName: z.string().min(1).max(80).optional(),
   }),
   bookingMessageSchema,
+  /** Photos or documents: a visitor's (shown in their own thread), or the team's. */
+  z.object({ ...base, type: z.literal('file'), files: z.array(fileRefSchema).min(1).max(4), text: z.string().max(2000).optional() }),
 ]);
 
 export type Message = z.infer<typeof messageSchema>;

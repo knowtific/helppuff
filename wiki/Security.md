@@ -78,6 +78,11 @@ caps.
 | `limits.feedbackPerIpPerMinute` | 30 | Thumbs up or down from one visitor a minute | In the Worker's memory, per isolate (best effort, no KV write) | 429 |
 | `limits.slotLookupsPerIpPerMinute` | 30 | Times one visitor loads free times in the booking calendar a minute | In the Worker's memory, per isolate (best effort, no KV write) | 429 |
 | `limits.bookingsPerIpPerHour` | 5 | Appointments one visitor books, moves or cancels from the chat an hour | In the Worker's memory, per isolate (best effort, no KV write) | 429 |
+| `limits.uploadsPerIpPerHour` | 20 | Photos and files one visitor sends an hour ([[Photos and files|Files]]) | In the Worker's memory, per isolate (best effort, no KV write) | 429 |
+| `files.maxChatMb` | 10 | The largest file a visitor sends | Each upload | 400 |
+| `files.perConversation` | 10 | Files one chat sends | D1 | 429 |
+| `files.keepChatDays` | 90 | Days a file sent in the chat is kept | The cron deletes older ones | — |
+| `files.maxJobMb` | 25 | The largest file attached to a job | Each upload | 400 |
 | `limits.pollsPerIpPerMinute` | 120 | Checks for new messages from one visitor a minute (Retell) | In memory | 429 |
 | `limits.endsPerIpPerMinute` | 10 | Chats one visitor closes a minute. A chat's `conversation.ended` webhook fires once, whatever is replayed | In memory; once-only in D1 | 429 |
 | `limits.retellLookupsPerMinute` | 120 | Knowledge-base lookups by a Retell agent a minute, whole site | KV | 429 |
@@ -113,7 +118,10 @@ the server and the widget, so they are not settings: a message is at most
 4000 characters and an action's value 2000; a reply carries at most 20
 messages; a form has at most 12 fields; a session token's connector state is
 at most 1 KB and remembers the last 5 forms shown; prompts are at most 16,000
-characters; an upload at most 10 MB; a crawled page at most 3 MB. Setup links
+characters; a knowledge-base upload at most 10 MB (a photo or file: see the
+`files` limits above); a visitor's message carries at most 4 files; a file
+link lasts 12 hours (a week on Telegram, a chat's length for the visitor); a
+crawled page at most 3 MB. Setup links
 last 24 hours, sign-in links 15 minutes, dashboard sessions 7 days. Webhooks
 time out after 8 s and are retried at 1 min, 5 min, 30 min, 2 h and 6 h; each
 endpoint keeps its last 50 deliveries.

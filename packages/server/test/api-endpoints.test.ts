@@ -44,13 +44,13 @@ const summaryAi = {
   }),
 };
 
-async function world(site: Site = {}) {
+async function world(site: Site = {}, extraEnv: Record<string, unknown> = {}) {
   resetSchemaMemo();
   resetMemoryLimits();
   const db = d1();
   const kv = memoryKv();
   const pending: Promise<unknown>[] = [];
-  const env = testEnv({ HELPPUFF_DB: db, HELPPUFF_KV: kv, AI: summaryAi, ADMIN_EMAIL: 'owner@acme.com', ADMIN_PASSWORD_HASH: await hashPassword('correct horse battery', 10_000) });
+  const env = testEnv({ HELPPUFF_DB: db, HELPPUFF_KV: kv, AI: summaryAi, ADMIN_EMAIL: 'owner@acme.com', ADMIN_PASSWORD_HASH: await hashPassword('correct horse battery', 10_000), ...extraEnv });
   const h = harness(testConfig(site), env, null, (p) => pending.push(p));
   const settle = async () => {
     while (pending.length) await Promise.all(pending.splice(0));
@@ -266,6 +266,36 @@ describe('every area, end to end through /api/v1', () => {
     expectDocumented('GET', `/jobs/${id}`, one.json);
     expectDocumented('DELETE', `/jobs/${id}`, (await w.call('DELETE', `/jobs/${id}`, tool)).json);
     expect((await w.call('GET', `/jobs/${id}`, tool)).status).toBe(404);
+  });
+
+  it('job files: attached from another tool, listed with signed links, removed', async () => {
+    const objects = new Map<string, Uint8Array>();
+    const meta = new Map<string, unknown>();
+    const bucket = {
+      put: async (key: string, value: ArrayBuffer, options?: { httpMetadata?: unknown }) => void (objects.set(key, new Uint8Array(value)), meta.set(key, options?.httpMetadata)),
+      get: async (key: string) => (objects.has(key) ? { body: new Response(objects.get(key)).body!, size: objects.get(key)!.length, httpMetadata: meta.get(key) } : null),
+      delete: async (keys: string | string[]) => void [keys].flat().forEach((k) => objects.delete(k)),
+    };
+    const w = await world({ files: { jobs: true } } as Site, { HELPPUFF_FILES: bucket });
+    const tool = await w.key(['jobs:write']);
+    const reader = await w.key(['jobs:read']);
+    const id = (await w.call('POST', '/jobs', tool, { title: 'Install a heater' })).json['id'] as string;
+    const pdf = new TextEncoder().encode('%PDF-1.4\n1 0 obj\n<<>>\nendobj\n');
+    const added = await w.call('POST', `/jobs/${id}/files?name=compliance.pdf`, tool, pdf);
+    expect(added.status, JSON.stringify(added.json)).toBe(201);
+    expect(added.json).toMatchObject({ name: 'compliance.pdf', type: 'application/pdf', size: pdf.length });
+    expectDocumented('POST', `/jobs/${id}/files`, added.json);
+    // Reading needs only jobs:read; attaching needs jobs:write.
+    expect((await w.call('POST', `/jobs/${id}/files?name=x.pdf`, reader, pdf)).status).toBe(403);
+    const listed = await w.call('GET', `/jobs/${id}/files`, reader);
+    expectDocumented('GET', `/jobs/${id}/files`, listed.json);
+    const link = new URL(listed.json['files'][0]['url'] as string);
+    const served = await w.h.fetch(link.pathname + link.search);
+    expect(served.status).toBe(200);
+    expect(served.headers.get('Content-Disposition')).toMatch(/^attachment; filename="compliance.pdf"/);
+    const removed = await w.call('DELETE', `/jobs/${id}/files/${added.json['id']}`, tool);
+    expectDocumented('DELETE', `/jobs/${id}/files/${added.json['id']}`, removed.json);
+    expect(objects.size).toBe(0);
   });
 
   it('appointments: the settings in force, free times, booked from another tool, moved, completed, deleted; integrations', async () => {

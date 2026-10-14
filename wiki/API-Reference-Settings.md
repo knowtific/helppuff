@@ -187,7 +187,7 @@ type SuggestHomeScreenResponse = {
 
 `GET /settings` · scope `settings:read`
 
-The assistant, widget, home screen, lead form, automatic summaries (`autoSummary`), crawl and security settings as one object, with a hash of it. Also: `ai`, who writes the answers and what they come from (changed only with the CLI, `helppuff model` and `helppuff rag`, then a deploy); `suggestedHome`, what the widget shows on its home screen until it is set up (questions and links suggested from the website; null once the home screen was saved), and the `forms` and `flows` a shortcut can open.
+The assistant, widget, home screen, lead form, automatic summaries (`autoSummary`), crawl and security settings as one object, with a hash of it. Also: `ai`, who writes the answers and what they come from (changed only with the CLI, `helppuff model` and `helppuff rag`, then a deploy); `suggestedHome`, what the widget shows on its home screen until it is set up (questions and links suggested from the website; null once the home screen was saved), the `forms` and `flows` a shortcut can open; and `storage`, whether the deployment has its R2 bucket for files (`files`: photos in the chat, files on jobs; both off until turned on).
 
 | Parameter | In | Required | Description |
 | --- | --- | --- | --- |
@@ -352,11 +352,22 @@ const data = (await response.json()) as SettingsResponse;
       "phone": "optional",
       "location": "Our office, 12 Smith St",
       "syncMinutes": 15
+    },
+    "files": {
+      "chat": "live",
+      "jobs": true,
+      "maxChatMb": 10,
+      "maxJobMb": 25,
+      "perConversation": 10,
+      "keepChatDays": 90,
+      "aiSeesPhotos": false,
+      "visionModel": "@cf/meta/llama-4-scout-17b-16e-instruct"
     }
   },
   "hash": "5c1e…",
   "meta": null,
   "captcha": false,
+  "storage": true,
   "suggestedHome": {
     "questions": [
       "How much is a blocked drain?"
@@ -503,10 +514,21 @@ type SettingsResponse = {
       location: string;
       syncMinutes: number;
     };
+    files: {
+      chat: string;
+      jobs: boolean;
+      maxChatMb: number;
+      maxJobMb: number;
+      perConversation: number;
+      keepChatDays: number;
+      aiSeesPhotos: boolean;
+      visionModel: string;
+    };
   };
   hash: string;
   meta: string | null;
   captcha: boolean;
+  storage: boolean;
   suggestedHome: {
     questions: string[];
     links: {
@@ -749,6 +771,16 @@ const data = (await response.json()) as ChangeSettingsResponse;
       "phone": "optional",
       "location": "Our office, 12 Smith St",
       "syncMinutes": 15
+    },
+    "files": {
+      "chat": "live",
+      "jobs": true,
+      "maxChatMb": 10,
+      "maxJobMb": 25,
+      "perConversation": 10,
+      "keepChatDays": 90,
+      "aiSeesPhotos": false,
+      "visionModel": "@cf/meta/llama-4-scout-17b-16e-instruct"
     }
   },
   "hash": "7d2a…",
@@ -757,7 +789,8 @@ const data = (await response.json()) as ChangeSettingsResponse;
     "by": "key:k7m3p9q2r4s8",
     "hash": "7d2a…"
   },
-  "captcha": false
+  "captcha": false,
+  "storage": true
 }
 ```
 ```ts [Type]
@@ -867,6 +900,16 @@ type ChangeSettingsResponse = {
       location: string;
       syncMinutes: number;
     };
+    files: {
+      chat: string;
+      jobs: boolean;
+      maxChatMb: number;
+      maxJobMb: number;
+      perConversation: number;
+      keepChatDays: number;
+      aiSeesPhotos: boolean;
+      visionModel: string;
+    };
   };
   hash: string;
   meta: {
@@ -875,6 +918,7 @@ type ChangeSettingsResponse = {
     hash: string;
   };
   captcha: boolean;
+  storage: boolean;
 };
 ```
 <!-- /tabs -->

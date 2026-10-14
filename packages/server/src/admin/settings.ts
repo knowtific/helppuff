@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { iconNames, linkItemSchema, shortcutSchema, type Shortcut, type WidgetConfig } from '@helppuff/protocol';
 import type { KvStore } from '@helppuff/connector-types';
 import { ANSWER_REASONING, answerReasoning } from '@helppuff/rag';
-import { assistantConfigSchema, bookingsConfigSchema, liveConfigSchema, securitySchema, storedSiteConfigSchema, type SiteConfig, type StoredSiteConfig } from '../config/schema.js';
+import { assistantConfigSchema, bookingsConfigSchema, filesConfigSchema, liveConfigSchema, securitySchema, storedSiteConfigSchema, type SiteConfig, type StoredSiteConfig } from '../config/schema.js';
 import { resolveSite, siteConfigKey } from '../config/site.js';
 import { HelpPuffError } from '../core/errors.js';
 import type { HonoEnv } from '../core/request.js';
@@ -12,6 +12,7 @@ import { QUOTE_FLOW_ID } from '../jobs/widget.js';
 import { isAssistant, knowledgeOf, providerOf } from '../core/assistant.js';
 import { dismissSuggestedHome, readSuggestedHome } from '../home/suggest.js';
 import { forgetFoundBooking } from '../bookings/found.js';
+import { filesBucket } from '../files/store.js';
 
 /**
  * The assistant's settings as one flat object — what the onboarding
@@ -147,6 +148,8 @@ export const settingsSchema = z
     home: homeSettingsSchema.optional(),
     /** Appointments (the `bookings` site section): how visitors book, and the date picker's calendar. Absent from older Workers. */
     bookings: bookingsConfigSchema.optional(),
+    /** Files (the `files` site section): visitors sending photos in the chat, files on jobs. Absent from older Workers. */
+    files: filesConfigSchema.optional(),
   })
   .strict();
 export type Settings = z.infer<typeof settingsSchema>;
@@ -187,6 +190,7 @@ export const settingsPatchSchema = settingsSchema.partial().extend({
     .extend({ mode: bookingsConfigSchema.shape.mode.unwrap().nullable().optional(), link: z.string().url().max(2000).nullable().optional(), eventType: z.string().max(500).nullable().optional(), account: z.string().max(200).nullable().optional(), calendar: z.string().max(300).nullable().optional(), timezone: z.string().max(64).nullable().optional(), location: z.string().trim().max(300).nullable().optional() })
     .strict()
     .optional(),
+  files: filesConfigSchema.partial().optional(),
 });
 export type SettingsPatch = z.infer<typeof settingsPatchSchema>;
 
@@ -230,6 +234,7 @@ export function readSettings(site: SiteConfig): Settings {
       links: w.home.links ? { title: w.home.links.title || 'Useful pages', items: w.home.links.items } : null,
     },
     bookings: site.bookings,
+    files: site.files,
   };
 }
 
@@ -254,7 +259,7 @@ const compact = (value: Record<string, unknown>) =>
   Object.fromEntries(Object.entries(value).filter(([, v]) => v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)));
 
 /** The site config sections that carry these settings, rewritten. */
-export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<SiteConfig, 'widget' | 'connector' | 'knowledge' | 'assistant' | 'security' | 'live' | 'bookings' | 'autoSummary'> {
+export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<SiteConfig, 'widget' | 'connector' | 'knowledge' | 'assistant' | 'security' | 'live' | 'bookings' | 'files' | 'autoSummary'> {
   const current = readSettings(site);
   const s: Settings = {
     ...current,
@@ -266,6 +271,7 @@ export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<Site
     security: current.security,
     home: { ...current.home!, ...patch.home },
     bookings: current.bookings,
+    files: current.files,
   } as Settings;
 
   const widget: WidgetConfig = structuredClone(site.widget);
@@ -317,7 +323,8 @@ export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<Site
   }
   const knowledge = { ...site.knowledge, ...s.crawl };
   const live = liveConfigSchema.parse({ ...site.live, ...(patch.live ?? {}) });
-  return { widget, connector, knowledge, assistant: s.behaviour, security: mergeSecurity(site, patch.security), live, bookings: mergeBookings(site.bookings, patch.bookings), autoSummary: s.autoSummary };
+  const files = filesConfigSchema.parse({ ...site.files, ...(patch.files ?? {}) });
+  return { widget, connector, knowledge, assistant: s.behaviour, security: mergeSecurity(site, patch.security), live, bookings: mergeBookings(site.bookings, patch.bookings), files, autoSummary: s.autoSummary };
 }
 
 /** The bookings section with a patch applied: a null clears a field (`mode: null`: the website decides again). Throws a ZodError for a bad value. */
@@ -352,6 +359,8 @@ settingsRoutes.get('/settings', async (c) => {
     hash: await settingsHash(settings),
     meta: stored?.settings ?? null,
     captcha: Boolean(site.security.captcha),
+    // Whether this deployment has file storage (an R2 bucket): files can be turned on, but do nothing without it.
+    storage: Boolean(filesBucket(ctx.env)),
     // What the widget shows until the home screen is set up here: suggested from the website.
     suggestedHome: suggested && !suggested.dismissed ? { questions: suggested.questions ?? [], links: suggested.links ?? null, at: suggested.at } : null,
     // The model and knowledge: shown, changed only with the CLI (`helppuff model`, `helppuff rag`) and a deploy.
@@ -434,6 +443,7 @@ export async function saveSettings(c: Context<HonoEnv>, siteId: string, patch: u
     security: next.security,
     live: next.live,
     bookings: next.bookings,
+    files: next.files,
     autoSummary: next.autoSummary,
     settings: { at: ctx.platform.now(), by, hash },
   });
@@ -441,5 +451,5 @@ export async function saveSettings(c: Context<HonoEnv>, siteId: string, patch: u
   // The owner set the home screen up: the suggestions from the website stop.
   if (parsed.data.home) await dismissSuggestedHome(kv, siteId, ctx.platform.now());
   if (parsed.data.bookings) forgetFoundBooking(siteId);
-  return { site: siteId, connector: next.connector.type, settings, hash, meta: record.settings, captcha: Boolean(next.security.captcha) };
+  return { site: siteId, connector: next.connector.type, settings, hash, meta: record.settings, captcha: Boolean(next.security.captcha), storage: Boolean(filesBucket(ctx.env)) };
 }

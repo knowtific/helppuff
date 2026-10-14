@@ -5,7 +5,8 @@ import { Avatar, Badge, Button, Card, Empty, ErrorNote, InfoTip, Input, Segmente
 import { ContactTagChip } from '../components/ContactTags';
 import { AttributesEditor, ConversationStatusBadge, LabelChip, LabelPicker, NotesPanel, SideSection, ToolData, useLabels, WaitingBadge } from '../components/inbox';
 import { RelatedAppointments } from '../components/Appointments';
-import { api, isMember, parseSummary, type ConversationDetail, type ConversationRow, type Me, type StoredMessage, type Summary, type Team } from '../lib/api';
+import { FileGrid } from '../components/Files';
+import { api, isMember, parseSummary, type ConversationDetail, type ConversationRow, type Me, type StoredFile, type StoredMessage, type Summary, type Team } from '../lib/api';
 import { sendTyping, useLiveEvents } from '../lib/live';
 import { RelatedJobs } from './Jobs';
 import { cn, flag, fmtDateTime, fmtRelative, fmtTime, href, pathOf, useData, useDebounced, usePersisted } from '../lib/utils';
@@ -65,6 +66,9 @@ function Bubble({ message }: { message: StoredMessage }) {
   const links = Array.isArray(payload['links']) ? (payload['links'] as { label: string; url: string }[]) : null;
   const human = Boolean(message.author);
   const name = (payload['meta'] as { agentName?: string } | undefined)?.agentName;
+  // Photos and files the visitor sent: what they wrote with them, then the files (links signed when the page loaded).
+  const files = Array.isArray(payload['files']) ? (payload['files'] as StoredFile[]) : null;
+  const text = files ? (typeof payload['caption'] === 'string' ? payload['caption'] : '') : message.text;
   if (message.role === 'system' || message.type === 'notice' || message.type === 'handover') {
     return <p className="py-1 text-center text-xs text-muted-foreground">{message.text}</p>;
   }
@@ -76,7 +80,7 @@ function Bubble({ message }: { message: StoredMessage }) {
           {human ? `${name ?? message.author} (team)` : 'Assistant'}
         </span>
       )}
-      {message.text && message.type !== 'options' && (
+      {text && message.type !== 'options' && (
         <div
           className={cn(
             'max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-[13px] leading-relaxed',
@@ -84,9 +88,10 @@ function Bubble({ message }: { message: StoredMessage }) {
           )}
         >
           {message.type === 'card' && <span className="block font-medium">{message.text}</span>}
-          {message.type === 'card' ? String(payload['body'] ?? '') : message.text}
+          {message.type === 'card' ? String(payload['body'] ?? '') : text}
         </div>
       )}
+      {files && <FileGrid files={files} className={cn('max-w-[85%]', mine && 'justify-end')} />}
       {options && (
         <div className="flex max-w-[85%] flex-wrap gap-1.5">
           {message.text && <p className="w-full text-[13px]">{message.text}</p>}

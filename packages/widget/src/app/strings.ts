@@ -4,6 +4,7 @@ export const DEFAULT_STRINGS = {
   resume: 'Continue conversation',
   resumeLabel: 'Picking up where you left off',
   send: 'Send',
+  attach: 'Send a photo or file',
   close: 'Close chat',
   back: 'Back',
   menu: 'Menu',
