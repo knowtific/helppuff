@@ -103,7 +103,6 @@ describe('agreement with the protocol Zod schemas', () => {
       teaser: { text: 'Hi', delayMs: 8000, oncePerSession: true },
       sound: { enabled: true },
       captcha: { provider: 'turnstile', siteKey: '0xAAA' },
-      poweredBy: false,
     };
     const parsed = parseConfig(rich);
     expect(parsed).not.toBeNull();
@@ -120,27 +119,17 @@ describe('agreement with the protocol Zod schemas', () => {
     expect(mine?.home.subtitle).toBe(theirs.home.subtitle);
     expect(mine?.leadForm.enabled).toBe(theirs.leadForm.enabled);
     expect(mine?.leadForm.fields).toEqual(theirs.leadForm.fields);
-    expect(mine?.poweredBy).toBe(theirs.poweredBy);
   });
 });
 
 describe('parseConfig — poweredBy', () => {
-  it('passes a whitelabelled credit through in a shape Zod accepts', () => {
-    const value = { text: 'Powered by Knowtific', url: 'https://www.knowtific.com.au/' };
-    const parsed = parseConfig({ poweredBy: value });
-    expect(parsed?.poweredBy).toEqual(value);
-    expect(widgetConfigSchema.safeParse(parsed).success).toBe(true);
-  });
-
-  it('drops an unsafe link but keeps the text', () => {
-    expect(parseConfig({ poweredBy: { text: 'Knowtific', url: 'javascript:alert(1)' } })?.poweredBy).toEqual({
-      text: 'Knowtific',
-    });
-  });
-
-  it('falls back to the default credit when the object has no usable text', () => {
-    expect(parseConfig({ poweredBy: { url: 'https://a.co' } })?.poweredBy).toBe(true);
-    expect(parseConfig({ poweredBy: 'yes' })?.poweredBy).toBe(true);
+  it('ignores an old config that hid or replaced the credit, in a shape Zod still accepts', () => {
+    for (const poweredBy of [false, { text: 'Powered by Knowtific', url: 'https://www.knowtific.com.au/' }]) {
+      const parsed = parseConfig({ poweredBy });
+      expect(parsed).not.toBeNull();
+      expect(parsed && 'poweredBy' in parsed).toBe(false);
+      expect(widgetConfigSchema.safeParse({ poweredBy }).success).toBe(true);
+    }
   });
 });
 

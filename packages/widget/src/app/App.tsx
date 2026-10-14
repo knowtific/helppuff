@@ -26,7 +26,7 @@ import type { Runtime } from '../loader.js';
 import { toWidgetError, type Api } from './api.js';
 import { clientId, pageContext, pathAllowed, currentPath } from './context.js';
 import { clear as clearStorage, load as loadStored, save as saveStored } from './persist.js';
-import { makeStrings } from './strings.js';
+import { DEFAULT_STRINGS, makeStrings } from './strings.js';
 import { GREETING_PREFIX } from './store.js';
 
 /** The live chunk's file, set at build time (absent in tests: no live connection there). */
@@ -998,7 +998,7 @@ export function App({
             </div>
           )}
 
-          {config.poweredBy ? <PoweredBy value={config.poweredBy} t={t} /> : null}
+          <PoweredBy t={t} />
 
           <LiveRegion messages={messages} />
         </div>
@@ -1020,31 +1020,20 @@ export function App({
   }
 }
 
-const HELPPUFF_URL = 'https://github.com/helppuff-chat/helppuff';
+const HELPPUFF_URL = 'https://knowtific.github.io/helppuff/';
 
 /**
- * The footer credit. `true` is the HelpPuff credit (its wording still
- * overridable through `strings.poweredBy`); an object whitelabels it, and one
- * without a `url` renders as plain text rather than a link to nowhere.
+ * The footer credit, always shown and always naming HelpPuff. Its wording can
+ * be translated through `strings.poweredBy`, but a wording without "HelpPuff"
+ * (or an empty one) falls back to the default.
  */
-function PoweredBy({
-  value,
-  t,
-}: {
-  value: Exclude<WidgetConfig['poweredBy'], false>;
-  t: ReturnType<typeof makeStrings>;
-}) {
-  const text = value === true ? t('poweredBy') : value.text;
-  const url = value === true ? HELPPUFF_URL : value.url;
+function PoweredBy({ t }: { t: ReturnType<typeof makeStrings> }) {
+  const own = t('poweredBy');
   return (
     <div class="hp-powered">
-      {url ? (
-        <a href={url} target="_blank" rel="noopener noreferrer">
-          {text}
-        </a>
-      ) : (
-        text
-      )}
+      <a href={HELPPUFF_URL} target="_blank" rel="noopener noreferrer">
+        {/helppuff/i.test(own) ? own : DEFAULT_STRINGS.poweredBy}
+      </a>
     </div>
   );
 }

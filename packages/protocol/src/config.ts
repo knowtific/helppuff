@@ -183,9 +183,9 @@ export const teaserSchema = z
   );
 
 /**
- * The footer credit. `true` shows the HelpPuff credit, `false` hides it, and an
- * object whitelabels it: `text` replaces the wording and `url`, when given,
- * is where it links. Without a `url` the credit is plain text.
+ * The footer credit, as older configs set it (`false` hid it, an object
+ * replaced it). Still accepted so those configs load, but ignored: the widget
+ * always shows "Powered by HelpPuff".
  */
 export const poweredBySchema = z.union([
   z.boolean(),
@@ -217,7 +217,7 @@ export const widgetConfigSchema = z.object({
     .object({ provider: z.literal('turnstile').describe('Cloudflare Turnstile.'), siteKey: z.string().min(1).max(200).describe('The Turnstile site key.') })
     .optional()
     .describe('Set by `security.captcha`; you do not need to set it here.'),
-  poweredBy: poweredBySchema.default(true).describe('The footer credit: `true`, `false`, or `{ text, url }` for your own.'),
+  poweredBy: poweredBySchema.optional().describe('Ignored: the widget always shows "Powered by HelpPuff". Accepted so older configs still load.'),
   strings: z.record(z.string().min(1).max(64), z.string().max(300)).optional().describe('UI string overrides. Keys are validated by the widget, not here.'),
 });
 

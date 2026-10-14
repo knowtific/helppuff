@@ -1,16 +1,23 @@
 # Using with AI agents
 
-HelpPuff is built to be set up and looked after by coding agents (Claude Code,
-Codex, Cursor, OpenCode and others) as much as by people. Give the agent the
-shared instructions once; it can then set up, test and embed the assistant and
-hand back the dashboard and preview links.
+HelpPuff is **AI-agent first**: it is made to be set up, changed and looked
+after by your coding agent (Claude Code, Codex, Cursor, OpenCode and others).
+You don't have to configure anything by hand, though you can. Every setting
+has a command that answers in JSON, so the agent can read what is there,
+change it and check the result.
 
-## The simplest path: give your agent the instructions
+## Set it up: one folder, one prompt
 
-Copy this prompt into Claude Code, Codex, Cursor, OpenCode or another AI coding
-agent:
+Make a folder for your assistant and open your agent in it:
 
-> Follow the HelpPuff instructions at https://raw.githubusercontent.com/knowtific/helppuff/main/instructions.md and install it in this project. Complete setup automatically with the recommended free defaults. Ask me only for information you cannot determine safely or authorization I must complete. Continue until it is deployed, added to the website when possible, tested with real questions, and you have given me the dashboard, embed and preview links.
+```bash
+mkdir my-assistant && cd my-assistant
+claude        # or codex, cursor ., opencode…
+```
+
+Then paste this prompt:
+
+> Follow the HelpPuff instructions at https://raw.githubusercontent.com/knowtific/helppuff/main/instructions.md and set up HelpPuff in this folder. Complete setup automatically with the recommended free defaults. Ask me only for information you cannot determine safely or authorization I must complete. Continue until it is deployed, added to the website when possible, tested with real questions, and you have given me the dashboard, embed and preview links.
 
 The instructions are plain Markdown. They work across agents and do not require
 a plugin, skill or MCP server.
@@ -42,12 +49,29 @@ to run `npx wrangler login` (a browser sign-in) or store an API token with
 project folder the agent names. It never asks you to paste credentials into
 the chat.
 
-## Let your agent set it up with you
+(Running it in your website's own repository works too: the agent finds the
+address there and adds the script to your pages.)
 
-You don't have to click through the dashboard's settings. Every setting has
-a command, so your agent can go through them with you: it reads what is
-there, explains it in plain words, asks only what changes the result, then
-applies it and shows you what changed. Ask it, in the project folder:
+## Change anything by asking
+
+Open your agent in the project folder and say what you want, in your own
+words:
+
+- *"Make the chat button orange and call the assistant Sam."*
+- *"Don't ask for details before the chat starts."*
+- *"Never quote prices; offer a callback instead."*
+- *"Turn on live chat so my team can answer."*
+- *"When someone asks where their order is, check our order API."*
+- *"Send hot leads to our Slack."*
+- *"Upgrade HelpPuff to the latest version."*
+
+It reads the current settings first (including what was changed in the
+dashboard), changes only what you asked, deploys when needed, tests it with
+a real question and tells you what changed.
+
+Or let it walk you through everything: it reads what is there, explains it
+in plain words, asks only what changes the result, then applies it. Ask it,
+in the project folder:
 
 > Go through my HelpPuff settings with me and set them up.
 

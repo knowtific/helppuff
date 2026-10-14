@@ -8,25 +8,27 @@
 # HelpPuff
 
 HelpPuff is an open-source AI chat assistant for websites that runs entirely on
-**your own Cloudflare account**. One command sets up the chat widget, the
-server, a knowledge base learned from your website, and a dashboard for
-conversations and leads. The default setup runs on the **Workers Free plan**.
+**your own Cloudflare account**: the chat widget, the server, a knowledge base
+learned from your website, and a dashboard for conversations and leads. The
+default setup runs on the **Workers Free plan**.
 
-```bash
-npx @knowtific/helppuff
-```
+It is **AI-agent first**. You don't configure it by hand (though you can):
+make a folder, open your coding agent in it (Claude Code, Codex, Cursor,
+OpenCode…) and paste this prompt:
 
-It asks for your website, deploys, and gives you one link: a setup page where
-you create your sign-in and check what it learned. Coding agents (Claude Code,
-Codex, Cursor…) can do the whole thing for you; see [[Using with AI agents|AI-Agents]].
+> Follow the HelpPuff instructions at https://raw.githubusercontent.com/knowtific/helppuff/main/instructions.md and set up HelpPuff in this folder. Complete setup automatically with the recommended free defaults. Ask me only for information you cannot determine safely or authorization I must complete. Continue until it is deployed, added to the website when possible, tested with real questions, and you have given me the dashboard, embed and preview links.
 
-For the agent path, copy the prompt from [[Using with AI agents|AI-Agents]], or
-give your agent the shared [instructions.md](https://raw.githubusercontent.com/knowtific/helppuff/main/instructions.md).
+The agent deploys it, learns your website, tests it with real questions and
+gives you the dashboard link. Later, ask it for any change ("make the button
+orange", "turn on live chat"). See [[Getting started|Getting-Started]].
+
+Prefer the terminal? `npx @knowtific/helppuff` asks for your website and
+gives you a setup link.
 
 ## Start here
 
-- **[[Getting started|Getting-Started]]**: install, the setup page, adding it to your site.
-- **[[Using with AI agents|AI-Agents]]**: let Claude Code or another agent set it up and look after it.
+- **[[Getting started|Getting-Started]]**: one prompt to your AI agent (or one command), the setup page, adding it to your site.
+- **[[Using with AI agents|AI-Agents]]**: what your agent does, and the changes you can ask it for.
 - **[[The dashboard|Dashboard]]**: test chat, conversations, jobs, calendar, contacts, callbacks, analytics, settings.
 - **[[Tutorials]]**: complete setups to copy, from order tracking to hot leads in Slack.
 

@@ -1,4 +1,4 @@
-import { ArrowUpCircle, Bell, Bot, Briefcase, CalendarDays, ChartColumn, ChevronDown, ChevronsUpDown, CircleHelp, House, LogOut, MessagesSquare, Moon, PanelsTopLeft, PhoneCall, Server, Settings, Sun, Users } from 'lucide-react';
+import { ArrowUpCircle, Bell, Bot, Briefcase, CalendarDays, ChartColumn, ChevronDown, ChevronsUpDown, CircleHelp, House, Inbox, LogOut, MessagesSquare, Moon, PanelsTopLeft, PhoneCall, Server, Settings, Sun, Users } from 'lucide-react';
 import { useEffect, useRef, useState, type ComponentProps, type KeyboardEvent, type ReactNode } from 'react';
 import { api, isMember, roleOf, type CallbackList, type LiveStatus, type Me, type Prefs, type Site } from '../lib/api';
 import { onToast, setAvailable, unlockAudio, useLiveConnection, useLiveEvents, type Toast } from '../lib/live';
@@ -73,7 +73,7 @@ export type SettingsGroup = { label: string; icon: ReactNode; items: SettingsLin
 const GROUPS: { label: string; icon: ReactNode; keys: string[] }[] = [
   { label: 'Assistant', icon: <Bot />, keys: ['instructions', 'prompt', 'knowledge', 'business', 'bookings', 'agent'] },
   { label: 'Widget', icon: <PanelsTopLeft />, keys: ['chat', 'home', 'appearance', 'leads'] },
-  { label: 'Team', icon: <Users />, keys: ['live', 'labels', 'contact_tags', 'fields', 'jobs', 'notifications'] },
+  { label: 'Inbox & CRM', icon: <Inbox />, keys: ['live', 'labels', 'contact_tags', 'fields', 'jobs', 'notifications'] },
   { label: 'System', icon: <Server />, keys: ['advanced', 'webhooks', 'integrations', 'api', 'team', 'updates'] },
 ];
 

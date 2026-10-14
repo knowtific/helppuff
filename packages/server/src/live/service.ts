@@ -458,7 +458,9 @@ export async function closeConversation(deps: LiveDeps, input: { siteId?: string
 
 /**
  * Back to the assistant: it answers the visitor's next message. From a live
- * chat, or a closed one (reopened for the assistant).
+ * chat, or a closed one (reopened for the assistant). A chat the assistant
+ * still has, only quiet, is reopened without a notice: the visitor never left
+ * it, so "You're back with the assistant" would be said twice.
  */
 export async function handBack(deps: LiveDeps, live: LiveConfig, input: { conversationId: string; by: string }) {
   const row = await liveRow(deps.db, input.conversationId);
@@ -466,14 +468,19 @@ export async function handBack(deps: LiveDeps, live: LiveConfig, input: { conver
   const now = deps.now();
   const closed = row.status === 'closed' || row.last_at < now - live.closeAfterMinutes * 60_000;
   if (row.status !== 'live' && !closed) throw new LiveError('not_live', 'The assistant already has this chat.');
-  const notice = [handoverMessage('left', COPY.left, null, now)];
-  await deps.db.batch([
-    ...messageStatements(deps.db, input.conversationId, notice, now),
-    deps.db.prepare("UPDATE conversations SET status = 'bot', waiting_since = NULL, closed_at = NULL, last_at = ? WHERE id = ?").bind(now, input.conversationId),
-  ]);
+  const leaving = row.status === 'live' || row.status === 'closed';
+  // Claimed on the status read above, so two clicks (or the dashboard and Telegram at once) write one notice.
+  const claim = (await deps.db
+    .prepare("UPDATE conversations SET status = 'bot', waiting_since = NULL, closed_at = NULL, last_at = ? WHERE id = ? AND COALESCE(status, 'bot') = ?")
+    .bind(now, input.conversationId, row.status ?? 'bot')
+    .run()) as { meta?: { changes?: number }; changes?: number } | undefined;
+  if ((claim?.meta?.changes ?? claim?.changes ?? 1) === 0) throw new LiveError('not_live', 'The assistant already has this chat.');
+  const notice = leaving ? [handoverMessage('left', COPY.left, null, now)] : [];
+  if (notice.length) await deps.db.batch(messageStatements(deps.db, input.conversationId, notice, now));
   deps.waitUntil(
     (async () => {
       await publish(deps, row.site_id, { type: 'ended', conversationId: input.conversationId, status: 'left', messages: notice });
+      if (!leaving) return;
       await emit(deps, row.site_id, 'handover.ended', { conversationId: input.conversationId, by: input.by, outcome: 'back_to_ai' });
       const telegram = await telegramOf(deps, row.site_id);
       if (telegramReady(telegram)) await closeThread({ db: deps.db, fetch: deps.fetch }, telegram, input.conversationId, '🤖 Handed back to the assistant.');

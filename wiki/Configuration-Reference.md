@@ -509,7 +509,7 @@ Set by `security.captcha`; you do not need to set it here.
 
 ### `widget.poweredBy`
 
-The footer credit: `true`, `false`, or `{ text, url }` for your own. Type: boolean \| object, default `true`.
+Ignored: the widget always shows "Powered by HelpPuff". Accepted so older configs still load. Type: boolean \| object.
 
 ### `widget.strings`
 

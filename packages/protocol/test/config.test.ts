@@ -10,7 +10,8 @@ describe('widgetConfigSchema', () => {
     expect(config.home.title).toBe('Hi there');
     expect(config.leadForm.enabled).toBe(true);
     expect(config.leadForm.fields).toEqual([...DEFAULT_LEAD_FIELDS]);
-    expect(config.poweredBy).toBe(true);
+    // The credit is not a setting any more: always shown by the widget.
+    expect(config.poweredBy).toBeUndefined();
   });
 
   it('falls back to the default lead fields when the configured ones are malformed', () => {
@@ -22,7 +23,7 @@ describe('widgetConfigSchema', () => {
     expect(widgetConfigSchema.safeParse({ brand: { accent: 'red; }' } }).success).toBe(false);
   });
 
-  it('accepts a whitelabelled credit, with or without a link', () => {
+  it('still loads an old config that set the credit (the widget ignores it)', () => {
     const linked = { text: 'Powered by Knowtific', url: 'https://www.knowtific.com.au/' };
     expect(widgetConfigSchema.parse({ poweredBy: linked }).poweredBy).toEqual(linked);
     expect(widgetConfigSchema.parse({ poweredBy: { text: 'Knowtific' } }).poweredBy).toEqual({ text: 'Knowtific' });

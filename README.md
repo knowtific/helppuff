@@ -5,34 +5,71 @@
   </picture>
 </h1>
 
-### Your website's AI assistant — deployed by your AI agent, owned by you.
+### Your website's AI assistant — set up by your AI agent, owned by you.
 
 **[Website](https://knowtific.github.io/helppuff/)** · **[Docs](https://knowtific.github.io/helppuff/docs/)** · **[Widget playground](https://knowtific.github.io/helppuff/playground/)** · **[Dashboard demo](https://knowtific.github.io/helppuff/dashboard-demo/)**
 
-HelpPuff is an open-source AI chat assistant for websites. It learns your
-content, answers visitors, captures leads and gives your team a practical CRM
-dashboard. The entire default stack runs inside **your Cloudflare account** and
-fits the **Workers Free plan**.
+HelpPuff is an open-source AI chat assistant for websites, and an **AI-agent
+first** project: paste one prompt into your coding agent and it sets
+everything up for you. It learns your content, answers visitors, captures
+leads and gives your team a practical CRM dashboard. The entire default
+stack runs inside **your Cloudflare account** and fits the **Workers Free
+plan**.
 
 > No HelpPuff subscription. No VPS to patch. No chatbot vendor holding your
 > customer database.
 
-## Install it
+## AI-agent first
 
-You can either run the CLI yourself:
+HelpPuff is built to be set up and run by your AI coding agent. You don't
+need to learn a config file or click through settings (you still can):
+Claude Code, Codex, Cursor, OpenCode or any other coding agent does it for
+you, because every part of HelpPuff has a command it can run and read.
+
+**1. Make a folder** for your assistant and open your agent in it:
+
+```bash
+mkdir my-assistant && cd my-assistant
+claude        # or codex, cursor ., opencode…
+```
+
+**2. Paste this prompt:**
+
+> Follow the HelpPuff instructions at https://raw.githubusercontent.com/knowtific/helppuff/main/instructions.md and set up HelpPuff in this folder. Complete setup automatically with the recommended free defaults. Ask me only for information you cannot determine safely or authorization I must complete. Continue until it is deployed, added to the website when possible, tested with real questions, and you have given me the dashboard, embed and preview links.
+
+**3. Answer what it asks.** Usually that's your website address and a
+Cloudflare sign-in in your browser. The agent deploys everything to your
+Cloudflare account, learns your website, tests the assistant with real
+questions, and gives you the dashboard, the script for your site and a
+preview link. If your website's code is in the folder, it adds the script
+too.
+
+### Then change anything by asking
+
+Open your agent in the same folder and say what you want:
+
+- *"Make the chat button orange and call the assistant Sam."*
+- *"Don't ask for details before the chat starts."*
+- *"Never quote prices; offer a callback instead."*
+- *"Turn on live chat so my team can answer."*
+- *"When someone asks where their order is, check our order API."*
+- *"Go through my HelpPuff settings with me."*
+
+It changes the setting, deploys if needed, tests it and tells you what
+changed. Every page in the dashboard's Settings also has an **Ask your AI
+agent** button that copies the request for that page.
+
+### Prefer to do it yourself?
+
+Run the CLI in an empty folder. It asks one question (your website) and
+gives you a setup link:
 
 ```bash
 npx @knowtific/helppuff
 ```
 
-Or copy this prompt into Claude Code, Codex, Cursor, OpenCode or another
-AI coding agent:
-
-> Follow the HelpPuff instructions at https://raw.githubusercontent.com/knowtific/helppuff/main/instructions.md and install it in this project. Complete setup automatically with the recommended free defaults. Ask me only for information you cannot determine safely or authorization I must complete. Continue until it is deployed, added to the website when possible, tested with real questions, and you have given me the dashboard, embed and preview links.
-
-The agent can complete the setup, configure the assistant, add the embed code,
-deploy it and test the result. You only step in when authorization or a real
-business decision is required.
+See [Getting started](wiki/Getting-Started.md) and
+[Using with AI agents](wiki/AI-Agents.md).
 
 ## Try it in your browser
 

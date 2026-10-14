@@ -71,16 +71,31 @@ assistant call that tool, and `{{crm_lookup.tier}}` puts in what it returned.
 Extract tools save visitor details after the chat and are set under **After the
 chat**. The **Prompt & tools** page (Settings → Prompt & tools) shows a chat as a
 diagram, left to right: tools called before the chat, the **Prompt** (with
-**Knowledge** above it and **Webhooks** below), then the summary and labels
+**Knowledge** above it and **Webhooks** below), then **AI post-processing**
 and the tools called after it. Click **Prompt** to edit it, add tools to it
 and see its history; **+ Add** on a step adds a tool there. Type `{{` in the
 prompt for a list of everything you can use. See [[Tools]].
 
-The **Summary** switch in that diagram turns automatic summaries and AI
-labels on or off for new chats. Turning it off also stops automatic questions
-to answer; transcripts, after-chat tools and webhooks still run. You can still
-choose **Summarise** on an individual conversation. The same setting is
-`autoSummary` in `helppuff.json` and `GET /settings`.
+### AI post-processing
+
+Five quiet minutes after a visitor's last message, the AI goes over the
+finished chat and:
+
+- writes a **summary** and a suggested next step;
+- adds **labels**: intent, sentiment, lead quality, outcome and topics, plus
+  any of your own labels (Settings → Labels) you let the AI use;
+- saves **contact details** typed in the chat rather than a form (an email
+  or phone number becomes a lead; nothing the visitor did not write);
+- lists the **questions it could not answer** that your knowledge base does
+  not cover, under Knowledge → Questions to answer (with the `knowledge.gap`
+  webhook and email).
+
+One switch on the **AI post-processing** step turns all of it on or off for
+new chats. Off, transcripts, after-chat tools and webhooks still run
+(`conversation.completed` arrives without a summary or labels), and you can
+still choose **Summarise** on a single conversation. It uses Workers AI and
+counts towards the daily budget. The same setting is `autoSummary` in
+`helppuff.json` and `GET /settings`.
 
 ### Changes during a conversation
 

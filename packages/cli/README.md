@@ -11,6 +11,14 @@ Cloudflare account** and fits the **Workers Free plan**.
 > No HelpPuff subscription. No VPS to patch. No chatbot vendor holding your
 > customer database.
 
+**AI-agent first.** You don't have to configure it by hand: make a folder,
+open your coding agent in it (Claude Code, Codex, Cursor, OpenCode…) and
+paste the prompt under [Built for AI agents](#built-for-ai-agents). It sets
+everything up, tests it and gives you the links. Later, ask it for any
+change in your own words.
+
+Or run it yourself:
+
 ```bash
 npx @knowtific/helppuff
 ```
@@ -70,12 +78,13 @@ link and the script tag for your site.
 
 ## Built for AI agents
 
-Copy this prompt into any coding agent:
+Make a folder, open your coding agent in it, and paste this prompt:
 
-> Follow the HelpPuff instructions at https://raw.githubusercontent.com/knowtific/helppuff/main/instructions.md and install it in this project. Complete setup automatically with the recommended free defaults. Ask me only for information you cannot determine safely or authorization I must complete. Continue until it is deployed, added to the website when possible, tested with real questions, and you have given me the dashboard, embed and preview links.
+> Follow the HelpPuff instructions at https://raw.githubusercontent.com/knowtific/helppuff/main/instructions.md and set up HelpPuff in this folder. Complete setup automatically with the recommended free defaults. Ask me only for information you cannot determine safely or authorization I must complete. Continue until it is deployed, added to the website when possible, tested with real questions, and you have given me the dashboard, embed and preview links.
 
 The instructions are plain Markdown and do not require a plugin, skill or MCP
-server.
+server. Afterwards, ask the agent for any change ("make the button orange",
+"turn on live chat", "go through my HelpPuff settings with me").
 
 Commands support structured `--json` output, return missing decisions as
 `needs_input`, never echo secrets, and work non-interactively.

@@ -226,8 +226,6 @@ function OptionsForm({ widget, update, backend, setBackend, embed, setEmbed }: {
   const offset = getPath(widget, 'launcher.offset');
   const leadFields = (getPath(widget, 'leadForm.fields') as { name: string }[] | undefined) ?? FIELD_LIBRARY.slice(0, 2);
   const leadNames = new Set(leadFields.map((f) => f.name));
-  const poweredBy = getPath(widget, 'poweredBy');
-  const poweredByMode = poweredBy === false ? 'hidden' : poweredBy && typeof poweredBy === 'object' ? 'custom' : 'HelpPuff';
 
   /** Shortcuts open the quote flow, so switching them on brings it along. */
   const withSupport = (path: string, value: unknown) => {
@@ -348,10 +346,6 @@ function OptionsForm({ widget, update, backend, setBackend, embed, setEmbed }: {
 
       <Section title="Extras">
         <Toggle label="Reply sound" path="sound" checked={getPath(widget, 'sound.enabled') === true} onChange={(on) => update('sound', on ? { enabled: true } : undefined)} />
-        <Choice label="Footer credit" path="poweredBy" value={poweredByMode as 'HelpPuff' | 'hidden' | 'custom'} options={['HelpPuff', 'custom', 'hidden'] as const} onChange={(v) => update('poweredBy', v === 'hidden' ? false : v === 'custom' ? { text: 'Your own credit' } : true)} />
-        {poweredByMode === 'custom' && (
-          <TextInput label="Credit text" path="poweredBy.text" value={str('poweredBy.text')} onChange={(v) => update('poweredBy.text', v ?? 'Your own credit')} />
-        )}
       </Section>
 
       <Section title="Embed and replies">

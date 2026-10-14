@@ -324,6 +324,33 @@ describe('live chat', () => {
     expect((await (await w.owner.get(`/conversations/${id}`)).json()) as { conversation: unknown }).toMatchObject({ conversation: { status: 'live', assigned_to: OWNER } });
   });
 
+  it('says "back with the assistant" once: not twice from a person, not to a chat that only went quiet', async () => {
+    const w = await world(live);
+    const { id } = await chat(w.h);
+    await w.settle();
+    const backNotices = async () =>
+      ((await (await w.owner.get(`/conversations/${id}`)).json()) as { messages: { type: string; payload: { status?: string } | null }[] }).messages.filter(
+        (m) => m.type === 'handover' && m.payload?.status === 'left',
+      ).length;
+
+    // The assistant's chat goes quiet and shows as closed: reopening it tells the visitor nothing.
+    w.db.raw.prepare('UPDATE conversations SET last_at = ? WHERE id = ?').run(Date.now() - 61 * 60_000, id);
+    expect((await w.owner.send('POST', `/conversations/${id}/handback`)).status).toBe(200);
+    expect(await backNotices()).toBe(0);
+
+    // From a person: one notice, and a second click finds the assistant already has it.
+    await w.owner.send('POST', `/conversations/${id}/takeover`);
+    const [first, second] = await Promise.all([w.owner.send('POST', `/conversations/${id}/handback`), w.owner.send('POST', `/conversations/${id}/handback`)]);
+    expect([first.status, second.status].sort()).toEqual([200, 409]);
+    await w.settle();
+    expect(await backNotices()).toBe(1);
+
+    // It goes quiet again: reopening adds no second one.
+    w.db.raw.prepare('UPDATE conversations SET last_at = ? WHERE id = ?').run(Date.now() - 61 * 60_000, id);
+    expect((await w.owner.send('POST', `/conversations/${id}/handback`)).status).toBe(200);
+    expect(await backNotices()).toBe(1);
+  });
+
   it('reopens a closed chat, with a person or with the assistant', async () => {
     const w = await world(live);
     const { token, id } = await chat(w.h);

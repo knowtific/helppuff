@@ -47,7 +47,6 @@ const CONFIG = parseConfig({
   },
   chat: { placeholder: 'Type a message…', fallbackContact: { phone: '+61400000000', email: 'hello@example.com' } },
   teaser: { text: 'Questions? Ask away — we reply in a minute or two.', delayMs: 3000 },
-  poweredBy: true,
 }) as WidgetConfig;
 
 const now = Date.now();

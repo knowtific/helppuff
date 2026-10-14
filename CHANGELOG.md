@@ -8,6 +8,36 @@ never needs you to change anything. Upgrade with
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-14
+
+### Changed
+
+- The prompt editor says how to use a tool (`{{ tool_name }}`), with a link to
+  the Tools page in the docs.
+- On Prompt & tools, the Summary & labels step is now **AI post-processing**:
+  one switch, with what it does listed under it (summary, labels, contact
+  details typed in the chat, questions to answer) and a Learn more link.
+- The Settings group that held Live chat, Labels, Contact tags, Custom fields,
+  Jobs and Notifications is now called **Inbox & CRM** (it was "Team", easy to
+  mix up with Team & security).
+
+- **"Powered by HelpPuff" is always shown** in the widget. `widget.poweredBy`
+  no longer hides or replaces it: older configs with it still load, and the
+  value is ignored. `strings.poweredBy` can still translate it, as long as the
+  translation says HelpPuff. The credit now links to the HelpPuff website.
+- The README, the docs and the website lead with setting HelpPuff up through
+  your AI agent: make a folder, open your agent in it, paste one prompt, then
+  ask it for any change. The shared instructions handle a new, empty folder
+  (they work in it and ask for the website address). The CLI is still there
+  if you'd rather run it yourself.
+
+### Fixed
+
+- "You're back with the assistant" no longer appears twice in a conversation.
+  Reopening a chat the assistant already had (one that only went quiet) adds
+  no notice, and two hand-backs at once (two clicks, or the dashboard and
+  Telegram) write one.
+
 ## [0.7.0] - 2026-10-13
 
 ### Changed

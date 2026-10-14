@@ -189,9 +189,10 @@ each, which the per-visitor limits count by). The same numbers are in the API:
 ## Settings
 
 Opens as a menu in the sidebar, in four groups: **Assistant** (Instructions,
-Prompt & tools, Knowledge, Business details, Bookings, Import & export), **Widget** (Chat, Home screen,
-Appearance, Lead form), **Team** (Live chat, Labels, Jobs, Notifications) and
-**System** (Advanced, Webhooks, Integrations, API keys, Team & security, Updates). What each
+Prompt & tools, Knowledge, Business details, Bookings, Import & export),
+**Widget** (Chat, Home screen, Appearance, Lead form), **Inbox & CRM** (Live
+chat, Labels, Contact tags, Custom fields, Jobs, Notifications) and **System**
+(Advanced, Webhooks, Integrations, API keys, Team & security, Updates). What each
 page is for is behind the (?) beside its title.
 
 **No need to set them by hand:** every page has **Ask your AI agent**, with a
@@ -206,7 +207,7 @@ agent goes through that page with you and changes it through the same API
 | **Appearance** | Colour (taken from your site), position, the button's icon |
 | **Lead form** | The form before the chat: on/off, its fields, which are required, your own extra fields |
 | **Instructions** | What to do when a visitor is interested, tone, answer length and prices: settings HelpPuff adds around the prompt |
-| **Prompt & tools** | A chat as a diagram: [[tools|Tools]] before it, the prompt (click it to edit, add tools and see its history and everything HelpPuff adds) with Knowledge above and Webhooks below, then the optional summary and labels and the tools after it. The Summary switch controls automatic summaries. See [[Prompt and instructions|Prompts-and-Instructions]] |
+| **Prompt & tools** | A chat as a diagram: [[tools|Tools]] before it, the prompt (click it to edit, add tools and see its history and everything HelpPuff adds) with Knowledge above and Webhooks below, then optional AI post-processing (summary, labels, contact details, questions to answer; one switch) and the tools after it. See [[Prompt and instructions|Prompts-and-Instructions]] |
 | **Knowledge** | What it has learned; see [Knowledge](#knowledge) above |
 | **Bookings** | How visitors book: not at all, through your booking page, or a date picker in the chat that HelpPuff books (the AI never does); the calendar it syncs with, the hours, and a live preview. See [[Bookings]] |
 | **Import & export** | The whole setup (prompt, tools, behaviour and lead form) as one [[agent file|Agent-Files]]: start from a [[tutorial's template|Tutorials]], import a file, or download this site's |

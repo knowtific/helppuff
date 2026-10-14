@@ -108,7 +108,6 @@ export const PRESETS: Preset[] = [
         fallbackContact: { phone: '+61400000000', email: 'hello@example.com' },
       },
       sound: { enabled: true },
-      poweredBy: true,
       ...SUPPORT,
     },
   },
@@ -119,7 +118,6 @@ export const PRESETS: Preset[] = [
       brand: { name: 'Acme', agentName: 'Assistant', accent: '#111827', theme: 'light' },
       launcher: { position: 'bottom-right', icon: 'chat', shape: 'orb' },
       leadForm: { enabled: false },
-      poweredBy: false,
     },
   },
   {
@@ -155,7 +153,6 @@ export const PRESETS: Preset[] = [
       },
       leadForm: { enabled: true, fields: [FIELD_LIBRARY[0], FIELD_LIBRARY[2]], privacy: PRIVACY },
       chat: { initialMessages: ['Hi, I’m Mia. How can I help today?'] },
-      poweredBy: { text: 'Harbour Physio assistant' },
       ...SUPPORT,
     },
   },

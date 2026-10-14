@@ -59,8 +59,7 @@ under `widget` in `helppuff.json`; see the
         { "field": "suburb", "ask": "Which suburb?", "input": "text" }
       ],
       "submit": { "as": "message", "template": "I'd like a quote for {service} in {suburb}." } }
-  ],
-  "poweredBy": { "text": "Built by Acme", "url": "https://acme.com.au" }
+  ]
 }
 ```
 
@@ -75,6 +74,10 @@ under `widget` in `helppuff.json`; see the
   and values cannot inject CSS.
 - **`strings`** overrides any text the widget shows (button labels, error
   messages), for wording or language.
+- **"Powered by HelpPuff"** is always shown at the bottom of the chat. It is
+  not a setting; `strings.poweredBy` can translate it, as long as the
+  translation still says HelpPuff. Older configs with `poweredBy` still load,
+  and the value is ignored.
 - **Live chat** ([[Live chat|Live-Chat]]): when it is on, a **person** button
   at the top of the chat asks for someone from the team (`strings.talkToPerson`),
   and the header says who is answering (`strings.liveStatus`). Its code is a

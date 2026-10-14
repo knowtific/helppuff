@@ -68,11 +68,11 @@ const key = async (element: Element, name: string) =>
   });
 
 describe('the Prompt page with tools', () => {
-  it('shows a chat as steps: before, the prompt with knowledge and webhooks, then the summary and after', async () => {
+  it('shows a chat as steps: before, the prompt with knowledge and webhooks, then AI post-processing and after', async () => {
     fakeApi({ 'GET /prompt': PROMPT, 'GET /tools': list([tool({ before: true })]) });
     const page = await mount(<Prompt me={me('owner')} />);
     const headings = [...page.querySelectorAll('h2')].map((h) => h.textContent?.trim());
-    expect(headings).toEqual(expect.arrayContaining([expect.stringContaining('Before the chat'), expect.stringContaining('Summary & labels'), expect.stringContaining('After the chat')]));
+    expect(headings).toEqual(expect.arrayContaining([expect.stringContaining('Before the chat'), expect.stringContaining('AI post-processing'), expect.stringContaining('After the chat')]));
     expect(byText(page, 'Chat starts')).toBeTruthy();
     expect(byText(page, 'Chat ends')).toBeTruthy();
     expect(button(page, /^Prompt/)?.textContent).toMatch(/v2.*1 tool · published/);

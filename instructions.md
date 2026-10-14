@@ -13,6 +13,10 @@ assistant is deployed and tested or you reach a step only the user can perform.
 
 - If the workspace contains `helppuff.json`, this is an existing HelpPuff
   project. Do not run `init`; follow **Existing projects** below.
+- If the workspace is empty (a folder the user made for the assistant), work
+  in it directly. This is the usual start: the user made a folder, opened you
+  in it and pasted the prompt. Ask for the website address, since there is no
+  site code to read it from.
 - If the workspace is the website's source repository, work in its root so the
   HelpPuff project and embed change can be committed with the website.
 - Otherwise, create a dedicated folder such as `chat-assistant/`. Do not put

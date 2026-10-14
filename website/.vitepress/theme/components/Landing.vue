@@ -21,7 +21,16 @@ const docs = (page: string) => withBase(`/docs/${page}`);
 
 const INSTALL = 'npx @knowtific/helppuff';
 const AGENT_PROMPT =
-  'Follow the HelpPuff instructions at https://raw.githubusercontent.com/knowtific/helppuff/main/instructions.md and install it in this project. Complete setup automatically with the recommended free defaults. Ask me only for information you cannot determine safely or authorization I must complete. Continue until it is deployed, added to the website when possible, tested with real questions, and you have given me the dashboard, embed and preview links.';
+  'Follow the HelpPuff instructions at https://raw.githubusercontent.com/knowtific/helppuff/main/instructions.md and set up HelpPuff in this folder. Complete setup automatically with the recommended free defaults. Ask me only for information you cannot determine safely or authorization I must complete. Continue until it is deployed, added to the website when possible, tested with real questions, and you have given me the dashboard, embed and preview links.';
+/** What people ask their agent once it is set up: each one a setting or a command it already has. */
+const ASKS = [
+  'Make the chat button orange and call the assistant Sam.',
+  'Don’t ask for details before the chat starts.',
+  'Never quote prices; offer a callback instead.',
+  'Turn on live chat so my team can answer.',
+  'When someone asks where their order is, check our order API.',
+  'Go through my HelpPuff settings with me.',
+];
 const copied = ref('');
 function copy(text: string, key: string) {
   void navigator.clipboard?.writeText(text).then(() => {
@@ -57,7 +66,6 @@ const LOOKS = [
     widget: {
       brand: { name: 'Harbour Plumbing', agentName: 'Mia', accent: '#0F766E', theme: 'light', tokens: { font: 'Georgia, "Times New Roman", serif', 'radius-panel': '32px' } },
       launcher: { icon: 'chat', shape: 'pill', label: 'Questions?' },
-      poweredBy: false,
     },
   },
 ];
@@ -90,7 +98,7 @@ const STATS = [
   { value: '$0', label: 'to start, on Cloudflare’s Workers Free plan' },
   { value: '~300', label: 'typical AI answers a day within the free allowance' },
   { value: '~35 KB', label: 'gzipped, loaded after your page so it never slows it' },
-  { value: '1', label: 'command to set up, deploy and connect everything' },
+  { value: '1', label: 'prompt to your AI agent to set up, deploy and test it' },
 ];
 
 type Cell = boolean | string;
@@ -206,7 +214,7 @@ const ICONS: Record<string, string> = {
       <div class="wrap hero-grid">
         <div class="hero-copy">
           <a class="eyebrow" :href="REPO" target="_blank" rel="noopener">
-            <span class="dot" /> Open source · MIT · Runs on Cloudflare’s free plan
+            <span class="dot" /> AI-agent first · Open source · Runs on Cloudflare’s free plan
           </a>
           <h1>
             Your website’s AI assistant.<br />
@@ -217,19 +225,32 @@ const ICONS: Record<string, string> = {
             turns requests into jobs, all inside <strong>your own Cloudflare account</strong>. No subscription, no server to patch,
             no chatbot vendor holding your customers.
           </p>
+          <p class="lede agent-lede">
+            <strong>Your AI agent sets it up.</strong> Make a folder, open Claude Code, Codex or Cursor in it and paste one prompt.
+            Nothing to configure by hand, unless you want to.
+          </p>
+          <button class="agent-prompt" type="button" aria-label="Copy the prompt for your AI agent" @click="copy(AGENT_PROMPT, 'hero-agent')">
+            <span class="ap-head">
+              <svg viewBox="0 0 24 24"><path :d="ICONS.bot" /></svg>
+              Paste into your AI agent
+              <span class="copy-state">
+                <svg viewBox="0 0 24 24"><path :d="copied === 'hero-agent' ? ICONS.check : ICONS.copy" /></svg>
+                {{ copied === 'hero-agent' ? 'Copied' : 'Copy' }}
+              </span>
+            </span>
+            <span class="ap-text">{{ AGENT_PROMPT }}</span>
+          </button>
+          <p class="sub-note">
+            Prefer the terminal?
+            <button class="inline-copy" type="button" :aria-label="`Copy ${INSTALL}`" @click="copy(INSTALL, 'install')">
+              <code>{{ INSTALL }}</code>
+              <svg viewBox="0 0 24 24"><path :d="copied === 'install' ? ICONS.check : ICONS.copy" /></svg>
+            </button>
+          </p>
           <div class="ctas">
             <a class="btn primary" :href="docs('Getting-Started')">Get started <svg viewBox="0 0 24 24"><path :d="ICONS.arrow" /></svg></a>
             <a class="btn ghost" :href="WIDGET_DEMO.href" target="_blank" rel="noopener">Try every option live</a>
           </div>
-          <button class="install" type="button" :aria-label="`Copy ${INSTALL}`" @click="copy(INSTALL, 'install')">
-            <span class="prompt">$</span>
-            <code>{{ INSTALL }}</code>
-            <span class="copy-state">
-              <svg viewBox="0 0 24 24"><path :d="copied === 'install' ? ICONS.check : ICONS.copy" /></svg>
-              {{ copied === 'install' ? 'Copied' : 'Copy' }}
-            </span>
-          </button>
-          <p class="sub-note">or let Claude Code, Codex or Cursor do it: <a href="#agents">one prompt</a>.</p>
         </div>
 
         <div class="hero-art">
@@ -254,6 +275,56 @@ const ICONS: Record<string, string> = {
       <div v-for="s in STATS" :key="s.value" class="stat">
         <b>{{ s.value }}</b>
         <span>{{ s.label }}</span>
+      </div>
+    </section>
+
+    <!-- Agents -->
+    <section class="agents" id="agents">
+      <div class="wrap agents-grid">
+        <div>
+          <p class="kicker">AI-agent first</p>
+          <h2>Make a folder. Paste one prompt. <span class="hp-emph">Your agent does the rest.</span></h2>
+          <p>
+            You don’t configure HelpPuff by hand (though you can). Claude Code, Codex, Cursor or OpenCode takes an empty
+            folder to a tested assistant on your site: it deploys it, learns your website, asks a real question and hands
+            you the links. You only tell it your website and sign in to Cloudflare.
+          </p>
+          <ol class="steps">
+            <li><code>mkdir my-assistant &amp;&amp; cd my-assistant</code></li>
+            <li>Open your agent there: <code>claude</code> <code>codex</code> <code>cursor .</code></li>
+            <li>Paste the prompt</li>
+          </ol>
+          <ul class="ticks">
+            <li><svg viewBox="0 0 24 24"><path :d="ICONS.check" /></svg> Shared instructions for every agent: no plugin, skill or MCP server</li>
+            <li><svg viewBox="0 0 24 24"><path :d="ICONS.check" /></svg> Everything the dashboard does is in the CLI and admin API</li>
+            <li><svg viewBox="0 0 24 24"><path :d="ICONS.check" /></svg> Any model or knowledge base with one command, even your own code</li>
+            <li><svg viewBox="0 0 24 24"><path :d="ICONS.check" /></svg> You step in only for sign-in or a real business decision</li>
+          </ul>
+          <button class="btn primary" type="button" @click="copy(AGENT_PROMPT, 'agent')">
+            <svg viewBox="0 0 24 24"><path :d="copied === 'agent' ? ICONS.check : ICONS.copy" /></svg>
+            {{ copied === 'agent' ? 'Prompt copied' : 'Copy the agent prompt' }}
+          </button>
+          <p class="asks-label">Then change anything by asking:</p>
+          <ul class="asks">
+            <li v-for="a in ASKS" :key="a">“{{ a }}”</li>
+          </ul>
+        </div>
+        <div class="terminal" role="img" aria-label="An example agent session: init, a question for you, knowledge status, a test question, then the embed added to your site">
+          <div class="term-bar"><i /><i /><i /><span>claude — my-site</span></div>
+          <pre><span class="t-dim">›</span> Follow the HelpPuff instructions … set up HelpPuff in this folder
+
+<span class="t-acc">●</span> helppuff init --url https://harbour.example --deploy --json
+  <span class="t-dim">{ "status": "needs_input", "questions": [ … ] }</span>
+<span class="t-acc">●</span> Asked you the one thing it could not detect, re-ran
+  <span class="t-dim">{ "status": "created", "deploy": { … } }</span>
+<span class="t-acc">●</span> helppuff knowledge status --json
+  <span class="t-ok">✓</span> Website learned
+<span class="t-acc">●</span> helppuff ask "Do you do emergency callouts?" --json
+  <span class="t-ok">✓</span> Reply cites /services/emergency
+<span class="t-acc">●</span> Added the embed script to app/layout.tsx
+
+  Done: your dashboard, embed and preview links.</pre>
+        </div>
       </div>
     </section>
 
@@ -434,47 +505,6 @@ const ICONS: Record<string, string> = {
       </div>
     </section>
 
-    <!-- Agents -->
-    <section class="agents" id="agents">
-      <div class="wrap agents-grid">
-        <div>
-          <p class="kicker">Built for AI agents</p>
-          <h2>Paste one prompt. <span class="hp-emph">Your agent does the rest.</span></h2>
-          <p>
-            Claude Code, Codex, Cursor or OpenCode can take a folder from empty to a tested assistant on your site.
-            The CLI answers in JSON, asks only what it cannot work out as structured questions, never echoes a secret,
-            and tests real answers without touching your visitors’ limits.
-          </p>
-          <ul class="ticks">
-            <li><svg viewBox="0 0 24 24"><path :d="ICONS.check" /></svg> Shared instructions for every agent: no plugin, skill or MCP server</li>
-            <li><svg viewBox="0 0 24 24"><path :d="ICONS.check" /></svg> Everything the dashboard does is in the CLI and admin API</li>
-            <li><svg viewBox="0 0 24 24"><path :d="ICONS.check" /></svg> Any model or knowledge base with one command, even your own code</li>
-            <li><svg viewBox="0 0 24 24"><path :d="ICONS.check" /></svg> You step in only for sign-in or a real business decision</li>
-          </ul>
-          <button class="btn primary" type="button" @click="copy(AGENT_PROMPT, 'agent')">
-            <svg viewBox="0 0 24 24"><path :d="copied === 'agent' ? ICONS.check : ICONS.copy" /></svg>
-            {{ copied === 'agent' ? 'Prompt copied' : 'Copy the agent prompt' }}
-          </button>
-        </div>
-        <div class="terminal" role="img" aria-label="An example agent session: init, a question for you, knowledge status, a test question, then the embed added to your site">
-          <div class="term-bar"><i /><i /><i /><span>claude — my-site</span></div>
-          <pre><span class="t-dim">›</span> Install HelpPuff in this project (prompt from the README)
-
-<span class="t-acc">●</span> helppuff init --url https://harbour.example --deploy --json
-  <span class="t-dim">{ "status": "needs_input", "questions": [ … ] }</span>
-<span class="t-acc">●</span> Asked you the one thing it could not detect, re-ran
-  <span class="t-dim">{ "status": "created", "deploy": { … } }</span>
-<span class="t-acc">●</span> helppuff knowledge status --json
-  <span class="t-ok">✓</span> Website learned
-<span class="t-acc">●</span> helppuff ask "Do you do emergency callouts?" --json
-  <span class="t-ok">✓</span> Reply cites /services/emergency
-<span class="t-acc">●</span> Added the embed script to app/layout.tsx
-
-  Done: your dashboard, embed and preview links.</pre>
-        </div>
-      </div>
-    </section>
-
     <!-- Stack -->
     <section class="wrap block">
       <header class="section-head">
@@ -597,17 +627,33 @@ h1 { text-wrap: balance; margin: 22px 0 18px; font-size: clamp(40px, 6.2vw, 72px
 .lede strong { color: var(--ink); font-weight: 600; }
 .ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
 .ctas.center { justify-content: center; }
-.install {
-  margin-top: 22px; display: inline-flex; align-items: center; gap: 12px; padding: 10px 12px 10px 18px; border-radius: 14px;
-  border: 1px solid var(--line); background: var(--soft); cursor: pointer; font: inherit; color: var(--ink); transition: border-color 160ms;
-}
-.install:hover { border-color: var(--ink); }
-.install code { font-family: var(--vp-font-family-mono); font-size: 15px; }
-.prompt { color: var(--hp-heading-accent); font-family: var(--vp-font-family-mono); font-weight: 700; }
 .copy-state { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); padding: 4px 10px; border-radius: 8px; background: var(--card); }
 .copy-state svg { width: 14px; height: 14px; }
 .sub-note { margin: 12px 0 0; font-size: 14px; color: var(--ink-2); }
 .sub-note a { color: var(--hp-link); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
+
+.agent-lede { margin-top: 14px; }
+/* The agent prompt, the first thing to copy: a card showing its first lines. */
+.agent-prompt {
+  margin-top: 24px; display: grid; gap: 8px; width: 100%; max-width: 560px; padding: 12px 14px 14px; border-radius: 14px; text-align: left;
+  border: 1px solid var(--line); background: var(--soft); cursor: pointer; font: inherit; color: var(--ink); transition: border-color 160ms;
+}
+.agent-prompt:hover { border-color: var(--ink); }
+.agent-prompt:focus-visible, .inline-copy:focus-visible { outline: 2px solid var(--hp-link); outline-offset: 2px; }
+.ap-head { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+.ap-head > svg { color: var(--hp-heading-accent); }
+.ap-head .copy-state { margin-left: auto; }
+.ap-text {
+  font-family: var(--vp-font-family-mono); font-size: 13px; line-height: 1.55; color: var(--ink-2);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.inline-copy {
+  display: inline-flex; align-items: center; gap: 6px; margin-left: 4px; padding: 2px 8px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--soft); color: var(--ink); cursor: pointer; font: inherit; vertical-align: middle;
+}
+.inline-copy:hover { border-color: var(--ink); }
+.inline-copy code { font-family: var(--vp-font-family-mono); font-size: 13px; }
+.inline-copy svg { width: 14px; height: 14px; }
 
 .hero-copy { position: relative; z-index: 1; }
 .hero-art { position: relative; height: 640px; }
@@ -727,6 +773,16 @@ figcaption b { display: block; font-size: 16px; color: var(--ink); margin-bottom
 .ticks { list-style: none; padding: 0; margin: 24px 0 30px; display: grid; gap: 12px; }
 .ticks li { display: flex; gap: 10px; align-items: flex-start; color: var(--ink); font-size: 15px; }
 .ticks svg { color: var(--hp-heading-accent); margin-top: 2px; }
+.steps { margin: 22px 0 0; padding: 0; list-style: none; counter-reset: step; display: grid; gap: 10px; color: var(--ink); font-size: 15px; }
+.steps li { counter-increment: step; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.steps li::before {
+  content: counter(step); display: inline-grid; place-items: center; width: 22px; height: 22px; margin-right: 4px; border-radius: 50%;
+  font-size: 12px; font-weight: 700; background: var(--hp-accent); color: var(--hp-on-accent);
+}
+.steps code, .asks code { font-family: var(--vp-font-family-mono); font-size: 13px; padding: 1px 6px; border-radius: 6px; background: var(--card); }
+.agents p.asks-label { margin: 28px 0 10px; font-size: 14px; font-weight: 600; color: var(--ink); }
+.asks { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.asks li { font-size: 13px; padding: 6px 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--ink-2); }
 /* The terminal is dark in both themes: deep oxblood, porcelain type, citron for what you type. */
 .terminal { --t-bg: color-mix(in srgb, var(--hp-oxblood) 82%, var(--hp-ink)); --t-text: var(--hp-porcelain); border-radius: 18px; border: 1px solid color-mix(in srgb, var(--t-text) 14%, var(--t-bg)); background: var(--t-bg); box-shadow: 0 40px 90px -30px var(--hp-shadow); overflow: hidden; }
 .term-bar { display: flex; align-items: center; gap: 7px; height: 40px; padding: 0 16px; border-bottom: 1px solid color-mix(in srgb, var(--t-text) 10%, var(--t-bg)); }
@@ -809,7 +865,6 @@ figcaption b { display: block; font-size: 16px; color: var(--ink); margin-bottom
   .c-row { min-width: 620px; }
   .stack, .panel { padding: 24px; }
   .browser iframe { height: 620px; }
-  .install code { font-size: 13px; }
   .final { padding: 56px 20px; border-radius: 24px; }
 }
 </style>

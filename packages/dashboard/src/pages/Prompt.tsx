@@ -1,6 +1,6 @@
 import { ArrowDownToLine, ArrowLeft, ArrowUpFromLine, BookOpen, Bot, ChevronRight, History, Loader2, Lock, MessageSquare, MessageSquareOff, PackageOpen, RotateCcw, Sparkles, Webhook, X } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { PageHeader, SettingsTabs } from '../components/Shell';
+import { HelpLink, HelpNote, PageHeader, SettingsTabs } from '../components/Shell';
 import { AskAgent, agentRequest } from './Settings';
 import { hostOf, PromptEditor, promptSuggestions, ToolDialog, unknownRefs, type Section } from '../components/Tools';
 import { AddMenu, Canvas, Edge, Node, NodeButton, Stem, type Tint } from '../components/Flow';
@@ -14,10 +14,10 @@ import { cn, fmtDateTime, fmtNumber, fmtRelative, href, useData } from '../lib/u
 /**
  * What happens around every chat, as a diagram that does not move: tools
  * before the chat, the prompt (with the knowledge above it and the webhooks
- * below), then the summary and labels and the tools after it. Each step is
+ * below), then AI post-processing and the tools after it. Each step is
  * where you change it: the prompt opens in a modal (its editor, its tools,
- * its history), "+ Add" offers your tools or a new one, and Knowledge,
- * Labels and Webhooks open their pages. In the prompt, `{{tool}}` lets the
+ * its history), "+ Add" offers your tools or a new one, and Knowledge and
+ * Webhooks open their pages. In the prompt, `{{tool}}` lets the
  * assistant call one and `{{tool.key}}` reads what it returned.
  *
  * Publishing makes a new prompt version live; restoring publishes an old
@@ -138,13 +138,11 @@ export function Prompt({ me }: { me: Me }) {
   };
   const knowledge = useKnowledgeStatus(Boolean(siteInfo?.knowledge));
   const hooks = useData(() => api<{ webhooks: { id: string; enabled: boolean }[] }>('/webhooks').catch(() => null), []);
-  const labels = useData(() => api<{ labels: { id: string }[] }>('/labels').catch(() => null), []);
   const list = tools.data;
   const named = new Set(promptToolRefs(text).map((r) => r.name));
   const inPrompt = list?.tools.filter((t) => named.has(t.name) && (t.kind === 'http' || !t.after)) ?? [];
   const learned = (knowledge.status?.pages.indexed ?? 0) + (knowledge.status?.pages.unchanged ?? 0);
   const hookCount = hooks.data?.webhooks.filter((h) => h.enabled).length ?? 0;
-  const labelCount = labels.data?.labels.length ?? 0;
   /** A tool goes into the prompt as a sentence the owner can then reword. */
   const addToPrompt = (tool: Pick<ToolView, 'name' | 'kind'>) => {
     if (named.has(tool.name)) return;
@@ -157,7 +155,7 @@ export function Prompt({ me }: { me: Me }) {
       <div inert={open}>
         <PageHeader
           title="Prompt & tools"
-          description="What happens around every chat: tools before it, your prompt and knowledge during it, then an optional summary, tools and webhooks after it. Click any step to change it."
+          description="What happens around every chat: tools before it, your prompt and knowledge during it, then optional AI post-processing, tools and webhooks after it. Click any step to change it."
           help="Prompts-and-Instructions"
           actions={
             <>
@@ -238,38 +236,39 @@ export function Prompt({ me }: { me: Me }) {
 
                 <Edge icon={<MessageSquareOff />} label="Chat ends" />
 
-                {/* After the chat: the summary and labels, then the owner's tools */}
+                {/* After the chat: AI post-processing (one switch), then the owner's tools */}
                 <div className="relative flex flex-col gap-3 lg:w-64 lg:shrink-0 lg:pl-4">
                   <span className="absolute top-10 bottom-10 left-0 hidden w-px bg-border lg:block" aria-hidden />
                   <Node
                     tint="teal"
                     icon={<Sparkles />}
-                    title="Summary & labels"
-                    tip={me.summaries ? 'When on, five quiet minutes after the last message, AI writes a summary and labels. Turning it off stops both for new chats; after-chat tools and webhooks still run.' : 'Automatic summaries need a Workers AI binding.'}
+                    title="AI post-processing"
+                    aside={
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-label="AI post-processing"
+                        aria-checked={summaryOn}
+                        aria-busy={summaryBusy}
+                        disabled={!me.summaries || summaryBusy}
+                        onClick={() => void toggleSummary()}
+                        className={cn('relative h-5 w-9 shrink-0 rounded-full border border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50', summaryOn ? 'bg-primary' : 'bg-muted-foreground/30')}
+                      >
+                        <span className={cn('absolute top-px left-px size-4 rounded-full bg-background shadow-sm transition-transform motion-reduce:transition-none', summaryOn ? 'translate-x-4' : 'translate-x-0')} />
+                      </button>
+                    }
                   >
-                    <div className="flex items-center justify-between text-[13px]">
-                      <span>Summary</span>
-                      <span className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">{summaryOn ? 'On' : 'Off'}</span>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-label="Automatic summaries"
-                          aria-checked={summaryOn}
-                          aria-busy={summaryBusy}
-                          disabled={!me.summaries || summaryBusy}
-                          onClick={() => void toggleSummary()}
-                          className={cn('relative h-5 w-9 shrink-0 rounded-full border border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50', summaryOn ? 'bg-primary' : 'bg-muted-foreground/30')}
-                        >
-                          <span className={cn('absolute top-px left-px size-4 rounded-full bg-background shadow-sm transition-transform motion-reduce:transition-none', summaryOn ? 'translate-x-4' : 'translate-x-0')} />
-                        </button>
-                      </span>
-                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {!me.summaries ? 'Needs a Workers AI binding.' : summaryOn ? 'Five quiet minutes after the last message, AI:' : 'Off for new chats. Tools and webhooks still run.'}
+                    </p>
+                    <ul className={cn('list-disc space-y-0.5 pl-4 text-[13px] marker:text-muted-foreground', !summaryOn && 'text-muted-foreground')}>
+                      <li>Writes a summary</li>
+                      <li>Adds labels</li>
+                      <li>Saves contact details typed in the chat</li>
+                      <li>Lists questions it could not answer</li>
+                    </ul>
                     {summaryError && <p role="alert" className="text-xs text-danger">{summaryError}</p>}
-                    <a href={href({ page: 'settings', id: 'labels' })} className="flex items-center justify-between text-[13px] hover:underline">
-                      <span>Labels</span>
-                      <span className="text-xs text-muted-foreground">{labelCount ? `${labelCount} →` : 'Add →'}</span>
-                    </a>
+                    <HelpLink page="Prompts-and-Instructions#ai-post-processing" />
                   </Node>
                   {list && <ToolsNode section="after" list={list} onOpen={(tool) => setDialog({ tool })} onNew={() => setDialog({ tool: null, section: 'after' })} onChange={(tool, on) => setFlag(tool, 'after', on)} />}
                 </div>
@@ -543,6 +542,9 @@ function PromptModal({
                 </div>
               )}
               <PromptEditor value={text} onChange={onText} suggestions={suggestions} label="System prompt" placeholder={PROMPT_PLACEHOLDER} className="min-h-[22rem] resize-y font-mono text-[12.5px] leading-relaxed" />
+              <HelpNote page="Tools" label="Learn more">
+                To use a tool, write <code className="rounded bg-muted px-1 font-mono">{'{{ tool_name }}'}</code> in the prompt.
+              </HelpNote>
               {list?.assistant && (
                 <div className="flex flex-wrap items-center gap-2">
                   <PromptTools text={text} list={list} onOpen={onOpenTool} />
