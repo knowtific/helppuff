@@ -9,7 +9,8 @@ import { makeStrings } from '../src/app/strings.js';
 /** Photos and files in the widget: the paperclip, and file messages drawn by the upload chunk. */
 
 const t = makeStrings();
-const file: Message = { id: 'm1', ts: 1, role: 'user', type: 'file', files: [{ id: 'f_1', name: 'leak.jpg', type: 'image/jpeg', size: 1000, url: 'https://w.test/v1/files/demo/chat/f_1?e=1&s=x' }] };
+const photo = { id: 'f_1', name: 'leak.jpg', type: 'image/jpeg', size: 1000, url: 'https://w.test/v1/files/demo/chat/f_1?e=1&s=x' };
+const file: Message = { id: 'm1', ts: 1, role: 'user', type: 'file', files: [photo] };
 
 describe('the paperclip', () => {
   it('shows only when the app allows a file, and hands over the input', () => {
@@ -35,7 +36,7 @@ describe('file messages', () => {
 
   it('show photos as pictures and other files as links, with what was written', () => {
     const root = document.createElement('div');
-    drawFiles(root, { role: 'agent', text: 'Your quote', files: [...(file as { files: never[] }).files, { id: 'f_2', name: 'quote.pdf', type: 'application/pdf', size: 10 }] });
+    drawFiles(root, { role: 'agent', text: 'Your quote', files: [photo, { id: 'f_2', name: 'quote.pdf', type: 'application/pdf', size: 10 }] });
     expect(root.querySelector('img')?.getAttribute('alt')).toBe('leak.jpg');
     const links = root.querySelectorAll('a');
     expect(links[0]?.getAttribute('href')).toBe('https://w.test/v1/files/demo/chat/f_1?e=1&s=x');
