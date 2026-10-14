@@ -28,6 +28,8 @@ export const API_BASE = '/api/v1';
 export const ADMIN_BASE = '/admin/api';
 const MAX_BODY = 1_000_000;
 const MAX_UPLOAD = 10 * 1024 * 1024 + 1024;
+/** `files.maxJobMb`'s ceiling. */
+const MAX_JOB_UPLOAD = 95 * 1024 * 1024 + 1024;
 const KEY_IN_URL = ['key', 'api_key', 'apikey', 'apiKey', 'token', 'access_token'];
 
 /** The path below the base the request came through: `/leads/abc`. */
@@ -51,7 +53,9 @@ export async function publicApiGate(c: Context<HonoEnv>, next: Next): Promise<vo
     throw new HelpPuffError('bad_request', { message: 'Send the key in the Authorization header, never in the URL.', detail: 'api_key_in_url' });
   }
   const length = Number(c.req.header('Content-Length') ?? 0);
-  if (length > (path === '/knowledge/files' ? MAX_UPLOAD : MAX_BODY)) {
+  // Uploads carry their bytes; their own routes check them against the site's limits.
+  const upload = path === '/knowledge/files' ? MAX_UPLOAD : /^\/jobs\/[^/]+\/files$/.test(path) ? MAX_JOB_UPLOAD : MAX_BODY;
+  if (length > upload) {
     throw new HelpPuffError('bad_request', { message: 'The request body is too large.', detail: 'api_payload_too_large' });
   }
 

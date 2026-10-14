@@ -12,7 +12,7 @@ import { concerns, looking, nudge, type Concern } from './attention';
 
 export type LiveEvent =
   | { t: 'handover'; conversationId: string; conversation: { leadName?: string | null; leadEmail?: string | null; firstMessage?: string | null; pageUrl?: string | null } }
-  | { t: 'message'; conversationId: string; message: { role: string; text?: string }; by?: string; assignedTo?: string | null; who?: string | null }
+  | { t: 'message'; conversationId: string; message: { role: string; text?: string; files?: { name: string }[] }; by?: string; assignedTo?: string | null; who?: string | null }
   | { t: 'assigned'; conversationId: string; to: string | null; name: string | null; by?: string }
   | { t: 'ended'; conversationId: string; status: 'left' | 'closed' }
   | { t: 'missed'; conversationId: string }

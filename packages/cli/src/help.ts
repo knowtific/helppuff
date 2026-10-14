@@ -80,7 +80,8 @@ COMMANDS
     keys list|create|revoke  API keys for the public API (/api/v1): scoped, one site each, shown once
     api <METHOD> <path>  Call any public API endpoint with this project's admin key (--data '{…}')
     callbacks            Visitors waiting to be called back: list them, mark them done
-    jobs                 Requests, quotes and work on the pipeline: list, create, move, set up
+    jobs                 Requests, quotes and work on the pipeline: list, create, move, attach files, set up
+    files                Photos and files on R2: visitors send them in the chat, the team attaches them to jobs
     bookings             How visitors book: none, a booking link, or a date picker in the chat (HelpPuff books)
     appointments         The appointments: list, add, move, cancel, mark done, read the synced calendar
     integrations         Keys for Composio (Google Calendar, Outlook), Cal.com and Calendly
@@ -115,8 +116,8 @@ FILES
 CLOUDFLARE ACCESS
   Easiest: \`npx wrangler login\` once (opens a browser) — helppuff reuses that login.
   Or an API token (https://dash.cloudflare.com/profile/api-tokens → Custom Token) with: Workers Scripts:Edit,
-  Workers KV Storage:Edit, D1:Edit, Vectorize:Edit, Account Settings:Read (+ AI Search:Edit and :Run for the
-  cloudflare backend) — as CLOUDFLARE_API_TOKEN (env or .env) or --cf-token. A logs-only token needs
+  Workers KV Storage:Edit, D1:Edit, Vectorize:Edit, Account Settings:Read (+ Workers R2 Storage:Edit for photos
+  and files, AI Search:Edit and :Run for the cloudflare backend) — as CLOUDFLARE_API_TOKEN (env or .env) or --cf-token. A logs-only token needs
   Workers Tail:Read. CLOUDFLARE_ACCOUNT_ID or
   --account-id picks the account when the token sees several.
 
@@ -449,10 +450,16 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
   },
   jobs: {
     usage:
-      "helppuff jobs list [--status open|won|lost|all] [--search …] | show <job> | create [--title …] [--fields '{…}'] [--name …] [--email …] [--phone …] [--details …] [--value N] | move <job> <stage> [--reason …] | update <job> <text> | pipeline | template <id> | setup",
+      "helppuff jobs list [--status open|won|lost|all] [--search …] | show <job> | create [--title …] [--fields '{…}'] [--name …] [--email …] [--phone …] [--details …] [--value N] | move <job> <stage> [--reason …] | update <job> <text> | files <job> | attach <job> <path…> | detach <job> <file> | pipeline | template <id> | setup",
     summary:
-      'Requests, quotes and work on the site\'s pipeline, the same as the dashboard\'s Jobs page and Settings → Jobs. They come from the assistant (when a visitor asks for a quote or work done), the widget\'s quote questions, the API, and by hand. A job is named by its number (1042) or id; a stage by its name or id. `pipeline` shows the stages, fields and quote questions; `template` starts again from one (service-quote, projects, support, sales-demo, bookings, custom-orders, basic); `setup` lets the AI read the website and choose. Each change sends the job.* webhooks.',
-    examples: ['helppuff jobs --json', 'helppuff jobs create --name "Ada Lovelace" --email ada@example.com --fields \'{"service":"Hot water","address":"Glebe"}\'', 'helppuff jobs move 1042 "Quote sent"', 'helppuff jobs move 1042 Lost --reason "Went with another quote"', 'helppuff jobs setup --json'],
+      'Requests, quotes and work on the site\'s pipeline, the same as the dashboard\'s Jobs page and Settings → Jobs. They come from the assistant (when a visitor asks for a quote or work done), the widget\'s quote questions, the API, and by hand. A job is named by its number (1042) or id; a stage by its name or id. `pipeline` shows the stages, fields and quote questions; `template` starts again from one (service-quote, projects, support, sales-demo, bookings, custom-orders, basic); `setup` lets the AI read the website and choose. `files` lists a job\'s photos and files (and the ones the visitor sent in its conversation) with links that work for 12 hours; `attach` uploads files (photos, PDF, Office documents, text, CSV, MP4/MOV, up to files.maxJobMb), `detach` removes one by id or name: files on jobs must be on (`helppuff files jobs on`). Each change sends the job.* webhooks.',
+    examples: ['helppuff jobs --json', 'helppuff jobs create --name "Ada Lovelace" --email ada@example.com --fields \'{"service":"Hot water","address":"Glebe"}\'', 'helppuff jobs move 1042 "Quote sent"', 'helppuff jobs move 1042 Lost --reason "Went with another quote"', 'helppuff jobs setup --json', 'helppuff jobs attach 1042 ./after-install.jpg ./compliance.pdf'],
+  },
+  files: {
+    usage: 'helppuff files status | chat live|always|off | jobs on|off | ai on|off [--model <id>] | limits [--max-chat-mb N] [--max-job-mb N] [--per-conversation N] [--keep-days N]',
+    summary:
+      'Photos and files, kept in the deployment\'s own R2 bucket (private; every link is signed and expires). Both off by default, turned on separately, the same as Settings → Advanced → Files. `chat live` lets visitors send photos and PDFs while a person has the chat (live chat must be on); `chat always` also to the assistant, which is told a file arrived but never opens it, unless `ai on`: then a vision model (Workers AI, `--model`, default Llama 4 Scout) describes each photo once and the assistant reads that (more AI usage per photo). `jobs on` lets the team attach files to jobs (`helppuff jobs attach`). `limits` sets the largest file from visitors and on jobs (MB), files per chat, and how many days chat files are kept (job files stay until removed). Needs R2 turned on once for the Cloudflare account (the dashboard asks a person to accept the plan; free up to 10 GB); `helppuff deploy` then makes the bucket. Saved live and in helppuff.json (`files`).',
+    examples: ['helppuff files status --json', 'helppuff files chat live', 'helppuff files jobs on', 'helppuff files ai on', 'helppuff files limits --max-chat-mb 5 --keep-days 30'],
   },
   model: {
     usage: 'helppuff model | model set <workers-ai|openai-compatible|openai|gemini|anthropic|custom> [--model …] [--preset …] [--base-url …] [--key-env NAME] [--module ./llm.ts] [--secrets A,B] [--gateway …] [--gateway-id …] [--account-id …] [--yes] | model test ["question"]',

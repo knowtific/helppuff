@@ -85,9 +85,11 @@ The **Jobs** page (everyone on the team, members too):
   a number (`1042`). The view and filters are remembered.
 - **A job:** its stage, who has it, value and due date; its fields; **Add an
   update** (a line in its history, like *Parts ordered, back Thursday*);
-  private team **notes**; links to the contact and the conversation; and the
-  **history** of everything that happened: created, moved, each field
-  changed, and who did it.
+  private team **notes**; links to the contact and the conversation;
+  **files** (photos, plans, quotes: when [[files on jobs|Files#files-on-jobs]]
+  are on), with the photos the visitor sent in the chat; and the **history**
+  of everything that happened: created, moved, each field changed, files
+  attached, and who did it.
 
 With [[live chat|Live-Chat]] on, a new job from the chat, the quote
 questions or the API notifies the team the way a new message does (see
@@ -104,6 +106,7 @@ helppuff jobs create --name "Ada Lovelace" --email ada@example.com --fields '{"s
 helppuff jobs move 1042 "Quote sent"
 helppuff jobs move 1042 Lost --reason "Went with another quote"
 helppuff jobs update 1042 "Booked for Thursday 9am"
+helppuff jobs attach 1042 ./after-install.jpg  # files on jobs must be on
 helppuff jobs pipeline                          # stages, fields, quote questions
 helppuff jobs template projects                 # start again from a template
 helppuff jobs setup                             # let the AI choose from the website

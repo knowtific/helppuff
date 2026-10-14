@@ -4,6 +4,7 @@ import { PageHeader } from '../components/Shell';
 import { NotesPanel, SideSection } from '../components/inbox';
 import { Avatar, Badge, Button, Card, Empty, ErrorNote, InfoTip, Input, Segmented, Select, Skeleton, Textarea, useModal } from '../components/ui';
 import { RelatedAppointments } from '../components/Appointments';
+import { JobFilesSection } from '../components/Files';
 import { api, isMember, type Job, type JobDetail, type JobEvent, type JobField, type JobList, type JobStage, type Me, type PipelineView, type Team } from '../lib/api';
 import { useLiveEvents } from '../lib/live';
 import { cn, fmtDateTime, fmtRelative, href, useData, useDebounced, usePersisted } from '../lib/utils';
@@ -494,6 +495,10 @@ export function describeEvent(event: JobEvent): string {
       return String(d['text']);
     case 'edited':
       return d['field'] === 'title' ? `Title: ${v(d['from'])} → ${v(d['to'])}` : d['field'] === 'due' ? 'Due date changed' : 'Details changed';
+    case 'file':
+      return `Attached ${String(d['name'])}`;
+    case 'file_removed':
+      return `Removed ${String(d['name'])}`;
     case 'appointment': {
       const when = typeof d['start'] === 'number' ? new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).format(d['start']) : '';
       const what = String(d['title'] ?? 'Appointment');
@@ -663,6 +668,8 @@ function JobPanel({ id, me, pipeline, team, onChanged }: { id: string; me: Me; p
               <RelatedAppointments filter={{ job: id }} context={{ jobId: id, label: `For #${data.number} ${data.title}` }} admin={!member} />
             </SideSection>
           )}
+
+          <JobFilesSection jobId={id} me={me} onChanged={reload} />
 
           <SideSection title="Add an update">
             <form

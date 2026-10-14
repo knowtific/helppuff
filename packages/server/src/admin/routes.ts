@@ -33,6 +33,8 @@ import { callbackRoutes, callbackView } from './callbacks.js';
 import { attributesJson, closeCutoff, CONVERSATION_STATUSES, conversationExtras, inboxRoutes, labelsSql, mergeAttributes, parseJsonObject, parseLabels, statusFilter, statusSql, type ConversationStatus } from './inbox.js';
 import { liveRoutes } from './live.js';
 import { jobRoutes, maybeSetup } from './jobs.js';
+import { fileAdminRoutes } from './files.js';
+import { filesBucket, filesOf, LINK_TTL_MS, signedFileUrl } from '../files/store.js';
 import { homeRoutes, maybeSuggestHome } from './home.js';
 import { assistantRoutes } from './assistant.js';
 import { contactTagRoutes, contactTagsSql, contactTagStatements, parseContactTags } from './contact-tags.js';
@@ -433,8 +435,27 @@ adminRoutes.get('/conversations/:id', async (c) => {
   await currentAdmin(c);
   const found = await loadConversation(db(c), c.req.param('id'), await closeCutoff(c));
   assertSiteAccess(c, found.conversation['site_id'], 'conversation');
-  return c.json(found);
+  return c.json(await withFileLinks(c, found));
 });
+
+/** The photos and files in a transcript, each with a link signed now (stored references carry none). Removed ones lose theirs. */
+async function withFileLinks<T extends { conversation: Record<string, unknown>; messages: { payload: unknown }[] }>(c: Context<HonoEnv>, found: T): Promise<T> {
+  const named = found.messages.some((m) => Array.isArray((m.payload as { files?: unknown } | null)?.files));
+  if (!named) return found;
+  const ctx = c.get('helppuff');
+  const rows = await filesOf(db(c), { conversationId: String(found.conversation['id']) });
+  const now = ctx.platform.now();
+  const origin = new URL(c.req.url).origin;
+  const links = new Map(await Promise.all(rows.map(async (r) => [r.id, await signedFileUrl(requireSecret(ctx), origin, r, now + LINK_TTL_MS)] as const)));
+  return {
+    ...found,
+    messages: found.messages.map((m) => {
+      const files = (m.payload as { files?: { id: string }[] } | null)?.files;
+      if (!Array.isArray(files)) return m;
+      return { ...m, payload: { ...(m.payload as object), files: files.map((f) => (links.has(f.id) ? { ...f, url: links.get(f.id) } : { ...f, removed: true })) } };
+    }),
+  };
+}
 
 adminRoutes.post('/conversations/:id/summary', async (c) => {
   assertSameOrigin(c);
@@ -678,7 +699,7 @@ adminRoutes.delete('/leads/:id', async (c) => {
   assertSiteAccess(c, lead.site_id, 'lead');
   const erase = c.req.query('erase') === 'conversations';
   const linked = erase ? (await d.prepare('SELECT id FROM conversations WHERE lead_id = ?').bind(id).all<{ id: string }>()).results.map((r) => r.id) : [];
-  await deleteConversations(d, linked);
+  await deleteConversations(d, linked, filesBucket(c.get('helppuff').env));
   await d.batch([
     d.prepare('UPDATE conversations SET lead_id = NULL WHERE lead_id = ?').bind(id),
     d.prepare('UPDATE callbacks SET lead_id = NULL WHERE lead_id = ?').bind(id),
@@ -857,5 +878,6 @@ adminRoutes.route('/', inboxRoutes);
 adminRoutes.route('/', contactTagRoutes);
 adminRoutes.route('/', liveRoutes);
 adminRoutes.route('/', jobRoutes);
+adminRoutes.route('/', fileAdminRoutes);
 adminRoutes.route('/', homeRoutes);
 adminRoutes.route('/', assistantRoutes);

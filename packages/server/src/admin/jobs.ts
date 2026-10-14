@@ -15,6 +15,7 @@ import { assertAdmin, assertSameOrigin, assertSiteAccess, currentAdmin, db, json
 import { actorOf } from './inbox.js';
 import { displayName } from './live.js';
 import { knowledgeOf } from '../core/assistant.js';
+import { deleteFiles, filesBucket, filesOf } from '../files/store.js';
 
 /**
  * Jobs: the site's pipeline (stages, fields, quote questions, the template
@@ -386,6 +387,7 @@ jobRoutes.delete('/jobs/:id', async (c) => {
   assertSameOrigin(c);
   assertAdmin(await currentAdmin(c));
   const row = await ownJob(c);
+  await deleteFiles({ db: db(c), bucket: filesBucket(c.get('helppuff').env) }, await filesOf(db(c), { jobId: row.id }));
   await deleteJob(db(c), row);
   return c.json({ id: row.id, deleted: true });
 });

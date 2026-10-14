@@ -35,7 +35,10 @@ live chat hub (a Cloudflare Durable Object, on the Free plan).
    replies, with their name above them.
 4. If nobody takes it within **Wait before offering a callback** (default
    120 seconds), they get the callback form, and can keep waiting.
-5. When the team hands back to the assistant, or closes the chat, they are
+5. With [[photos in the chat|Files]] set to `live`, a paperclip lets them
+   send photos and PDFs while a person has the chat. The team sees them in
+   the conversation (and as links on Telegram).
+6. When the team hands back to the assistant, or closes the chat, they are
    told; if they write again, the assistant answers. The team can step back
    in at any time (see [Answering](#answering)).
 

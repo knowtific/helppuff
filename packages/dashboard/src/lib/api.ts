@@ -509,6 +509,22 @@ export function uploadFile(file: File): Promise<{ id: string; status: FileStatus
   });
 }
 
+/** A photo or file, with a signed link that works for a while. */
+export type StoredFile = { id: string; name: string; type: string; size: number; url?: string; removed?: boolean; uploadedBy?: string; uploadedByName?: string | null; createdAt?: number };
+export type JobFiles = { enabled: boolean; storage: boolean; maxMb: number; files: StoredFile[]; fromChat: StoredFile[] };
+
+export const jobFiles = (jobId: string) => api<JobFiles>(`/jobs/${encodeURIComponent(jobId)}/files`);
+
+export function attachJobFile(jobId: string, file: File): Promise<StoredFile> {
+  return api(`/jobs/${encodeURIComponent(jobId)}/files?name=${encodeURIComponent(file.name)}`, {
+    method: 'POST',
+    body: file,
+    headers: { 'Content-Type': file.type || 'application/octet-stream' },
+  });
+}
+
+export const removeJobFile = (jobId: string, fileId: string) => api<{ id: string; deleted: boolean }>(`/jobs/${encodeURIComponent(jobId)}/files/${encodeURIComponent(fileId)}`, { method: 'DELETE' });
+
 export type LeadField = { name: string; label: string; type: 'text' | 'email' | 'tel' | 'textarea' | 'select'; required: boolean; options?: string[] };
 
 export type Settings = {
@@ -534,6 +550,19 @@ export type Settings = {
   home?: HomeSettings;
   /** Appointments: how visitors book, the date picker's calendar. Absent from older Workers. */
   bookings?: BookingsSettings;
+  /** Photos and files: in the chat, on jobs. Absent from older Workers. */
+  files?: FilesSettings;
+};
+
+export type FilesSettings = {
+  chat: 'off' | 'live' | 'always';
+  jobs: boolean;
+  maxChatMb: number;
+  maxJobMb: number;
+  perConversation: number;
+  keepChatDays: number;
+  aiSeesPhotos: boolean;
+  visionModel: string;
 };
 
 export type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
@@ -643,6 +672,7 @@ export type Limits = {
   handoversPerIpPerDay?: number;
   waitingPerSite?: number;
   liveSocketsPerIp?: number;
+  uploadsPerIpPerHour?: number;
 };
 export type SecuritySettings = {
   limits: Limits;
@@ -659,6 +689,8 @@ export type SettingsView = {
   meta: { at: number; by: string | null } | null;
   /** Turnstile is set up (`security.captcha`). */
   captcha?: boolean;
+  /** The deployment has its R2 bucket: files can work. */
+  storage?: boolean;
   /** What the widget's home screen shows until it is set up: suggested from the website. */
   suggestedHome?: { questions: string[]; links: HomeLinks | null; at: number } | null;
   /** Who writes the answers and what they come from: changed only with the CLI. Null for a backend that runs its own. */

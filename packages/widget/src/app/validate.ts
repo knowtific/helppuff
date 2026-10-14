@@ -1,5 +1,5 @@
 import { isHttpUrl, isSafeUrl } from '@helppuff/protocol/url';
-import type { Action, Field, Flow, FlowStep, Img, Message, Option, Shortcut, WidgetConfig } from '@helppuff/protocol';
+import type { Action, Field, FileRef, Flow, FlowStep, Img, Message, Option, Shortcut, WidgetConfig } from '@helppuff/protocol';
 
 /**
  * Boundary validation for the widget: config and every message from the
@@ -241,6 +241,16 @@ export function parseMessage(input: unknown): Message | null {
         out['booked'] = booked;
       }
       return out as Message;
+    }
+    case 'file': {
+      // Photos and files, a visitor's or the team's: links the server signed.
+      const files = list(input['files'], 4, (f) =>
+        isObject(f) && str(f['id'], 64) && str(f['name'], 200) && str(f['type'], 100) && Number.isInteger(f['size']) && (f['size'] as number) >= 0
+          ? ({ id: f['id'], name: f['name'], type: f['type'], size: f['size'], ...(isHttpUrl(f['url']) && f['url'].length <= 2048 ? { url: f['url'] } : {}) } as FileRef)
+          : null,
+      );
+      const text = str(input['text'], 2000);
+      return files.length ? ({ ...base, type: 'file', files, ...(text ? { text } : {}) } as Message) : null;
     }
     case 'handover': {
       const text = str(input['text'], 600);

@@ -75,6 +75,7 @@ variable, e.g. `{ "env": "OPENAI_API_KEY" }`, whose value lives in `.env` and on
 | `live.showAgentName` | boolean | `true` | Show visitors the first name of the person answering ("Sam joined"); off: "Someone from the team". |
 | `live.aiWhileWaiting` | boolean | `false` | Let the assistant keep answering until someone takes the chat. |
 | `bookings` | object | `{}` | Appointments: `mode` `none`, `link` (offer a booking page) or `picker` (a date picker in the chat; HelpPuff books, the assistant never does). Left out, a booking link found on the website is offered. With the picker, `sync` picks the calendar (keys in Settings → Integrations, `helppuff integrations`). `helppuff bookings` changes them. |
+| `files` | object | `{}` | Photos and files on R2: visitors sending them in the chat (`chat`: `off`, `live` while a person has the chat, or `always`) and the team attaching them to jobs (`jobs`). Both off by default; `helppuff files` turns them on. Needs R2 on for the Cloudflare account (deploy makes the bucket). |
 
 ## `backend`
 
@@ -295,6 +296,7 @@ Per-visitor and per-site limits. The daily cap is the cost backstop.
 | `security.limits.liveSocketsPerIp` | integer | `3` | Live chat connections one visitor (IP) may hold open at once. · 1–100 |
 | `security.limits.slotLookupsPerIpPerMinute` | integer | `30` | Times one visitor (IP) may load free times in the booking calendar a minute. · 1–600 |
 | `security.limits.bookingsPerIpPerHour` | integer | `5` | Appointments one visitor (IP) may book, move or cancel an hour, from the chat. · 1–100 |
+| `security.limits.uploadsPerIpPerHour` | integer | `20` | Photos and files one visitor (IP) may send an hour, when visitors can send files (`files.chat`). · 1–1000 |
 
 ## `leads`
 
@@ -326,6 +328,7 @@ Written by `helppuff deploy`. Safe to commit; holds no secrets.
 | `cloudflare.kvNamespaceId` | string |  | The KV namespace (live config, new-conversation counters). |
 | `cloudflare.d1DatabaseId` | string |  | The D1 database (conversations, leads, knowledge). |
 | `cloudflare.vectorizeIndex` | string |  | The Vectorize index (knowledge vectors). |
+| `cloudflare.filesBucket` | string |  | The R2 bucket (photos and files), when the account has R2. |
 
 ## `widget`
 

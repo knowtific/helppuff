@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { basename } from 'node:path';
+import { formatBytes } from '@helppuff/protocol/files';
 import { assertKnown, str } from '../args.js';
 import { CliError, EXIT } from '../errors.js';
 import { c } from '../output.js';
@@ -15,6 +18,9 @@ import type { Ctx } from './context.js';
  *   create [--title …] [--fields '{"service":"Hot water"}'] [--name …] [--email …] [--phone …] [--details …] [--value 450]
  *   move <job> <stage> [--reason …]      a stage by name or id
  *   update <job> <text…>                 a line in the job's history
+ *   files <job>                          its photos and files (and the chat's), with links
+ *   attach <job> <path…>                 attach files (`files.jobs` on)
+ *   detach <job> <file>                  remove one, by id or name
  *   pipeline                             the stages, fields and quote questions
  *   template <id>                        start again from a template
  *   setup                                let the AI choose from the website
@@ -38,10 +44,12 @@ type Job = {
   stale: boolean;
   createdAt: number;
 };
+type JobFile = { id: string; name: string; type: string; size: number; url: string; uploadedByName: string | null; createdAt: number };
+type JobFiles = { enabled: boolean; storage: boolean; maxMb: number; files: JobFile[]; fromChat: JobFile[] };
 type Detail = Job & { history: { at: number; actorName: string | null; kind: string; data: Record<string, unknown> | null }[] };
 
 const USAGE =
-  'Usage: helppuff jobs list [--status open|won|lost|all] [--search …] | show <job> | create [--title …] [--fields JSON] [--name …] [--email …] [--phone …] [--details …] [--value N] | move <job> <stage> [--reason …] | update <job> <text> | pipeline | template <id> | setup';
+  'Usage: helppuff jobs list [--status open|won|lost|all] [--search …] | show <job> | create [--title …] [--fields JSON] [--name …] [--email …] [--phone …] [--details …] [--value N] | move <job> <stage> [--reason …] | update <job> <text> | files <job> | attach <job> <path…> | detach <job> <file> | pipeline | template <id> | setup';
 
 const usage = () => new CliError('usage', USAGE, { exitCode: EXIT.usage });
 
@@ -124,6 +132,41 @@ export async function jobsCommand(ctx: Ctx): Promise<number> {
       const reason = str(ctx.flags, 'reason');
       const job = await api.send<Job>('POST', `/admin/api/jobs/${encodeURIComponent(await resolve(api, first))}/move`, { stageId: stage.id, ...(reason ? { lostReason: reason } : {}) });
       ctx.out.result(job, () => ctx.out.success(`#${job.number} is in ${stage.name}.`));
+      return 0;
+    }
+    case 'files': {
+      if (!first) throw usage();
+      const listed = await api.get<JobFiles>(`/admin/api/jobs/${encodeURIComponent(await resolve(api, first))}/files`);
+      ctx.out.result(listed, () => {
+        if (!listed.enabled) process.stdout.write(c.dim('Files on jobs are off: `helppuff files jobs on`.\n'));
+        if (!listed.files.length && !listed.fromChat.length) process.stdout.write(c.dim('No files.\n'));
+        for (const f of listed.files) process.stdout.write(`${f.id}  ${c.bold(f.name)}  ${c.dim(formatBytes(f.size))}${f.uploadedByName ? c.dim(`  — ${f.uploadedByName}`) : ''}\n  ${c.dim(f.url)}\n`);
+        if (listed.fromChat.length) process.stdout.write(`\n${c.bold('Sent in the chat')}\n`);
+        for (const f of listed.fromChat) process.stdout.write(`${f.id}  ${c.bold(f.name)}  ${c.dim(formatBytes(f.size))}\n  ${c.dim(f.url)}\n`);
+        if (listed.files.length || listed.fromChat.length) process.stdout.write(c.dim('\nLinks work for 12 hours.\n'));
+      });
+      return 0;
+    }
+    case 'attach': {
+      if (!first || !rest.length) throw usage();
+      const id = encodeURIComponent(await resolve(api, first));
+      const attached: JobFile[] = [];
+      for (const path of rest) {
+        if (!existsSync(path)) throw new CliError('usage', `No file at ${path}.`, { exitCode: EXIT.usage });
+        attached.push(await api.upload<JobFile>(`/admin/api/jobs/${id}/files`, { name: basename(path) }, readFileSync(path), 'application/octet-stream'));
+      }
+      ctx.out.result({ files: attached }, () => ctx.out.success(`Attached ${attached.map((f) => f.name).join(', ')}.`));
+      return 0;
+    }
+    case 'detach': {
+      const which = rest.join(' ').trim();
+      if (!first || !which) throw usage();
+      const id = encodeURIComponent(await resolve(api, first));
+      const { files } = await api.get<JobFiles>(`/admin/api/jobs/${id}/files`);
+      const file = files.find((f) => f.id === which) ?? files.find((f) => f.name === which);
+      if (!file) throw new CliError('not_found', `No file "${which}" on this job.`, { exitCode: EXIT.error, hint: `helppuff jobs files ${first}` });
+      const removed = await api.send<{ id: string; deleted: boolean }>('DELETE', `/admin/api/jobs/${id}/files/${encodeURIComponent(file.id)}`);
+      ctx.out.result(removed, () => ctx.out.success(`Removed ${file.name}.`));
       return 0;
     }
     case 'update': {

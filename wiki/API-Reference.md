@@ -131,6 +131,9 @@ Requests, quotes, projects or tickets on the site's pipeline: create them from y
 - [[Move a job|API-Reference-Jobs#move-a-job]]: `POST /jobs/:id/move`
 - [[Add an update|API-Reference-Jobs#add-an-update]]: `POST /jobs/:id/updates`
 - [[Add a note to a job|API-Reference-Jobs#add-a-note-to-a-job]]: `POST /jobs/:id/notes`
+- [[A job's files|API-Reference-Jobs#a-jobs-files]]: `GET /jobs/:id/files`
+- [[Attach a file to a job|API-Reference-Jobs#attach-a-file-to-a-job]]: `POST /jobs/:id/files`
+- [[Remove a file from a job|API-Reference-Jobs#remove-a-file-from-a-job]]: `DELETE /jobs/:id/files/:fileId`
 - [[Delete a job|API-Reference-Jobs#delete-a-job]]: `DELETE /jobs/:id`
 - [[The pipeline|API-Reference-Jobs#the-pipeline]]: `GET /jobs/pipeline`
 - [[Change the pipeline|API-Reference-Jobs#change-the-pipeline]]: `PUT /jobs/pipeline`

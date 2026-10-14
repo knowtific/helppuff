@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
 import { widgetConfigSchema } from '@helppuff/protocol';
-import { assistantConfigSchema, bookingsConfigSchema, liveConfigSchema, securitySchema } from '@helppuff/server';
+import { assistantConfigSchema, bookingsConfigSchema, filesConfigSchema, liveConfigSchema, securitySchema } from '@helppuff/server';
 import { workersAiOptionsSchema } from '@helppuff/connector-workers-ai';
 import { CliError } from '../errors.js';
 
@@ -411,6 +411,9 @@ export const projectSchema = z
     bookings: bookingsConfigSchema
       .default({})
       .describe('Appointments: `mode` `none`, `link` (offer a booking page) or `picker` (a date picker in the chat; HelpPuff books, the assistant never does). Left out, a booking link found on the website is offered. With the picker, `sync` picks the calendar (keys in Settings → Integrations, `helppuff integrations`). `helppuff bookings` changes them.'),
+    files: filesConfigSchema
+      .default({})
+      .describe('Photos and files on R2: visitors sending them in the chat (`chat`: `off`, `live` while a person has the chat, or `always`) and the team attaching them to jobs (`jobs`). Both off by default; `helppuff files` turns them on. Needs R2 on for the Cloudflare account (deploy makes the bucket).'),
     leads: z
       .object({
         webhook: z
@@ -438,6 +441,7 @@ export const projectSchema = z
         kvNamespaceId: z.string().optional().describe('The KV namespace (live config, new-conversation counters).'),
         d1DatabaseId: z.string().optional().describe('The D1 database (conversations, leads, knowledge).'),
         vectorizeIndex: z.string().optional().describe('The Vectorize index (knowledge vectors).'),
+        filesBucket: z.string().optional().describe('The R2 bucket (photos and files), when the account has R2.'),
       })
       .strict()
       .default({})

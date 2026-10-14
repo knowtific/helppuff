@@ -205,6 +205,22 @@ export async function doctor(cwd: string, doFetch: typeof fetch = fetch): Promis
     );
   }
 
+  if (url && env['ADMIN_API_KEY']) {
+    checks.push(
+      await attempt('files', async () => {
+        const live = await adminApi(loaded!, { fetch: doFetch, env }).get<{ settings: { files?: { chat: string; jobs: boolean } }; storage?: boolean }>('/admin/api/settings');
+        const files = live.settings.files;
+        if (!files) return { status: 'skip', detail: 'this Worker is older than files', fix: 'helppuff upgrade' };
+        const on = [files.chat !== 'off' ? `chat (${files.chat})` : '', files.jobs ? 'jobs' : ''].filter(Boolean);
+        if (!on.length) return { status: 'skip', detail: live.storage ? 'off; storage ready' : 'off', fix: 'helppuff files chat live | helppuff files jobs on' };
+        if (!live.storage) {
+          return { status: 'fail', detail: `on for ${on.join(' and ')}, but this deployment has no R2 bucket`, fix: 'turn on R2 once at https://dash.cloudflare.com/?to=/:account/r2/overview, then helppuff deploy' };
+        }
+        return { status: 'pass', detail: `on for ${on.join(' and ')}; R2 bucket bound` };
+      }),
+    );
+  }
+
   if (url) {
     checks.push(
       await attempt('live', async () => {

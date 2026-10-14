@@ -20,6 +20,8 @@ export type MessageHandlers = {
   isConsumed: (message: Message) => boolean;
   /** Draws a booking message (the picker or the appointment card) with the booking chunk. */
   booking?: ((el: HTMLElement, message: Message, consumed: boolean) => () => void) | undefined;
+  /** Draws a file message's photos and files with the upload chunk. */
+  files?: ((el: HTMLElement, message: Message) => () => void) | undefined;
   /** Thumbs up/down on a reply, when the server records ratings. */
   rating?: { get: (message: Message) => number; set: (message: Message, value: 1 | -1 | 0) => void; labels: [string, string] } | undefined;
 };
@@ -40,6 +42,8 @@ export const inertHandlers: MessageHandlers = {
  * — that is what lets a newer server talk to an older widget.
  */
 export function MessageView({ message, handlers }: { message: Message; handlers: MessageHandlers }) {
+  // Photos and files, and what was written with them: drawn by the upload chunk (`handlers.files`).
+  if (message.type === 'file') return handlers.files ? <BookingView message={message} consumed={false} mount={handlers.files} /> : null;
   if (message.role === 'user' && message.type === 'text') {
     return <UserMessage text={message.text} />;
   }
@@ -126,7 +130,7 @@ export function MessageView({ message, handlers }: { message: Message; handlers:
  * row at all. Emitting an empty wrapper still costs a fade-in animation, a
  * gap and a timestamp, so the visitor sees something flash and disappear.
  */
-const DRAWABLE = new Set(['text', 'notice', 'options', 'card', 'carousel', 'links', 'form', 'handover', 'booking']);
+const DRAWABLE = new Set(['text', 'notice', 'options', 'card', 'carousel', 'links', 'form', 'handover', 'booking', 'file']);
 
 export function canRender(message: Message): boolean {
   return DRAWABLE.has(message.type);

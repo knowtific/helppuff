@@ -7,6 +7,7 @@ import { knowledgeEnv } from './knowledge/env.js';
 import { runScheduledCrawls } from './knowledge/crawl.js';
 import { dbFrom, ensureSchema } from './db/d1.js';
 import { runScheduledBookings } from './bookings/cron.js';
+import { filesBucket, purgeOldChatFiles } from './files/store.js';
 
 type Ctx = { waitUntil(promise: Promise<unknown>): void };
 
@@ -25,7 +26,8 @@ export function createWorker(config: HelpPuffConfig, extensions: Extensions = {}
     fetch: app.fetch,
     /**
      * Every 15 minutes: re-crawls that are due (by each site's schedule),
-     * then bookings (the synced calendars, reminders). One trigger, so a
+     * then bookings (the synced calendars, reminders), then chat files past
+     * their keeping time. One trigger, so a
      * deployment never needs a second.
      */
     async scheduled(_controller: unknown, env: Record<string, unknown>, ctx: Ctx): Promise<void> {
@@ -41,6 +43,9 @@ export function createWorker(config: HelpPuffConfig, extensions: Extensions = {}
           for (const id of Object.keys(config.sites)) sites[id] = await resolveSite({ config, platform }, id);
           if (knowledge) await runScheduledCrawls(knowledge, sites, Date.now()).catch(() => {});
           await runScheduledBookings(env, db, sites, Date.now()).catch(() => {});
+          // Photos and files sent in the chat are kept `files.keepChatDays`.
+          const bucket = filesBucket(env);
+          if (bucket) for (const [id, site] of Object.entries(sites)) await purgeOldChatFiles({ db, bucket }, id, site.files.keepChatDays, Date.now()).catch(() => {});
         })().catch(() => {}),
       );
     },

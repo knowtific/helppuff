@@ -111,7 +111,7 @@ const DESCRIPTIONS: Record<SettingsSection, string> = {
   fields: 'See and manage the data fields on conversations, contacts and jobs.',
   jobs: 'Requests, quotes and work: the stages they go through, what you need to know, and the quote questions on the widget.',
   notifications: 'The emails you get, and your own alerts for live chats. Everyone on the team chooses their own.',
-  advanced: 'The model, how often your site is re-read, rate limits, blocked IPs and sign-in protection.',
+  advanced: 'The model, how often your site is re-read, photos and files, rate limits, blocked IPs and sign-in protection.',
   webhooks: 'Send chats, messages, leads and callbacks to other tools as they happen.',
   api: 'Use HelpPuff from your own servers, as a backend: keys, the base URL and examples.',
   team: 'Who can sign in and what they can do, and what to do if you’re locked out.',

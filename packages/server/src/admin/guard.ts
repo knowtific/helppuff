@@ -49,6 +49,7 @@ const MEMBER_ROUTES: [method: string | '*', path: RegExp][] = [
   ['GET', /^\/jobs(\/pipeline)?$/],
   ['POST', /^\/jobs$/],
   ['*', /^\/jobs\/(?!pipeline|setup)[^/]+(\/(move|updates|notes))?$/],
+  ['*', /^\/jobs\/(?!pipeline|setup)[^/]+\/files(\/[^/]+)?$/],
   ['GET', /^\/bookings$/],
   ['GET', /^\/appointments$/],
   ['POST', /^\/appointments(\/sync)?$/],
@@ -57,8 +58,9 @@ const MEMBER_ROUTES: [method: string | '*', path: RegExp][] = [
 
 export function memberMay(method: string, path: string): boolean {
   const relative = path.replace(/^\/(admin\/api|api\/v1)/, '') || '/';
-  // Deleting is for admins: a member can close a conversation, not erase it.
-  if (method === 'DELETE' && !/^\/notes\//.test(relative)) return false;
+  // Deleting is for admins: a member can close a conversation, not erase it. Notes and the files
+  // they attached to a job are their own (the handlers check whose).
+  if (method === 'DELETE' && !/^\/notes\//.test(relative) && !/^\/jobs\/[^/]+\/files\/[^/]+$/.test(relative)) return false;
   return MEMBER_ROUTES.some(([m, re]) => (m === '*' || m === method) && re.test(relative));
 }
 

@@ -128,3 +128,30 @@ test('“let the AI choose” without AI falls back to the basic template, and n
   expect(setup.body['pipeline']).toMatchObject({ template: 'basic' });
   expect(await count()).toBe(before);
 });
+
+test('files on jobs: turned on in Settings → Advanced, a photo attached, shown and in the history', async ({ browser, request }) => {
+  const title = `Hot water install ${Date.now()}`;
+  const made = await admin(request, 'POST', '/jobs', { title });
+  expect(made.status).toBe(201);
+  const page = await signIn(browser);
+  // Off by default: no Files section on a job.
+  await page.goto(`/admin/#/jobs/${String(made.body['id'])}`);
+  await expect(page.getByRole('heading', { name: 'History' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Attach files' })).toHaveCount(0);
+
+  await page.goto('/admin/#/settings/advanced');
+  await page.getByLabel('Files on jobs').check();
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText(/Saved/)).toBeVisible();
+  if (process.env['HELPPUFF_SHOTS']) await page.locator('fieldset', { hasText: 'Visitors send photos and PDFs' }).screenshot({ path: `${process.env['HELPPUFF_SHOTS']}/files-settings.png` });
+
+  await page.goto(`/admin/#/jobs/${String(made.body['id'])}`);
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEklEQVR4nGP4z8CAFWEXHbQSACj/P8Fu7N9hAAAAAElFTkSuQmCC', 'base64');
+  await page.getByLabel('Attach files').setInputFiles({ name: 'after-install.png', mimeType: 'image/png', buffer: png });
+  await expect(page.getByRole('img', { name: 'after-install.png' })).toBeVisible();
+  await expect(page.getByText('Attached after-install.png')).toBeVisible();
+  if (process.env['HELPPUFF_SHOTS']) await page.screenshot({ path: `${process.env['HELPPUFF_SHOTS']}/job-files.png` });
+
+  expect((await admin(request, 'PUT', '/settings', { settings: { files: { jobs: false } } })).status).toBe(200);
+  await page.context().close();
+});

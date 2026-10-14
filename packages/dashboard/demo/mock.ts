@@ -76,6 +76,7 @@ let settings: Settings = {
       liveSocketsPerIp: 3,
       slotLookupsPerIpPerMinute: 30,
       bookingsPerIpPerHour: 5,
+      uploadsPerIpPerHour: 20,
     },
     signIn: { attemptsPerIp: 10, attemptsPerAccount: 5, windowMinutes: 15, captcha: true },
     allowIps: [],
@@ -83,6 +84,7 @@ let settings: Settings = {
     sessionTtlHours: 24,
   },
   live: { enabled: true, waitSeconds: 120, closeAfterMinutes: 60, showAgentName: true, aiWhileWaiting: false },
+  files: { chat: 'live', jobs: true, maxChatMb: 10, maxJobMb: 25, perConversation: 10, keepChatDays: 90, aiSeesPhotos: false, visionModel: '@cf/meta/llama-4-scout-17b-16e-instruct' },
 };
 let prefs: Prefs = { available: true, notifyNewChat: true, notifyNewMessage: true, soundNewChat: true, soundNewMessage: true, sound: 'chime', volume: 0.7, repeatUntilTaken: false, emails: ['lead.hot', 'callback.requested', 'handover.requested'] };
 /** The email service, connected to Resend. Secret header values never come back, as on the Worker. */
@@ -807,6 +809,7 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
       hash: String(settingsAt),
       meta: { at: settingsAt, by: OWNER },
       captcha: true,
+      storage: true,
       ai: { provider: 'workers-ai', model: settings.assistant?.model ?? null, knowledge: 'helppuff' },
       // The links the widget shows until the owner saves the home screen: picked from the website.
       suggestedHome: homeSuggested ? { questions: [], links: SUGGESTED_LINKS, at: NOW - 6 * DAY } : null,
@@ -1023,6 +1026,9 @@ export function installDemoApi(): void {
       } catch {
         // Not JSON: an upload. Its name is in the query.
       }
+    } else if (init.body instanceof Blob) {
+      // A file attached to a job: kept in the page as a blob link, like the Worker's signed one.
+      body = { blobUrl: URL.createObjectURL(init.body), blobType: init.body.type, blobSize: init.body.size };
     }
     // A moment of latency, so loading states look the way they do for real.
     await new Promise((resolve) => setTimeout(resolve, 120));

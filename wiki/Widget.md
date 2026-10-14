@@ -82,6 +82,11 @@ under `widget` in `helppuff.json`; see the
   at the top of the chat asks for someone from the team (`strings.talkToPerson`),
   and the header says who is answering (`strings.liveStatus`). Its code is a
   separate small file (`live-*.js`), downloaded only when a chat is handed over.
+- **Photos and files** ([[Photos and files|Files]]): when visitors may send
+  them, a paperclip sits next to the message box (`strings.attach` is its
+  label; `strings.fileFailed` the message when a file could not be sent).
+  Its code is a separate small file (`upload-*.js`), downloaded when a file is
+  picked or shown.
 
 ## The home screen
 

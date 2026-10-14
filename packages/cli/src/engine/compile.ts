@@ -52,6 +52,8 @@ export const DB_BINDING = 'HELPPUFF_DB';
 export const VECTORS_BINDING = 'VECTORS';
 export const WORKFLOW_BINDING = 'CRAWL_WORKFLOW';
 export const LIVE_HUB_BINDING = 'LIVE_HUB';
+/** Photos and files on R2 (server `files/store.ts`). */
+export const FILES_BINDING = 'HELPPUFF_FILES';
 export const BROWSER_BINDING = 'BROWSER';
 /**
  * Every 15 minutes: the Worker decides per site whether a re-crawl is due,
@@ -288,6 +290,8 @@ export function compile(
     workerUrl?: string | undefined;
     kvNamespaceId?: string;
     d1DatabaseId?: string | undefined;
+    /** The R2 bucket for photos and files, when the account has R2 (`ensureR2Bucket`). */
+    filesBucket?: string | undefined;
     dev?: boolean;
     devPort?: number;
     runtimeVersion?: string;
@@ -330,7 +334,7 @@ export function compile(
     ? { ...project.security, limits: { ...project.security.limits, messagesPerIpPerMinute: 600, messagesPerIpPerDay: 100_000, sessionsPerIpPerHour: 1000, sessionsPerIpPerDay: 10_000 } }
     : project.security;
   const knowledge = knowledgeFor(project);
-  const stored = { connector, sinks, security, widget, assistant: project.assistant, autoSummary: project.autoSummary, live: project.live, bookings: project.bookings, ...(knowledge ? { knowledge } : {}) };
+  const stored = { connector, sinks, security, widget, assistant: project.assistant, autoSummary: project.autoSummary, live: project.live, bookings: project.bookings, files: project.files, ...(knowledge ? { knowledge } : {}) };
   const site = { origins, ...stored };
   const serverConfig = { sites: { [project.site]: site } };
 
@@ -363,6 +367,8 @@ export function compile(
     ...(database ? [ADMIN_API_KEY] : []),
   ].sort();
   const aiSearchInstance = aiSearchInstanceFor(project);
+  // Photos and files (`files`): bound whenever the bucket exists, so turning them on needs no redeploy. Simulated locally.
+  const filesBucket = database ? (options.filesBucket ?? (options.dev ? 'helppuff-files-local' : undefined)) : undefined;
 
   const wrangler: Record<string, unknown> = {
     name: workerName,
@@ -394,10 +400,12 @@ export function compile(
     ...(ownKnowledge
       ? {
           vectorize: [{ binding: VECTORS_BINDING, index_name: vectorizeIndexFor(project), ...(options.dev ? { remote: true } : {}) }],
-          triggers: { crons: [CRAWL_CRON] },
           ...(knowledge?.renderJs === 'never' ? {} : { browser: { binding: BROWSER_BINDING, ...(options.dev ? { remote: true } : {}) } }),
         }
       : {}),
+    ...(filesBucket ? { r2_buckets: [{ binding: FILES_BINDING, bucket_name: filesBucket }] } : {}),
+    // Every 15 minutes: due re-crawls, synced calendars and reminders, chat files past their keeping time.
+    ...(ownKnowledge || filesBucket ? { triggers: { crons: [CRAWL_CRON] } } : {}),
     assets: { directory: 'assets', not_found_handling: 'none' },
     vars: {
       HELPPUFF_LOG: options.dev ? '1' : '0',

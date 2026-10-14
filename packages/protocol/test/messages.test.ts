@@ -13,7 +13,7 @@ describe('messageSchema', () => {
 
   it('covers every message type in the fixtures', () => {
     const types = new Set(validMessages.map((m) => m.type));
-    expect([...types].sort()).toEqual(['booking', 'card', 'carousel', 'form', 'handover', 'links', 'notice', 'options', 'text']);
+    expect([...types].sort()).toEqual(['booking', 'card', 'carousel', 'file', 'form', 'handover', 'links', 'notice', 'options', 'text']);
   });
 });
 

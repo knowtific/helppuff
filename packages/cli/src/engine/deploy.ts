@@ -249,6 +249,16 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
   } else if (loaded.project.dashboard.enabled) {
     warnings.push('The dashboard is on but has no admin: set it with `helppuff config set dashboard.adminEmail you@example.com`.');
   }
+  // Photos and files (R2): the bucket is made whenever the account allows it, so turning files on
+  // later needs no redeploy. Without R2 the deploy goes on; it only says so when files are on.
+  let filesBucket: string | undefined;
+  if (d1DatabaseId) {
+    progress?.('Preparing file storage…');
+    const name = resourceName(loaded.project.site);
+    const r2 = await cf.api.ensureR2Bucket(cf.accountId, name).catch(() => 'error' as const);
+    if (r2 === 'ready' || r2 === 'created') filesBucket = name;
+    else if (filesWanted(loaded.project)) warnings.push(filesStorageWarning(r2));
+  }
   const vectorizeIndex = vectorizeIndexFor(loaded.project);
   if (vectorizeIndex) {
     const model = embeddingModelFor(loaded.project);
@@ -320,7 +330,7 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
   if (wantsKnowledge && storeInConfig) await syncNow();
 
   const version = runtimeVersion();
-  const compiled = compile(loaded, { workerUrl: url, kvNamespaceId, d1DatabaseId, runtimeVersion: version });
+  const compiled = compile(loaded, { workerUrl: url, kvNamespaceId, d1DatabaseId, filesBucket, runtimeVersion: version });
   const workerExists = await cf.api.workerExists(cf.accountId, workerName);
   let workerDeployed = false;
   // The preview page is generated here, not shipped in the runtime, so it is part of the Worker too.
@@ -390,6 +400,7 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
       kvNamespaceId,
       ...(d1DatabaseId ? { d1DatabaseId } : {}),
       ...(vectorizeIndex ? { vectorizeIndex } : {}),
+      ...(filesBucket ? { filesBucket } : {}),
     };
   });
 
@@ -586,4 +597,20 @@ export async function startCrawlFromCli(api: AdminApi, request: CrawlRequest, pr
     urls,
     ...(request.mode === 'match' ? { include: request.include } : {}),
   });
+}
+
+/** Files are on in helppuff.json (photos in the chat, or files on jobs). */
+export function filesWanted(project: LoadedProject['project']): boolean {
+  return project.files.chat !== 'off' || project.files.jobs;
+}
+
+/** Why there is no file storage, and the one thing to do about it. */
+export function filesStorageWarning(why: 'not_enabled' | 'no_access' | 'error'): string {
+  if (why === 'not_enabled') {
+    return 'Files are on, but R2 is not turned on for this Cloudflare account. Turn it on once at https://dash.cloudflare.com/?to=/:account/r2/overview (free up to 10 GB; Cloudflare may ask for a card), then run `helppuff deploy` again.';
+  }
+  if (why === 'no_access') {
+    return 'Files are on, but the Cloudflare token cannot reach R2. Add the "Workers R2 Storage › Edit" permission to the API token (or use `npx wrangler login`), then run `helppuff deploy` again.';
+  }
+  return 'Files are on, but the R2 bucket could not be prepared. Run `helppuff deploy` again in a minute.';
 }

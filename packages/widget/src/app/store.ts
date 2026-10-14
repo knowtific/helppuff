@@ -32,7 +32,7 @@ export type Pending = {
 };
 
 export type SendInput =
-  | { kind: 'text'; text: string }
+  | { kind: 'text'; text: string; files?: string[] }
   | { kind: 'action'; actionId: string; value: string; label: string };
 
 /** An in-progress client-side flow. */

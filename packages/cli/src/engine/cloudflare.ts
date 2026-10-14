@@ -22,6 +22,7 @@ export const TOKEN_PERMISSIONS = [
   'Account › Workers KV Storage › Edit',
   'Account › D1 › Edit',
   'Account › Vectorize › Edit',
+  'Account › Workers R2 Storage › Edit (for photos and files; optional)',
   'Account › Account Settings › Read',
   'Account › AI Search › Edit (only for the Cloudflare AI Search backend)',
   'Account › AI Search › Run (only for the Cloudflare AI Search backend)',
@@ -209,6 +210,40 @@ export class CloudflareApi {
 
   async deleteD1Database(accountId: string, databaseId: string): Promise<void> {
     await this.call('DELETE', `/accounts/${accountId}/d1/database/${databaseId}`);
+  }
+
+  // ------------------------------------------------------------ R2
+  // developers.cloudflare.com/api/resources/r2/subresources/buckets (checked 2026-10-14):
+  //   GET  /accounts/{id}/r2/buckets/{name}   404, code 10006: no such bucket
+  //   POST /accounts/{id}/r2/buckets          { name }
+  // Code 10042 (NotEntitled): R2 was never turned on for the account. Only a
+  // person can do that (the dashboard asks them to accept the plan), so it is
+  // reported, never thrown: files are optional and the deploy goes on.
+
+  /** The bucket for photos and files, found or made. `not_enabled`: R2 is off for the account; `no_access`: the token lacks R2. */
+  async ensureR2Bucket(accountId: string, name: string): Promise<'ready' | 'created' | 'not_enabled' | 'no_access'> {
+    const codes = (thrown: unknown) => ((thrown as CliError).details?.['errors'] as { code: number }[] | undefined)?.map((e) => e.code) ?? [];
+    const refused = (thrown: unknown): 'not_enabled' | 'no_access' | null => {
+      if (!(thrown instanceof CliError)) return null;
+      if (codes(thrown).includes(10042)) return 'not_enabled';
+      return thrown.code === 'cloudflare_permission' ? 'no_access' : null;
+    };
+    try {
+      await this.call('GET', `/accounts/${accountId}/r2/buckets/${encodeURIComponent(name)}`);
+      return 'ready';
+    } catch (thrown) {
+      const why = refused(thrown);
+      if (why) return why;
+      if (!(thrown instanceof CliError && thrown.details?.['status'] === 404)) throw thrown;
+    }
+    try {
+      await this.call('POST', `/accounts/${accountId}/r2/buckets`, { json: { name } });
+      return 'created';
+    } catch (thrown) {
+      const why = refused(thrown);
+      if (why) return why;
+      throw thrown;
+    }
   }
 
   // ------------------------------------------------------------ Vectorize
@@ -410,6 +445,8 @@ function cloudflareError(
     ? 'Vectorize › Edit'
     : /ai-search/.test(path)
     ? 'AI Search › Edit and AI Search › Run'
+    : /\/r2\//.test(path)
+    ? 'Workers R2 Storage › Edit'
     : /storage\/kv/.test(path)
       ? 'Workers KV Storage › Edit'
       : /workers/.test(path)
