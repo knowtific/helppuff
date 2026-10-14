@@ -8,6 +8,19 @@ never needs you to change anything. Upgrade with
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-10-14
+
+### Added
+
+- Google Calendar bookings can opt out of automatic Google Meet links in
+  Settings → Bookings.
+
+### Changed
+
+- Bookings explains that Cal.com and Calendly event types control their meeting
+  locations, and where to change them.
+- The website includes the Google tag for analytics.
+
 ## [0.9.1] - 2026-10-14
 
 ### Fixed

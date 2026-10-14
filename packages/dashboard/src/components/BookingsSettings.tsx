@@ -380,6 +380,18 @@ export function BookingsSettings() {
                     </Select>
                   </Labeled>
                 )}
+                {sync === 'google' && (
+                  <label className="flex cursor-pointer items-start gap-2 text-xs">
+                    <input type="checkbox" checked={draft.createMeetingLink !== false} onChange={(e) => set({ createMeetingLink: e.target.checked })} />
+                    <span>Create a Google Meet link for new bookings</span>
+                  </label>
+                )}
+                {sync === 'calcom' && (
+                  <p className="text-xs text-muted-foreground">Cal.com creates meeting links according to this event type’s Location setting. Change it in Cal.com to use an in-person or other location.</p>
+                )}
+                {sync === 'calendly' && (
+                  <p className="text-xs text-muted-foreground">Calendly creates meeting links according to this event type’s Location setting. Change it in Calendly to use an in-person, phone, or other location.</p>
+                )}
               </div>
             </Card>
 

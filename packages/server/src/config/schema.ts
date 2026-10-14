@@ -190,6 +190,7 @@ export const bookingsConfigSchema = z
     sync: z.enum(CALENDAR_SYNCS).default('none').describe('The calendar the picker syncs with: `none` (HelpPuff keeps the appointments, free time from `hours`), `calcom`, `calendly`, `google` or `outlook` (the last two through Composio). Keys live in Settings → Integrations (`helppuff integrations`).'),
     account: z.string().max(200).optional().describe('`google` / `outlook`: the Composio connected account to use. Left out: the site\'s only one.'),
     calendar: z.string().max(300).optional().describe('`google` / `outlook`: the calendar id. Left out: the primary calendar.'),
+    createMeetingLink: z.boolean().default(true).describe('`google`: create a Google Meet link for new bookings when no location is set. Turn off for appointments without an online meeting. Cal.com uses its event type location instead.'),
     eventType: z.string().max(500).optional().describe('`calcom`: the event type id; `calendly`: the event type URI. Their slots, length and rules are used.'),
     title: z.string().trim().min(1).max(120).default('Appointment').describe('What is booked, as the visitor and the calendar see it.'),
     duration: z.number().int().min(5).max(480).default(30).describe('Minutes (`none`, `google`, `outlook`; the event type decides for Cal.com and Calendly).'),

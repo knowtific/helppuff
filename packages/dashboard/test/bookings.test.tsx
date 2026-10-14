@@ -15,7 +15,7 @@ afterEach(async () => {
 });
 
 const HOURS = { mon: ['09:00-17:00'], tue: ['09:00-17:00'], wed: ['09:00-17:00'], thu: ['09:00-17:00'], fri: ['09:00-17:00'], sat: [], sun: [] };
-const bookings = (over: Partial<Bookings> = {}): Bookings => ({ label: 'Book a time', sync: 'none', title: 'Appointment', duration: 30, hours: HOURS, buffer: 0, notice: 120, daysAhead: 30, phone: 'optional', syncMinutes: 15, ...over });
+const bookings = (over: Partial<Bookings> = {}): Bookings => ({ label: 'Book a time', sync: 'none', createMeetingLink: true, title: 'Appointment', duration: 30, hours: HOURS, buffer: 0, notice: 120, daysAhead: 30, phone: 'optional', syncMinutes: 15, ...over });
 const view = (b: Bookings) => ({ site: 'acme', connector: 'assistant', settings: { accent: '#5B5BF7', bookings: b }, hash: 'h', meta: null });
 const status = (mode: 'none' | 'link' | 'picker', found: unknown = null, chosen = false) => ({
   site: 'acme',
@@ -137,6 +137,28 @@ describe('Settings → Bookings', () => {
     });
     await flush();
     expect([...page.querySelectorAll('option')].some((option) => option.textContent === 'Owner Google')).toBe(true);
+  });
+
+  it('lets the owner disable new Google Meet links without leaving Bookings', async () => {
+    let saved = bookings({ mode: 'picker', sync: 'google' });
+    const calls = fakeApi({
+      'GET /settings': () => view(saved),
+      'GET /bookings': () => status('picker', null, true),
+      'GET /bookings/slots': SLOTS,
+      'GET /integrations': { items: [], help: {} },
+      'GET /integrations/composio/accounts?toolkit=google': { items: [] },
+      'POST /bookings/test': { ok: false, detail: 'Connect Composio first.', eventTypes: [] },
+      'PUT /settings': (c: { body: unknown }) => {
+        saved = { ...saved, ...((c.body as { settings: { bookings: Bookings } }).settings.bookings) };
+        return view(saved);
+      },
+    });
+    const page = await mount(<BookingsSettings />);
+    const toggle = page.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    expect(toggle.checked).toBe(true);
+    await click(toggle);
+    await click(button(page, 'Save'));
+    expect((calls.find((c) => c.method === 'PUT')?.body as { settings: { bookings: Bookings } }).settings.bookings.createMeetingLink).toBe(false);
   });
 
   it('keeps unsaved booking choices when the Composio popup is blocked', async () => {

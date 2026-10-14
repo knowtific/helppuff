@@ -90,7 +90,7 @@ const graphTime = (value: unknown): number | null => {
   return time(/[zZ]|[+-]\d\d:?\d\d$/.test(raw) ? raw : `${raw}Z`);
 };
 
-export function googleCalendar(client: ComposioClient, input: { account?: string | null; calendar?: string | null }): Calendar {
+export function googleCalendar(client: ComposioClient, input: { account?: string | null; calendar?: string | null; createMeetingLink?: boolean }): Calendar {
   const calendarId = input.calendar || 'primary';
   const list = async (window: { start: number; end: number }): Promise<ExternalEvent[]> => {
     const data = await client.execute('GOOGLECALENDAR_EVENTS_LIST', { calendarId, timeMin: new Date(window.start).toISOString(), timeMax: new Date(window.end).toISOString(), singleEvents: true, maxResults: 250, showDeleted: true }, input.account);
@@ -133,8 +133,8 @@ export function googleCalendar(client: ComposioClient, input: { account?: string
           attendees: b.attendee.email ? [b.attendee.email] : [],
           description: [b.notes, b.attendee.phone ? `Phone: ${b.attendee.phone}` : null, 'Booked in the chat (HelpPuff).'].filter(Boolean).join('\n'),
           send_updates: 'all',
-          // A meeting link only when the business did not say where it happens.
-          create_meeting_room: !b.location,
+          // A meeting link only when enabled and the business did not set a place.
+          create_meeting_room: input.createMeetingLink !== false && !b.location,
           ...(b.location ? { location: b.location } : {}),
         },
         input.account,

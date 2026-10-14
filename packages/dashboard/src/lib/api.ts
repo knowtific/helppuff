@@ -575,6 +575,7 @@ export type BookingsSettings = {
   sync: CalendarSync;
   account?: string;
   calendar?: string;
+  createMeetingLink?: boolean;
   eventType?: string;
   title: string;
   duration: number;

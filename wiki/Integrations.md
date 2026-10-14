@@ -57,6 +57,10 @@ Cal.com show at the next sync (every 15 minutes).
    You can also connect it on this page.
 3. Choose the event type in **Settings → Bookings**.
 
+Calendly creates video links according to that event type's **Location**
+setting. To book in person or by phone, change the location in Calendly;
+HelpPuff uses the event type's choice.
+
 Calendly lets apps book directly only on its paid plans (Standard and up).
 On a free plan, the picker still shows your real free times; when the
 visitor picks one, Calendly's own page opens for that time with their name

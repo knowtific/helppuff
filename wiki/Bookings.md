@@ -64,7 +64,7 @@ bookings are written. The picker looks and works the same with each.
 | **None** (default) | Your hours here, less the appointments already booked | HelpPuff only | Nothing |
 | **Cal.com** (cloud or self-hosted) | The event type's own slots | Cal.com, and HelpPuff | A Cal.com API key |
 | **Calendly** | The event type's available times | Calendly on paid plans; on a free plan the visitor finishes on Calendly's page for the time they picked, and the booking is read back | A Calendly personal access token |
-| **Google Calendar** | Your hours here, less busy time in the calendar | Google Calendar (with a Meet link unless you set a place), and HelpPuff | Composio, and a Google Calendar account connected through it |
+| **Google Calendar** | Your hours here, less busy time in the calendar | Google Calendar (with a Meet link when the option is on and no place is set), and HelpPuff | Composio, and a Google Calendar account connected through it |
 | **Outlook / Microsoft 365** | The same | Outlook, and HelpPuff | Composio, and an Outlook account |
 
 Choose Cal.com or Calendly in **Settings → Bookings** to enter its key there;
@@ -95,6 +95,7 @@ goes both ways:
 | **Event type** | Cal.com and Calendly: which event type is booked. Its length, hours and rules are used |
 | **Title, minutes** | What is booked, and how long (None, Google, Outlook) |
 | **Where** | Shown on the confirmation (None; a calendar sets its own) |
+| **Create a Google Meet link** | Google Calendar only. On by default for new bookings without a place; turn it off to create calendar events without a Meet link. Cal.com and Calendly use the chosen event type's Location setting instead; change that in the provider. |
 | **Phone** | Ask for a phone number: no, optional or required |
 | **Time zone** | Yours, for the hours (default the assistant's) |
 | **Hours** | Per weekday, up to four ranges; an empty day is closed |

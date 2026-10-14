@@ -327,7 +327,9 @@ describe('appointments in the dashboard and the API', () => {
   it('saves the bookings settings: a mode, hours, and null hands the choice back to the website', async () => {
     const w = await world();
     const saved = await json(await w.owner.send('PUT', '/settings', { settings: { bookings: { mode: 'picker', duration: 45, hours: { ...ALL_DAY, sun: [] } } } }));
-    expect(saved['settings'].bookings).toMatchObject({ mode: 'picker', duration: 45, sync: 'none' });
+    expect(saved['settings'].bookings).toMatchObject({ mode: 'picker', duration: 45, sync: 'none', createMeetingLink: true });
+    const withoutMeet = await json(await w.owner.send('PUT', '/settings', { settings: { bookings: { createMeetingLink: false } } }));
+    expect(withoutMeet['settings'].bookings.createMeetingLink).toBe(false);
     expect((await json(await w.owner.get('/me')))['sites'][0].bookings).toBe('picker');
     const bad = await w.owner.send('PUT', '/settings', { settings: { bookings: { hours: { ...ALL_DAY, mon: ['17:00-09:00'] } } } });
     expect(bad.status).toBe(400);
@@ -495,7 +497,9 @@ describe('the calendars\' clients, against their documented APIs', () => {
     expect(list).toMatchObject({ user_id: 'acme', connected_account_id: 'ca_1', arguments: { calendarId: 'primary', singleEvents: true } });
     const made = await google.book({ start: Date.parse('2026-10-15T00:00:00Z'), end: Date.parse('2026-10-15T00:30:00Z'), title: 'Consultation', attendee: { name: 'Ada', email: 'ada@example.com', timezone: 'Australia/Perth' }, idem: 'x' });
     expect(made).toMatchObject({ externalId: 'g_new', location: 'https://meet.google.com/abc' });
-    expect((JSON.parse(String(calls[1]!.init.body)) as Json)['arguments']).toMatchObject({ start_datetime: '2026-10-15T08:00:00', end_datetime: '2026-10-15T08:30:00', timezone: 'Australia/Perth', attendees: ['ada@example.com'] });
+    expect((JSON.parse(String(calls[1]!.init.body)) as Json)['arguments']).toMatchObject({ start_datetime: '2026-10-15T08:00:00', end_datetime: '2026-10-15T08:30:00', timezone: 'Australia/Perth', attendees: ['ada@example.com'], create_meeting_room: true });
+    await googleCalendar(client, { createMeetingLink: false }).book({ start: Date.parse('2026-10-15T00:00:00Z'), end: Date.parse('2026-10-15T00:30:00Z'), title: 'Consultation', attendee: { name: 'Ada', email: 'ada@example.com', timezone: 'Australia/Perth' }, idem: 'y' });
+    expect((JSON.parse(String(calls[2]!.init.body)) as Json)['arguments']).toMatchObject({ create_meeting_room: false });
     const outlook = outlookCalendar(client, {});
     expect(await outlook.list({ start: 0, end: 1 })).toEqual([expect.objectContaining({ id: 'o1', start: Date.parse('2026-10-15T01:00:00Z'), busy: true, attendees: [{ email: 'grace@example.com', name: 'Grace' }] })]);
     expect(await client.connectLink('googlecalendar', 'https://chat.acme.example/admin/')).toBe('https://connect.composio.dev/link/x');

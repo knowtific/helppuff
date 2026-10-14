@@ -83,7 +83,7 @@ export async function calendarFor(deps: Pick<BookingDeps, 'db' | 'secret' | 'fet
   }
   const client = composioClient({ key: integration.key, userId: siteId, fetch: deps.fetch });
   const options = { account: b.account ?? null, calendar: b.calendar ?? null };
-  return b.sync === 'google' ? googleCalendar(client, options) : outlookCalendar(client, options);
+  return b.sync === 'google' ? googleCalendar(client, { ...options, createMeetingLink: b.createMeetingLink }) : outlookCalendar(client, options);
 }
 
 /** A provider's failure as the visitor or the team should hear it. */

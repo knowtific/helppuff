@@ -54,6 +54,13 @@ export default defineConfig({
   },
 
   head: [
+    ['script', { async: '', src: 'https://www.googletagmanager.com/gtag/js?id=G-78BV2CW6TR' }],
+    ['script', {}, `
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-78BV2CW6TR');
+    `],
     ['link', { rel: 'icon', type: 'image/svg+xml', href: `${BASE}favicon.svg` }],
     ['link', { rel: 'icon', href: `${BASE}favicon.ico`, sizes: '48x48' }],
     ['link', { rel: 'apple-touch-icon', href: `${BASE}apple-touch-icon.png` }],
