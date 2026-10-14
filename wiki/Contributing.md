@@ -55,6 +55,9 @@ pnpm pack:cli       # …as an installable tarball, to test like a user would
 pnpm sync:docs      # regenerate the wiki's reference pages
 ```
 
+`git push` runs `pnpm typecheck` and `pnpm test` first (`.githooks/pre-push`;
+`pnpm install` turns it on). `git push --no-verify` skips it once.
+
 ## The repository
 
 A pnpm monorepo, TypeScript strict, ESM.

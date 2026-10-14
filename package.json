@@ -9,6 +9,7 @@
     "node": ">=20"
   },
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks 2>/dev/null || true",
     "ensure-config": "node scripts/ensure-config.mjs",
     "dev": "pnpm ensure-config && concurrently -n worker,widget -c cyan,magenta \"pnpm dev:server\" \"pnpm dev:widget\"",
     "dev:server": "pnpm --filter @helppuff/server dev",

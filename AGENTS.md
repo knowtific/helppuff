@@ -167,6 +167,8 @@ pnpm build:website  # playground + VitePress site, what GitHub Pages publishes
 pnpm dev:website    # the site with hot reload (wiki edits included)
 pnpm e2e            # playwright (needs `npx playwright install chromium` once)
 pnpm check          # lint + typecheck + test + build + e2e (what CI runs)
+# git push runs `pnpm typecheck` and `pnpm test` first (.githooks/pre-push, set up by
+# `pnpm install`); `git push --no-verify` skips it once.
 ```
 
 - If `pnpm dev` is already running on :8787, **don't kill it**; Playwright

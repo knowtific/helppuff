@@ -1,0 +1,10 @@
+#!/bin/sh
+# Typecheck and unit tests before every push, so CI never meets what a minute
+# here would have caught (vitest does not check types, so both run).
+# Skip once with `git push --no-verify`. Installed by `pnpm install`
+# (the root `prepare` script points git at .githooks).
+set -e
+echo "pre-push: pnpm typecheck"
+pnpm typecheck
+echo "pre-push: pnpm test"
+pnpm test
