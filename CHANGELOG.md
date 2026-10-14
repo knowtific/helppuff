@@ -14,6 +14,12 @@ never needs you to change anything. Upgrade with
 
 - Settings → Integrations now opens from the booking calendar sync link before
   the date picker has been saved.
+- Cal.com and Calendly keys can be connected directly in Settings → Bookings;
+  the calendar check and event types refresh there after connecting.
+- Google Calendar and Outlook can connect through Composio in Settings →
+  Bookings too, including the key and calendar account sign-in.
+- If the browser blocks Composio sign-in's new tab, Bookings offers a sign-in
+  link and keeps unsaved booking choices in place.
 
 ## [0.9.0] - 2026-10-14
 

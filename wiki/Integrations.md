@@ -24,11 +24,14 @@ part: you sign in to your calendar on Composio's page, and Composio keeps the
 credentials.
 
 1. Make an account at composio.dev and copy an API key (Settings → API keys).
-2. Paste it in **Composio** and press **Connect**.
+2. In **Settings → Bookings**, choose Google Calendar or Outlook under
+   **Calendar sync**, paste the key in **Composio** and press **Connect**. You
+   can also do this on this page.
 3. Press **Connect Google Calendar** or **Connect Outlook**, and sign in on
-   the page that opens. You come back to this page.
-4. In **Settings → Bookings**, choose that calendar under **Calendar sync**,
-   and pick the account if you have more than one.
+   the page that opens. Return to the page you started from after sign-in;
+   the account list refreshes when you return to the tab. If your browser
+   blocks the new tab, use the **Open Composio sign-in** link shown there.
+4. Pick the account if you have more than one, then save Bookings.
 
 Each HelpPuff site is its own user at Composio, so a site sees only its own
 accounts.
@@ -36,9 +39,10 @@ accounts.
 ## Cal.com
 
 1. In Cal.com, **Settings → Developer → API keys**, make a key.
-2. Paste it in **Cal.com**. Self-hosted? Tick it and give your API v2
+2. In **Settings → Bookings**, choose **Cal.com** and paste the key there. You
+   can also connect it on this page. Self-hosted? Tick it and give your API v2
    address, like `https://cal.example.com/api/v2`.
-3. In **Settings → Bookings**, choose **Cal.com** and the event type.
+3. Choose the event type in **Settings → Bookings**.
 
 Optional, for instant updates: under **Instant updates from Cal.com**, copy
 the address and secret into Cal.com's **Settings → Developer → Webhooks**,
@@ -49,8 +53,9 @@ Cal.com show at the next sync (every 15 minutes).
 
 1. In Calendly, **Integrations → API and webhooks**, make a personal access
    token.
-2. Paste it in **Calendly**.
-3. In **Settings → Bookings**, choose **Calendly** and the event type.
+2. In **Settings → Bookings**, choose **Calendly** and paste the token there.
+   You can also connect it on this page.
+3. Choose the event type in **Settings → Bookings**.
 
 Calendly lets apps book directly only on its paid plans (Standard and up).
 On a free plan, the picker still shows your real free times; when the

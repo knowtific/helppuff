@@ -1,8 +1,9 @@
 import { ExternalLink, Loader2, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, type BookingSlots, type BookingsPatch, type BookingsSettings as Bookings, type BookingsStatus, type CalendarSync, type EventType, type SettingsView, type Weekday } from '../lib/api';
-import { cn, href, useData } from '../lib/utils';
+import { cn, useData } from '../lib/utils';
 import { Choice } from './InstructionsForm';
+import { BookingIntegration } from './Integrations';
 import { WikiLink, wikiHref } from './Shell';
 import { Badge, Button, Card, CardHeader, ErrorNote, InfoTip, Input, Select, Skeleton } from './ui';
 
@@ -344,11 +345,9 @@ export function BookingsSettings() {
                   <div className="flex flex-wrap items-center gap-2 text-xs">
                     {check ? <Badge dot={check.ok ? '#22c55e' : '#f59e0b'}>{check.ok ? 'Connected' : 'Not ready'}</Badge> : <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
                     <span className="text-muted-foreground">{check?.detail ?? integration?.lastError ?? ''}</span>
-                    <a href={href({ page: 'settings', id: 'integrations' })} className="ml-auto underline-offset-2 hover:underline">
-                      {check?.ok ? 'Settings → Integrations' : 'Connect in Settings → Integrations'}
-                    </a>
                   </div>
                 )}
+                {integrationKind && <BookingIntegration key={integrationKind} kind={integrationKind} toolkit={sync === 'google' || sync === 'outlook' ? sync : undefined} onChanged={() => void loadCalendar(sync)} />}
                 {providerSlots && (
                   <Labeled label="Event type: its length, hours and rules are used">
                     <div className="flex gap-2">

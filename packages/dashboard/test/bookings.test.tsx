@@ -1,15 +1,17 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act } from 'react';
 import { BookingsSettings } from '../src/components/BookingsSettings';
 import { Integrations } from '../src/components/Integrations';
 import { Settings } from '../src/pages/Settings';
 import { Calendar } from '../src/pages/Calendar';
 import type { Appointment, BookingsSettings as Bookings, Me } from '../src/lib/api';
-import { button, byText, click, fakeApi, flush, me, mount, type, unmount } from './helpers';
+import { button, byText, click, fakeApi, flush, me, mount, select, type, unmount } from './helpers';
 
 /** Appointments in the dashboard: Settings → Bookings, Settings → Integrations, and the Calendar. */
 
 afterEach(async () => {
   await unmount();
+  vi.restoreAllMocks();
 });
 
 const HOURS = { mon: ['09:00-17:00'], tue: ['09:00-17:00'], wed: ['09:00-17:00'], thu: ['09:00-17:00'], fri: ['09:00-17:00'], sat: [], sun: [] };
@@ -60,20 +62,102 @@ describe('Settings → Bookings', () => {
     expect(byText(page, 'A preview: nothing was booked.')).toBeTruthy();
   });
 
-  it('asks for the event type with a calendar that has them, and links to Integrations', async () => {
+  it('asks for the event type with a connected calendar', async () => {
     fakeApi({
       'GET /settings': view(bookings({ mode: 'picker', sync: 'calcom' })),
       'GET /bookings': status('picker', null, true),
       'GET /bookings/slots': SLOTS,
+      'GET /integrations': { items: [{ kind: 'calcom', name: 'Cal.com', connected: true, baseUrl: null, status: 'ok', lastError: null, lastAt: null, account: null, plan: null, createdAt: 1, updatedAt: 1 }], help: { calcom: { name: 'Cal.com', key: 'API key', help: 'Cal.com API key' } } },
       'POST /bookings/test': { ok: true, detail: 'Connected: 2 event types.', eventTypes: [{ id: '11', name: '30 min intro', duration: 30 }, { id: '12', name: 'Site visit', duration: 60 }] },
     });
     const page = await mount(<BookingsSettings />);
     await flush();
     expect(byText(page, 'Connected: 2 event types.')).toBeTruthy();
     expect(byText(page, '30 min intro · 30 min')).toBeTruthy();
-    expect(page.querySelector('a[href="#/settings/integrations"]')).toBeTruthy();
+    expect(byText(page, 'Change Cal.com key or check connection')).toBeTruthy();
+    expect(page.querySelector('a[href="#/settings/integrations"]')).toBeNull();
     // The event type sets the length and hours: no hours here.
     expect(page.querySelector('[aria-label="When"]')).toBeNull();
+  });
+
+  it('connects Cal.com and loads event types without leaving Bookings', async () => {
+    let connected = false;
+    const calls = fakeApi({
+      'GET /settings': view(bookings({ mode: 'picker', sync: 'calcom' })),
+      'GET /bookings': status('picker', null, true),
+      'GET /bookings/slots': SLOTS,
+      'GET /integrations': () => ({ items: [{ kind: 'calcom', name: 'Cal.com', connected, baseUrl: null, status: connected ? 'ok' : 'none', lastError: null, lastAt: null, account: null, plan: null, createdAt: null, updatedAt: null }], help: { calcom: { name: 'Cal.com', key: 'API key', help: 'Cal.com → Settings → Developer → API keys.' } } }),
+      'POST /bookings/test': () => connected
+        ? { ok: true, detail: 'Connected: 1 event type.', eventTypes: [{ id: '11', name: 'Intro', duration: 30 }] }
+        : { ok: false, detail: 'Connect Cal.com first.', eventTypes: [] },
+      'PUT /integrations/calcom': () => {
+        connected = true;
+        return { check: { ok: true, detail: 'Connected: 1 event type.' } };
+      },
+    });
+    const page = await mount(<BookingsSettings />);
+    expect(byText(page, 'Connect Cal.com')).toBeTruthy();
+    await type(page.querySelector('input[type="password"]'), 'cal_live_abc');
+    await click(button(page, 'Connect'));
+    expect(calls.find((c) => c.method === 'PUT' && c.path === '/integrations/calcom')?.body).toEqual({ key: 'cal_live_abc', baseUrl: null });
+    expect(byText(page, 'Intro · 30 min')).toBeTruthy();
+    expect(byText(page, 'Change Cal.com key or check connection')).toBeTruthy();
+  });
+
+  it('connects a Google Calendar account through Composio from Bookings', async () => {
+    let keyConnected = false;
+    let accountConnected = false;
+    const calls = fakeApi({
+      'GET /settings': view(bookings({ mode: 'picker' })),
+      'GET /bookings': status('picker', null, true),
+      'GET /bookings/slots': SLOTS,
+      'GET /integrations': () => ({ items: [{ kind: 'composio', name: 'Composio', connected: keyConnected, baseUrl: null, status: keyConnected ? 'ok' : 'none', lastError: null, lastAt: null, account: null, plan: null, createdAt: null, updatedAt: null }], help: { composio: { name: 'Composio', key: 'API key', help: 'Connects Google Calendar.' } } }),
+      'GET /integrations/composio/accounts?toolkit=google': () => ({ items: accountConnected ? [{ id: 'ca_1', toolkit: 'googlecalendar', label: 'Owner Google', status: 'ACTIVE' }] : [] }),
+      'POST /bookings/test': () => ({ ok: keyConnected, detail: keyConnected ? 'The key works.' : 'Connect Composio first.', eventTypes: [] }),
+      'PUT /integrations/composio': () => {
+        keyConnected = true;
+        return { check: { ok: true, detail: 'The key works.' } };
+      },
+      'POST /integrations/composio/connect': { url: 'https://connect.composio.dev/link/one' },
+    });
+    const popup = { location: { href: '' }, close: vi.fn() };
+    vi.spyOn(window, 'open').mockReturnValue(popup as unknown as Window);
+    const page = await mount(<BookingsSettings />);
+    await select(page.querySelector('[aria-label="Calendar to sync with"]'), 'google');
+    expect(byText(page, 'Connect Composio')).toBeTruthy();
+    await type(page.querySelector('input[type="password"]'), 'ck_abc');
+    await click(button(page, 'Connect'));
+    expect(calls.find((c) => c.path === '/integrations/composio' && c.method === 'PUT')?.body).toEqual({ key: 'ck_abc' });
+    await click(button(page, 'Connect Google Calendar'));
+    expect(calls.find((c) => c.path === '/integrations/composio/connect')?.body).toEqual({ toolkit: 'google', returnUrl: `${location.origin}/admin/#/settings/bookings` });
+    expect(popup.location.href).toBe('https://connect.composio.dev/link/one');
+    accountConnected = true;
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+    });
+    await flush();
+    expect([...page.querySelectorAll('option')].some((option) => option.textContent === 'Owner Google')).toBe(true);
+  });
+
+  it('keeps unsaved booking choices when the Composio popup is blocked', async () => {
+    fakeApi({
+      'GET /settings': view(bookings({ mode: 'picker' })),
+      'GET /bookings': status('picker', null, true),
+      'GET /bookings/slots': SLOTS,
+      'GET /integrations': { items: [{ kind: 'composio', name: 'Composio', connected: true, baseUrl: null, status: 'ok', lastError: null, lastAt: null, account: null, plan: null, createdAt: 1, updatedAt: 1 }], help: { composio: { name: 'Composio', key: 'API key', help: 'Connects Google Calendar.' } } },
+      'GET /integrations/composio/accounts?toolkit=google': { items: [] },
+      'POST /bookings/test': { ok: false, detail: 'Connect a Google Calendar account.', eventTypes: [] },
+      'POST /integrations/composio/connect': { url: 'https://connect.composio.dev/link/one' },
+    });
+    vi.spyOn(window, 'open').mockReturnValue(null);
+    const page = await mount(<BookingsSettings />);
+    await select(page.querySelector('[aria-label="Calendar to sync with"]'), 'google');
+    const locationBeforeConnect = window.location.href;
+    await click(button(page, 'Connect Google Calendar'));
+    expect(window.location.href).toBe(locationBeforeConnect);
+    expect((page.querySelector('[aria-label="Calendar to sync with"]') as HTMLSelectElement).value).toBe('google');
+    expect(button(page.querySelector('.sticky')!, 'Save')?.disabled).toBe(false);
+    expect(page.querySelector('a[href="https://connect.composio.dev/link/one"]')?.textContent).toBe('Open Composio sign-in');
   });
 });
 

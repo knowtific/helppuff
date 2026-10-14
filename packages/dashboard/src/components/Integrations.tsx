@@ -1,5 +1,5 @@
 import { KeyRound, Loader2, Plus, RefreshCw, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api, type IntegrationView } from '../lib/api';
 import { fmtRelative, useData } from '../lib/utils';
 import { CopyBlock } from '../pages/Settings';
@@ -15,6 +15,7 @@ import { Badge, Button, Card, CardHeader, Disclosure, ErrorNote, Input, Password
 
 type Listed = { items: IntegrationView[]; help: Record<string, { name: string; key: string; help: string }> };
 type Account = { id: string; toolkit: string; label: string; status: string };
+const loadIntegrations = () => api<Listed>('/integrations');
 
 const USED_BY: Record<IntegrationView['kind'], string> = {
   composio: 'Google Calendar and Outlook for bookings; later, CRMs.',
@@ -87,19 +88,49 @@ function KeyForm({ item, help, onSaved, result, setResult, inset = false }: { it
   );
 }
 
-function ComposioAccounts() {
-  const { data, error, reload } = useData(() => api<{ items: Account[] }>('/integrations/composio/accounts'), []);
+/** One key editor in both settings pages: shared save, check, disclosure and result states. */
+function IntegrationKeyEditor({ item, help, onChanged, showForm, expanded = false, inline = false }: { item: IntegrationView; help: { key: string; help: string }; onChanged: () => void; showForm: boolean; expanded?: boolean; inline?: boolean }) {
+  const [result, setResult] = useState<Check>(null);
+  if (item.connected) return (
+    <Disclosure summary={inline ? `Change ${item.name} key or check connection` : 'Key and check'} className={inline ? undefined : 'border-t px-4 py-3'} open={expanded || item.status === 'error'}>
+      <KeyForm item={item} help={help} onSaved={onChanged} result={result} setResult={setResult} inset />
+    </Disclosure>
+  );
+  return showForm && <KeyForm item={item} help={help} onSaved={onChanged} result={result} setResult={setResult} inset={inline} />;
+}
+
+function ComposioAccounts({ toolkit, onChanged, inline = false }: { toolkit?: 'google' | 'outlook'; onChanged?: () => void; inline?: boolean }) {
+  const { data, error, reload } = useData(() => api<{ items: Account[] }>(`/integrations/composio/accounts${toolkit ? `?toolkit=${toolkit}` : ''}`), [toolkit]);
   const [opening, setOpening] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [manualLink, setManualLink] = useState<{ toolkit: 'google' | 'outlook'; url: string } | null>(null);
+  const [waitingForConnect, setWaitingForConnect] = useState(false);
+  const refresh = () => {
+    reload();
+    onChanged?.();
+  };
+  useEffect(() => {
+    if (!waitingForConnect) return;
+    const returned = () => {
+      setWaitingForConnect(false);
+      setManualLink(null);
+      refresh();
+    };
+    window.addEventListener('focus', returned);
+    return () => window.removeEventListener('focus', returned);
+  }, [waitingForConnect, toolkit]);
   const connect = async (toolkit: 'google' | 'outlook') => {
     setOpening(toolkit);
     setProblem(null);
+    setManualLink(null);
     // Opened first, filled after: browsers block a window opened after a wait.
     const tab = window.open('about:blank', '_blank');
     try {
-      const { url } = await api<{ url: string }>('/integrations/composio/connect', { method: 'POST', json: { toolkit, returnUrl: `${location.origin}/admin/#/settings/integrations` } });
-      if (tab) tab.location.href = url;
-      else window.location.href = url;
+      const { url } = await api<{ url: string }>('/integrations/composio/connect', { method: 'POST', json: { toolkit, returnUrl: `${location.origin}/admin/#/settings/${inline ? 'bookings' : 'integrations'}` } });
+      if (tab) {
+        tab.location.href = url;
+        setWaitingForConnect(true);
+      } else setManualLink({ toolkit, url });
     } catch (thrown) {
       tab?.close();
       setProblem((thrown as Error).message);
@@ -108,10 +139,10 @@ function ComposioAccounts() {
     }
   };
   return (
-    <div className="space-y-2 border-t p-4">
+    <div className={inline ? 'space-y-2 border-t pt-3' : 'space-y-2 border-t p-4'}>
       <div className="flex items-center justify-between">
         <p className="text-xs font-medium text-muted-foreground">Connected accounts</p>
-        <Button variant="ghost" size="icon" className="size-7" aria-label="Refresh accounts" onClick={reload}>
+        <Button variant="ghost" size="icon" className="size-7" aria-label="Refresh accounts" onClick={refresh}>
           <RefreshCw />
         </Button>
       </div>
@@ -127,13 +158,18 @@ function ComposioAccounts() {
         ))}
       </ul>
       <div className="flex flex-wrap gap-2 pt-1">
-        <Button variant="outline" size="sm" onClick={() => void connect('google')} disabled={opening !== null}>
+        {(!toolkit || toolkit === 'google') && <Button variant="outline" size="sm" onClick={() => void connect('google')} disabled={opening !== null}>
           {opening === 'google' ? <Loader2 className="animate-spin" /> : <Plus />} Connect Google Calendar
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => void connect('outlook')} disabled={opening !== null}>
+        </Button>}
+        {(!toolkit || toolkit === 'outlook') && <Button variant="outline" size="sm" onClick={() => void connect('outlook')} disabled={opening !== null}>
           {opening === 'outlook' ? <Loader2 className="animate-spin" /> : <Plus />} Connect Outlook
-        </Button>
+        </Button>}
       </div>
+      {manualLink && (!toolkit || manualLink.toolkit === toolkit) && (
+        <p role="status" className="text-xs text-muted-foreground">
+          Sign-in did not open. <a href={manualLink.url} target="_blank" rel="noopener noreferrer" onClick={() => setWaitingForConnect(true)} className="font-medium text-foreground underline-offset-2 hover:underline">Open Composio sign-in</a> to continue in a new tab.
+        </p>
+      )}
       {problem && <p role="alert" className="text-xs text-danger">{problem}</p>}
     </div>
   );
@@ -155,7 +191,7 @@ function CalcomWebhook() {
 }
 
 export function Integrations() {
-  const { data, error, reload } = useData(() => api<Listed>('/integrations'), []);
+  const { data, error, reload } = useData(loadIntegrations, []);
   if (error) return <ErrorNote error={error} onRetry={reload} />;
   if (!data) return <Skeleton className="h-64" />;
   return (
@@ -168,10 +204,31 @@ export function Integrations() {
   );
 }
 
+/** Connect a calendar while choosing it in Bookings; the same sealed key and check as Integrations. */
+export function BookingIntegration({ kind, toolkit, onChanged }: { kind: IntegrationView['kind']; toolkit?: 'google' | 'outlook'; onChanged: () => void }) {
+  const { data, error, reload } = useData(loadIntegrations, []);
+  if (error) return <ErrorNote error={error} onRetry={reload} />;
+  if (!data) return <Skeleton className="h-24" />;
+  const item = data.items.find((entry) => entry.kind === kind);
+  const help = data.help[kind];
+  if (!item || !help) return <p className="text-xs text-danger">This Worker cannot connect {kind === 'calcom' ? 'Cal.com' : kind === 'calendly' ? 'Calendly' : 'Composio'} yet. Check Settings → Updates.</p>;
+  const saved = () => {
+    reload();
+    onChanged();
+  };
+  return (
+    <div className="space-y-2 border-t pt-3">
+      {!item.connected && <p className="text-xs font-medium">Connect {item.name}</p>}
+      <IntegrationKeyEditor item={item} help={help} onChanged={saved} showForm inline />
+      {!item.connected && <p className="text-xs text-muted-foreground">The key is saved when you connect. Save your booking choices below when ready.</p>}
+      {item.kind === 'composio' && item.connected && <ComposioAccounts toolkit={toolkit} onChanged={onChanged} inline />}
+    </div>
+  );
+}
+
 /** One service: a row with Connect until it is connected; then its status, with the key folded away. */
 function IntegrationCard({ item, help, onChanged }: { item: IntegrationView; help: { key: string; help: string }; onChanged: () => void }) {
   const [open, setOpen] = useState(false);
-  const [result, setResult] = useState<Check>(null);
   return (
     <Card role="region" aria-label={item.name}>
       <CardHeader
@@ -212,13 +269,7 @@ function IntegrationCard({ item, help, onChanged }: { item: IntegrationView; hel
           {item.plan ? ` · ${item.plan} plan${item.plan === 'free' ? ': visitors finish booking on Calendly’s page, and it is read back' : ''}` : ''}
         </p>
       )}
-      {item.connected ? (
-        <Disclosure summary="Key and check" className="border-t px-4 py-3" open={open || item.status === 'error'}>
-          <KeyForm item={item} help={help} onSaved={onChanged} result={result} setResult={setResult} inset />
-        </Disclosure>
-      ) : (
-        open && <KeyForm item={item} help={help} onSaved={onChanged} result={result} setResult={setResult} />
-      )}
+      <IntegrationKeyEditor item={item} help={help} onChanged={onChanged} showForm={open} expanded={open} />
       {item.kind === 'composio' && item.connected && <ComposioAccounts />}
       {item.kind === 'calcom' && item.connected && <CalcomWebhook />}
     </Card>

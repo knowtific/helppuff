@@ -67,7 +67,10 @@ bookings are written. The picker looks and works the same with each.
 | **Google Calendar** | Your hours here, less busy time in the calendar | Google Calendar (with a Meet link unless you set a place), and HelpPuff | Composio, and a Google Calendar account connected through it |
 | **Outlook / Microsoft 365** | The same | Outlook, and HelpPuff | Composio, and an Outlook account |
 
-Keys and accounts live in [[Settings → Integrations|Integrations]]. The sync
+Choose Cal.com or Calendly in **Settings → Bookings** to enter its key there;
+the event types appear after it connects. You can also manage keys in
+[[Settings → Integrations|Integrations]]. For Google Calendar or Outlook, enter
+the Composio key and connect the calendar account in Bookings too. The sync
 goes both ways:
 
 - **HelpPuff → your calendar:** a booking, a move or a cancellation from the
