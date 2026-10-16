@@ -8,6 +8,24 @@ never needs you to change anything. Upgrade with
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-10-16
+
+### Changed
+
+- The README on npm is now the same as the one on GitHub (it had drifted into
+  a shorter, older version).
+- Both READMEs show an animated preview of setting HelpPuff up by asking Claude
+  Code, which plays in place on GitHub and npm.
+- Both READMEs link to a 4-minute tour of every feature on YouTube.
+
+### Fixed
+
+- The README's "Built for AI agents" section linked to a section that did not
+  exist; it now points to "AI-agent first".
+- The widget's size is given as about 41 KB gzipped in all (a 6 KB loader,
+  then the 35 KB chat once the page is idle); it said 35 KB, leaving out the
+  loader.
+
 ## [0.9.3] - 2026-10-16
 
 ### Added

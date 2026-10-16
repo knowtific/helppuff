@@ -1,6 +1,6 @@
 # The widget
 
-The chat bubble on your site. One `<script>` tag, about 35 KB gzipped, inside
+The chat bubble on your site. One `<script>` tag, about 41 KB gzipped in all, inside
 a shadow root so your page's CSS cannot break it and it cannot break your
 page. A small loader (about 6 KB) draws the button first; the chat itself
 loads once the page is idle, or as soon as a visitor reaches for the button,

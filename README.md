@@ -19,6 +19,10 @@ plan**.
 > No HelpPuff subscription. No VPS to patch. No chatbot vendor holding your
 > customer database.
 
+[![HelpPuff in 4 minutes: watch the tour on YouTube](https://i.ytimg.com/vi/OhpyStdl-js/maxresdefault.jpg)](https://www.youtube.com/watch?v=OhpyStdl-js)
+
+▶ **[Watch the 4-minute tour on YouTube](https://www.youtube.com/watch?v=OhpyStdl-js)**: every feature, from setup to the CRM.
+
 ## AI-agent first
 
 HelpPuff is built to be set up and run by your AI coding agent. You don't
@@ -26,7 +30,7 @@ need to learn a config file or click through settings (you still can):
 Claude Code, Codex, Cursor, OpenCode or any other coding agent does it for
 you, because every part of HelpPuff has a command it can run and read.
 
-[![Watch: set up HelpPuff by asking Claude Code (36 seconds)](https://knowtific.github.io/helppuff/videos/just-ask-poster-play.jpg)](https://knowtific.github.io/helppuff/videos/just-ask.mp4)
+[![Setting up HelpPuff by asking Claude Code](https://knowtific.github.io/helppuff/videos/just-ask.gif)](https://knowtific.github.io/helppuff/docs/Getting-Started)
 
 **1. Make a folder** for your assistant and open your agent in it:
 
@@ -156,7 +160,7 @@ experience, the operational tools and the customer follow-up workflow.
 | Feature | What it gives you | Learn more |
 | --- | --- | --- |
 | **Website and file knowledge** | Crawls selected pages and learns PDF, Word, Markdown and text files using hybrid semantic + keyword search | [Knowledge base](wiki/Knowledge-Base.md) |
-| **Fast, isolated widget** | An accessible, mobile-first widget in a shadow root; one script tag, about 35 KB gzipped, loaded after the page is ready | [Widget](wiki/Widget.md) |
+| **Fast, isolated widget** | An accessible, mobile-first widget in a shadow root; one script tag, about 41 KB gzipped in all: a 6 KB loader draws the button, and the chat loads once the page is idle | [Widget](wiki/Widget.md) |
 | **Rich conversations** | Streaming replies, shortcut buttons, suggested questions, option chips, cards, links and forms directly inside chat | [Widget](wiki/Widget.md) |
 | **Pre-chat forms** | Capture name, email, phone and custom fields before a conversation, with configurable required fields | [Leads](wiki/Leads.md) |
 | **Built-in CRM** | One lead per person, repeat conversations, pipeline stages, notes, custom answers and CSV export | [Dashboard](wiki/Dashboard.md#contacts) |
@@ -190,7 +194,7 @@ HelpPuff is designed so a coding agent can take the project from an empty
 folder to a tested production assistant. Every operation available in the
 dashboard is also available through the CLI or admin API.
 
-Use the agent prompt in the [Install it](#install-it) section above. The
+Use the agent prompt in the [AI-agent first](#ai-agent-first) section above. The
 instructions are plain Markdown and do not require a plugin, skill or MCP
 server.
 
