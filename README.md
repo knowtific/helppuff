@@ -26,7 +26,7 @@ need to learn a config file or click through settings (you still can):
 Claude Code, Codex, Cursor, OpenCode or any other coding agent does it for
 you, because every part of HelpPuff has a command it can run and read.
 
-[![Setting up HelpPuff by asking Claude Code](https://knowtific.github.io/helppuff/videos/just-ask.gif)](https://knowtific.github.io/helppuff/docs/Getting-Started)
+[![Setting up HelpPuff by asking Claude Code](https://knowtific.github.io/helppuff/videos/just-ask.gif)](https://knowtific.github.io/helppuff/docs/Getting-Started#_1-ask-your-ai-agent)
 
 **1. Make a folder** for your assistant and open your agent in it:
 
