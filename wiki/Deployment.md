@@ -107,5 +107,8 @@ the audit API records successful changes, not rejected API keys.
 
 ## Removing it
 
-`helppuff destroy --yes` deletes every resource above. Irreversible: the
-database's conversations, leads and knowledge go with it.
+`helppuff destroy --yes` deletes every resource above, including the R2
+bucket and its photos and files. Irreversible: the database's
+conversations, leads and knowledge go with it. Without `--yes` you type the
+site name, and it asks before deleting the files; `--keep-data` keeps the
+database, the vector index and the files.

@@ -26,6 +26,8 @@ need to learn a config file or click through settings (you still can):
 Claude Code, Codex, Cursor, OpenCode or any other coding agent does it for
 you, because every part of HelpPuff has a command it can run and read.
 
+[![Watch: set up HelpPuff by asking Claude Code (36 seconds)](https://knowtific.github.io/helppuff/videos/just-ask-poster-play.jpg)](https://knowtific.github.io/helppuff/videos/just-ask.mp4)
+
 **1. Make a folder** for your assistant and open your agent in it:
 
 ```bash

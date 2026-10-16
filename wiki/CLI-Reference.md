@@ -227,11 +227,11 @@ golden.json: [{ "question": "What's your phone number?", "source": "/contact", "
 helppuff destroy --yes [--keep-data]
 ```
 
-Delete everything this project created on Cloudflare: the Worker and its Workflow, KV, the D1 database (conversations, leads, knowledge), the Vectorize index, and an AI Search instance helppuff made. helppuff.json, prompt.md and .env stay, so `helppuff deploy` rebuilds it. Irreversible.
+Delete everything this project created on Cloudflare: the Worker and its Workflow, KV, the D1 database (conversations, leads, knowledge), the Vectorize index, an AI Search instance helppuff made, and the R2 bucket of photos and files (emptied first). Without --yes you type the site name, and it asks before deleting the files. helppuff.json, prompt.md and .env stay, so `helppuff deploy` rebuilds it. Irreversible.
 
 | Option | |
 | --- | --- |
-| `--keep-data` | Keep the D1 database and the Vectorize index |
+| `--keep-data` | Keep the D1 database, the Vectorize index and the files bucket |
 
 ### `helppuff secret`
 

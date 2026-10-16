@@ -246,6 +246,43 @@ export class CloudflareApi {
     }
   }
 
+  // Teardown (developers.cloudflare.com/api/resources/r2/subresources/buckets, checked 2026-10-16):
+  //   DELETE /accounts/{id}/r2/buckets/{name}                 refused until the bucket is empty
+  //   GET    /accounts/{id}/r2/buckets/{name}/objects         a page of objects (paging is not documented)
+  //   DELETE /accounts/{id}/r2/buckets/{name}/objects/{key}
+
+  /** Whether this project's bucket is there to delete. False when R2 is off or the token cannot see it. */
+  async r2BucketExists(accountId: string, name: string): Promise<boolean> {
+    try {
+      await this.call('GET', `/accounts/${accountId}/r2/buckets/${encodeURIComponent(name)}`);
+      return true;
+    } catch (thrown) {
+      if (thrown instanceof CliError && (thrown.details?.['status'] === 404 || thrown.code === 'cloudflare_permission')) return false;
+      if (thrown instanceof CliError && ((thrown.details?.['errors'] as { code: number }[] | undefined) ?? []).some((e) => e.code === 10042)) return false;
+      throw thrown;
+    }
+  }
+
+  /**
+   * Empty the bucket, then delete it; returns how many files went with it. Listing is
+   * repeated until it comes back empty, since the API does not document its paging.
+   */
+  async deleteR2Bucket(accountId: string, name: string): Promise<number> {
+    const bucket = `/accounts/${accountId}/r2/buckets/${encodeURIComponent(name)}`;
+    let removed = 0;
+    for (let round = 0; round < 10_000; round += 1) {
+      const page = (await this.call<{ key?: string }[]>('GET', `${bucket}/objects`)).result;
+      const keys = (Array.isArray(page) ? page : []).map((o) => o.key).filter((k): k is string => Boolean(k));
+      if (!keys.length) break;
+      for (const key of keys) {
+        await this.call('DELETE', `${bucket}/objects/${encodeURIComponent(key)}`);
+        removed += 1;
+      }
+    }
+    await this.call('DELETE', bucket);
+    return removed;
+  }
+
   // ------------------------------------------------------------ Vectorize
   // developers.cloudflare.com/api/resources/vectorize (checked 2026-10-04):
   //   POST   /vectorize/v2/indexes                       { name, config: { dimensions, metric } }

@@ -26,6 +26,14 @@ describe('wiki → website', () => {
     );
   });
 
+  it('plays a poster linked to an .mp4 in place, and leaves other image links alone', () => {
+    expect(translate('[![Watch it](https://x.test/p.jpg)](https://x.test/v.mp4)')).toBe(
+      '<video src="https://x.test/v.mp4" poster="https://x.test/p.jpg" aria-label="Watch it" controls playsinline preload="metadata" style="width:100%;border-radius:12px"></video>',
+    );
+    expect(translate('[![Logo](https://x.test/l.png)](https://x.test/)')).toBe('[![Logo](https://x.test/l.png)](https://x.test/)');
+    expect(translate('See [![a](p.jpg)](v.mp4) inline')).toBe('See [![a](p.jpg)](v.mp4) inline');
+  });
+
   it('builds the sidebar from _Sidebar.md, linking only to pages that exist', () => {
     const pages = new Set(wikiPages());
     const groups = wikiSidebar();

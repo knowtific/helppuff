@@ -13,24 +13,32 @@ import type { Ctx } from './context.js';
  * `helppuff destroy` — remove everything this project created on Cloudflare:
  * the Worker (and its crawl Workflow), the KV namespace, the D1 database
  * (conversations, leads, knowledge text), the Vectorize index, and an AI
- * Search instance helppuff created. Local files stay: helppuff.json, prompt.md
- * and .env are untouched, so `helppuff deploy` builds it all again.
+ * Search instance helppuff created, and the R2 bucket of photos and files.
+ * Local files stay: helppuff.json, prompt.md and .env are untouched, so
+ * `helppuff deploy` builds it all again.
  *
  * Irreversible, so it never runs without `--yes` (or typing the site id in
- * the terminal). `--keep-data` keeps the database and the vector index.
+ * the terminal, which then also asks about the files bucket). `--keep-data`
+ * keeps the database, the vector index and the files.
  */
 export async function destroyCommand(ctx: Ctx): Promise<number> {
   assertKnown(ctx.flags, ['yes', 'y', 'keep-data', 'cf-account', 'account-id'], 'destroy');
   const loaded = loadProject(ctx.cwd);
   const { project } = loaded;
   const keepData = Boolean(ctx.flags['keep-data']);
+  const confirmed = Boolean(ctx.flags['yes'] || ctx.flags['y']);
   const worker = workerNameFor(project);
   const name = resourceName(project.site);
 
-  if (!(ctx.flags['yes'] || ctx.flags['y'])) {
-    if (!ctx.interactive) {
-      throw new CliError('needs_confirmation', `This deletes ${worker} and its data from Cloudflare. Re-run with --yes to confirm.`, { exitCode: EXIT.usage });
-    }
+  if (!confirmed && !ctx.interactive) {
+    throw new CliError('needs_confirmation', `This deletes ${worker} and its data from Cloudflare. Re-run with --yes to confirm.`, { exitCode: EXIT.usage });
+  }
+  const cf = await cloudflareSession(loadEnv(loaded.dir), { accountId: str(ctx.flags, 'cf-account') ?? str(ctx.flags, 'account-id') });
+  // The bucket is made by every deploy the account allows, files on or not; only look when it could go.
+  const hasFiles = !keepData && (await cf.api.r2BucketExists(cf.accountId, name).catch(() => false));
+  let deleteFiles = hasFiles;
+
+  if (!confirmed) {
     p.note(
       [`Worker      ${worker} (and ${worker}-crawl)`, 'KV          config, rate limits', ...(keepData ? [] : ['D1          conversations, leads, knowledge text', 'Vectorize   the knowledge index'])].join('\n'),
       'Will be deleted',
@@ -40,9 +48,19 @@ export async function destroyCommand(ctx: Ctx): Promise<number> {
       p.cancel('Nothing was deleted.');
       return 1;
     }
+    if (hasFiles) {
+      const answer = await p.confirm({
+        message: `Also delete the R2 bucket ${name}, with every photo and file visitors and your team uploaded?`,
+        initialValue: false,
+      });
+      if (p.isCancel(answer)) {
+        p.cancel('Nothing was deleted.');
+        return 1;
+      }
+      deleteFiles = answer;
+    }
   }
 
-  const cf = await cloudflareSession(loadEnv(loaded.dir), { accountId: str(ctx.flags, 'cf-account') ?? str(ctx.flags, 'account-id') });
   const removed: string[] = [];
   const failed: { resource: string; error: string }[] = [];
   const attempt = async (resource: string, work: () => Promise<unknown>) => {
@@ -69,7 +87,9 @@ export async function destroyCommand(ctx: Ctx): Promise<number> {
     // Only an instance helppuff made for this site; a reused one belongs to someone else.
     const instance = aiSearchInstanceFor(project);
     if (instance === name) await attempt(`AI Search ${instance}`, () => cf.api.deleteAiSearchInstance(cf.accountId, instance));
+    if (deleteFiles) await attempt(`R2 ${name}`, () => cf.api.deleteR2Bucket(cf.accountId, name));
   }
+  const keptFiles = hasFiles && !deleteFiles ? name : undefined;
 
   if (!failed.length) {
     updateProject(loaded, (raw) => {
@@ -80,9 +100,10 @@ export async function destroyCommand(ctx: Ctx): Promise<number> {
     rmSync(join(loaded.dir, GENERATED_DIR), { recursive: true, force: true });
   }
 
-  ctx.out.result({ removed, failed, keptData: keepData, next: failed.length ? ['helppuff destroy --yes   (retry)'] : ['helppuff deploy   (to build it again)'] }, () => {
+  ctx.out.result({ removed, failed, keptData: keepData, ...(keptFiles ? { keptFilesBucket: keptFiles } : {}), next: failed.length ? ['helppuff destroy --yes   (retry)'] : ['helppuff deploy   (to build it again)'] }, () => {
     for (const r of removed) ctx.out.success(`Deleted ${r}`);
     for (const f of failed) ctx.out.warn(`${f.resource}: ${f.error}`);
+    if (keptFiles) ctx.out.info(`Kept the R2 bucket ${keptFiles} and its files. \`helppuff destroy --yes\` deletes it too.`);
     if (!failed.length) ctx.out.info(c.dim('helppuff.json, prompt.md and .env are untouched; `helppuff deploy` rebuilds everything.'));
   });
   return failed.length ? 1 : 0;

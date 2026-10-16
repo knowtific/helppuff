@@ -8,6 +8,21 @@ never needs you to change anything. Upgrade with
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-10-16
+
+### Added
+
+- A 36-second video of setting HelpPuff up by asking Claude Code, in the README
+  and on the Getting Started page (it plays in place on the website).
+- Getting Started explains the few clicks a brand-new Cloudflare account needs
+  before the first deploy: the `workers.dev` name, R2 and connecting this machine.
+
+### Fixed
+
+- `helppuff destroy` now deletes the R2 bucket of photos and files too, after
+  emptying it; before, the bucket was left behind. Without `--yes` it asks
+  first; with `--yes` it deletes it; `--keep-data` keeps it.
+
 ## [0.9.2] - 2026-10-14
 
 ### Added

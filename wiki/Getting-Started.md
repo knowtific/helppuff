@@ -10,9 +10,34 @@ You need:
 - **An AI coding agent**, or a terminal if you'd rather do it yourself.
 - **Node.js 20 or later** (for `npx`).
 - **A Cloudflare account.** The free plan is enough for the default setup.
+  Just made one? Take the [[two minutes first|Getting-Started#a-new-cloudflare-account]].
 - **A website** the assistant is for. It can be hosted anywhere; it does not have to be on Cloudflare.
 
+### A new Cloudflare account
+
+A brand-new account needs a few clicks in the
+[Cloudflare dashboard](https://dash.cloudflare.com/) before the first deploy.
+Neither HelpPuff nor your agent can do them for you:
+
+1. **Pick your `workers.dev` name.** Open **Workers & Pages** once. Cloudflare
+   gives the account a subdomain, which is part of every HelpPuff address:
+   `https://knowtific-helppuff-<site>.<name>.workers.dev`. To choose a
+   cleaner one, change *Subdomain* under *Account details* on that page.
+   If the account has none when you deploy, HelpPuff registers one made from
+   the account name (something like `jane-example-com-s-account`). Changing
+   it later changes your assistant's address, so the script on your website
+   has to change too.
+2. **Turn on R2**, only if you want [[photos and files|Files]]. Follow
+   [[One-time setup: R2|Files#one-time-setup-r2]]. Cloudflare may ask for a
+   card, even though it is free up to 10 GB. You can do this later.
+3. **Connect this machine to the account.** `npx wrangler login` signs in
+   with your browser. If you use an [[API token|Configuration#cloudflare-access]]
+   instead, set *Account Resources* to **Include → this account** only, so
+   the token cannot reach any other account you have.
+
 ## 1. Ask your AI agent
+
+[![Watch: set up HelpPuff by asking Claude Code (36 seconds)](https://knowtific.github.io/helppuff/videos/just-ask-poster.jpg)](https://knowtific.github.io/helppuff/videos/just-ask.mp4)
 
 Make a folder for your assistant and open your agent in it:
 
@@ -171,6 +196,6 @@ npx @knowtific/helppuff destroy --yes
 ```
 
 deletes everything it created on your Cloudflare account: the Worker, the
-database (conversations, leads, knowledge), the KV namespace and the vector
-index. Your project folder stays, so `deploy` can rebuild it. This cannot be
-undone.
+database (conversations, leads, knowledge), the KV namespace, the vector
+index and the bucket of photos and files. Your project folder stays, so
+`deploy` can rebuild it. This cannot be undone.

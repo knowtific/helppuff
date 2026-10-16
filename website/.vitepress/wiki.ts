@@ -52,7 +52,15 @@ const wikiLinks = (text: string) =>
   });
 
 /** Real HTML a wiki page may use; any other `<word>` in prose is a placeholder like `<worker>`. */
-const HTML_TAGS = 'a|b|br|details|div|em|i|img|kbd|p|picture|source|span|strong|sub|summary|sup';
+const HTML_TAGS = 'a|b|br|details|div|em|i|img|kbd|p|picture|source|span|strong|sub|summary|sup|video';
+
+/**
+ * A line that is only a poster linking to an `.mp4` (`[![Watch …](poster.jpg)](video.mp4)`):
+ * the GitHub wiki shows the poster and opens the video; the website plays it in place.
+ */
+const videos = (text: string) =>
+  text.replace(/^\[!\[([^\]]*)\]\(([^)\s]+)\)\]\(([^)\s]+\.mp4)\)$/gm, (_all, alt: string, poster: string, src: string) =>
+    `<video src="${src}" poster="${poster}" aria-label="${alt.replace(/"/g, '&quot;')}" controls playsinline preload="metadata" style="width:100%;border-radius:12px"></video>`);
 const PLACEHOLDER = new RegExp(`<(?!/?(?:${HTML_TAGS})\\b[^>]*>)(?!(?:https?:|mailto:)[^>\\s]*>)(?=[A-Za-z/])`, 'g');
 
 /** What Vue would otherwise read as a tag or an interpolation. Autolinks (`<https://…>`) stay. */
@@ -71,7 +79,7 @@ export const renderPage = (page: string): string => translate(readFileSync(join(
  * escaping, which skips fenced and inline code.
  */
 export function translate(markdown: string): string {
-  const source = wikiLinks(markdown).replace(/^<!-- tabs -->$/gm, '::: code-group').replace(/^<!-- \/tabs -->$/gm, ':::');
+  const source = videos(wikiLinks(markdown)).replace(/^<!-- tabs -->$/gm, '::: code-group').replace(/^<!-- \/tabs -->$/gm, ':::');
   const pieces: string[] = [];
   const code = /^```[^\n]*\n[\s\S]*?^```[^\n]*$|`[^`\n]+`/gm;
   let last = 0;

@@ -33,3 +33,27 @@ describe('ensureR2Bucket', () => {
     expect(filesStorageWarning('no_access')).toMatch(/Workers R2 Storage › Edit/);
   });
 });
+
+/** `helppuff destroy` takes the bucket too: emptied first, since Cloudflare refuses a bucket with files in it. */
+describe('deleteR2Bucket', () => {
+  const ACCOUNT = 'a'.repeat(32);
+  const bucket = `/client/v4/accounts/${ACCOUNT}/r2/buckets/knowtific-helppuff-acme`;
+
+  it('deletes every file, listing until the bucket is empty, then the bucket', async () => {
+    const pages = [[{ key: 'files/1/photo.jpg' }, { key: 'files/2/quote.pdf' }], [{ key: 'files/3/plan.png' }], []];
+    const { fetch, calls } = fakeFetch([
+      (url, init) => ((init.method ?? 'GET') === 'GET' && url.pathname === `${bucket}/objects` ? cf(pages.shift() ?? []) : undefined),
+      (url, init) => (init.method === 'DELETE' ? cf({}) : undefined),
+    ]);
+    expect(await new CloudflareApi('t', fetch).deleteR2Bucket(ACCOUNT, 'knowtific-helppuff-acme')).toBe(3);
+    const deletes = calls.filter((c) => c.method === 'DELETE').map((c) => new URL(c.url).pathname);
+    expect(deletes).toEqual([`${bucket}/objects/files%2F1%2Fphoto.jpg`, `${bucket}/objects/files%2F2%2Fquote.pdf`, `${bucket}/objects/files%2F3%2Fplan.png`, bucket]);
+  });
+
+  it('knows whether there is a bucket to delete', async () => {
+    const refused = (code: number, status = 403) => Response.json({ success: false, errors: [{ code, message: 'no' }], result: null }, { status });
+    expect(await new CloudflareApi('t', fakeFetch([() => cf({ name: 'b' })]).fetch).r2BucketExists(ACCOUNT, 'b')).toBe(true);
+    expect(await new CloudflareApi('t', fakeFetch([() => refused(10006, 404)]).fetch).r2BucketExists(ACCOUNT, 'b')).toBe(false);
+    expect(await new CloudflareApi('t', fakeFetch([() => refused(10042)]).fetch).r2BucketExists(ACCOUNT, 'b')).toBe(false);
+  });
+});

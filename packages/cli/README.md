@@ -17,6 +17,8 @@ paste the prompt under [Built for AI agents](#built-for-ai-agents). It sets
 everything up, tests it and gives you the links. Later, ask it for any
 change in your own words.
 
+[![Watch: set up HelpPuff by asking Claude Code (36 seconds)](https://knowtific.github.io/helppuff/videos/just-ask-poster-play.jpg)](https://knowtific.github.io/helppuff/docs/Getting-Started)
+
 Or run it yourself:
 
 ```bash
