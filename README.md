@@ -19,10 +19,6 @@ plan**.
 > No HelpPuff subscription. No VPS to patch. No chatbot vendor holding your
 > customer database.
 
-[![HelpPuff in 4 minutes: watch the tour on YouTube](https://i.ytimg.com/vi/OhpyStdl-js/maxresdefault.jpg)](https://www.youtube.com/watch?v=OhpyStdl-js)
-
-▶ **[Watch the 4-minute tour on YouTube](https://www.youtube.com/watch?v=OhpyStdl-js)**: every feature, from setup to the CRM.
-
 ## AI-agent first
 
 HelpPuff is built to be set up and run by your AI coding agent. You don't
@@ -89,6 +85,10 @@ Change anything and the preview updates. Chat with it, try rich replies
 your `helppuff.json`. Nothing to install, and no server or account needed.
 
 ## Why HelpPuff?
+
+<a href="https://www.youtube.com/watch?v=OhpyStdl-js"><img src="https://knowtific.github.io/helppuff/videos/tour-play.jpg" alt="Watch the 4-minute tour of HelpPuff on YouTube" width="480"></a>
+
+**[Watch the 4-minute tour on YouTube](https://www.youtube.com/watch?v=OhpyStdl-js)**: every feature, from setup to the CRM.
 
 Most hosted chatbots start with a monthly subscription, put important features
 behind higher plans, and keep your conversations and customer details in their

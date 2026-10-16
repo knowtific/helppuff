@@ -281,29 +281,6 @@ const ICONS: Record<string, string> = {
       </div>
     </section>
 
-    <!-- The tour -->
-    <section class="wrap tour" id="tour">
-      <header class="section-head">
-        <p class="kicker">The 4-minute tour</p>
-        <h2>Every feature, <span class="hp-emph">from one prompt to the CRM.</span></h2>
-      </header>
-      <div class="video">
-        <iframe
-          v-if="tourPlaying"
-          :src="`https://www.youtube-nocookie.com/embed/${TOUR}?autoplay=1&rel=0`"
-          title="HelpPuff: the 4-minute tour"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          referrerpolicy="strict-origin-when-cross-origin"
-          allowfullscreen
-        />
-        <button v-else class="video-facade" type="button" aria-label="Play the 4-minute tour of HelpPuff (plays from YouTube)" @click="tourPlaying = true">
-          <img :src="`https://i.ytimg.com/vi/${TOUR}/maxresdefault.jpg`" alt="" width="1280" height="720" loading="lazy" />
-          <span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>Watch the tour · 4 min</span>
-        </button>
-      </div>
-      <p class="video-note">Plays from YouTube · <a :href="`https://www.youtube.com/watch?v=${TOUR}`" target="_blank" rel="noopener">Open on YouTube</a></p>
-    </section>
-
     <!-- Agents -->
     <section class="agents" id="agents">
       <div class="wrap agents-grid">
@@ -365,6 +342,21 @@ const ICONS: Record<string, string> = {
           HelpPuff is the third option.
         </p>
       </header>
+      <div class="video">
+        <iframe
+          v-if="tourPlaying"
+          :src="`https://www.youtube-nocookie.com/embed/${TOUR}?autoplay=1&rel=0`"
+          title="HelpPuff: the 4-minute tour"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerpolicy="strict-origin-when-cross-origin"
+          allowfullscreen
+        />
+        <button v-else class="video-facade" type="button" aria-label="Play the 4-minute tour of HelpPuff (plays from YouTube)" @click="tourPlaying = true">
+          <img :src="`https://i.ytimg.com/vi/${TOUR}/maxresdefault.jpg`" alt="" width="1280" height="720" loading="lazy" />
+          <span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg></span>
+        </button>
+      </div>
+      <p class="video-note">Plays from YouTube · <a :href="`https://www.youtube.com/watch?v=${TOUR}`" target="_blank" rel="noopener">Open on YouTube</a></p>
       <div class="compare" role="table" aria-label="HelpPuff compared with hosted chatbots and building your own">
         <div class="c-row c-head" role="row">
           <span role="columnheader" />
@@ -702,18 +694,17 @@ h1 { text-wrap: balance; margin: 22px 0 18px; font-size: clamp(40px, 6.2vw, 72px
 .stat { padding: 22px 22px 20px; border: 1px solid var(--line); border-radius: 18px; background: var(--card); }
 .stat b { display: block; font-size: 38px; letter-spacing: -0.04em; line-height: 1.1; color: var(--hp-heading-accent); }
 .stat span { display: block; margin-top: 6px; font-size: 14px; line-height: 1.45; color: var(--ink-2); }
-.tour { margin-top: 96px; }
-.video { max-width: 980px; margin: 0 auto; aspect-ratio: 16 / 9; border-radius: 18px; overflow: hidden; border: 1px solid var(--line); background: #16000b; box-shadow: 0 30px 70px -30px var(--hp-shadow); }
+.video { max-width: 640px; margin: 0 auto; aspect-ratio: 16 / 9; border-radius: 18px; overflow: hidden; border: 1px solid var(--line); background: #16000b; box-shadow: 0 30px 70px -30px var(--hp-shadow); }
 .video iframe, .video-facade { display: block; width: 100%; height: 100%; border: 0; }
 .video-facade { position: relative; padding: 0; background: none; cursor: pointer; }
 .video-facade img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.video-facade .play { position: absolute; left: 24px; bottom: 24px; display: inline-flex; align-items: center; gap: 10px; padding: 12px 20px 12px 14px; border-radius: 999px; background: var(--hp-accent); border: 1px solid var(--hp-accent-edge); color: var(--hp-on-accent); font-size: 17px; font-weight: 700; box-shadow: 0 12px 30px -8px rgba(0, 0, 0, 0.55); transition: transform 0.15s ease; }
-.video-facade .play svg { width: 26px; height: 26px; fill: var(--hp-on-accent); }
-.video-facade:hover .play { transform: translateY(-2px); }
+.video-facade .play { position: absolute; left: 50%; top: 86.4%; width: 72px; height: 72px; margin: -36px 0 0 -36px; border-radius: 50%; display: grid; place-items: center; background: var(--hp-accent); border: 1px solid var(--hp-accent-edge); box-shadow: 0 10px 26px -6px rgba(0, 0, 0, 0.6); transition: transform 0.15s ease; }
+.video-facade .play svg { width: 30px; height: 30px; margin-left: 4px; fill: var(--hp-on-accent); }
+.video-facade:hover .play { transform: scale(1.08); }
 .video-facade:focus-visible { outline: 3px solid var(--hp-link); outline-offset: -3px; }
-.video-note { margin: 14px 0 0; text-align: center; font-size: 14px; color: var(--ink-2); }
+.video-note { margin: 12px 0 40px; text-align: center; font-size: 14px; color: var(--ink-2); }
 .video-note a { color: var(--hp-link); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
-@media (max-width: 640px) { .tour { margin-top: 64px; } .video { border-radius: 12px; } .video-facade .play { left: auto; right: 10px; bottom: 10px; gap: 6px; padding: 7px 12px 7px 9px; font-size: 13px; } .video-facade .play svg { width: 18px; height: 18px; } }
+@media (max-width: 640px) { .video { border-radius: 12px; } .video-facade .play { width: 54px; height: 54px; margin: -27px 0 0 -27px; } .video-facade .play svg { width: 22px; height: 22px; } }
 
 /* Sections */
 .block { margin-top: 120px; }
