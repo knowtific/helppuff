@@ -56,8 +56,9 @@ export function adminApi(loaded: LoadedProject, options: { url?: string; fetch?:
       // Handled below.
     }
     if (response.ok) return json as T;
-    const error = (json as { error?: { code?: string; message?: string } } | null)?.error;
-    const message = error?.message ?? `HTTP ${response.status}`;
+    const error = (json as { error?: { code?: string; message?: string; reason?: string; hint?: string } } | null)?.error;
+    // The Worker says what actually went wrong to the admin key (`reason`, `hint`).
+    const message = error?.reason ? `${error.message ?? `HTTP ${response.status}`} ${error.reason}` : (error?.message ?? `HTTP ${response.status}`);
     if (response.status === 401) {
       throw new CliError('admin_unauthorized', `The Worker refused the admin API key: ${message}`, {
         hint: `${ADMIN_KEY_ENV} in .env does not match the Worker's. Run \`helppuff deploy\` to set it again.`,
@@ -65,11 +66,12 @@ export function adminApi(loaded: LoadedProject, options: { url?: string; fetch?:
       });
     }
     if (response.status === 429) {
-      throw new CliError('rate_limited', message, { hint: 'Wait a minute and try again.', exitCode: EXIT.quota });
+      throw new CliError('rate_limited', message, { hint: error?.hint ?? 'Wait a minute and try again.', exitCode: EXIT.quota });
     }
+    const hint = error?.hint ?? (response.status === 404 && /knowledge/.test(path) ? 'Deploy with the workers-ai backend: `helppuff config set backend.type workers-ai && helppuff deploy`.' : undefined);
     throw new CliError(error?.code === 'not_found' ? 'not_found' : 'admin_error', message, {
-      details: { status: response.status, path },
-      ...(response.status === 404 && /knowledge/.test(path) ? { hint: 'Deploy with the workers-ai backend: `helppuff config set backend.type workers-ai && helppuff deploy`.' } : {}),
+      details: { status: response.status, path, ...(error?.code ? { code: error.code } : {}) },
+      ...(hint ? { hint } : {}),
     });
   };
 

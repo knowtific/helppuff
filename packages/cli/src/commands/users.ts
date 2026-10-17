@@ -10,6 +10,7 @@ import { loadProject } from '../engine/project.js';
 import { adminApi } from '../engine/admin-api.js';
 import { openBrowser } from '../engine/browser.js';
 import type { Ctx } from './context.js';
+import { confirmDelete } from './confirm.js';
 
 /**
  * `helppuff users` — who can sign in to the dashboard.
@@ -114,6 +115,7 @@ export async function usersCommand(ctx: Ctx): Promise<number> {
     case 'remove': {
       if (!email) throw new CliError('usage', 'Usage: helppuff users remove <email>', { exitCode: 2 });
       if (email === owner) throw new CliError('usage', 'The owner cannot be removed; change dashboard.adminEmail instead.', { exitCode: 2 });
+      if (!(await confirmDelete(ctx, `Remove ${email} from the dashboard?`, 'They are signed out at once.'))) return 1;
       await query('DELETE FROM admins WHERE email = ?', [email]);
       ctx.out.result({ email, action: 'removed' }, () => ctx.out.success(`${email} can no longer sign in.`));
       return 0;

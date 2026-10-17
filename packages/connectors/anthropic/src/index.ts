@@ -124,8 +124,9 @@ async function retrieve(ctx: ConnectorContext<AnthropicOptions>, history: Turn[]
         return `<document source="${source.replace(/"/g, '')}">\n${String(chunk.text).trim()}\n</document>`;
       });
     return documents.length ? `<knowledge>\n${documents.join('\n')}\n</knowledge>` : '';
-  } catch {
-    ctx.log('anthropic.knowledge_failed');
+  } catch (thrown) {
+    // The name only: a search error's message may quote the visitor's words.
+    ctx.log('anthropic.knowledge_failed', { reason: (thrown as Error)?.name ?? 'error' });
     return '';
   }
 }

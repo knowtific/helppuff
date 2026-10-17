@@ -6,6 +6,7 @@ import { dbFrom, type D1Like, type D1Statement } from '../db/d1.js';
 import { emitTo, outboundOf, workflowRetry } from '../webhooks/deliver.js';
 import type { HubCore, HubEvent, HubSettings } from './hub.js';
 import { closeThread, openThread, postToThread, readTelegram, telegramReady, type Telegram } from './telegram.js';
+import { reasonOf } from '../core/log.js';
 
 /**
  * Live chat, the Worker's side: handing a visitor over to the team, the
@@ -163,8 +164,8 @@ export async function messagesSince(db: D1Like, conversationId: string, after: n
 // ----------------------------------------------------------------- webhooks
 
 function emit(deps: LiveDeps, siteId: string, type: Parameters<typeof emitTo>[2], data: Record<string, unknown>): Promise<void> {
-  return emitTo({ db: deps.db, fetch: deps.fetch, now: deps.now, log: deps.log, retry: workflowRetry(deps.env), ...outboundOf(deps.env) }, siteId, type, data).catch(() => {
-    deps.log('webhook.emit_failed', { type });
+  return emitTo({ db: deps.db, fetch: deps.fetch, now: deps.now, log: deps.log, retry: workflowRetry(deps.env), ...outboundOf(deps.env) }, siteId, type, data).catch((thrown) => {
+    deps.log('webhook.emit_failed', { type, reason: reasonOf(thrown) });
   });
 }
 
@@ -254,10 +255,10 @@ export async function startHandover(
       await emit(deps, input.siteId, 'handover.requested', { conversationId: input.conversationId, reason: input.reason ?? null, page: card['pageUrl'] ?? null });
       if (telegramReady(telegram)) {
         await openThread({ db: deps.db, fetch: deps.fetch, now }, telegram, input.siteId, input.conversationId, threadTitle(card), await threadIntro(deps.db, input.conversationId, card, telegram)).catch(
-          () => deps.log('telegram.thread_failed'),
+          (thrown) => deps.log('telegram.thread_failed', { reason: reasonOf(thrown) }),
         );
       }
-    })().catch(() => deps.log('live.handover_failed')),
+    })().catch((thrown) => deps.log('live.handover_failed', { reason: reasonOf(thrown) })),
   );
   return { status: 'started', messages: [message] };
 }
@@ -328,7 +329,7 @@ export function relayVisitorMessage(deps: LiveDeps, siteId: string, conversation
       await publish(deps, siteId, { type: 'visitor', conversationId, message, assignedTo: row?.assignedTo ?? null, who: row?.name ?? row?.email ?? null });
       const telegram = await telegramOf(deps, siteId);
       if (telegramReady(telegram)) await postToThread({ db: deps.db, fetch: deps.fetch, now }, telegram, siteId, conversationId, `👤 ${telegramText}`);
-    })().catch(() => deps.log('live.relay_failed')),
+    })().catch((thrown) => deps.log('live.relay_failed', { reason: reasonOf(thrown) })),
   );
 }
 
@@ -399,7 +400,7 @@ export async function sendAgentMessage(
         const telegram = await telegramOf(deps, row.site_id);
         if (telegramReady(telegram)) await postToThread({ db: deps.db, fetch: deps.fetch, now }, telegram, row.site_id, input.conversationId, `💬 ${input.author.name ?? input.author.id}: ${text}`);
       }
-    })().catch(() => deps.log('live.agent_publish_failed')),
+    })().catch((thrown) => deps.log('live.agent_publish_failed', { reason: reasonOf(thrown) })),
   );
   return message;
 }
@@ -426,7 +427,7 @@ export async function assignConversation(deps: LiveDeps, live: LiveConfig, input
         if (telegramReady(telegram) && input.by !== input.to?.id) {
           await postToThread({ db: deps.db, fetch: deps.fetch, now }, telegram, row.site_id, input.conversationId, input.to ? `➡️ ${input.to.name ?? input.to.id} has this chat.` : '↩️ Nobody has this chat now.');
         }
-      })().catch(() => deps.log('live.assign_publish_failed')),
+      })().catch((thrown) => deps.log('live.assign_publish_failed', { reason: reasonOf(thrown) })),
     );
   }
   return { conversationId: input.conversationId, assignedTo: input.to?.id ?? null, assignedName: input.to?.name ?? null };
@@ -456,7 +457,7 @@ export async function closeConversation(deps: LiveDeps, input: { siteId?: string
       if (wasLive && telegramReady(telegram)) {
         await closeThread({ db: deps.db, fetch: deps.fetch }, telegram, input.conversationId, input.reason === 'idle' ? '✅ Closed: no messages for a while.' : `✅ Closed by ${input.by.replace(/^telegram:/, 'Telegram ')}.`);
       }
-    })().catch(() => deps.log('live.close_publish_failed')),
+    })().catch((thrown) => deps.log('live.close_publish_failed', { reason: reasonOf(thrown) })),
   );
   return { conversationId: input.conversationId, status: 'closed' as const, closedAt: now };
 }
@@ -489,7 +490,7 @@ export async function handBack(deps: LiveDeps, live: LiveConfig, input: { conver
       await emit(deps, row.site_id, 'handover.ended', { conversationId: input.conversationId, by: input.by, outcome: 'back_to_ai' });
       const telegram = await telegramOf(deps, row.site_id);
       if (telegramReady(telegram)) await closeThread({ db: deps.db, fetch: deps.fetch }, telegram, input.conversationId, '🤖 Handed back to the assistant.');
-    })().catch(() => deps.log('live.handback_publish_failed')),
+    })().catch((thrown) => deps.log('live.handback_publish_failed', { reason: reasonOf(thrown) })),
   );
   return { conversationId: input.conversationId, status: 'bot' as const };
 }
@@ -523,7 +524,7 @@ export async function takeOver(deps: LiveDeps, live: LiveConfig, input: { conver
       await emit(deps, row.site_id, 'conversation.assigned', { conversationId: input.conversationId, assignedTo: input.author.id, name: input.author.name, by: input.author.id, takeover: true });
       const telegram = await telegramOf(deps, row.site_id);
       if (telegramReady(telegram)) await postToThread({ db: deps.db, fetch: deps.fetch, now }, telegram, row.site_id, input.conversationId, `➡️ ${input.author.name ?? input.author.id} took this chat.`);
-    })().catch(() => deps.log('live.takeover_publish_failed')),
+    })().catch((thrown) => deps.log('live.takeover_publish_failed', { reason: reasonOf(thrown) })),
   );
   return result;
 }

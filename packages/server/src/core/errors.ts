@@ -1,4 +1,5 @@
 import { HTTP_STATUS_FOR_ERROR, type ErrorCode, type ErrorEnvelope } from '@helppuff/protocol';
+import { explainDetail } from './explain.js';
 
 /** Default visitor-facing copy. Never leaks a backend's own error text. */
 const DEFAULT_MESSAGES: Record<ErrorCode, string> = {
@@ -34,14 +35,28 @@ export class HelpPuffError extends Error {
     return HTTP_STATUS_FOR_ERROR[this.code];
   }
 
-  toEnvelope(): ErrorEnvelope {
+  /**
+   * The JSON body. `forOwner` adds what went wrong and what to do (`reason`,
+   * `hint`): only for the people who can fix it, never for a visitor.
+   */
+  toEnvelope(forOwner = false): ErrorEnvelope {
+    const explained = forOwner ? this.explanation() : null;
     return {
       error: {
         code: this.code,
         message: this.message,
         ...(this.retryAfter !== undefined ? { retryAfter: this.retryAfter } : {}),
+        ...(explained ? { reason: explained.reason.slice(0, 500), ...(explained.hint ? { hint: explained.hint.slice(0, 300) } : {}) } : {}),
       },
     };
+  }
+
+  /** The detail said plainly; for an opaque failure (`internal`, `connector_error`) at least the detail itself. */
+  explanation(): { reason: string; hint?: string } | null {
+    const known = explainDetail(this.detail);
+    if (known) return known;
+    if (this.detail && (this.code === 'internal' || this.code === 'connector_error')) return { reason: this.detail.slice(0, 500) };
+    return null;
   }
 }
 

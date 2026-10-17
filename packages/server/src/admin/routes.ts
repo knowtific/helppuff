@@ -1,6 +1,7 @@
 import { Hono, type Context } from 'hono';
 import { cleanText } from '@helppuff/protocol';
-import { chatRoutes, deleteConversations } from './chat.js';
+import { chatRoutes } from './chat.js';
+import { eraseContact } from './erase.js';
 import { accessRoutes } from './access.js';
 import { keyScopes } from '../api/keys.js';
 import { HelpPuffError } from '../core/errors.js';
@@ -34,7 +35,7 @@ import { attributesJson, closeCutoff, CONVERSATION_STATUSES, conversationExtras,
 import { liveRoutes } from './live.js';
 import { jobRoutes, maybeSetup } from './jobs.js';
 import { fileAdminRoutes } from './files.js';
-import { filesBucket, filesOf, LINK_TTL_MS, signedFileUrl } from '../files/store.js';
+import { filesOf, LINK_TTL_MS, signedFileUrl } from '../files/store.js';
 import { homeRoutes, maybeSuggestHome } from './home.js';
 import { assistantRoutes } from './assistant.js';
 import { contactTagRoutes, contactTagsSql, contactTagStatements, parseContactTags } from './contact-tags.js';
@@ -46,6 +47,7 @@ import { summarizeConversation, type AiRunner } from '../conversations/summary.j
 import { assistantInstructions, summaryModel } from '../conversations/complete.js';
 export { extractJson } from '../conversations/summary.js';
 import { PROMPT_LIMIT, PROMPT_SQL, promptCtx, promptField, publishPrompt, readPromptState, type PromptVersionRow, type PublishResult } from './prompts.js';
+import { reasonOf } from '../core/log.js';
 
 /**
  * The dashboard API, under `/admin/api`. Everything but sign-in needs a
@@ -176,8 +178,8 @@ adminRoutes.get('/me', async (c) => {
   // Jobs set themselves up from the website once it is learned (in the background).
   if (!key && dbFrom(ctx.env)) {
     for (const site of sites) {
-      ctx.platform.waitUntil(maybeSetup(ctx, site.id).catch(() => ctx.platform.log('jobs.setup_failed')));
-      ctx.platform.waitUntil(maybeSuggestHome(ctx, site.id).catch(() => ctx.platform.log('home.suggest_failed')));
+      ctx.platform.waitUntil(maybeSetup(ctx, site.id).catch((thrown) => ctx.platform.log('jobs.setup_failed', { siteId: site.id, reason: reasonOf(thrown) })));
+      ctx.platform.waitUntil(maybeSuggestHome(ctx, site.id).catch((thrown) => ctx.platform.log('home.suggest_failed', { siteId: site.id, reason: reasonOf(thrown) })));
     }
   }
   return c.json({
@@ -686,28 +688,21 @@ adminRoutes.get('/leads/:id', async (c) => {
 });
 
 /**
- * Delete a lead. `?erase=conversations` also deletes every conversation linked
- * to it, with their messages and callback requests: a person's "forget me".
+ * Delete a contact and everything recorded about them (`admin/erase.ts`):
+ * conversations, callback requests, notes, tags, jobs, appointments, files.
+ * Irreversible; the dashboard and the CLI ask first. (`?erase=conversations`,
+ * from before this was always so, is accepted and changes nothing.)
  */
 adminRoutes.delete('/leads/:id', async (c) => {
   assertSameOrigin(c);
-  await currentAdmin(c);
+  const admin = await currentAdmin(c);
   const d = db(c);
   const id = c.req.param('id');
   const lead = await d.prepare('SELECT id, site_id FROM leads WHERE id = ?').bind(id).first<{ id: string; site_id: string }>();
   if (!lead) throw new HelpPuffError('not_found', { message: 'No such lead.', detail: 'admin_lead_missing' });
   assertSiteAccess(c, lead.site_id, 'lead');
-  const erase = c.req.query('erase') === 'conversations';
-  const linked = erase ? (await d.prepare('SELECT id FROM conversations WHERE lead_id = ?').bind(id).all<{ id: string }>()).results.map((r) => r.id) : [];
-  await deleteConversations(d, linked, filesBucket(c.get('helppuff').env));
-  await d.batch([
-    d.prepare('UPDATE conversations SET lead_id = NULL WHERE lead_id = ?').bind(id),
-    d.prepare('UPDATE callbacks SET lead_id = NULL WHERE lead_id = ?').bind(id),
-    d.prepare('DELETE FROM notes WHERE lead_id = ? AND conversation_id IS NULL').bind(id),
-    d.prepare('DELETE FROM lead_tags WHERE lead_id = ?').bind(id),
-    d.prepare('DELETE FROM leads WHERE id = ?').bind(id),
-  ]);
-  return c.json({ id, deleted: true, conversationsDeleted: linked.length });
+  const erased = await eraseContact(c, admin, lead);
+  return c.json({ id, deleted: true, conversationsDeleted: erased.conversations, erased });
 });
 
 const csvCell = (value: unknown) => {

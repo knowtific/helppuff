@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { api, type ContactTag } from '../lib/api';
 import { useData } from '../lib/utils';
 import { Button, Card, CardHeader, ErrorNote, Input, Skeleton } from './ui';
+import { confirmDelete } from '../lib/confirm';
 
 type TagList = { tags: ContactTag[]; colors: string[] };
 
@@ -101,7 +102,7 @@ function TagRow({ tag, colors, onSaved }: { tag: ContactTag; colors: string[]; o
     setError(null);
   };
   const remove = async () => {
-    if (!window.confirm(`Delete “${tag.name}”? It will be removed from every contact.`)) return;
+    if (!confirmDelete(`Delete “${tag.name}”?`, 'It is removed from every contact.')) return;
     setBusy(true);
     setError(null);
     try {

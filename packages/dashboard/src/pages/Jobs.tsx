@@ -8,6 +8,7 @@ import { JobFilesSection } from '../components/Files';
 import { api, isMember, type Job, type JobDetail, type JobEvent, type JobField, type JobList, type JobStage, type Me, type PipelineView, type Team } from '../lib/api';
 import { useLiveEvents } from '../lib/live';
 import { cn, fmtDateTime, fmtRelative, href, useData, useDebounced, usePersisted } from '../lib/utils';
+import { confirmDelete } from '../lib/confirm';
 
 /**
  * Jobs: requests, quotes, projects or tickets on the site's pipeline. A
@@ -568,7 +569,7 @@ function JobPanel({ id, me, pipeline, team, onChanged }: { id: string; me: Me; p
             className="size-8"
             aria-label="Delete"
             onClick={() => {
-              if (window.confirm(`Delete #${data.number}? Its history and notes go too.`)) void run(() => api(`/jobs/${id}`, { method: 'DELETE' })).then(() => (window.location.hash = href({ page: 'jobs' })));
+              if (confirmDelete(`Delete job #${data.number}?`, 'Its history, notes and files go too.')) void run(() => api(`/jobs/${id}`, { method: 'DELETE' })).then(() => (window.location.hash = href({ page: 'jobs' })));
             }}
           >
             <Trash2 />

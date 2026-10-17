@@ -2,6 +2,7 @@ import type { HelpPuffConfig, SiteConfig } from './config/schema.js';
 import { resolveSite } from './config/site.js';
 import { createApp } from './app.js';
 import { resilientKv } from './core/platform.js';
+import { envLog, reasonOf } from './core/log.js';
 import { setExtensions, type Extensions, type KvStore } from '@helppuff/connector-types';
 import { knowledgeEnv } from './knowledge/env.js';
 import { runScheduledCrawls } from './knowledge/crawl.js';
@@ -34,19 +35,24 @@ export function createWorker(config: HelpPuffConfig, extensions: Extensions = {}
       const db = dbFrom(env);
       if (!db) return;
       const knowledge = knowledgeEnv(env);
-      const kv = resilientKv(env['HELPPUFF_KV'] as KvStore | undefined, () => {});
-      const platform = { kv, log: () => {} };
+      const log = envLog(env);
+      const kv = resilientKv(env['HELPPUFF_KV'] as KvStore | undefined, log);
+      const platform = { kv, log };
       ctx.waitUntil(
         (async () => {
           await ensureSchema(db);
           const sites: Record<string, SiteConfig> = {};
           for (const id of Object.keys(config.sites)) sites[id] = await resolveSite({ config, platform }, id);
-          if (knowledge) await runScheduledCrawls(knowledge, sites, Date.now()).catch(() => {});
-          await runScheduledBookings(env, db, sites, Date.now()).catch(() => {});
+          if (knowledge) await runScheduledCrawls(knowledge, sites, Date.now()).catch((thrown) => log('cron.crawls_failed', { reason: reasonOf(thrown) }));
+          await runScheduledBookings(env, db, sites, Date.now()).catch((thrown) => log('cron.bookings_failed', { reason: reasonOf(thrown) }));
           // Photos and files sent in the chat are kept `files.keepChatDays`.
           const bucket = filesBucket(env);
-          if (bucket) for (const [id, site] of Object.entries(sites)) await purgeOldChatFiles({ db, bucket }, id, site.files.keepChatDays, Date.now()).catch(() => {});
-        })().catch(() => {}),
+          if (bucket) {
+            for (const [id, site] of Object.entries(sites)) {
+              await purgeOldChatFiles({ db, bucket }, id, site.files.keepChatDays, Date.now()).catch((thrown) => log('cron.files_purge_failed', { siteId: id, reason: reasonOf(thrown) }));
+            }
+          }
+        })().catch((thrown) => log('cron.failed', { reason: reasonOf(thrown) })),
       );
     },
   };

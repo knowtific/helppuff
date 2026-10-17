@@ -5,6 +5,7 @@ import { fmtRelative, useData } from '../lib/utils';
 import { CopyBlock } from '../pages/Settings';
 import { HelpNote } from './Shell';
 import { Badge, Button, Card, CardHeader, Disclosure, ErrorNote, Input, PasswordInput, Skeleton } from './ui';
+import { confirmDelete } from '../lib/confirm';
 
 /**
  * Settings → Integrations: the site's keys for other services, each usable
@@ -253,7 +254,7 @@ function IntegrationCard({ item, help, onChanged }: { item: IntegrationView; hel
                 className="size-7"
                 aria-label={`Remove ${item.name}`}
                 onClick={() => {
-                  if (window.confirm(`Remove ${item.name}? A calendar synced through it stops syncing; appointments stay.`)) void api(`/integrations/${item.kind}`, { method: 'DELETE' }).then(onChanged, onChanged);
+                  if (confirmDelete(`Remove ${item.name}?`, 'A calendar synced through it stops syncing; appointments stay.')) void api(`/integrations/${item.kind}`, { method: 'DELETE' }).then(onChanged, onChanged);
                 }}
               >
                 <Trash2 />

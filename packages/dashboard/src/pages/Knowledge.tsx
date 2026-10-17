@@ -8,6 +8,7 @@ import { Badge, Button, Card, CardHeader, Empty, ErrorNote, InfoTip, Input, Segm
 import { api, uploadFile, type FileStatus, type KnowledgeFile, type KnowledgePage, type ManualEntry, type Me, type SearchResult, type Usage } from '../lib/api';
 import { cn, fmtNumber, fmtRelative, pathOf, useData } from '../lib/utils';
 import { Passages } from './Onboarding';
+import { confirmDelete } from '../lib/confirm';
 
 /**
  * The knowledge base (workers-ai): what the assistant has learned, from
@@ -315,6 +316,7 @@ function Files() {
     }
   };
   const remove = async (file: KnowledgeFile) => {
+    if (!confirmDelete(`Delete ${file.name}?`, 'The assistant forgets what it learned from it.')) return;
     await api(`/knowledge/files/${file.id}`, { method: 'DELETE' }).catch((thrown: Error) => setError(thrown));
     files.reload();
   };
@@ -459,6 +461,7 @@ function ManualKnowledge() {
     }
   };
   const remove = async (id: string) => {
+    if (!confirmDelete('Delete this answer?', 'The assistant forgets it at once.')) return;
     await api(`/knowledge/manual/${id}`, { method: 'DELETE' }).catch((thrown: Error) => setError(thrown));
     entries.reload();
   };

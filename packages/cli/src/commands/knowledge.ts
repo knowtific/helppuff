@@ -12,6 +12,7 @@ import { indexingStatus, syncKnowledge } from '../engine/knowledge.js';
 import { aiSearchInstanceFor, loadProject, updateProject, usesHelpPuffKnowledge, type LoadedProject } from '../engine/project.js';
 import { describeIndexing } from './setup.js';
 import type { Ctx } from './context.js';
+import { confirmDelete } from './confirm.js';
 
 /**
  * The knowledge base from the terminal (workers-ai): the same admin API the
@@ -232,6 +233,7 @@ export async function knowledgeCommand(ctx: Ctx): Promise<number> {
       if (rest[0] === 'remove') {
         const id = rest[1];
         if (!id) throw new CliError('usage', 'Usage: helppuff knowledge files remove <id>', { exitCode: EXIT.usage });
+        if (!(await confirmDelete(ctx, `Remove the file ${id}?`, 'The assistant forgets what it learned from it.'))) return 1;
         const removed = await api.send<{ chunks: number }>('DELETE', `/admin/api/knowledge/files/${encodeURIComponent(id)}`);
         ctx.out.result({ id, removed: true, chunks: removed.chunks }, () => ctx.out.success(`Removed ${id} (${removed.chunks} passage(s)).`));
         return 0;
@@ -318,6 +320,7 @@ export async function knowledgeCommand(ctx: Ctx): Promise<number> {
       assertKnown(ctx.flags, [], 'knowledge');
       const id = rest[0];
       if (!id) throw new CliError('usage', 'Usage: helppuff knowledge remove <id>', { exitCode: EXIT.usage });
+      if (!(await confirmDelete(ctx, `Remove the knowledge entry ${id}?`, 'The assistant forgets it at once.'))) return 1;
       await api.send('DELETE', `/admin/api/knowledge/manual/${encodeURIComponent(id)}`);
       ctx.out.result({ id, removed: true }, () => ctx.out.success(`Removed ${id}.`));
       return 0;

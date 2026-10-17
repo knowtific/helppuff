@@ -114,6 +114,35 @@ to keep or drop. It checks the buttons already on the page and skips suggested
 buttons with the same label or action. It also skips useful pages already
 listed or already opened by a button.
 
+### Starter questions
+
+The question buttons on the home screen are the **starter questions**: a
+visitor taps one and it is sent as their first message, so they get an answer
+without typing. They are the most used part of the home screen, so they should
+be the questions your customers really ask, and ones the assistant can answer.
+
+- **Written for you.** After the first crawl the AI reads the section headings
+  of your learned pages (services, FAQ and prices first) and writes four
+  questions of at most eight words, answerable from those pages. With nothing
+  learned yet, or no AI, it uses four general ones ("What services do you
+  offer?", "How much does it cost?", "Which areas do you cover?", "How do I
+  book?").
+- **Change them** in **Settings → Home screen**: edit, reorder or remove a
+  button, or add your own (**Ask a question**). Up to 8 buttons in all.
+- **From the CLI:**
+
+  ```bash
+  helppuff knowledge suggest           # four new questions from the learned pages (nothing changes)
+  helppuff knowledge suggest --apply   # show them in the widget now, in place of the current questions
+  helppuff config pull                 # keep them in helppuff.json
+  ```
+
+  `--apply` replaces only the question buttons; links, call, email, form and
+  quote buttons stay.
+- **Check them.** Tap each one in **Home → Try your assistant**, or run
+  `helppuff ask "…"`: a starter question the assistant cannot answer is the
+  first thing many visitors see.
+
 In `helppuff.json` it is `widget.home` (`title`, `subtitle`, `shortcuts`,
 `links`), and `helppuff config pull` brings dashboard changes into it. Over the
 API: `PUT /settings` with `home`, and `POST /home/suggest` for suggestions.

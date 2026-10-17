@@ -33,6 +33,8 @@ export function streamResponse(
   ctx: RequestCtx,
   path: string,
   work: (onText: (delta: string) => void) => Promise<unknown>,
+  /** The owner's own request: a failure carries its reason and hint (see `HelpPuffError.toEnvelope`). */
+  forOwner = false,
 ): Response {
   const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
   const writer = writable.getWriter();
@@ -60,8 +62,8 @@ export function streamResponse(
       await write('done', body);
     } catch (thrown) {
       const error = toHelpPuffError(thrown);
-      ctx.platform.log('request.error', { code: error.code, detail: error.detail ?? 'none', path, streamed: true });
-      await write('error', error.toEnvelope().error);
+      ctx.platform.log('request.error', { code: error.code, status: error.status, detail: error.detail ?? 'none', path, streamed: true });
+      await write('error', error.toEnvelope(forOwner).error);
     } finally {
       await writer.close().catch(() => {});
     }

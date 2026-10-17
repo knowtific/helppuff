@@ -18,6 +18,7 @@ import { calcomWebhookSecret, verifyCalcomSignature } from '../integrations/webh
 import { byDay, dayWindow, inPart } from '../bookings/slots.js';
 import { addDays, validTimeZone, zoned } from '../bookings/time.js';
 import { byIdem, type AppointmentRow } from '../bookings/store.js';
+import { reasonOf } from '../core/log.js';
 
 /**
  * The booking picker's calls (Settings → Bookings: date picker in the chat),
@@ -188,7 +189,7 @@ bookingRoutes.post('/v1/integrations/calcom/:site', async (c) => {
   const secret = await calcomWebhookSecret(deps.secret, siteId);
   if (!(await verifyCalcomSignature(secret, raw, c.req.header('x-cal-signature-256') ?? ''))) throw new HelpPuffError('unauthorized', { detail: 'calcom_signature' });
   if (b.sync === 'calcom' && effectiveBooking(site, null).mode === 'picker') {
-    ctx.platform.waitUntil(syncCalendar(deps, siteId, b).then(() => undefined).catch(() => ctx.platform.log('bookings.sync_failed', { siteId })));
+    ctx.platform.waitUntil(syncCalendar(deps, siteId, b).then(() => undefined).catch((thrown) => ctx.platform.log('bookings.sync_failed', { siteId, reason: reasonOf(thrown) })));
   }
   return c.json({ ok: true });
 });

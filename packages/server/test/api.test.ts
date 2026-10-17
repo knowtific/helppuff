@@ -215,7 +215,7 @@ describe('chat over the API', () => {
 });
 
 describe('leads, team and audit', () => {
-  it('creates a lead, refuses a second with the same email, and erases one with its conversations', async () => {
+  it('creates a lead, refuses a second with the same email, and erases one with everything about them', async () => {
     const w = await world();
     const crm = await w.createKey({ name: 'CRM', preset: 'crm' });
     const made = await w.call('POST', '/leads', crm.key, { name: 'Grace', email: 'Grace@Example.com', fields: { company: 'Navy' } });
@@ -229,9 +229,23 @@ describe('leads, team and audit', () => {
     const lead = await w.call('GET', `/leads/${made.json['id']}`, crm.key);
     expect(lead.json['conversations'].map((c: Json) => c['id'])).toEqual([conversation.json['id']]);
 
-    const erased = await w.call('DELETE', `/leads/${made.json['id']}?erase=conversations`, crm.key);
-    expect(erased.json).toMatchObject({ deleted: true, conversationsDeleted: 1 });
-    expect(w.db.raw.prepare('SELECT COUNT(*) AS n FROM messages').get()).toEqual({ n: 0 });
+    // Everything else recorded about her: a callback request, a note, a tag, a job with its history, a past appointment.
+    const leadId = String(made.json['id']);
+    const conversationId = String(conversation.json['id']);
+    const at = Date.now();
+    const raw = w.db.raw;
+    raw.prepare("INSERT INTO callbacks (id, site_id, conversation_id, lead_id, phone, requested_at) VALUES ('cb_1', 'demo', ?, ?, '0400 111 222', ?)").run(conversationId, leadId, at);
+    raw.prepare("INSERT INTO notes (id, site_id, lead_id, author, text, created_at, updated_at) VALUES ('n_1', 'demo', ?, 'owner', 'Prefers mornings', ?, ?)").run(leadId, at, at);
+    raw.prepare("INSERT INTO lead_tags (lead_id, tag_id, site_id, added_at) VALUES (?, 'tag_vip', 'demo', ?)").run(leadId, at);
+    raw.prepare("INSERT INTO jobs (id, site_id, number, stage_id, title, source, lead_id, stage_changed_at, created_at, updated_at) VALUES ('job_1', 'demo', 1, 'new', 'Quote', 'api', ?, ?, ?, ?)").run(leadId, at, at, at);
+    raw.prepare("INSERT INTO job_events (id, job_id, at, actor, kind) VALUES ('je_1', 'job_1', ?, 'owner', 'created')").run(at);
+    raw.prepare("INSERT INTO appointments (id, site_id, job_id, lead_id, title, starts_at, ends_at, timezone, status, source, created_at, updated_at) VALUES ('ap_1', 'demo', 'job_1', ?, 'Visit', ?, ?, 'UTC', 'done', 'manual', ?, ?)").run(leadId, at - 86_400_000, at - 82_800_000, at, at);
+
+    const erased = await w.call('DELETE', `/leads/${leadId}`, crm.key);
+    expect(erased.json).toMatchObject({ deleted: true, conversationsDeleted: 1, erased: { conversations: 1, callbacks: 1, notes: 1, jobs: 1, appointments: 1 } });
+    for (const table of ['leads', 'conversations', 'messages', 'callbacks', 'notes', 'lead_tags', 'jobs', 'job_events', 'appointments']) {
+      expect(raw.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get(), table).toEqual({ n: 0 });
+    }
   });
 
   it('adds a teammate with a one-time sign-in link, and removes them', async () => {

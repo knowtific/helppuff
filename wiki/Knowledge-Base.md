@@ -197,15 +197,22 @@ Per visitor message (`retrieve()` in `packages/rag/src/retrieve.ts`):
 1. **Standalone query** — a short or elliptical follow-up ("how much is it?")
    is searched together with the previous question. `retrieval.queryRewrite:
    llm` asks the model to rewrite it instead (one extra small call).
-2. **Hybrid search, in parallel** — Vectorize (top 20) and D1 FTS5 BM25 (top
+2. **Sentences of a long message** — a message of 60 characters or more with
+   at least two sentences (of three words or more) is also searched as its
+   last three sentences, each on its own. A question wrapped in context ("My
+   living room is 4m x 5m and the bedroom 3m x 3.5m. Roughly what would
+   installation cost?") is otherwise drowned by the context when searched
+   whole. The sentences are embedded in the same call as the whole message.
+3. **Hybrid search, in parallel** — Vectorize (top 20) and D1 FTS5 BM25 (top
    20; the visitor's words are quoted, so no FTS syntax gets through; titles
-   and headings weigh more than body text).
-3. **Reciprocal Rank Fusion** (k = 60), with a ×1.5 boost for categories the
-   question leans towards (phone/hours → contact, price → pricing, suburb →
+   and headings weigh more than body text), for the whole message and each
+   sentence.
+4. **Reciprocal Rank Fusion** (k = 60) of every list, with a ×1.5 boost for
+   categories the question leans towards (phone/hours → contact, price → pricing, suburb →
    location, book → booking). With `retrieval.intentModel:
    "@cf/cloudflare/clef-flash"` (off by default, about a neuron a question)
    Cloudflare's Clef classifier adds the categories it reads in the question.
-4. **Rerank** the top 10 with `@cf/baai/bge-reranker-base` (each passage cut to
+5. **Rerank** the top 10 with `@cf/baai/bge-reranker-base` (each passage cut to
    ~512 tokens, its heading path first), within 0.8 s. On by default; the
    dashboard's Settings → Advanced → "Double-check answers before replying"
    turns it off (`retrieval.rerankerModel: null`), about half a second sooner
@@ -218,10 +225,10 @@ Per visitor message (`retrieve()` in `packages/rag/src/retrieve.ts`):
    same AI binding) works the same way but is billed from AI Gateway credits,
    not the free neuron allocation: without credits every call fails (`2021:
    Insufficient AI Gateway credits`) and retrieval falls back to the fused order.
-5. Keep the best **4** (`finalK`) scoring at least `minScore` (0.2). **Nothing
+6. Keep the best **4** (`finalK`) scoring at least `minScore` (0.2). **Nothing
    above the threshold means no passage**: the prompt says so, and the model is
    told to say it is not sure and offer a person, never to guess.
-6. If the best passage stops mid-list or mid-table, the next chunk of the same
+7. If the best passage stops mid-list or mid-table, the next chunk of the same
    section is added.
 
 Each stage degrades rather than fails: no vectors yet → keywords only; the

@@ -7,6 +7,7 @@ import { c } from '../output.js';
 import { adminApi, type AdminApi } from '../engine/admin-api.js';
 import { loadProject } from '../engine/project.js';
 import type { Ctx } from './context.js';
+import { confirmDelete } from './confirm.js';
 
 /**
  * `helppuff jobs` — requests, quotes and work on the site's pipeline, the
@@ -165,6 +166,7 @@ export async function jobsCommand(ctx: Ctx): Promise<number> {
       const { files } = await api.get<JobFiles>(`/admin/api/jobs/${id}/files`);
       const file = files.find((f) => f.id === which) ?? files.find((f) => f.name === which);
       if (!file) throw new CliError('not_found', `No file "${which}" on this job.`, { exitCode: EXIT.error, hint: `helppuff jobs files ${first}` });
+      if (!(await confirmDelete(ctx, `Remove ${file.name} from this job?`))) return 1;
       const removed = await api.send<{ id: string; deleted: boolean }>('DELETE', `/admin/api/jobs/${id}/files/${encodeURIComponent(file.id)}`);
       ctx.out.result(removed, () => ctx.out.success(`Removed ${file.name}.`));
       return 0;

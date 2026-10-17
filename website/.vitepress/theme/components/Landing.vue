@@ -181,6 +181,16 @@ const KNOWLEDGE = [
   { name: 'Your own code', page: 'Custom-Knowledge-Base' },
 ];
 
+/** The first questions people ask; the full list is the wiki's FAQ page. */
+const FAQ = [
+  { q: 'Is it really free?', a: 'HelpPuff is free and open source (MIT). You pay Cloudflare, and your AI provider if you pick one. The default setup fits the Workers Free plan: about 300 answers a day.', page: 'Costs-and-Limits' },
+  { q: 'What does it cost with more traffic?', a: 'On Workers Paid ($5 a month) with the default model, roughly $12 a month at 1,000 messages a day, $55 at 5,000 and $108 at 10,000. Every model and provider is in the table.', page: 'Costs-and-Limits#costs-at-higher-volume' },
+  { q: 'Where is my data stored?', a: 'Only in your Cloudflare account: conversations and leads in your D1 database, knowledge in D1 and Vectorize, settings in KV. HelpPuff receives none of it.', page: 'Security' },
+  { q: 'Can I use ChatGPT, Claude or Gemini?', a: 'Yes. Workers AI is the default (no key), and one command switches to OpenAI, Claude, Gemini, DeepSeek or any OpenAI-compatible API. The knowledge base, tools and guardrails stay the same.', page: 'Models-and-Providers' },
+  { q: 'Does it make things up?', a: 'It answers only from your site, your files and your own answers. When nothing matches, it says it is not sure and offers a person, instead of guessing.', page: 'Knowledge-Base' },
+  { q: 'Can I use my own domain?', a: 'Yes: helppuff domain add chat.yourdomain.com. It starts on workers.dev, which keeps working after you add a domain.', page: 'Deployment#your-own-domain' },
+];
+
 /** Lucide-style outline icons, 24px grid. */
 const ICONS: Record<string, string> = {
   book: 'M4 19.5V5a2 2 0 0 1 2-2h13v16H6.5A2.5 2.5 0 0 0 4 21.5Zm0 0A2.5 2.5 0 0 1 6.5 17H19M8 7h7M8 11h5',
@@ -586,6 +596,21 @@ const ICONS: Record<string, string> = {
       </div>
     </section>
 
+    <!-- FAQ -->
+    <section class="wrap block" id="faq">
+      <header class="section-head">
+        <p class="kicker">Questions</p>
+        <h2>Asked <span class="hp-emph">before every install.</span></h2>
+      </header>
+      <div class="faq">
+        <details v-for="item in FAQ" :key="item.q">
+          <summary>{{ item.q }}</summary>
+          <p>{{ item.a }} <a :href="docs(item.page)">More →</a></p>
+        </details>
+      </div>
+      <p class="faq-more"><a :href="docs('FAQ')">Every question, answered →</a></p>
+    </section>
+
     <!-- Final CTA -->
     <section class="wrap">
       <div class="final">
@@ -846,6 +871,18 @@ figcaption b { display: block; font-size: 16px; color: var(--ink); margin-bottom
 .chip small { font-size: 11px; color: var(--hp-heading-accent); font-weight: 600; }
 .panel .chips-label { margin: 18px 0 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
 .panel .whole { display: inline-block; margin-top: 18px; font-size: 14px; }
+
+/* FAQ */
+.faq { max-width: 820px; margin: 0 auto; border: 1px solid var(--line); border-radius: 22px; background: var(--card); overflow: hidden; }
+.faq details + details { border-top: 1px solid var(--line); }
+.faq summary { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 20px 24px; cursor: pointer; list-style: none; font-size: 17px; font-weight: 600; color: var(--ink); }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: '+'; flex: none; font-size: 22px; font-weight: 400; line-height: 1; color: var(--ink-2); transition: transform 160ms; }
+.faq details[open] summary::after { transform: rotate(45deg); }
+.faq summary:focus-visible { outline: 2px solid var(--hp-heading-accent); outline-offset: -2px; }
+.faq p { margin: 0; padding: 0 24px 22px; font-size: 15.5px; line-height: 1.65; color: var(--ink-2); }
+.faq-more { margin: 20px 0 0; text-align: center; font-size: 15px; }
+@media (max-width: 600px) { .faq summary { padding: 18px; font-size: 16px; } .faq p { padding: 0 18px 20px; } }
 
 /* Final */
 .final { position: relative; overflow: hidden; margin-top: 120px; padding: 80px 32px; border-radius: 32px; text-align: center; background: var(--hp-surface); border: 1px solid var(--line); color: var(--ink); }

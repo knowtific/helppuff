@@ -8,6 +8,7 @@ import { loadEnv } from '../engine/env.js';
 import { loadProject } from '../engine/project.js';
 import type { Ctx } from './context.js';
 import { expand, headerFlags, mergeHeaders } from './request-flags.js';
+import { confirmDelete } from './confirm.js';
 
 /**
  * `helppuff email` — the email service that sends the team's notifications,
@@ -116,6 +117,7 @@ export async function emailCommand(ctx: Ctx): Promise<number> {
       return 0;
     }
     case 'remove': {
+      if (!(await confirmDelete(ctx, 'Remove the email service?', 'Nobody gets notification emails until you set one up again.'))) return 1;
       await api.send('DELETE', '/admin/api/notifications/email');
       ctx.out.result({ removed: true }, () => ctx.out.success('Removed the email service. Everyone keeps their choices for when you set one up again.'));
       return 0;

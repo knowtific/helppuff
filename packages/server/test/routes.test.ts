@@ -66,6 +66,12 @@ describe('POST /v1/sites/:siteId/sessions', () => {
     expect((await envelope(response))?.code).toBe('forbidden_origin');
   });
 
+  it("accepts the Worker's own pages on whatever domain it answers (the preview on a custom domain)", async () => {
+    const h = harness(testConfig(), testEnv(), null);
+    const response = await h.post('/v1/sites/demo/sessions', startBody, { headers: { Origin: 'http://server.test' } });
+    expect(response.status).toBe(200);
+  });
+
   it('accepts an allowlisted origin regardless of case and trailing slash', async () => {
     const h = harness(testConfig(), testEnv(), null);
     const response = await h.post('/v1/sites/demo/sessions', startBody, {

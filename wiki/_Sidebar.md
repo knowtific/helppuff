@@ -4,6 +4,7 @@
 - [[Getting started|Getting-Started]]
 - [[Using with AI agents|AI-Agents]]
 - [[The dashboard|Dashboard]]
+- [[FAQ]]
 
 **Tutorials**
 - [[All tutorials|Tutorials]]

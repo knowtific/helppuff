@@ -418,7 +418,7 @@ export function ToolDialog({
                 {draft.id &&
                   (confirmDelete ? (
                     <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      Delete {tool?.name}?
+                      Delete {tool?.name}? This cannot be undone.
                       <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)}>
                         Keep
                       </Button>

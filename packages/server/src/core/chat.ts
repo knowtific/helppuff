@@ -31,6 +31,7 @@ import { assistantText, chatFilesMode, describePhotos, fileRef, messageFiles, vi
 import { filesBucket, signedFileUrl, type FileRow } from '../files/store.js';
 import type { AiRunner } from '../conversations/summary.js';
 import { requireSecret } from './request.js';
+import { reasonOf } from './log.js';
 
 /**
  * A conversation with the assistant, whoever holds it: the widget (a browser
@@ -134,10 +135,16 @@ export function cleanSend(input: SendRequest): SendRequest {
 /** Send the turn as JSON, or as the stream the client asked for. */
 async function answer<T>(c: Context<HonoEnv>, ctx: RequestCtx, streaming: boolean, relay: ReturnType<typeof textRelay>, work: Promise<ChatTurn>, respond: Respond<T>): Promise<Response> {
   if (streaming) {
-    return streamResponse(ctx, c.req.path, async (onText) => {
-      relay.attach(onText);
-      return (await respond(await work, true)).body;
-    });
+    const forOwner = Boolean(c.get('actor')) || (await ctx.isOwner());
+    return streamResponse(
+      ctx,
+      c.req.path,
+      async (onText) => {
+        relay.attach(onText);
+        return (await respond(await work, true)).body;
+      },
+      forOwner,
+    );
   }
   const { body, headers } = await respond(await work, false);
   for (const [key, value] of Object.entries(headers ?? {})) c.header(key, value);
@@ -531,7 +538,7 @@ async function seePhotos(ctx: RequestCtx, site: SiteConfig, rows: FileRow[]): Pr
   const db = dbFrom(ctx.env);
   if (!ai || typeof ai.run !== 'function' || !bucket || !db) return rows;
   const seen = await ctx.timing.span('vision', () => describePhotos({ db, bucket, ai: ai as AiRunner, model: site.files.visionModel, log: ctx.platform.log }, rows));
-  ctx.platform.waitUntil(seen.save().catch(() => ctx.platform.log('file.describe_save_failed')));
+  ctx.platform.waitUntil(seen.save().catch((thrown) => ctx.platform.log('file.describe_save_failed', { reason: reasonOf(thrown) })));
   return seen.rows;
 }
 
@@ -541,7 +548,7 @@ export function endChat(ctx: RequestCtx, session: Pick<ChatSession, 'siteId' | '
   const end = prepared.connector.end;
   if (end) {
     const cctx = connectorContext(ctx, prepared, siteId, sessionId);
-    ctx.platform.waitUntil(end(cctx, session.state).catch(() => ctx.platform.log('connector.end_failed')));
+    ctx.platform.waitUntil(end(cctx, session.state).catch((thrown) => ctx.platform.log('connector.end_failed', { reason: reasonOf(thrown) })));
   }
   ctx.platform.log('session.ended', { siteId, sessionId });
   const db = dbFrom(ctx.env);
@@ -557,6 +564,6 @@ export function endChat(ctx: RequestCtx, session: Pick<ChatSession, 'siteId' | '
         .bind(sessionId, siteId, now, now, now)
         .run()) as { meta?: { changes?: number }; changes?: number } | undefined;
       if ((result?.meta?.changes ?? result?.changes ?? 0) > 0) emit(ctx, siteId, 'conversation.ended', { conversationId: sessionId });
-    })().catch(() => ctx.platform.log('record.failed')),
+    })().catch((thrown) => ctx.platform.log('record.failed', { reason: reasonOf(thrown) })),
   );
 }

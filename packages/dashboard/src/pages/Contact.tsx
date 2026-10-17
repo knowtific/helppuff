@@ -7,6 +7,7 @@ import { RelatedAppointments } from '../components/Appointments';
 import { api, isMember, parseSummary, type ContactDetail, type ContactTag, type Me } from '../lib/api';
 import { RelatedJobs } from './Jobs';
 import { fmtDateTime, fmtRelative, href, pathOf, useData } from '../lib/utils';
+import { confirmDelete } from '../lib/confirm';
 
 /**
  * One person, like a CRM's contact page: their details (editable), custom
@@ -116,7 +117,7 @@ export function Contact({ id, me }: { id: string; me: Me }) {
   if (!data) return <div className="space-y-3 p-6">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-24" />)}</div>;
   const name = data.name ?? data.email ?? data.phone ?? 'Unnamed';
   const remove = async () => {
-    if (!window.confirm(`Delete ${name}? Their conversations stay.`)) return;
+    if (!confirmDelete(`Delete ${name} and everything about them?`, 'Their conversations, messages, files, callback requests, notes, tags, jobs and appointments are deleted too. Upcoming appointments are cancelled in your calendar.')) return;
     setDeleting(true);
     await api(`/leads/${id}`, { method: 'DELETE' }).finally(() => setDeleting(false));
     window.location.hash = href({ page: 'leads' });

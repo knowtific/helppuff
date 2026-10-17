@@ -16,6 +16,7 @@ import { loadEnv, redact, writeEnvVar } from '../engine/env.js';
 import { findProject, GENERATED_DIR, loadProject, updateProject, workerNameFor, type LoadedProject, usesHelpPuffKnowledge, modelOf, retrievalOf } from '../engine/project.js';
 import { projectJsonSchema, writeSchemaFile } from '../engine/schema.js';
 import type { Ctx } from './context.js';
+import { publicUrl } from '../engine/domain.js';
 
 function target(ctx: Ctx, loaded: LoadedProject): { url: string; origin: string } {
   if (ctx.flags['local']) {
@@ -81,6 +82,8 @@ export async function statusCommand(ctx: Ctx): Promise<number> {
   const loaded = loadProject(ctx.cwd);
   const { project } = loaded;
   const url = project.cloudflare.url;
+  // What visitors use: the custom domain when there is one.
+  const site = publicUrl(project);
   // The live knowledge base and today's budget, when the Worker can be asked.
   const knowledge =
     url && usesHelpPuffKnowledge(project) && loadEnv(loaded.dir)['ADMIN_API_KEY']
@@ -97,8 +100,9 @@ export async function statusCommand(ctx: Ctx): Promise<number> {
     origins: project.origins,
     deployed: Boolean(url),
     url: url ?? null,
-    preview: url ? `${url}/` : null,
-    embed: url ? embedSnippet(url, project.site) : null,
+    domain: project.cloudflare.domain ?? null,
+    preview: site ? `${site}/` : null,
+    embed: site ? embedSnippet(site, project.site) : null,
     worker: workerNameFor(project),
     knowledge,
     ...(url && project.backend.type === 'retell' && project.backend.retrieval === 'helppuff'
@@ -115,8 +119,8 @@ export async function statusCommand(ctx: Ctx): Promise<number> {
         ? `  model     ${String(model['provider'])}${model['preset'] ? ` (${String(model['preset'])})` : ''}${model['model'] ? ` · ${String(model['model'])}` : ''}\n  knowledge ${retrievalOf(project)!.type}`
         : `  backend   ${backend['type']}${backend['model'] ? ` · ${String(backend['model'])}` : ''}`,
       `  website   ${project.website ?? c.dim('none')}`,
-      url ? `  preview   ${c.cyan(`${url}/`)}` : `  deployed  ${c.yellow('not yet')} — run ${c.cyan('helppuff deploy')}`,
-      ...(url ? [`  embed     ${embedSnippet(url, project.site)}`] : []),
+      site ? `  preview   ${c.cyan(`${site}/`)}` : `  deployed  ${c.yellow('not yet')} — run ${c.cyan('helppuff deploy')}`,
+      ...(site ? [`  embed     ${embedSnippet(site, project.site)}`] : []),
       ...(knowledge && 'chunks' in knowledge
         ? [
             `  knowledge ${knowledge.chunks} passages · ${knowledge.run ? `last crawl ${knowledge.run.status} (${knowledge.run.done}/${knowledge.run.total})` : 'not crawled yet'}`,
@@ -145,7 +149,7 @@ export async function doctorCommand(ctx: Ctx): Promise<number> {
 export async function embedCommand(ctx: Ctx): Promise<number> {
   assertKnown(ctx.flags, [], 'embed');
   const loaded = loadProject(ctx.cwd);
-  const url = loaded.project.cloudflare.url;
+  const url = publicUrl(loaded.project);
   if (!url) throw new CliError('not_deployed', 'Not deployed yet, so there is no snippet.', { hint: 'helppuff deploy' });
   const embed = embedSnippet(url, loaded.project.site);
   ctx.out.result({ embed, url }, () => process.stdout.write(`${embed}\n`));

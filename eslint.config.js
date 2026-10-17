@@ -58,8 +58,8 @@ export default tseslint.config(
   },
 
   {
-    // The one place a console call is intended, behind a debug flag.
-    files: ['packages/widget/src/lib/env.ts', 'packages/server/src/core/request.ts'],
+    // The one place a console call is intended: the widget's debug flag, the server's logger.
+    files: ['packages/widget/src/lib/env.ts', 'packages/server/src/core/log.ts'],
     rules: { 'no-console': 'off' },
   },
 

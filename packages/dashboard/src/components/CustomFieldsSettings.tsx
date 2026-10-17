@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 import { useData } from '../lib/utils';
 import { JobFieldsSettings } from './JobsSettings';
 import { Button, Card, CardHeader, ErrorNote, Input, Skeleton } from './ui';
+import { confirmDelete } from '../lib/confirm';
 
 type Scope = 'conversation' | 'contact';
 type Attribute = { name: string; used: number; defined: boolean };
@@ -20,7 +21,7 @@ function AttributeRow({ attribute, scope, busy, change }: { attribute: Attribute
   };
   const remove = () => {
     const values = attribute.used ? ` and its values on ${records}` : '';
-    if (window.confirm(`Remove “${attribute.name}”${values}? This cannot be undone.`)) void change('DELETE', { scope, name: attribute.name });
+    if (confirmDelete(`Remove “${attribute.name}”${values}?`)) void change('DELETE', { scope, name: attribute.name });
   };
   return (
     <li className="flex flex-wrap items-center gap-2 px-4 py-2.5 text-[13px]">

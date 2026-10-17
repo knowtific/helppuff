@@ -8,6 +8,45 @@ never needs you to change anything. Upgrade with
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-17
+
+### Added
+
+- **Your own domain**: `helppuff domain add chat.acme.com` points a domain on
+  your Cloudflare account at the assistant (Cloudflare makes the DNS record
+  and certificate). The embed snippet, demo page and dashboard links use it;
+  workers.dev keeps working. `helppuff domain` shows its state, `helppuff
+  domain remove` detaches it, and `helppuff deploy` attaches it again if it
+  went missing. Saved as `cloudflare.domain` in helppuff.json.
+- **Errors say why, to you.** When a request is yours (the dashboard, the
+  CLI's admin key, an API key, `helppuff chat` and `helppuff ask`), an error
+  now carries `reason` (what went wrong, e.g. "The model API refused the key
+  (HTTP 401)") and `hint` (what to do, e.g. `helppuff secret set …`). The CLI
+  and the dashboard show them. Visitors still get only the safe message.
+- **Failures are always logged**, on every deployment: every failed request
+  (`request.error` with its code, status and reason) and every background
+  job that failed (crawls, webhooks, calendar syncs, live chat relays,
+  summaries), as JSON lines at `error` or `warn` in `helppuff logs` and
+  Cloudflare's Observability. Before, these were only logged with
+  `HELPPUFF_LOG=1`. Still no message text, contact details or IP addresses.
+- The wiki has an FAQ, a full Troubleshooting guide (every error message and
+  code, logs), costs at 1,000, 5,000 and 10,000 messages a day for every
+  model and provider, and starter questions; the website has an FAQ section.
+
+### Changed
+
+- **Deleting a contact deletes everything about them**: their conversations
+  (messages, files, labels, notes), callback requests, notes, tags, jobs and
+  appointments (upcoming ones are cancelled in the synced calendar first).
+  It is how you answer a "forget me" request. Before, the conversations
+  stayed unless the API was asked to erase them.
+- **Every delete asks first** and says it cannot be undone, in the
+  dashboard and the CLI. CLI deletes run without a terminal (or with
+  `--json`) stop with `needs_confirmation` unless `--yes` is given, which is
+  now accepted by every command.
+- The Worker's own pages (the demo page) work on whatever domain it answers,
+  without a redeploy.
+
 ## [0.9.4] - 2026-10-16
 
 ### Changed

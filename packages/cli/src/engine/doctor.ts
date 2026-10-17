@@ -8,6 +8,7 @@ import { EMBEDDING_DIMENSIONS } from '@helppuff/rag';
 import { adminApi } from './admin-api.js';
 import { PROVIDER_KEYS } from './questions.js';
 import { embeddingModelFor, healthCheck } from './deploy.js';
+import { domainAnswers, publicUrl } from './domain.js';
 
 /**
  * Every check that explains "why isn't it working", each with the fix.
@@ -177,7 +178,7 @@ export async function doctor(cwd: string, doFetch: typeof fetch = fetch): Promis
         if (!status.run) return { status: 'warn', detail: 'nothing crawled yet', fix: 'helppuff crawl --wait  (or pick pages on the setup page)' };
         if (status.chunks === 0) return { status: 'warn', detail: `last crawl ${status.run.status}, but no passages`, fix: 'helppuff knowledge pages --status error' };
         if (status.usage.state === 'exhausted') {
-          return { status: 'warn', detail: `${status.chunks} passages; today's budget is spent (${status.usage.neurons}/${status.usage.budget} neurons)`, fix: 'It resets at 00:00 UTC. Raise backend.budget.dailyNeurons only on Workers Paid.' };
+          return { status: 'warn', detail: `${status.chunks} passages; today's budget is spent (${status.usage.neurons}/${status.usage.budget} neurons)`, fix: 'It resets at 00:00 UTC. On Workers Paid, raise model.budget.dailyNeurons (backend.budget.dailyNeurons in an older helppuff.json).' };
         }
         return { status: 'pass', detail: `${status.chunks} passages; last crawl ${status.run.status} (${status.run.done}/${status.run.total}); budget ${status.usage.state}` };
       }),
@@ -226,10 +227,20 @@ export async function doctor(cwd: string, doFetch: typeof fetch = fetch): Promis
       await attempt('live', async () => {
         const ok = await healthCheck(url, project.site, project.origins[0] ?? url, doFetch, undefined, 2);
         return ok
-          ? { status: 'pass', detail: `${url} answers; embed: ${embedSnippet(url, project.site)}` }
+          ? { status: 'pass', detail: `${url} answers; embed: ${embedSnippet(publicUrl(project) ?? url, project.site)}` }
           : { status: 'fail', detail: `${url} does not answer the config route`, fix: 'helppuff deploy --force' };
       }),
     );
+    const domain = project.cloudflare.domain;
+    if (domain) {
+      checks.push(
+        await attempt('domain', async () =>
+          (await domainAnswers(domain, doFetch))
+            ? { status: 'pass', detail: `https://${domain} answers` }
+            : { status: 'fail', detail: `https://${domain} does not answer (just added? its certificate can take a few minutes)`, fix: 'helppuff domain (says whether it is attached), or helppuff domain add ' + domain },
+        ),
+      );
+    }
   } else {
     checks.push({ name: 'live', status: 'skip', detail: 'not deployed yet', fix: 'helppuff deploy' });
   }

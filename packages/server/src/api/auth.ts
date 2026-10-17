@@ -8,6 +8,7 @@ import { dbFrom } from '../db/d1.js';
 import { keyAllowIps, keyScopes, noteKeyUsed, verifyKey } from './keys.js';
 import { findEndpoint, type Endpoint } from './registry.js';
 import { hasScope } from './scopes.js';
+import { reasonOf } from '../core/log.js';
 
 /**
  * The public API's door (`/api/v1/*`), before any handler runs:
@@ -119,6 +120,6 @@ export function audit(c: Context<HonoEnv>): void {
         .run();
       // Now and then, forget what is older than the retention.
       if (Math.random() < 0.02) await db.prepare('DELETE FROM audit_log WHERE at < ?').bind(now - AUDIT_KEEP_MS).run();
-    })().catch(() => ctx.platform.log('audit.failed')),
+    })().catch((thrown) => ctx.platform.log('audit.failed', { reason: reasonOf(thrown) })),
   );
 }

@@ -7,6 +7,7 @@ import { loadEnv } from '../engine/env.js';
 import { loadProject } from '../engine/project.js';
 import type { Ctx } from './context.js';
 import { headerFlags, mergeHeaders } from './request-flags.js';
+import { confirmDelete } from './confirm.js';
 
 /**
  * `helppuff webhooks` — endpoints that receive the site's events, the same as
@@ -110,6 +111,7 @@ export async function webhooksCommand(ctx: Ctx): Promise<number> {
     }
     case 'remove': {
       const id = need();
+      if (!(await confirmDelete(ctx, `Remove the webhook ${id}?`, 'It stops receiving events at once.'))) return 1;
       await api.send('DELETE', `/admin/api/webhooks/${encodeURIComponent(id)}`);
       ctx.out.result({ id, removed: true }, () => ctx.out.success(`Removed ${id}.`));
       return 0;

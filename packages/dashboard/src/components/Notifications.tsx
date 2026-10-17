@@ -6,6 +6,7 @@ import { cn, fmtRelative, useData } from '../lib/utils';
 import { RequestEditor, type RequestDraft } from './RequestFields';
 import { WikiLink } from './Shell';
 import { Badge, Button, Card, CardHeader, ErrorNote, Input, PasswordInput, Select, Skeleton } from './ui';
+import { confirmDelete } from '../lib/confirm';
 
 /**
  * Settings → Notifications, the email part. Everyone picks the emails they
@@ -182,7 +183,7 @@ function ServiceSummary({ service, onEdit, onChanged }: { service: EmailService;
           variant="ghost"
           size="sm"
           disabled={busy !== null}
-          onClick={() => void run('remove', async () => {
+          onClick={() => confirmDelete('Remove the email service?', 'Nobody gets notification emails until you set one up again.') && void run('remove', async () => {
             await api('/notifications/email', { method: 'DELETE' });
             onChanged();
           })}

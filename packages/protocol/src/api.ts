@@ -27,6 +27,13 @@ export const errorEnvelopeSchema = z.object({
     /** Always safe to show a visitor. Never a backend's raw error text. */
     message: z.string().min(1).max(300),
     retryAfter: z.number().int().nonnegative().optional(),
+    /**
+     * Only for the people who can fix it (an admin session or key, an API
+     * key, the owner's test chat): what actually went wrong, in plain words.
+     */
+    reason: z.string().max(500).optional(),
+    /** Only with `reason`: what to do about it, as a command where there is one. */
+    hint: z.string().max(300).optional(),
   }),
 });
 export type ErrorEnvelope = z.infer<typeof errorEnvelopeSchema>;

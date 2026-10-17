@@ -56,6 +56,7 @@ import {
 } from './project.js';
 import { readState, writeState } from './state.js';
 import { wranglerDeploy } from './wrangler.js';
+import { attachDomain, onPublicUrl, publicUrl } from './domain.js';
 
 /**
  * `helppuff deploy`, end to end. Safe to run again at any time: every step
@@ -100,6 +101,8 @@ export type DeployOptions = {
 
 export type DeployResult = {
   url: string;
+  /** The custom domain visitors use (`helppuff domain`), when there is one; `dashboard`, `preview` and `embed` are on it. */
+  domain?: string | null;
   /** The CRM dashboard, when enabled. */
   dashboard: string | null;
   preview: string;
@@ -404,6 +407,19 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
     };
   });
 
+  // The custom domain (`helppuff domain add`), attached again if it went missing (a new account, a destroy).
+  const domain = loaded.project.cloudflare.domain;
+  if (domain) {
+    const attached = await cf.api.workerDomains(cf.accountId, workerName).catch(() => null);
+    if (attached && !attached.some((d) => d.hostname === domain)) {
+      progress?.(`Pointing ${domain} at the Worker…`);
+      await attachDomain(cf.api, cf.accountId, workerName, domain).catch((thrown: unknown) => {
+        warnings.push(`${domain} is not attached: ${(thrown as Error).message}${thrown instanceof CliError && thrown.hint ? ` ${thrown.hint}` : ''}`);
+      });
+    }
+  }
+  const site = publicUrl(loaded.project) ?? url;
+
   const indexing = await indexingStatus(cf.api, cf.accountId, loaded.project).catch(() => null);
   const healthy = await healthCheck(url, compiled.site, loaded.project.origins[0] ?? url, doFetch, progress);
   if (!healthy) {
@@ -422,6 +438,7 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
     const api = adminApi(loaded, { url, fetch: doFetch, env });
     await waitForAdminKey(api, progress);
     setupUrl = await mintSetupLink(api, warnings);
+    if (setupUrl) setupUrl = onPublicUrl(setupUrl, loaded.project);
     if (loaded.project.knowledge.files.length) {
       progress?.('Adding your files to the knowledge base…');
       files = await uploadFilesToWorker(loaded, api, progress).catch((thrown: unknown) => {
@@ -468,9 +485,10 @@ export async function deploy(initial: LoadedProject, options: DeployOptions = {}
 
   return {
     url,
-    dashboard: dashboardEnabled(loaded.project) ? dashboardUrl(url) : null,
-    preview: `${url}/`,
-    embed: embedSnippet(url, compiled.site),
+    domain: domain ?? null,
+    dashboard: dashboardEnabled(loaded.project) ? dashboardUrl(site) : null,
+    preview: `${site}/`,
+    embed: embedSnippet(site, compiled.site),
     site: compiled.site,
     account: { id: cf.accountId, name: cf.accountName },
     workerDeployed,

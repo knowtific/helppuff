@@ -345,6 +345,29 @@ helppuff logs --json --seconds 10
 
 A Cloudflare API token needs Workers Tail Read (or Workers Scripts Write) on the Worker. The tail shows new requests only; older stored logs are in Cloudflare Workers Observability. The audit API records successful changes, not failed sign-ins or rejected API keys.
 
+### `helppuff domain`
+
+```
+helppuff domain [status] | add <hostname> [--wait <seconds>] | remove [<hostname>] [--yes]
+```
+
+A custom domain for the assistant, e.g. chat.acme.com, through Cloudflare Workers Custom Domains: Cloudflare makes the DNS record and the certificate. The domain must be a zone (Active) on the same Cloudflare account, and the hostname must not have a DNS record of its own. `add` attaches it, saves it as cloudflare.domain in helppuff.json and waits up to --wait seconds (60; 0 with --json) for it to answer; the embed snippet, preview and dashboard links then use it, and `helppuff deploy` attaches it again if it went missing. workers.dev keeps working, so pages with the old script are fine. `remove` detaches it (asks first; --yes for scripts). `status` says whether it is attached and answering.
+
+| Option | |
+| --- | --- |
+| `--wait <seconds>` | With add: how long to wait for the domain to answer (default 60, 0 with --json) |
+| `--yes` | With remove: do not ask |
+| `--cf-account, --account-id <id>` | Cloudflare account, if the token can access several |
+| `--cf-token <token>` | Cloudflare API token; prefer CLOUDFLARE_API_TOKEN in .env |
+
+```bash
+helppuff domain add chat.acme.com
+helppuff domain --json
+helppuff domain remove chat.acme.com --yes --json
+```
+
+A Cloudflare API token needs Workers Scripts › Edit (and Zone › Read to find the zone); `wrangler login` has both. A domain whose DNS is elsewhere must be added to Cloudflare first (nameservers changed at the registrar). Removing the domain leaves its certificate in Cloudflare (SSL/TLS → Edge Certificates).
+
 ### `helppuff embed`
 
 ```

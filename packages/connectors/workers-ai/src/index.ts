@@ -488,8 +488,9 @@ async function respond(
       for (const [stage, ms] of Object.entries(found.trace.ms)) ctx.time?.(`rag.${stage}`, ms);
       chunks = found.chunks;
       spent += found.neurons;
-    } catch {
-      ctx.log('retrieve.failed');
+    } catch (thrown) {
+      // The name only: a search error's message may quote the visitor's words.
+      ctx.log('retrieve.failed', { reason: (thrown as Error)?.name ?? 'error' });
     }
   }
 
@@ -682,8 +683,8 @@ function recordSpend(ctx: ConnectorContext<WorkersAiOptions>, db: D1Like | null,
             .run();
         }
         await budgetAlerts(ctx, db);
-      } catch {
-        ctx.log('usage.record_failed');
+      } catch (thrown) {
+        ctx.log('usage.record_failed', { reason: String((thrown as Error)?.message ?? thrown).slice(0, 200) });
       }
     })(),
   );

@@ -24,10 +24,12 @@ export function isAllowedOrigin(origin: string | null | undefined, allowlist: re
 
 /**
  * Session endpoints require a recognised `Origin`. A request without one is
- * not a browser request from an allowed site, so it is rejected.
+ * not a browser request from an allowed site, so it is rejected. `self`, the
+ * origin the request was made to, is allowed too: only the Worker serves
+ * pages there (the preview), on workers.dev or a custom domain added later.
  */
-export function assertAllowedOrigin(origin: string | null | undefined, allowlist: readonly string[]): string {
-  if (!isAllowedOrigin(origin, allowlist)) {
+export function assertAllowedOrigin(origin: string | null | undefined, allowlist: readonly string[], self?: string): string {
+  if (!isAllowedOrigin(origin, self ? [...allowlist, self] : allowlist)) {
     throw new HelpPuffError('forbidden_origin', { detail: 'origin_not_allowed' });
   }
   return normalizeOrigin(origin as string) as string;

@@ -437,7 +437,12 @@ export const projectSchema = z
       .object({
         accountId: z.string().regex(/^[0-9a-f]{32}$/).optional().describe('The Cloudflare account deployed to.'),
         workerName: z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/).optional().describe('The Worker\'s name. Default: knowtific-helppuff-<site>.'),
-        url: z.string().url().optional().describe('Where the Worker answers.'),
+        url: z.string().url().optional().describe('Where the Worker answers on workers.dev. Always works, also with a custom domain.'),
+        domain: z
+          .string()
+          .regex(/^[a-z0-9.-]+$/)
+          .optional()
+          .describe('A custom domain the Worker also answers on, e.g. `chat.acme.com` (a zone on the same Cloudflare account). Set with `helppuff domain add`; the embed snippet, preview and dashboard links use it, and `helppuff deploy` attaches it again if it went missing.'),
         kvNamespaceId: z.string().optional().describe('The KV namespace (live config, new-conversation counters).'),
         d1DatabaseId: z.string().optional().describe('The D1 database (conversations, leads, knowledge).'),
         vectorizeIndex: z.string().optional().describe('The Vectorize index (knowledge vectors).'),

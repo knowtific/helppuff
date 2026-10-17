@@ -5,6 +5,7 @@ import { adminApi, type AdminApi } from '../engine/admin-api.js';
 import { loadEnv } from '../engine/env.js';
 import { loadProject } from '../engine/project.js';
 import type { Ctx } from './context.js';
+import { confirmDelete } from './confirm.js';
 
 /**
  * Appointments from the terminal, the same as the dashboard's Settings →
@@ -261,7 +262,9 @@ export async function appointmentsCommand(ctx: Ctx): Promise<number> {
       done(await api.send<Appointment>('PATCH', `/admin/api/appointments/${need()}`, { status: 'no_show' }), 'No-show');
       return 0;
     case 'delete': {
-      const result = await api.send<{ id: string; deleted: boolean }>('DELETE', `/admin/api/appointments/${need()}`);
+      const id = need();
+      if (!(await confirmDelete(ctx, `Delete the appointment ${id}?`, 'If it is still on, it is cancelled in the synced calendar too.'))) return 1;
+      const result = await api.send<{ id: string; deleted: boolean }>('DELETE', `/admin/api/appointments/${id}`);
       ctx.out.result(result, () => ctx.out.success(`Deleted ${result.id}.`));
       return 0;
     }
@@ -321,6 +324,7 @@ export async function integrationsCommand(ctx: Ctx): Promise<number> {
     }
     case 'remove': {
       const k = kind();
+      if (!(await confirmDelete(ctx, `Remove the ${k} key?`, 'A calendar synced through it stops syncing; appointments stay.'))) return 1;
       const result = await api.send<{ kind: string; deleted: boolean }>('DELETE', `/admin/api/integrations/${k}`);
       ctx.out.result(result, () => ctx.out.success(`Removed ${k}.`));
       return 0;

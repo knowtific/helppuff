@@ -5,6 +5,7 @@ import { retrieve, type AiLike, type D1Like, type VectorIndexLike } from '@helpp
 import { resolveSite } from '../config/site.js';
 import { isAssistant, knowledgeOf, providerOf } from '../core/assistant.js';
 import { HelpPuffError } from '../core/errors.js';
+import { explainDetail } from '../core/explain.js';
 import type { HonoEnv } from '../core/request.js';
 import { prepareConnector } from '../core/run.js';
 import { assertAdmin, assertSameOrigin, currentAdmin, jsonBody, siteParam } from './guard.js';
@@ -21,12 +22,8 @@ export const assistantRoutes = new Hono<HonoEnv>();
 /** A missing secret, a refused key, an unreachable API: said plainly, for the person setting it up. */
 function explain(thrown: unknown): string {
   const detail = isConnectorError(thrown) ? (thrown.detail ?? '') : thrown instanceof HelpPuffError ? (thrown.detail ?? '') : String((thrown as Error)?.message ?? thrown);
-  const secret = /missing_secret:(\w+)/.exec(detail)?.[1];
-  if (secret) return `${secret} is not set on the Worker. Run \`helppuff secret set ${secret}\`, then \`helppuff deploy\`.`;
-  if (/custom_(model|retriever)_missing/.test(detail)) return 'The custom module is not in the deployed Worker. Run `helppuff deploy`.';
-  if (/_(401|403):/.test(detail)) return `The provider refused the key (${detail.slice(0, 160)}).`;
-  if (/_404:/.test(detail)) return `The provider does not know that model or address (${detail.slice(0, 160)}).`;
-  if (/timeout/.test(detail)) return 'The provider took too long to answer.';
+  const known = explainDetail(detail);
+  if (known) return known.hint ? `${known.reason} Fix: ${known.hint}.` : known.reason;
   return detail.slice(0, 300) || 'The call failed.';
 }
 

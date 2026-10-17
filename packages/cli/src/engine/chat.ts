@@ -64,7 +64,7 @@ async function call(doFetch: typeof fetch, url: string, init: RequestInit): Prom
 async function envelope(response: Response): Promise<Record<string, unknown>> {
   const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (response.ok) return body;
-  const error = (body['error'] ?? {}) as { code?: string; message?: string };
+  const error = (body['error'] ?? {}) as { code?: string; message?: string; reason?: string; hint?: string };
   const hints: Record<string, string> = {
     forbidden_origin: 'The origin is not allowed. Redeploy with `helppuff deploy` so the preview origin is added.',
     captcha_failed: 'Turnstile is on for this site, so scripted chats are refused. Test in the preview page instead.',
@@ -73,8 +73,10 @@ async function envelope(response: Response): Promise<Record<string, unknown>> {
     internal: 'Usually a missing secret. `helppuff doctor` lists what the Worker is missing.',
     rate_limited: 'Rate limited — wait a minute and try again.',
   };
-  throw new CliError(`chat_${error.code ?? response.status}`, `The assistant answered ${response.status}: ${error.message ?? 'no message'}`, {
-    ...(error.code && hints[error.code] ? { hint: hints[error.code] } : {}),
+  // The Worker says what went wrong (`reason`, `hint`) to the owner's own test chats.
+  const hint = error.hint ?? (error.code ? hints[error.code] : undefined);
+  throw new CliError(`chat_${error.code ?? response.status}`, `The assistant answered ${response.status}: ${error.reason ?? error.message ?? 'no message'}`, {
+    ...(hint ? { hint } : {}),
   });
 }
 

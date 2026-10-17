@@ -66,20 +66,25 @@ export function createApp(config: HelpPuffConfig): Hono<HonoEnv> {
    * The single exit for every failure. Always the JSON envelope, never an HTML
    * error page — the widget's parser must always have something valid to read.
    */
-  app.onError((thrown, c) => {
+  app.onError(async (thrown, c) => {
     const error = toHelpPuffError(thrown);
-    c.get('helppuff')?.platform.log('request.error', {
+    const ctx = c.get('helppuff');
+    ctx?.platform.log('request.error', {
       code: error.code,
+      status: error.status,
       detail: error.detail ?? 'none',
+      method: c.req.method,
       path: c.req.path,
     });
+    // Signed in (a dashboard session, the admin key, an API key) or the owner's test chat: say what went wrong.
+    const forOwner = Boolean(c.get('actor')) || Boolean(await ctx?.isOwner().catch(() => false));
 
     const headers = new Headers(c.req.path.startsWith('/api/') ? { 'X-Request-Id': `req_${crypto.randomUUID()}` } : corsHeaders(c.req.header('Origin'), origins));
     headers.set('Content-Type', 'application/json');
     headers.set('Cache-Control', 'no-store');
     if (error.retryAfter !== undefined) headers.set('Retry-After', String(error.retryAfter));
 
-    return new Response(JSON.stringify(error.toEnvelope()), { status: error.status, headers });
+    return new Response(JSON.stringify(error.toEnvelope(forOwner)), { status: error.status, headers });
   });
 
   return app;

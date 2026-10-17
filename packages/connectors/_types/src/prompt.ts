@@ -167,8 +167,8 @@ async function fetchPrompt(
     if (ctx.waitUntil) ctx.waitUntil(cache.catch(() => {}));
     else await cache;
     return text;
-  } catch {
-    ctx.log('prompt.fetch_failed');
+  } catch (thrown) {
+    ctx.log('prompt.fetch_failed', { reason: String((thrown as Error)?.message ?? thrown).slice(0, 200) });
     return null;
   } finally {
     clearTimeout(timer);

@@ -11,6 +11,7 @@ import { extractJson, replyOf, type AiRunner } from '../conversations/summary.js
 import { callHttp, extractFields, MAX_VALUE, missingPrechat, needsUser, parseData, saveAttributesStatement, saveDataStatement, type ToolOutcome } from './run.js';
 import { openTool, siteTools, whenHolds, withArgs, type Tool, type ToolRow } from './store.js';
 import { capSize, type TemplateScope } from './template.js';
+import { reasonOf } from '../core/log.js';
 
 /**
  * The site's tools in a chat (HelpPuff's assistant only):
@@ -112,7 +113,7 @@ export function toolsHandle(
     if (attributes && Object.keys(attributes).length) {
       statements.push(saveAttributesStatement(db, siteId, sessionId, attributes, now));
     }
-    ctx.platform.waitUntil(db.batch(statements).catch(() => ctx.platform.log('tools.save_failed', { siteId })));
+    ctx.platform.waitUntil(db.batch(statements).catch((thrown) => ctx.platform.log('tools.save_failed', { siteId, reason: reasonOf(thrown) })));
   };
 
   return {

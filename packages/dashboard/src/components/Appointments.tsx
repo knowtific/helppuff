@@ -3,6 +3,7 @@ import { useState, type FormEvent, type ReactNode } from 'react';
 import { api, type Appointment, type AppointmentStatus } from '../lib/api';
 import { cn, href, useData } from '../lib/utils';
 import { Badge, Button, Card, Input, Select, Textarea, useModal } from './ui';
+import { confirmDelete } from '../lib/confirm';
 
 /**
  * Appointments in the dashboard (on with the date picker, Settings →
@@ -186,7 +187,7 @@ export function AppointmentPanel({ appointment, admin, onClose, onChanged }: { a
     }
   };
   const remove = async () => {
-    if (!window.confirm(`Delete this appointment?${a.provider !== 'none' && open ? ' It is cancelled in your calendar too.' : ''}`)) return;
+    if (!confirmDelete('Delete this appointment?', a.provider !== 'none' && open ? 'It is cancelled in your calendar too.' : undefined)) return;
     setBusy(true);
     try {
       await api(`/appointments/${a.id}`, { method: 'DELETE' });

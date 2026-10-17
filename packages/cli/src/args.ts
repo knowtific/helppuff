@@ -109,8 +109,8 @@ export function bool(flags: Flags, name: string): boolean | undefined {
 }
 
 export function assertKnown(flags: Flags, allowed: string[], command: string): void {
-  // Global flags: accepted by every command.
-  const known = new Set([...allowed, 'json', 'help', 'h', 'cwd', 'version', 'non-interactive', 'verbose', 'config']);
+  // Global flags: accepted by every command (`--yes` answers a delete's confirmation, commands/confirm.ts).
+  const known = new Set([...allowed, 'json', 'help', 'h', 'cwd', 'version', 'non-interactive', 'verbose', 'config', 'yes', 'y']);
   const unknown = Object.keys(flags).filter((name) => !known.has(name));
   if (unknown.length) {
     throw new CliError('usage', `Unknown option(s) for \`helppuff ${command}\`: ${unknown.map((u) => `--${u}`).join(', ')}`, {

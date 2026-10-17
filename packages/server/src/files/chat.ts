@@ -6,6 +6,7 @@ import { dbFrom } from '../db/d1.js';
 import { liveAvailable } from '../live/service.js';
 import { replyOf, type AiRunner } from '../conversations/summary.js';
 import { fileKey, filesBucket, type FileRow, type FilesBucket } from './store.js';
+import { reasonOf } from '../core/log.js';
 
 /**
  * Files in a conversation: whether this chat can send them, the files a
@@ -91,8 +92,8 @@ export async function describePhotos(deps: { db: D1Like; bucket: FilesBucket; ai
       if (!description) throw new Error('empty');
       described.push({ ...row, description });
       updates.push({ id: row.id, description });
-    } catch {
-      deps.log('file.describe_failed');
+    } catch (thrown) {
+      deps.log('file.describe_failed', { reason: reasonOf(thrown) });
       described.push(row);
     }
   }

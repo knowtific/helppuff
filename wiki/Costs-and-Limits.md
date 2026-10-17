@@ -29,6 +29,85 @@ message (the dashboard, usage, webhooks) happens after the reply.
 is then billed per neuron past the free allocation. Other AI providers bill
 you directly at their own prices.
 
+## Costs at higher volume
+
+Past a few hundred answers a day you need **Workers Paid** ($5 a month), and
+you raise two settings that otherwise stop you, on purpose:
+
+```bash
+helppuff config set security.limits.messagesPerSitePerDay 12000   # the daily cap (default 500)
+helppuff model set workers-ai                                     # only if helppuff.json has no "model" yet
+helppuff config set model.budget.dailyNeurons 400000              # Workers AI only (default 9,000)
+helppuff deploy
+```
+
+(An older `helppuff.json` with `backend` has the budget at
+`backend.budget.dailyNeurons`; `helppuff upgrade` moves it.)
+
+Estimated **monthly** cost, in US dollars, for visitor messages a day (one
+message = one answer). Prices checked on 2026-10-17 from each provider's
+pricing page; they change, so check before you commit.
+
+### Answers by Workers AI (on your Cloudflare bill)
+
+| Model | 1,000 a day | 5,000 a day | 10,000 a day |
+| --- | --- | --- | --- |
+| GLM-4.7 Flash, thinking off | **$8** | **$37** | **$72** |
+| GLM-4.7 Flash (default) | **$12** | **$55** | **$108** |
+| Qwen3 30B | **$11** | **$51** | **$102** |
+| GLM-5.3 Flash (estimate) | **$18** | **$86** | **$171** |
+| Llama 4 Scout | **$20** | **$96** | **$191** |
+| gpt-oss-120b | **$40** | **$193** | **$385** |
+| DeepSeek V4 Flash (estimate) | **$41** | **$202** | **$402** |
+
+The total: Workers Paid ($5), the Vectorize queries past the included amount
+(about $2 at 5,000 a day, $4 at 10,000) and the neurons past the free 10,000 a
+day at $0.011 per 1,000. Neurons per answer are the measured ones from
+[[AI models|AI-Models]] (search, answer and the conversation's summary).
+
+### Answers by another provider (their bill, plus Cloudflare's)
+
+| Model | Per 1,000 answers | 1,000 a day | 5,000 a day | 10,000 a day |
+| --- | --- | --- | --- | --- |
+| Gemini 2.5 Flash-Lite | $0.38 | **$16** | **$71** | **$141** |
+| GPT-6 Luna | $0.40 | **$17** | **$74** | **$147** |
+| Claude Haiku 5.5 | $0.40 | **$17** | **$74** | **$147** |
+| DeepSeek V4.1 Flash (off-peak – peak) | $0.57 – $1.14 | **$22 – 39** | **$100 – 185** | **$198 – 369** |
+| GPT-5.6 Luna | $0.84 | **$30** | **$140** | **$279** |
+| GPT-5.4 nano | $0.85 | **$30** | **$142** | **$282** |
+| Gemini 3.1 Flash-Lite | $1.05 | **$36** | **$172** | **$342** |
+| Gemini 3.6 Flash (until 2026-12-31) | $3.00 | **$95** | **$464** | **$927** |
+| Gemini 3.6 Flash (from 2027) | $6.00 | **$185** | **$914** | **$1,827** |
+| GPT-5.4 mini | $3.15 | **$100** | **$487** | **$972** |
+| Claude Haiku 4.5 | $4.00 | **$125** | **$614** | **$1,227** |
+| Claude Sonnet 5.5 | $8.00 | **$245** | **$1,214** | **$2,427** |
+| GPT-6.1 Sol | $8.00 | **$245** | **$1,214** | **$2,427** |
+
+The total: the provider's tokens, plus Cloudflare's part: Workers Paid ($5),
+Vectorize, and HelpPuff's own knowledge search and conversation summaries,
+which still run on Workers AI (about $7 a month at 5,000 a day, $18 at
+10,000; free at 1,000).
+
+**How these are worked out:**
+
+- **An answer** reads about 3,000 tokens (instructions, four passages, recent
+  history; capped by `model.budget.maxInputTokens`) and writes about 200,
+  which matches what Workers AI measures for the default model. A provider's
+  "thinking" tokens are billed as output, so a model thinking hard costs more
+  than the table; prompt caching, where a provider offers it, costs less.
+- **A conversation** is taken as four messages, with one summary.
+- **Cloudflare's other parts stay within Workers Paid at these volumes:**
+  requests (10 million a month included; each page view loads the widget's
+  settings once, so about 300,000 page views a day fit), D1 (25 billion rows
+  read, 50 million written), Workflows (one job per conversation), KV and
+  logs. Vectorize counts (queries + stored passages) × 1,024 dimensions, with
+  50 million included.
+- **Your own API** (`http`, Retell, OpenAI with its own file store) bills you
+  directly; Cloudflare's part is then about $5–10 a month.
+
+Keep `security.limits.messagesPerSitePerDay` a little above your real
+traffic: it is still the backstop if someone scripts the widget.
+
 ## The daily AI budget
 
 With the default backend, HelpPuff tracks every neuron it spends (in D1, by
@@ -45,7 +124,8 @@ UTC day) and steps down gracefully instead of failing:
 
 It resets at 00:00 UTC. Settings → Knowledge in the dashboard and `helppuff knowledge
 status` show today's use. On Workers Paid, raise
-`backend.budget.dailyNeurons` to whatever you are happy to spend.
+`model.budget.dailyNeurons` to whatever you are happy to spend (see
+[[Costs at higher volume|Costs-and-Limits#costs-at-higher-volume]]).
 
 Learning your site costs a few neurons per page, once: unchanged pages are
 never embedded again. Uploaded files cost the same per page of text. Each

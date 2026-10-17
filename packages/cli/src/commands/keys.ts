@@ -7,6 +7,7 @@ import { adminApi, ADMIN_KEY_ALIAS, ADMIN_KEY_ENV } from '../engine/admin-api.js
 import { loadEnv, writeEnvVar } from '../engine/env.js';
 import { loadProject } from '../engine/project.js';
 import type { Ctx } from './context.js';
+import { confirmDelete } from './confirm.js';
 
 /**
  * `helppuff keys` — API keys for the public API (`/api/v1`), the same as
@@ -75,6 +76,7 @@ export async function keysCommand(ctx: Ctx): Promise<number> {
     }
     case 'revoke': {
       if (!arg) throw new CliError('usage', USAGE, { exitCode: EXIT.usage });
+      if (!(await confirmDelete(ctx, `Revoke the API key ${arg}?`, 'Anything using it stops working within 30 seconds.'))) return 1;
       const revoked = await api.send<KeyView>('DELETE', `/admin/api/keys/${encodeURIComponent(arg)}`);
       ctx.out.result(revoked, () => ctx.out.success(`Revoked ${revoked.prefix}… — refused everywhere within 30 seconds.`));
       return 0;
@@ -112,6 +114,7 @@ export async function apiCommand(ctx: Ctx): Promise<number> {
     }
   }
   const path = rawPath.replace(/^\/?(api\/v1)?\/?/, '/');
+  if (method === 'DELETE' && !(await confirmDelete(ctx, `DELETE ${path}?`))) return 1;
   let response: Response;
   try {
     response = await fetch(`${url}/api/v1${path}`, {

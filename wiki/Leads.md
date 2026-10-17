@@ -139,6 +139,32 @@ for details only when arranging a callback.
 ## Privacy
 
 Leads and transcripts are stored in the D1 database on **your** Cloudflare
-account, nowhere else. HelpPuff stores no IP addresses (only the country), and
-its logs never contain message text or contact details. To delete everything:
-`helppuff destroy --yes`.
+account, nowhere else. HelpPuff stores no IP addresses (only the country and a
+salted hash for the per-visitor limits), and its logs never contain message
+text or contact details.
+
+### Deleting a contact ("forget me")
+
+Deleting a contact deletes **everything recorded about them**, so it is also
+how you answer a person who asks to be forgotten:
+
+- their conversations, with every message, the photos and files sent in them,
+  labels and notes;
+- their callback requests, notes and tags;
+- their jobs, with each job's history, notes and files;
+- their appointments. An upcoming one is cancelled in the synced calendar
+  first, as deleting an appointment does (a calendar that refuses does not
+  stop the rest).
+
+Questions to answer that came from their chats keep only the question text.
+It cannot be undone, so it always asks first:
+
+- **Dashboard**: the contact's page → the bin icon (admins only).
+- **API**: `DELETE /api/v1/leads/<id>` (`leads:write`); the answer counts what
+  went (`erased`). From the CLI: `helppuff api DELETE /leads/<id>` (asks
+  first; `--yes` for scripts).
+
+Copies already sent elsewhere (webhooks, your CRM, emails to the team) are not
+reachable from here; delete them there. Deleting one conversation
+(`DELETE /api/v1/conversations/<id>`) keeps the contact. To delete
+everything: `helppuff destroy --yes`.

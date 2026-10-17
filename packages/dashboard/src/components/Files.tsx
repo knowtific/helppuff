@@ -6,6 +6,7 @@ import { cn, useData } from '../lib/utils';
 import { HelpLink } from './Shell';
 import { SideSection } from './inbox';
 import { Button, ErrorNote } from './ui';
+import { confirmDelete } from '../lib/confirm';
 
 /**
  * Photos and files (R2): a grid of them in a transcript or on a job, and a
@@ -85,7 +86,7 @@ export function JobFilesSection({ jobId, me, onChanged }: { jobId: string; me: M
     }
   };
   const remove = async (file: StoredFile) => {
-    if (!window.confirm(`Remove ${file.name}?`)) return;
+    if (!confirmDelete(`Remove ${file.name}?`)) return;
     setFailed(null);
     try {
       await removeJobFile(jobId, file.id);

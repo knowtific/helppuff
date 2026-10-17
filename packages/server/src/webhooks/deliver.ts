@@ -3,6 +3,7 @@ import { openHeaders, sendOutbound, storedHeaders, type OutboundSpec } from '../
 import type { RequestCtx } from '../core/request.js';
 import { notifyByEmail } from '../notifications/email.js';
 import { dbFrom, ensureSchema, type D1Like } from '../db/d1.js';
+import { reasonOf } from '../core/log.js';
 
 /**
  * Webhooks the owner adds in the dashboard (D1 `webhooks`), and their
@@ -267,8 +268,8 @@ export function emit(ctx: RequestCtx, siteId: string, type: WebhookEventType, da
       siteId,
       type,
       data,
-    ).catch(() => {
-      ctx.platform.log('webhook.emit_failed', { type });
+    ).catch((thrown) => {
+      ctx.platform.log('webhook.emit_failed', { type, reason: reasonOf(thrown) });
     }),
   );
 }

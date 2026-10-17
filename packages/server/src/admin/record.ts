@@ -5,6 +5,7 @@ import { dbFrom, ensureSchema, type D1Like, type D1Statement } from '../db/d1.js
 import { conversationStarted, leadCaptured, turn } from '../webhooks/events.js';
 import { emit } from '../webhooks/deliver.js';
 import { startConversationJob } from '../conversations/complete.js';
+import { reasonOf } from '../core/log.js';
 
 /**
  * Writes the conversation to D1 for the dashboard, after the response.
@@ -177,8 +178,8 @@ function schedule(ctx: RequestCtx, work: (db: D1Like) => Promise<void>): void {
       try {
         await ensureSchema(db);
         await work(db);
-      } catch {
-        ctx.platform.log('record.failed');
+      } catch (thrown) {
+        ctx.platform.log('record.failed', { reason: reasonOf(thrown) });
       }
     })(),
   );

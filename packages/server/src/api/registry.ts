@@ -969,10 +969,10 @@ export const ENDPOINTS: Endpoint[] = [
     path: '/leads/:id',
     scope: 'leads:write',
     tag: 'Leads',
-    summary: 'Delete a lead',
-    description: 'Deletes the lead. With `?erase=conversations`, also every conversation linked to it, with their messages and callback requests: for a person who asks to be forgotten.',
-    query: [{ name: 'erase', description: '`conversations` to delete the linked conversations too.', example: 'conversations' }],
-    response: { id: leadId, deleted: true, conversationsDeleted: 2 },
+    summary: 'Delete a lead and everything about them',
+    description:
+      'Deletes the contact and everything recorded about them: their conversations (messages, chat files, labels, notes), callback requests, notes, tags, jobs (with their history and files) and appointments; an upcoming appointment is cancelled at the synced calendar first. For a person who asks to be forgotten. Irreversible. `erased` counts what went.',
+    response: { id: leadId, deleted: true, conversationsDeleted: 2, erased: { conversations: 2, callbacks: 1, notes: 3, jobs: 1, appointments: 1, files: 2 } },
   },
   {
     method: 'GET',

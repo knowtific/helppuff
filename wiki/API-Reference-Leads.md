@@ -12,7 +12,7 @@ The people who gave contact details: your CRM's contacts, with custom attributes
 - [[Create a lead|API-Reference-Leads#create-a-lead]]: `POST /leads`
 - [[Get a lead|API-Reference-Leads#get-a-lead]]: `GET /leads/:id`
 - [[Update a lead|API-Reference-Leads#update-a-lead]]: `PATCH /leads/:id`
-- [[Delete a lead|API-Reference-Leads#delete-a-lead]]: `DELETE /leads/:id`
+- [[Delete a lead and everything about them|API-Reference-Leads#delete-a-lead-and-everything-about-them]]: `DELETE /leads/:id`
 - [[Export leads as CSV|API-Reference-Leads#export-leads-as-csv]]: `GET /leads.csv`
 
 ## List contact tags
@@ -862,16 +862,15 @@ type UpdateLeadResponse = {
 ```
 <!-- /tabs -->
 
-## Delete a lead
+## Delete a lead and everything about them
 
 `DELETE /leads/:id` · scope `leads:write`
 
-Deletes the lead. With `?erase=conversations`, also every conversation linked to it, with their messages and callback requests: for a person who asks to be forgotten.
+Deletes the contact and everything recorded about them: their conversations (messages, chat files, labels, notes), callback requests, notes, tags, jobs (with their history and files) and appointments; an upcoming appointment is cancelled at the synced calendar first. For a person who asks to be forgotten. Irreversible. `erased` counts what went.
 
 | Parameter | In | Required | Description |
 | --- | --- | --- | --- |
 | `id` | path | yes | The record's id. |
-| `erase` | query | no | `conversations` to delete the linked conversations too. |
 
 **Request**
 
@@ -889,7 +888,7 @@ const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/leads/${id}`, {
   },
 });
 if (!response.ok) throw new Error(((await response.json()) as ApiError).error.message);
-const data = (await response.json()) as DeleteLeadResponse;
+const data = (await response.json()) as DeleteLeadAndEverythingAboutThemResponse;
 ```
 <!-- /tabs -->
 
@@ -900,14 +899,30 @@ const data = (await response.json()) as DeleteLeadResponse;
 {
   "id": "lead_5e3f0c8a-1f7b-4f8e-9a51-0e2b7c4d1a90",
   "deleted": true,
-  "conversationsDeleted": 2
+  "conversationsDeleted": 2,
+  "erased": {
+    "conversations": 2,
+    "callbacks": 1,
+    "notes": 3,
+    "jobs": 1,
+    "appointments": 1,
+    "files": 2
+  }
 }
 ```
 ```ts [Type]
-type DeleteLeadResponse = {
+type DeleteLeadAndEverythingAboutThemResponse = {
   id: string;
   deleted: boolean;
   conversationsDeleted: number;
+  erased: {
+    conversations: number;
+    callbacks: number;
+    notes: number;
+    jobs: number;
+    appointments: number;
+    files: number;
+  };
 };
 ```
 <!-- /tabs -->

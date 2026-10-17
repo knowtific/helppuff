@@ -324,6 +324,7 @@ export function compile(
     ...new Set([
       ...project.origins,
       ...(options.workerUrl ? [new URL(options.workerUrl).origin] : []),
+      ...(project.cloudflare.domain ? [`https://${project.cloudflare.domain}`] : []),
       ...(options.dev ? [devOrigin(options.devPort)] : []),
     ]),
   ];

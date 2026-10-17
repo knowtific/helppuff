@@ -7,6 +7,7 @@ import { loadEnv } from '../engine/env.js';
 import { loadProject } from '../engine/project.js';
 import type { Ctx } from './context.js';
 import { expand } from './request-flags.js';
+import { confirmDelete } from './confirm.js';
 
 /**
  * `helppuff tools` — the site's own tools, the same as the tools on the
@@ -200,6 +201,7 @@ export async function toolsCommand(ctx: Ctx): Promise<number> {
     }
     case 'remove': {
       const current = await find(need());
+      if (!(await confirmDelete(ctx, `Remove the tool ${current.name}?`, 'The assistant stops using it at once.'))) return 1;
       await api.send('DELETE', `/admin/api/tools/${encodeURIComponent(current.id)}`);
       ctx.out.result({ name: current.name, removed: true }, () => ctx.out.success(`Removed ${current.name}. Take {{${current.name}}} out of the prompt too.`));
       return 0;

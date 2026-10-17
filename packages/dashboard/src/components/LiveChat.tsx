@@ -6,6 +6,7 @@ import { Button, Card, CardHeader, ErrorNote, InfoTip, Input, Select, Skeleton, 
 import { api, type Label, type LiveSettings, type LiveStatus, type Prefs, type SettingsView, type TelegramView } from '../lib/api';
 import { askNotifications, notificationState, playSound, setAvailable, testNotification, unlockAudio } from '../lib/live';
 import { cn, useData } from '../lib/utils';
+import { confirmDelete } from '../lib/confirm';
 
 /**
  * Settings → Live chat (the `live` section, and Telegram), Labels, and each
@@ -374,7 +375,7 @@ function LabelRow({ label, colors, onChange }: { label: Label; colors: string[];
         className="size-7"
         aria-label={`Delete ${label.name}`}
         onClick={() => {
-          if (window.confirm(`Delete “${label.name}”? It comes off every conversation.`)) onChange(() => api(`/labels/${label.id}`, { method: 'DELETE' }));
+          if (confirmDelete(`Delete “${label.name}”?`, 'It comes off every conversation.')) onChange(() => api(`/labels/${label.id}`, { method: 'DELETE' }));
         }}
       >
         <Trash2 />

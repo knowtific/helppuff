@@ -57,6 +57,7 @@ COMMANDS
     status               What is deployed, where, the embed snippet, and the knowledge base
     doctor               Check every piece (config, secrets, token, index, knowledge, Worker) with fixes
     logs                 Tail the deployed Worker's Cloudflare logs in this terminal (Ctrl-C to stop)
+    domain               A custom domain for the assistant (chat.acme.com) instead of workers.dev: add, remove, status
     embed                Print the <script> snippet for the site
 
   Change
@@ -136,6 +137,8 @@ GLOBAL OPTIONS
   --json              machine-readable output        --cwd <dir>        run as if in <dir>
   --config <file>     the helppuff.json to use         --non-interactive  never prompt (also: no TTY, CI=1)
   --help, -h          help                           --version          print the version
+  --yes, -y           answer a delete's "This cannot be undone" question (every delete asks; without a
+                      terminal or with --json it stops with needs_confirmation unless --yes is given)
 `;
 
 type CommandHelp = { usage: string; summary: string; options?: [string, string][]; examples?: string[]; notes?: string };
@@ -338,6 +341,19 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     ],
     examples: ['helppuff logs', 'helppuff logs --method POST', 'helppuff logs --json --seconds 10'],
     notes: 'A Cloudflare API token needs Workers Tail Read (or Workers Scripts Write) on the Worker. The tail shows new requests only; older stored logs are in Cloudflare Workers Observability. The audit API records successful changes, not failed sign-ins or rejected API keys.',
+  },
+  domain: {
+    usage: 'helppuff domain [status] | add <hostname> [--wait <seconds>] | remove [<hostname>] [--yes]',
+    summary:
+      'A custom domain for the assistant, e.g. chat.acme.com, through Cloudflare Workers Custom Domains: Cloudflare makes the DNS record and the certificate. The domain must be a zone (Active) on the same Cloudflare account, and the hostname must not have a DNS record of its own. `add` attaches it, saves it as cloudflare.domain in helppuff.json and waits up to --wait seconds (60; 0 with --json) for it to answer; the embed snippet, preview and dashboard links then use it, and `helppuff deploy` attaches it again if it went missing. workers.dev keeps working, so pages with the old script are fine. `remove` detaches it (asks first; --yes for scripts). `status` says whether it is attached and answering.',
+    options: [
+      ['--wait <seconds>', 'With add: how long to wait for the domain to answer (default 60, 0 with --json)'],
+      ['--yes', 'With remove: do not ask'],
+      ['--cf-account, --account-id <id>', 'Cloudflare account, if the token can access several'],
+      ['--cf-token <token>', 'Cloudflare API token; prefer CLOUDFLARE_API_TOKEN in .env'],
+    ],
+    examples: ['helppuff domain add chat.acme.com', 'helppuff domain --json', 'helppuff domain remove chat.acme.com --yes --json'],
+    notes: 'A Cloudflare API token needs Workers Scripts › Edit (and Zone › Read to find the zone); `wrangler login` has both. A domain whose DNS is elsewhere must be added to Cloudflare first (nameservers changed at the registrar). Removing the domain leaves its certificate in Cloudflare (SSL/TLS → Edge Certificates).',
   },
   embed: { usage: 'helppuff embed', summary: 'Print the <script> tag to paste into the site.' },
   users: {

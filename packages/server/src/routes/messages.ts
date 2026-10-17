@@ -35,7 +35,7 @@ export async function authenticate(ctx: RequestCtx, authorization: string | unde
 
   const payload = await verifyToken(secret, token, ctx.platform.now());
   const site = await resolveSite(ctx, payload.siteId);
-  assertAllowedOrigin(ctx.origin, site.origins);
+  assertAllowedOrigin(ctx.origin, site.origins, ctx.selfOrigin);
 
   return { payload, site, prepared: prepareConnector(ctx, site), secret };
 }

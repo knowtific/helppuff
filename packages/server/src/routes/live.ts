@@ -10,6 +10,7 @@ import { agentSocket } from '../admin/live.js';
 import { safeEqual } from '../admin/guard.js';
 import { closeConversation, handBack, hubOf, HUB_ORIGIN, LiveError, liveDeps, readLiveState, sendAgentMessage, takeOver } from '../live/service.js';
 import { botApi, postToThread, readTelegram, readUpdate, saveTelegram, TELEGRAM_HELP, TELEGRAM_SECRET_HEADER, type TelegramUpdate } from '../live/telegram.js';
+import { reasonOf } from '../core/log.js';
 
 /**
  * Live chat's public doors: the visitor's socket, the team's socket (same
@@ -35,7 +36,7 @@ liveSocketRoutes.get('/v1/live/socket', async (c) => {
   if (!offered.includes(LIVE_SUBPROTOCOL) || !token) throw new HelpPuffError('unauthorized', { detail: 'live_token_missing' });
   const payload = await verifyToken(requireSecret(ctx), token, ctx.platform.now());
   const site = await resolveSite(ctx, payload.siteId);
-  assertAllowedOrigin(ctx.origin, site.origins);
+  assertAllowedOrigin(ctx.origin, site.origins, ctx.selfOrigin);
   const db = dbFrom(ctx.env);
   const hub = hubOf(ctx.env, payload.siteId);
   if (!site.live.enabled || !db || !hub) throw new HelpPuffError('not_found', { detail: 'live_off' });
@@ -73,7 +74,7 @@ liveSocketRoutes.post('/v1/integrations/telegram/:site', async (c) => {
     throw new HelpPuffError('unauthorized', { detail: 'telegram_bad_secret' });
   }
   const update = (await c.req.json().catch(() => ({}))) as TelegramUpdate;
-  ctx.platform.waitUntil(handleUpdate(c, siteId, update).catch(() => ctx.platform.log('telegram.update_failed')));
+  ctx.platform.waitUntil(handleUpdate(c, siteId, update).catch((thrown) => ctx.platform.log('telegram.update_failed', { siteId, reason: reasonOf(thrown) })));
   return c.json({ ok: true });
 });
 

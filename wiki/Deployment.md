@@ -79,6 +79,51 @@ app file anywhere, and point the script at the Worker with `data-api`:
 <script src="https://cdn.acme.com/helppuff/loader.js" data-site="acme" data-api="https://knowtific-helppuff-acme.you.workers.dev" async></script>
 ```
 
+## Your own domain
+
+By default the assistant answers on `knowtific-helppuff-<site>.<you>.workers.dev`.
+To use an address on your own domain, like `chat.acme.com`:
+
+```bash
+helppuff domain add chat.acme.com
+```
+
+It attaches the hostname to the Worker with Cloudflare's Workers Custom
+Domains: Cloudflare creates the DNS record and the certificate itself. Then:
+
+- `cloudflare.domain` in `helppuff.json` is set, and the embed snippet, the
+  demo page and the dashboard links use the new address (`helppuff embed`
+  prints the snippet). Put the new script on your site when it suits you.
+- **workers.dev keeps working**, so pages with the old script keep their
+  widget, and the CLI keeps using it. Nothing breaks while the certificate is
+  issued (usually a minute or two; `add` waits up to 60 seconds, and
+  `helppuff domain` checks again).
+- `helppuff deploy` attaches the domain again if it went missing (a new
+  account, after `destroy`), and `helppuff doctor` checks that it answers.
+
+**What it needs:**
+
+- The domain is on **the same Cloudflare account** as the assistant, and
+  Active (its nameservers point at Cloudflare). A domain whose DNS is
+  elsewhere must be added to Cloudflare first (**Add a domain** in the
+  Cloudflare dashboard, then change the nameservers at your registrar).
+- The hostname has **no DNS record of its own**. If `chat.acme.com` already
+  has one, delete it under your domain → **DNS → Records**, then run
+  `helppuff domain add` again (`domain_dns_conflict` says so).
+- With an API token: **Workers Scripts › Edit**, plus **Zone › Read** to find
+  the zone. `wrangler login` has both.
+
+```bash
+helppuff domain                          # attached? answering?
+helppuff domain remove chat.acme.com     # asks first; --yes for scripts and agents
+```
+
+Removing it leaves the certificate in Cloudflare (SSL/TLS → Edge
+Certificates) until you delete it there. A domain is only set from the CLI
+(or an AI agent using it): the dashboard has no Cloudflare login to do it
+with. One domain per assistant is tracked in `helppuff.json`; the dashboard
+signs you in separately on each address.
+
 ## Before going live
 
 1. `origins` lists every host the widget is on, including `www` and any staging site.
@@ -94,16 +139,28 @@ app file anywhere, and point the script at the Worker with `data-api`:
 
 ## Logs
 
-Workers observability is turned on. In the Cloudflare dashboard, open the
-Worker → **Observability** to see stored request logs, or **Logs → Live** for new
-requests. From the folder containing `helppuff.json`, run `helppuff logs` to
-tail new requests in the terminal; press Ctrl-C to stop. `helppuff logs --json
+Failures are always logged, on every deployment: a refused or failed
+request, a background job that failed (a crawl, a webhook, a calendar sync,
+a live chat relay) and the reason, as a JSON line at `error` (or `warn` for a
+refused request, such as a rate limit). Never message text, contact details
+or IP addresses. Everything else (timings, a chat starting) is logged only
+with `HELPPUFF_LOG=1`, which `helppuff dev` sets.
+
+From the folder containing `helppuff.json`, run `helppuff logs` to tail new
+requests in the terminal; press Ctrl-C to stop. `helppuff logs --json
 --seconds 15` returns one JSON object with events collected during those 15
 seconds. The command uses your `wrangler login` session or
 `CLOUDFLARE_API_TOKEN` from `.env`; a logging-only token needs **Workers Tail
-Read** for the Worker. Cloudflare's invocation logs show request and response
-status. HelpPuff's detailed structured events are off on production Workers;
-the audit API records successful changes, not rejected API keys.
+Read** for the Worker. Workers observability is turned on, so in the
+Cloudflare dashboard the Worker → **Observability** has stored logs
+(searchable, e.g. `request.error`) and **Logs → Live** new ones.
+
+A failed request logs `request.error` with its `code`, `status`, `detail`
+(the machine-readable reason, such as `missing_secret:OPENAI_API_KEY` or
+`origin_not_allowed`), method and path. The same reason, said plainly with
+what to do, is in the error response for the owner: the CLI, the dashboard,
+API keys and `helppuff chat`/`ask` show it. Visitors only get the safe
+message. See [[Troubleshooting|Troubleshooting#logs]].
 
 ## Removing it
 

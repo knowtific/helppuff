@@ -5,6 +5,7 @@ import { cn, copyText, fmtRelative, useData } from '../lib/utils';
 import { Badge, Button, Card, Empty, ErrorNote, Input, Segmented, Skeleton } from './ui';
 import { RequestEditor, type RequestDraft } from './RequestFields';
 import { HelpLink, HelpNote } from './Shell';
+import { confirmDelete } from '../lib/confirm';
 
 /**
  * Settings → Webhooks: endpoints that receive what happens — chats, messages,
@@ -308,7 +309,7 @@ function WebhookCard({ hook, events, onChanged }: { hook: Webhook; events: Event
             className="size-7"
             aria-label={`Delete webhook ${hook.url}`}
             onClick={() => {
-              if (window.confirm('Delete this webhook? It stops receiving events at once.')) void api(`/webhooks/${hook.id}`, { method: 'DELETE' }).then(onChanged, (thrown: Error) => setError(thrown));
+              if (confirmDelete('Delete this webhook?', 'It stops receiving events at once.')) void api(`/webhooks/${hook.id}`, { method: 'DELETE' }).then(onChanged, (thrown: Error) => setError(thrown));
             }}
           >
             <Trash2 />

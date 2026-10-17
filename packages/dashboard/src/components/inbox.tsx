@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { api, type ConversationStatus, type Label, type LabelRef, type Note } from '../lib/api';
 import { cn, fmtRelative, href } from '../lib/utils';
 import { Badge, Button, Input, Textarea } from './ui';
+import { confirmDelete } from '../lib/confirm';
 
 /**
  * The inbox's shared pieces: a conversation's status, the waiting indicator,
@@ -308,7 +309,7 @@ export function NotesPanel({ notes, me, isAdmin, addPath, onChange }: { notes: N
                       <Pencil className="size-3" />
                     </button>
                   )}
-                  <button type="button" className="rounded p-0.5 hover:text-danger" aria-label="Delete note" onClick={() => void run(() => api(`/notes/${note.id}`, { method: 'DELETE' }))}>
+                  <button type="button" className="rounded p-0.5 hover:text-danger" aria-label="Delete note" onClick={() => confirmDelete('Delete this note?') && void run(() => api(`/notes/${note.id}`, { method: 'DELETE' }))}>
                     <Trash2 className="size-3" />
                   </button>
                 </span>

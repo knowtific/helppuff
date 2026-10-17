@@ -3,6 +3,7 @@ import { LIVE_PING, LIVE_SUBPROTOCOL } from '@helppuff/protocol';
 import { dbFrom } from '../db/d1.js';
 import { HubCore, type HubEvent, type HubSocket } from './hub.js';
 import { runDue, type LiveDeps } from './service.js';
+import { envLog } from '../core/log.js';
 
 /**
  * The live hub's Durable Object: one per site (`idFromName(siteId)`), SQLite
@@ -117,7 +118,7 @@ export class LiveHub extends DurableObject<Env> {
           now: () => Date.now(),
           fetch: globalThis.fetch.bind(globalThis),
           waitUntil: (p) => this.ctx.waitUntil(p.catch(() => {})),
-          log: () => {},
+          log: envLog(this.env),
         }
       : null;
     await runDue(this.core, deps, await this.ctx.storage.get<string>('site'));

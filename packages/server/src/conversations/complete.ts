@@ -12,6 +12,7 @@ import { promptField } from '../admin/prompts.js';
 import { missingFromKnowledge, recordGaps, gapView, type KnowledgeSearch } from '../knowledge/gaps.js';
 import type { SiteConfig } from '../config/schema.js';
 import { parseData } from '../tools/run.js';
+import { reasonOf } from '../core/log.js';
 
 /**
  * The end of a conversation, as a background job (the Worker's Workflow).
@@ -117,9 +118,9 @@ export function startConversationJob(ctx: RequestCtx, siteId: string, conversati
         knowledgeBase: ownsKnowledge(site),
       };
       await workflow.create!({ id: instance.slice(0, 100), params });
-    })().catch(() => {
+    })().catch((thrown) => {
       // Already started (the id is the conversation's), or Workflows unavailable: the dashboard can still summarise.
-      ctx.platform.log('conversation.job_not_started');
+      ctx.platform.log('conversation.job_not_started', { reason: reasonOf(thrown) });
     }),
   );
 }

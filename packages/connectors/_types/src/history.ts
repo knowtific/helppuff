@@ -78,7 +78,7 @@ export function appendHistory(ctx: HistoryCtx, previous: Turn[], added: Turn[]):
   if (ctx.history) return;
   const turns = trimHistory([...previous, ...added]);
   ctx.waitUntil(
-    ctx.kv.put(historyKey(ctx), JSON.stringify(turns), { expirationTtl: HISTORY_TTL_SECONDS }).catch(() => ctx.log('history.write_failed')),
+    ctx.kv.put(historyKey(ctx), JSON.stringify(turns), { expirationTtl: HISTORY_TTL_SECONDS }).catch((thrown) => ctx.log('history.write_failed', { reason: String((thrown as Error)?.message ?? thrown).slice(0, 200) })),
   );
 }
 
@@ -89,7 +89,7 @@ export function appendHistory(ctx: HistoryCtx, previous: Turn[], added: Turn[]):
  */
 export function saveScope(ctx: HistoryCtx, scope: PromptScope): void {
   ctx.waitUntil(
-    ctx.kv.put(`${historyKey(ctx)}:scope`, JSON.stringify(scope), { expirationTtl: HISTORY_TTL_SECONDS }).catch(() => ctx.log('scope.write_failed')),
+    ctx.kv.put(`${historyKey(ctx)}:scope`, JSON.stringify(scope), { expirationTtl: HISTORY_TTL_SECONDS }).catch((thrown) => ctx.log('scope.write_failed', { reason: String((thrown as Error)?.message ?? thrown).slice(0, 200) })),
   );
 }
 

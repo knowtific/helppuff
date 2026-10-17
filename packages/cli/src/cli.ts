@@ -37,6 +37,7 @@ import { upgradeCommand } from './commands/upgrade.js';
 import { promptCommand } from './commands/prompt.js';
 import { liveCommand, telegramCommand } from './commands/live.js';
 import { logsCommand } from './commands/logs.js';
+import { domainCommand } from './commands/domain.js';
 
 const COMMANDS: Record<string, (ctx: Ctx) => Promise<number>> = {
   init: initCommand,
@@ -47,6 +48,7 @@ const COMMANDS: Record<string, (ctx: Ctx) => Promise<number>> = {
   status: statusCommand,
   doctor: doctorCommand,
   logs: logsCommand,
+  domain: domainCommand,
   knowledge: knowledgeCommand,
   discover: discoverCommand,
   crawl: crawlCommand,

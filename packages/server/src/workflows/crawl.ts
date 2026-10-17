@@ -10,6 +10,7 @@ import { suggestAfterLearning } from '../home/suggest.js';
 import { foundAfterLearning } from '../bookings/found.js';
 import { DEFAULT_CHAT_MODEL } from '../knowledge/env.js';
 import type { KvStore } from '@helppuff/connector-types';
+import { envLog, reasonOf } from '../core/log.js';
 
 /**
  * The Worker's background jobs: one Cloudflare Workflow, so each job survives
@@ -39,6 +40,7 @@ export class CrawlWorkflow extends WorkflowEntrypoint<Record<string, unknown>, J
       sleep: (name, ms) => step.sleep(name, ms),
     };
     const payload = event.payload;
+    const log = envLog(this.env);
     const fetcher = globalThis.fetch.bind(globalThis);
 
     // Jobs that need only the database: they run for every backend with a dashboard.
@@ -72,16 +74,16 @@ export class CrawlWorkflow extends WorkflowEntrypoint<Record<string, unknown>, J
     // The site's webhooks hear when learning finishes; a failing endpoint never fails the job.
     // Learning the site the first time also sets Jobs and the home screen up from it (once; never over the owner's).
     const notify: Notify = async (type, data) => {
-      await emitTo({ db: env.db, fetch: fetcher, retry: workflowRetry(this.env), ...outboundOf(this.env) }, payload.siteId, type, data).catch(() => {});
+      await emitTo({ db: env.db, fetch: fetcher, retry: workflowRetry(this.env), ...outboundOf(this.env) }, payload.siteId, type, data).catch((thrown) => log('webhook.emit_failed', { siteId: payload.siteId, type, reason: reasonOf(thrown) }));
       if (type !== 'knowledge.crawl.finished') return;
       const ai = this.env['AI'] as Partial<AiRunner> | undefined;
       const runner = ai && typeof ai.run === 'function' ? (ai as AiRunner) : undefined;
       const kv = this.env['HELPPUFF_KV'] as KvStore | undefined;
-      await setupAfterLearning({ db: env.db, ai: runner, kv, now: () => Date.now() }, payload.siteId).catch(() => {});
+      await setupAfterLearning({ db: env.db, ai: runner, kv, now: () => Date.now() }, payload.siteId).catch((thrown) => log('jobs.setup_failed', { siteId: payload.siteId, reason: reasonOf(thrown) }));
       // And the widget's home screen: useful pages as links, the questions visitors ask (once; the owner's own win).
-      await suggestAfterLearning({ db: env.db, ai: runner, kv, model: DEFAULT_CHAT_MODEL, now: () => Date.now() }, payload.siteId, '').catch(() => {});
+      await suggestAfterLearning({ db: env.db, ai: runner, kv, model: DEFAULT_CHAT_MODEL, now: () => Date.now() }, payload.siteId, '').catch((thrown) => log('home.suggest_failed', { siteId: payload.siteId, reason: reasonOf(thrown) }));
       // And the booking link it found: offered while the owner has not chosen how visitors book.
-      await foundAfterLearning({ db: env.db, kv, now: () => Date.now() }, payload.siteId).catch(() => {});
+      await foundAfterLearning({ db: env.db, kv, now: () => Date.now() }, payload.siteId).catch((thrown) => log('bookings.found_failed', { siteId: payload.siteId, reason: reasonOf(thrown) }));
     };
     if ('kind' in payload && payload.kind === 'file') {
       if (!env.uploads) throw new Error('No KV binding to read the upload from.');

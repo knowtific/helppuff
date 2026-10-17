@@ -117,7 +117,7 @@ The people who gave contact details: your CRM's contacts, with custom attributes
 - [[Create a lead|API-Reference-Leads#create-a-lead]]: `POST /leads`
 - [[Get a lead|API-Reference-Leads#get-a-lead]]: `GET /leads/:id`
 - [[Update a lead|API-Reference-Leads#update-a-lead]]: `PATCH /leads/:id`
-- [[Delete a lead|API-Reference-Leads#delete-a-lead]]: `DELETE /leads/:id`
+- [[Delete a lead and everything about them|API-Reference-Leads#delete-a-lead-and-everything-about-them]]: `DELETE /leads/:id`
 - [[Export leads as CSV|API-Reference-Leads#export-leads-as-csv]]: `GET /leads.csv`
 
 ### [[Jobs|API-Reference-Jobs]]

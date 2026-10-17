@@ -31,6 +31,7 @@ gives you a setup link.
 - **[[Using with AI agents|AI-Agents]]**: what your agent does, and the changes you can ask it for.
 - **[[The dashboard|Dashboard]]**: test chat, conversations, jobs, calendar, contacts, callbacks, analytics, settings.
 - **[[Tutorials]]**: complete setups to copy, from order tracking to hot leads in Slack.
+- **[[FAQ]]**: short answers to the common questions (cost, data, models, your own domain), each with its page.
 
 ## Set it up your way
 

@@ -20,6 +20,7 @@ import { BookingsSettings } from '../components/BookingsSettings';
 import { Integrations } from '../components/Integrations';
 import { CustomFieldsSettings } from '../components/CustomFieldsSettings';
 import { ContactTagsSettings } from '../components/ContactTags';
+import { confirmDelete } from '../lib/confirm';
 
 /** What to ask a coding agent, per page: it reads the settings with the CLI, asks, then changes them. */
 const AGENT_TOPICS: Partial<Record<SettingsSection | 'prompt' | 'knowledge', string>> = {
@@ -282,7 +283,7 @@ function Team({ me }: { me: Me }) {
                     className="size-7"
                     aria-label={`Remove ${person.email}`}
                     onClick={() => {
-                      if (window.confirm(`Remove ${person.email}? They are signed out at once.`)) void run(() => api(`/admins/${encodeURIComponent(person.email)}`, { method: 'DELETE' }));
+                      if (confirmDelete(`Remove ${person.email}?`, 'They are signed out at once.')) void run(() => api(`/admins/${encodeURIComponent(person.email)}`, { method: 'DELETE' }));
                     }}
                   >
                     <Trash2 />

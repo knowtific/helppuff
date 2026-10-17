@@ -10,6 +10,16 @@ export class ApiError extends Error {
   }
 }
 
+type ErrorBody = { error?: { message?: string; code?: string; reason?: string; hint?: string } };
+
+/** The Worker's message, plus what actually went wrong and what to do (it says so to signed-in people). */
+function errorText(body: ErrorBody, fallback: string): string {
+  const e = body.error;
+  const text = e?.message ?? fallback;
+  if (!e?.reason) return text;
+  return `${text} ${e.reason}${e.hint ? ` Fix: ${e.hint}.` : ''}`;
+}
+
 type Listener = () => void;
 const unauthorized = new Set<Listener>();
 export function onUnauthorized(listener: Listener): () => void {
@@ -26,9 +36,9 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
     ...(json !== undefined ? { body: JSON.stringify(json) } : {}),
   });
   if (response.ok) return (await response.json()) as T;
-  const body = (await response.json().catch(() => ({}))) as { error?: { message?: string; code?: string } };
+  const body = (await response.json().catch(() => ({}))) as ErrorBody;
   if (response.status === 401 && path !== '/login') unauthorized.forEach((listener) => listener());
-  throw new ApiError(response.status, body.error?.message ?? `Request failed (${response.status})`, body.error?.code);
+  throw new ApiError(response.status, errorText(body, `Request failed (${response.status})`), body.error?.code);
 }
 
 /**
@@ -39,9 +49,9 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
 export async function download(path: string): Promise<void> {
   const response = await fetch(`/admin/api${path}`, { credentials: 'same-origin' });
   if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { error?: { message?: string; code?: string } };
+    const body = (await response.json().catch(() => ({}))) as ErrorBody;
     if (response.status === 401) unauthorized.forEach((listener) => listener());
-    throw new ApiError(response.status, body.error?.message ?? `Download failed (${response.status})`, body.error?.code);
+    throw new ApiError(response.status, errorText(body, `Download failed (${response.status})`), body.error?.code);
   }
   const name = /filename="([^"]+)"/.exec(response.headers.get('Content-Disposition') ?? '')?.[1] ?? path.split('/').pop() ?? 'download';
   const url = URL.createObjectURL(await response.blob());

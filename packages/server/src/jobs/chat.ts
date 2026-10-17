@@ -6,6 +6,7 @@ import { dbFrom } from '../db/d1.js';
 import { announceJob } from '../admin/jobs.js';
 import { cleanFields, createJob, jobView, missingFields, type JobField, type JobRow, type Pipeline } from './store.js';
 import { CONTACT_FIELDS, cachedPipeline, readQuote } from './widget.js';
+import { reasonOf } from '../core/log.js';
 
 /**
  * Jobs from the chat: the assistant's `create_job` tool (with a short form
@@ -66,8 +67,8 @@ export async function jobsHandle(ctx: RequestCtx, siteId: string, sessionId: str
         if (missing.length) added.push(jobFormMessage(row, missing, pipeline));
         announceJob(ctx, siteId, 'job.created', jobView(row, pipeline, ctx.platform.now()));
         return { number: row.number, missing: missing.map((f) => f.label) };
-      } catch {
-        ctx.platform.log('jobs.create_failed', { siteId });
+      } catch (thrown) {
+        ctx.platform.log('jobs.create_failed', { siteId, reason: reasonOf(thrown) });
         return null;
       }
     },

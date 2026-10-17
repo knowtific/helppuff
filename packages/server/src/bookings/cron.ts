@@ -1,5 +1,6 @@
 import type { SiteConfig } from '../config/schema.js';
 import type { D1Like } from '../db/d1.js';
+import { envLog } from '../core/log.js';
 import { emitTo, outboundOf, workflowRetry } from '../webhooks/deliver.js';
 import { effectiveBooking } from './found.js';
 import { bookingsOf, lastSynced, sendReminders, syncCalendar, type BookingDeps } from './service.js';
@@ -13,6 +14,7 @@ export async function runScheduledBookings(env: Record<string, unknown>, db: D1L
   const secret = typeof env['HELPPUFF_SECRET'] === 'string' ? env['HELPPUFF_SECRET'] : '';
   const fetcher: typeof fetch = (input, init) => globalThis.fetch(input, init);
   const out = { synced: [] as string[], reminded: 0 };
+  const log = envLog(env);
   // Deliveries finish before the cron does.
   const deliveries: Promise<void>[] = [];
   for (const [siteId, site] of Object.entries(sites)) {
@@ -23,7 +25,7 @@ export async function runScheduledBookings(env: Record<string, unknown>, db: D1L
       secret,
       fetch: fetcher,
       now: () => now,
-      log: () => {},
+      log,
       emit: (type, data) => {
         deliveries.push(emitTo({ db, fetch: fetcher, now: () => now, retry: workflowRetry(env), ...outboundOf(env) }, siteId, type, data).catch(() => {}));
       },

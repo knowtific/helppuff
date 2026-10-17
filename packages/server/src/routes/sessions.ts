@@ -23,7 +23,7 @@ sessionRoutes.post('/v1/sites/:siteId/sessions', async (c) => {
   const ctx = c.get('helppuff');
   const siteId = c.req.param('siteId');
   const site = await ctx.timing.span('site', () => resolveSite(ctx, siteId));
-  assertAllowedOrigin(ctx.origin, site.origins);
+  assertAllowedOrigin(ctx.origin, site.origins, ctx.selfOrigin);
 
   const parsed = startSessionRequestSchema.safeParse(await readJsonBody(c.req.raw));
   if (!parsed.success) throw new HelpPuffError('bad_request', { detail: 'session_body_invalid' });

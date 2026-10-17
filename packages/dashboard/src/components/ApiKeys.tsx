@@ -5,6 +5,7 @@ import { copyText, fmtRelative, useData } from '../lib/utils';
 import { CopyBlock } from '../pages/Settings';
 import { HelpLink } from './Shell';
 import { Badge, Button, Card, CardHeader, Empty, ErrorNote, Input, Select, Skeleton } from './ui';
+import { confirmDelete } from '../lib/confirm';
 
 /**
  * Settings → API keys: keys for the public API (`/api/v1`). A key works on
@@ -126,7 +127,7 @@ function KeyRow({ item, onRevoked }: { item: Key; onRevoked: () => void }) {
           size="sm"
           disabled={busy}
           onClick={() => {
-            if (!window.confirm(`Revoke “${item.name}”? Anything using it stops working within 30 seconds.`)) return;
+            if (!confirmDelete(`Revoke “${item.name}”?`, 'Anything using it stops working within 30 seconds.')) return;
             setBusy(true);
             api(`/keys/${item.id}`, { method: 'DELETE' }).then(onRevoked, (thrown: Error) => setError(thrown)).finally(() => setBusy(false));
           }}

@@ -324,7 +324,8 @@ Written by `helppuff deploy`. Safe to commit; holds no secrets.
 | --- | --- | --- | --- |
 | `cloudflare.accountId` | string |  | The Cloudflare account deployed to. |
 | `cloudflare.workerName` | string |  | The Worker's name. Default: knowtific-helppuff-<site>. |
-| `cloudflare.url` | string |  | Where the Worker answers. · URL |
+| `cloudflare.url` | string |  | Where the Worker answers on workers.dev. Always works, also with a custom domain. · URL |
+| `cloudflare.domain` | string |  | A custom domain the Worker also answers on, e.g. `chat.acme.com` (a zone on the same Cloudflare account). Set with `helppuff domain add`; the embed snippet, preview and dashboard links use it, and `helppuff deploy` attaches it again if it went missing. |
 | `cloudflare.kvNamespaceId` | string |  | The KV namespace (live config, new-conversation counters). |
 | `cloudflare.d1DatabaseId` | string |  | The D1 database (conversations, leads, knowledge). |
 | `cloudflare.vectorizeIndex` | string |  | The Vectorize index (knowledge vectors). |

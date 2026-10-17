@@ -54,6 +54,8 @@ type Envelope<T> = {
   result_info?: { page?: number; per_page?: number; total_count?: number; count?: number };
 };
 
+export type WorkerDomain = { id: string; hostname: string; service: string; zone_id: string; zone_name: string };
+
 export class CloudflareApi {
   constructor(
     private readonly token: string,
@@ -405,6 +407,25 @@ export class CloudflareApi {
       },
     });
     return out.result;
+  }
+
+  /** The custom domains a Worker answers on (Workers Custom Domains). */
+  async workerDomains(accountId: string, service: string): Promise<WorkerDomain[]> {
+    const out = await this.call<WorkerDomain[]>('GET', `/accounts/${accountId}/workers/domains?service=${encodeURIComponent(service)}`);
+    return (out.result ?? []).map((d) => ({ id: d.id, hostname: d.hostname, service: d.service, zone_id: d.zone_id, zone_name: d.zone_name }));
+  }
+
+  /** Point `hostname` at the Worker. Cloudflare makes the DNS record and the certificate; a hostname with a DNS record of its own is refused. */
+  async attachWorkerDomain(accountId: string, hostname: string, service: string, zone: { id: string; name: string } | null): Promise<WorkerDomain> {
+    const out = await this.call<WorkerDomain>('PUT', `/accounts/${accountId}/workers/domains`, {
+      json: { hostname, service, ...(zone ? { zone_id: zone.id, zone_name: zone.name } : {}) },
+    });
+    const d = out.result;
+    return { id: d.id, hostname: d.hostname, service: d.service, zone_id: d.zone_id, zone_name: d.zone_name };
+  }
+
+  async detachWorkerDomain(accountId: string, id: string): Promise<void> {
+    await this.call('DELETE', `/accounts/${accountId}/workers/domains/${encodeURIComponent(id)}`);
   }
 
   /** The zone that serves `host` on this account, trying parent domains too. */
