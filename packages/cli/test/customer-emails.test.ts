@@ -100,6 +100,6 @@ describe('Cloudflare Email Service', () => {
 
   it('compiles the customer emails into the live config', () => {
     const compiled = compile(project({ customerEmails: { replies: { enabled: true }, inbound: { domain: 'chat.acme.com', ruleId: 'r1' } } }));
-    expect(compiled.storedConfig['customerEmails']).toMatchObject({ copy: { enabled: false }, replies: { enabled: true }, inbound: { enabled: false, domain: 'chat.acme.com', ruleId: 'r1' } });
+    expect((compiled.storedConfig as Record<string, unknown>)['customerEmails']).toMatchObject({ copy: { enabled: false }, replies: { enabled: true }, inbound: { enabled: false, domain: 'chat.acme.com', ruleId: 'r1' } });
   });
 });
