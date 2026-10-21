@@ -9,6 +9,7 @@ import { runScheduledCrawls } from './knowledge/crawl.js';
 import { dbFrom, ensureSchema } from './db/d1.js';
 import { runScheduledBookings } from './bookings/cron.js';
 import { filesBucket, purgeOldChatFiles } from './files/store.js';
+import { handleInboundEmail, type InboundMessage } from './email/inbound.js';
 
 type Ctx = { waitUntil(promise: Promise<unknown>): void };
 
@@ -25,6 +26,34 @@ export function createWorker(config: HelpPuffConfig, extensions: Extensions = {}
   const app = createApp(config);
   return {
     fetch: app.fetch,
+    /**
+     * Answers by email (Customer emails): Cloudflare Email Routing hands the
+     * Worker mail sent to a site's reply address (`email/inbound.ts`).
+     */
+    async email(message: InboundMessage, env: Record<string, unknown>, ctx: Ctx): Promise<void> {
+      const log = envLog(env);
+      const db = dbFrom(env);
+      if (!db) {
+        message.setReject('Not set up');
+        return;
+      }
+      const kv = resilientKv(env['HELPPUFF_KV'] as KvStore | undefined, log);
+      await ensureSchema(db);
+      await handleInboundEmail(message, {
+        sites: async () => {
+          const sites: Record<string, SiteConfig> = {};
+          for (const id of Object.keys(config.sites)) sites[id] = await resolveSite({ config, platform: { kv, log } }, id);
+          return sites;
+        },
+        db,
+        env,
+        secret: typeof env['HELPPUFF_SECRET'] === 'string' ? env['HELPPUFF_SECRET'] : '',
+        now: () => Date.now(),
+        log,
+        waitUntil: (promise) => ctx.waitUntil(promise),
+        owner: typeof env['ADMIN_EMAIL'] === 'string' ? env['ADMIN_EMAIL'].toLowerCase() : undefined,
+      });
+    },
     /**
      * Every 15 minutes: re-crawls that are due (by each site's schedule),
      * then bookings (the synced calendars, reminders), then chat files past

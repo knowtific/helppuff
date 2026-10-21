@@ -6,7 +6,7 @@ import { ContactTagChip } from '../components/ContactTags';
 import { AttributesEditor, ConversationStatusBadge, LabelChip, LabelPicker, NotesPanel, SideSection, ToolData, useLabels, WaitingBadge } from '../components/inbox';
 import { RelatedAppointments } from '../components/Appointments';
 import { FileGrid } from '../components/Files';
-import { api, isMember, parseSummary, type ConversationDetail, type ConversationRow, type Me, type StoredFile, type StoredMessage, type Summary, type Team } from '../lib/api';
+import { api, isMember, parseSummary, type ConversationDetail, type ConversationRow, type Me, type ReplyByEmail, type StoredFile, type StoredMessage, type Summary, type Team } from '../lib/api';
 import { sendTyping, useLiveEvents } from '../lib/live';
 import { RelatedJobs } from './Jobs';
 import { cn, flag, fmtDateTime, fmtRelative, fmtTime, href, pathOf, useData, useDebounced, usePersisted } from '../lib/utils';
@@ -113,6 +113,11 @@ function Bubble({ message }: { message: StoredMessage }) {
       )}
       <span className="flex items-center gap-1.5 px-1 text-[10px] text-muted-foreground">
         {fmtTime(message.ts)}
+        {payload['via'] === 'email' && (
+          <span className="inline-flex items-center gap-0.5" title={typeof payload['from'] === 'string' ? `From another address: ${payload['from']}` : undefined}>
+            <Mail className="size-3" aria-hidden /> by email{typeof payload['from'] === 'string' ? ` from ${payload['from']}` : ''}
+          </span>
+        )}
         {message.feedback === 1 && (
           <span className="inline-flex items-center gap-0.5 text-foreground">
             <ThumbsUp className="size-3" aria-hidden /> Helpful
@@ -199,8 +204,17 @@ function SummaryCard({ id, stored, enabled, onDone }: { id: string; stored: Summ
 }
 
 /** The reply box of a live chat: Enter sends, Shift+Enter is a new line. */
-function Composer({ id, onSent, note }: { id: string; onSent: () => void; note: string | null }) {
+/** `s…@gmail.com`: enough to recognise, not the whole address on a shared screen. */
+const masked = (email: string) => {
+  const [local = '', domain = ''] = email.split('@');
+  return `${local.slice(0, 1)}…@${domain}`;
+};
+
+function Composer({ id, onSent, note, email, who }: { id: string; onSent: () => void; note: string | null; email: ReplyByEmail | undefined; who: string }) {
   const [text, setText] = useState('');
+  const [alsoEmail, setAlsoEmail] = useState(true);
+  // Customer emails: whether this reply also reaches them by email.
+  const emailed = email && !email.onSite && email.to && !email.unsubscribed;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const typing = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -210,7 +224,7 @@ function Composer({ id, onSent, note }: { id: string; onSent: () => void; note: 
     setBusy(true);
     setError(null);
     try {
-      await api(`/conversations/${id}/reply`, { method: 'POST', json: { text: value } });
+      await api(`/conversations/${id}/reply`, { method: 'POST', json: { text: value, ...(emailed && !alsoEmail ? { email: false } : {}) } });
       setText('');
       sendTyping(id, false);
       onSent();
@@ -229,6 +243,25 @@ function Composer({ id, onSent, note }: { id: string; onSent: () => void; note: 
       }}
     >
       {note && <p className="mb-2 text-xs text-muted-foreground">{note}</p>}
+      {email && !email.onSite && (
+        <p className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          {emailed ? (
+            <>
+              <span>
+                <Mail className="mr-1 inline size-3.5 align-[-2px]" aria-hidden />
+                {who} isn’t on the site: this reply will also be emailed to {masked(email.to!)}
+              </span>
+              <label className="inline-flex items-center gap-1.5 text-foreground">
+                <input type="checkbox" className="accent-[var(--primary)]" checked={alsoEmail} onChange={(e) => setAlsoEmail(e.target.checked)} /> Also email
+              </label>
+            </>
+          ) : email.unsubscribed ? (
+            <span>{who} unsubscribed from emails: they’ll see it only if they come back.</span>
+          ) : (
+            <span>No email for this visitor: they’ll see it only if they come back.</span>
+          )}
+        </p>
+      )}
       <div className="flex items-end gap-2">
         <Textarea
           rows={2}
@@ -365,6 +398,16 @@ function Detail({ id, me, team, onChanged }: { id: string; me: Me; team: Team | 
               <Lock /> Close
             </Button>
           )}
+          {lead?.email && (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={busy !== null}
+              onClick={() => window.confirm(`Email ${lead.email} a copy of this conversation?`) && void act('copy', 'email-copy')}
+            >
+              {busy === 'copy' ? <Loader2 className="animate-spin" /> : <Mail />} Email a copy
+            </Button>
+          )}
         </div>
       </div>
       {actionError && (
@@ -388,6 +431,8 @@ function Detail({ id, me, team, onChanged }: { id: string; me: Me; team: Team | 
             <Composer
               id={id}
               onSent={reload}
+              email={data.customerEmail}
+              who={lead?.name?.split(/\s+/)[0] ?? 'The visitor'}
               note={status === 'bot' ? 'The assistant is answering. Sending takes the chat over.' : status === 'closed' ? 'This chat is closed. Sending reopens it with you.' : null}
             />
           )}

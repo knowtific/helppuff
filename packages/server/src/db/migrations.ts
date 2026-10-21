@@ -813,6 +813,36 @@ export const MIGRATIONS: readonly Migration[] = [
       'CREATE INDEX IF NOT EXISTS files_site_scope ON files (site_id, scope, created_at)',
     ],
   },
+  {
+    id: 20,
+    name: 'customer_emails',
+    statements: [
+      // A contact who unsubscribed from emails (notifications/customer.ts): when, or NULL.
+      'ALTER TABLE leads ADD COLUMN email_off INTEGER',
+      // When the team's replies were last emailed to the customer (the `customer-reply` job).
+      'ALTER TABLE conversations ADD COLUMN emailed_at INTEGER',
+      // `request` (the owner's request) or `cloudflare` (the Worker's send_email binding, sending as `from_address`).
+      'ALTER TABLE email_service ADD COLUMN kind TEXT',
+      'ALTER TABLE email_service ADD COLUMN from_address TEXT',
+      // Every email to or from a customer: `copy`, `reply`, `test` sent; `inbound`, `inbound-test` received.
+      `CREATE TABLE IF NOT EXISTS customer_emails (
+        id TEXT PRIMARY KEY,
+        site_id TEXT NOT NULL,
+        conversation_id TEXT,
+        kind TEXT NOT NULL,
+        to_email TEXT,
+        status TEXT NOT NULL,
+        error TEXT,
+        message_id TEXT,
+        ref TEXT,
+        sent_at INTEGER NOT NULL
+      )`,
+      'CREATE INDEX IF NOT EXISTS customer_emails_site ON customer_emails (site_id, sent_at DESC)',
+      'CREATE INDEX IF NOT EXISTS customer_emails_conversation ON customer_emails (conversation_id, sent_at)',
+      'CREATE INDEX IF NOT EXISTS customer_emails_message ON customer_emails (message_id)',
+      'CREATE INDEX IF NOT EXISTS customer_emails_ref ON customer_emails (site_id, ref)',
+    ],
+  },
 ];
 
 export const LATEST_MIGRATION = MIGRATIONS[MIGRATIONS.length - 1]!.id;

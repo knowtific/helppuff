@@ -37,7 +37,7 @@ export type Erased = {
 const ids = (rows: { id: string }[]) => rows.map((r) => r.id);
 const marks = (list: unknown[]) => list.map(() => '?').join(', ');
 
-export async function eraseContact(c: Context<HonoEnv>, admin: Admin, lead: { id: string; site_id: string }): Promise<Erased> {
+export async function eraseContact(c: Context<HonoEnv>, admin: Admin, lead: { id: string; site_id: string; email?: string | null }): Promise<Erased> {
   const d = db(c);
   const ctx = c.get('helppuff');
   const bucket = filesBucket(ctx.env);
@@ -100,6 +100,8 @@ export async function eraseContact(c: Context<HonoEnv>, admin: Admin, lead: { id
     d.prepare('DELETE FROM callbacks WHERE lead_id = ?').bind(lead.id),
     d.prepare('DELETE FROM notes WHERE lead_id = ?').bind(lead.id),
     d.prepare('DELETE FROM lead_tags WHERE lead_id = ?').bind(lead.id),
+    // The emails to them that no conversation holds any more (tests aside, every one has one; this catches a typed address).
+    ...(lead.email ? [d.prepare('DELETE FROM customer_emails WHERE site_id = ? AND lower(to_email) = ?').bind(lead.site_id, lead.email.toLowerCase())] : []),
     d.prepare('DELETE FROM leads WHERE id = ?').bind(lead.id),
   ]);
 

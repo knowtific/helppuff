@@ -106,7 +106,7 @@ async function handleUpdate(c: Context<HonoEnv>, siteId: string, update: Telegra
     }
     case 'reply':
       try {
-        await sendAgentMessage(deps, site.live, { conversationId: incoming.conversationId, text: incoming.text, author: incoming.from, from: 'telegram' });
+        await sendAgentMessage(deps, site.live, { conversationId: incoming.conversationId, text: incoming.text, author: incoming.from, from: 'telegram', email: { site, siteId, send: true } });
       } catch (thrown) {
         if (thrown instanceof LiveError) await inThread(incoming.conversationId, `⚠️ Not sent: ${thrown.message}`);
       }

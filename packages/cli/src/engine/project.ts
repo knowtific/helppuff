@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
 import { widgetConfigSchema } from '@helppuff/protocol';
-import { assistantConfigSchema, bookingsConfigSchema, filesConfigSchema, liveConfigSchema, securitySchema } from '@helppuff/server';
+import { assistantConfigSchema, bookingsConfigSchema, customerEmailsSchema, filesConfigSchema, liveConfigSchema, securitySchema } from '@helppuff/server';
 import { workersAiOptionsSchema } from '@helppuff/connector-workers-ai';
 import { CliError } from '../errors.js';
 
@@ -414,6 +414,20 @@ export const projectSchema = z
     files: filesConfigSchema
       .default({})
       .describe('Photos and files on R2: visitors sending them in the chat (`chat`: `off`, `live` while a person has the chat, or `always`) and the team attaching them to jobs (`jobs`). Both off by default; `helppuff files` turns them on. Needs R2 on for the Cloudflare account (deploy makes the bucket).'),
+    customerEmails: customerEmailsSchema
+      .default({})
+      .describe('Emails to your customers, each off by default: a copy of the conversation (`copy`), the team\'s replies when they left (`replies`, needs live chat), and answers by email (`inbound`, set up by `helppuff email replies on <subdomain>`). They send through the email service (`helppuff email`). See the wiki\'s Customer emails page.'),
+    email: z
+      .object({
+        cloudflare: z
+          .object({ from: z.string().email().describe('The sender, on a domain onboarded for sending in Cloudflare Email Service.') })
+          .strict()
+          .optional()
+          .describe('Send with Cloudflare Email Service (the Worker\'s `send_email` binding) instead of a request. Set by `helppuff email set --cloudflare --from …`. Emailing customers (any address not verified in Cloudflare) needs Workers Paid.'),
+      })
+      .strict()
+      .default({})
+      .describe('How the Worker sends email, when it is not the request set with `helppuff email set` (stored on the Worker).'),
     leads: z
       .object({
         webhook: z

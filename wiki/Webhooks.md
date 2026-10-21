@@ -22,7 +22,7 @@ leads only; see [[Leads]].
 | Event | When | `data` |
 | --- | --- | --- |
 | `conversation.started` | A visitor opened a chat | `conversationId`, `page` `{url,title,referrer,utm}`, `locale`, `country`, `form` (pre-chat form fields or null), `firstMessage`, `data` (what [[tools|Tools]] returned before the chat, or null) |
-| `message.received` | A visitor sent a message (including the pre-chat form's message) | `conversationId`, `kind` (`text` or `action`), `text`, `action` `{id,value}` for a button or form |
+| `message.received` | A visitor sent a message (including the pre-chat form's message), in the chat or [[by email|Customer-Emails#answers-by-email]] | `conversationId`, `kind` (`text` or `action`), `text`, `action` `{id,value}` for a button or form; an answer by email has `channel: "email"`, `from` (who, or their other address) and `assignedTo` |
 | `message.sent` | The assistant replied, or a person on the team did (live chat) | `conversationId`, `text` (the reply as plain text), `messages` (the rich messages as the widget showed them), `author` `{kind: "human", id, name}` for a person's reply |
 | `lead.captured` | Contact details arrived: the form, typed in the chat, or found by the assistant | `conversationId`, `source` (`form`, `chat`, `ai`), `name`, `email`, `phone`, `fields` (custom form fields), `message` |
 | `callback.requested` | The visitor asked to be called back: the assistant requested it with the details it had, or the visitor sent the callback form. Sent with `lead.captured`; see [Callbacks](#callbacks) | `callbackId`, `conversationId`, `name`, `email`, `phone`, `message`, `requestedAt` |

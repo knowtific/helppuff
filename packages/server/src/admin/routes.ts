@@ -1,3 +1,4 @@
+import { customerEmailRoutes } from './customer-emails.js';
 import { Hono, type Context } from 'hono';
 import { cleanText } from '@helppuff/protocol';
 import { chatRoutes } from './chat.js';
@@ -39,7 +40,7 @@ import { filesOf, LINK_TTL_MS, signedFileUrl } from '../files/store.js';
 import { homeRoutes, maybeSuggestHome } from './home.js';
 import { assistantRoutes } from './assistant.js';
 import { contactTagRoutes, contactTagsSql, contactTagStatements, parseContactTags } from './contact-tags.js';
-import { liveAvailable } from '../live/service.js';
+import { liveAvailable, visitorConnected } from '../live/service.js';
 import { versionRoutes } from './version.js';
 import { dbFrom, ensureSchema, type D1Like } from '../db/d1.js';
 import { emit } from '../webhooks/deliver.js';
@@ -437,8 +438,25 @@ adminRoutes.get('/conversations/:id', async (c) => {
   await currentAdmin(c);
   const found = await loadConversation(db(c), c.req.param('id'), await closeCutoff(c));
   assertSiteAccess(c, found.conversation['site_id'], 'conversation');
-  return c.json(await withFileLinks(c, found));
+  return c.json({ ...(await withFileLinks(c, found)), customerEmail: await replyByEmail(c, found) });
 });
+
+/**
+ * What the reply box says about email (Customer emails): whether a reply is
+ * also emailed to a customer who left, to which address, and whether they
+ * are on the site now. Null when the site emails no replies.
+ */
+async function replyByEmail(c: Context<HonoEnv>, found: Awaited<ReturnType<typeof loadConversation>>) {
+  const ctx = c.get('helppuff');
+  const siteId = String(found.conversation['site_id']);
+  const emails = (await resolveSite(ctx, siteId)).customerEmails;
+  const lastVisitor = [...found.messages].reverse().find((m) => m.role === 'user');
+  const byEmail = (lastVisitor?.payload as { via?: unknown } | null)?.via === 'email';
+  const on = emails.replies.enabled || (emails.inbound.enabled && Boolean(emails.inbound.domain) && byEmail);
+  if (!on) return null;
+  const to = typeof found.lead?.['email'] === 'string' ? found.lead['email'] : null;
+  return { to, unsubscribed: Boolean(found.lead?.['email_off']), onSite: await visitorConnected(ctx.env, siteId, String(found.conversation['id'])), byEmail };
+}
 
 /** The photos and files in a transcript, each with a link signed now (stored references carry none). Removed ones lose theirs. */
 async function withFileLinks<T extends { conversation: Record<string, unknown>; messages: { payload: unknown }[] }>(c: Context<HonoEnv>, found: T): Promise<T> {
@@ -698,7 +716,7 @@ adminRoutes.delete('/leads/:id', async (c) => {
   const admin = await currentAdmin(c);
   const d = db(c);
   const id = c.req.param('id');
-  const lead = await d.prepare('SELECT id, site_id FROM leads WHERE id = ?').bind(id).first<{ id: string; site_id: string }>();
+  const lead = await d.prepare('SELECT id, site_id, email FROM leads WHERE id = ?').bind(id).first<{ id: string; site_id: string; email: string | null }>();
   if (!lead) throw new HelpPuffError('not_found', { message: 'No such lead.', detail: 'admin_lead_missing' });
   assertSiteAccess(c, lead.site_id, 'lead');
   const erased = await eraseContact(c, admin, lead);
@@ -860,6 +878,7 @@ adminRoutes.route('/', setupRoutes);
 adminRoutes.route('/', signInRoutes);
 adminRoutes.route('/', webhookRoutes);
 adminRoutes.route('/', notificationRoutes);
+adminRoutes.route('/', customerEmailRoutes);
 adminRoutes.route('/', toolRoutes);
 adminRoutes.route('/', agentRoutes);
 adminRoutes.route('/', identityRoutes);

@@ -486,7 +486,8 @@ const data = (await response.json()) as CreateLeadResponse;
       "name": "VIP",
       "color": "#eab308"
     }
-  ]
+  ],
+  "email_off": null
 }
 ```
 ```ts [Type]
@@ -513,6 +514,7 @@ type CreateLeadResponse = {
     name: string;
     color: string;
   }>;
+  email_off: string | null;
 };
 ```
 <!-- /tabs -->
@@ -581,6 +583,7 @@ const data = (await response.json()) as GetLeadResponse;
       "color": "#eab308"
     }
   ],
+  "email_off": null,
   "conversations": [
     {
       "id": "1b0f6a52-3c1e-4c55-9f0e-2d1c7a9e5b10",
@@ -662,6 +665,7 @@ type GetLeadResponse = {
     name: string;
     color: string;
   }>;
+  email_off: string | null;
   conversations: Array<{
     id: string;
     startedAt: number;
@@ -831,7 +835,8 @@ const data = (await response.json()) as UpdateLeadResponse;
       "name": "VIP",
       "color": "#eab308"
     }
-  ]
+  ],
+  "email_off": null
 }
 ```
 ```ts [Type]
@@ -858,6 +863,7 @@ type UpdateLeadResponse = {
     name: string;
     color: string;
   }>;
+  email_off: string | null;
 };
 ```
 <!-- /tabs -->

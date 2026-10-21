@@ -54,6 +54,7 @@ export function memoryHub() {
       fetch: async (url: string, init?: RequestInit) => {
         const path = new URL(url).pathname;
         if (path === '/presence') return Response.json(core.presence());
+        if (path === '/visitor') return Response.json({ connected: core.visitorConnected(new URL(url).searchParams.get('c') ?? '') });
         if (path === '/publish') {
           const event = JSON.parse(String(init?.body)) as HubEvent;
           events.push(event);

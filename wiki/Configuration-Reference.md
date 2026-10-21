@@ -76,6 +76,18 @@ variable, e.g. `{ "env": "OPENAI_API_KEY" }`, whose value lives in `.env` and on
 | `live.aiWhileWaiting` | boolean | `false` | Let the assistant keep answering until someone takes the chat. |
 | `bookings` | object | `{}` | Appointments: `mode` `none`, `link` (offer a booking page) or `picker` (a date picker in the chat; HelpPuff books, the assistant never does). Left out, a booking link found on the website is offered. With the picker, `sync` picks the calendar (keys in Settings → Integrations, `helppuff integrations`). `helppuff bookings` changes them. |
 | `files` | object | `{}` | Photos and files on R2: visitors sending them in the chat (`chat`: `off`, `live` while a person has the chat, or `always`) and the team attaching them to jobs (`jobs`). Both off by default; `helppuff files` turns them on. Needs R2 on for the Cloudflare account (deploy makes the bucket). |
+| `customerEmails` | object | `{}` | Emails to your customers, each off by default: a copy of the conversation (`copy`), the team's replies when they left (`replies`, needs live chat), and answers by email (`inbound`, set up by `helppuff email replies on <subdomain>`). They send through the email service (`helppuff email`). See the wiki's Customer emails page. |
+| `customerEmails.copy` | object | `{}` | A copy of the conversation (A). |
+| `customerEmails.copy.enabled` | boolean | `false` | When a chat ends, email the customer a short recap and the whole conversation. Anyone can type someone else's address, so that person gets the copy: the limits and the unsubscribe link keep it small. |
+| `customerEmails.replies` | object | `{}` | The team's replies, when the customer has left (B). |
+| `customerEmails.replies.enabled` | boolean | `false` | Email a reply from the team to a customer who is no longer on the site (needs live chat), with a link to continue the chat. Waits `security.limits.customerReplyDelaySeconds` first. |
+| `customerEmails.inbound` | object | `{}` | Answers by email (C). |
+| `customerEmails.inbound.enabled` | boolean | `false` | Customers answer by replying to the email: it lands in the same conversation as a live chat waiting for the team. Turns on only once `helppuff email replies on` set the address up and a test arrived. |
+| `customerEmails.inbound.domain` | string |  | The subdomain replies are received at, e.g. `chat.acme.com` (Cloudflare Email Routing). Set by `helppuff email replies on`. · ≤ 253 chars |
+| `customerEmails.inbound.ruleId` | string |  | The Email Routing rule that hands `reply@<domain>` to the Worker. Set by the CLI. · ≤ 64 chars |
+| `email` | object | `{}` | How the Worker sends email, when it is not the request set with `helppuff email set` (stored on the Worker). |
+| `email.cloudflare` | object |  | Send with Cloudflare Email Service (the Worker's `send_email` binding) instead of a request. Set by `helppuff email set --cloudflare --from …`. Emailing customers (any address not verified in Cloudflare) needs Workers Paid. |
+| `email.cloudflare.from` **(required)** | string |  | The sender, on a domain onboarded for sending in Cloudflare Email Service. · email |
 
 ## `backend`
 
@@ -297,6 +309,11 @@ Per-visitor and per-site limits. The daily cap is the cost backstop.
 | `security.limits.slotLookupsPerIpPerMinute` | integer | `30` | Times one visitor (IP) may load free times in the booking calendar a minute. · 1–600 |
 | `security.limits.bookingsPerIpPerHour` | integer | `5` | Appointments one visitor (IP) may book, move or cancel an hour, from the chat. · 1–100 |
 | `security.limits.uploadsPerIpPerHour` | integer | `20` | Photos and files one visitor (IP) may send an hour, when visitors can send files (`files.chat`). · 1–1000 |
+| `security.limits.customerReplyDelaySeconds` | integer | `120` | Seconds HelpPuff waits before emailing the team's replies to a customer who left (`customerEmails.replies`): back in time, they see them in the chat, and a burst is one email. 0 sends each at once. · 0–3600 |
+| `security.limits.customerEmailsPerContactPerDay` | integer | `5` | Emails one customer may get from HelpPuff a day (UTC): copies and the team's replies. · 1–100 |
+| `security.limits.customerEmailsPerSitePerDay` | integer | `200` | Emails to customers the site may send a day (UTC), all of them together. · 1–10000 |
+| `security.limits.inboundEmailsPerConversationPerDay` | integer | `20` | Email replies one conversation may receive a day (UTC), when customers can answer by email. Past it they are refused. · 1–500 |
+| `security.limits.inboundEmailsPerSitePerDay` | integer | `200` | Email replies the site may receive a day (UTC), all conversations together. · 1–10000 |
 
 ## `leads`
 

@@ -70,7 +70,7 @@ test('the owner connects an email service, chooses an email, and a new contact e
 
   await service.getByRole('button', { name: 'Send me a test' }).click();
   await expect(page.getByText(`Sent to ${OWNER.email}`)).toBeVisible();
-  const test = (await outbox(request)).find((s) => s.host === 'mail.e2e.test');
+  const test = (await outbox(request)).find((s) => s.host === 'mail.e2e.test' && s.body['subject'] === 'A test from HelpPuff');
   expect(test).toMatchObject({ method: 'POST', path: '/send', body: { to: OWNER.email, subject: 'A test from HelpPuff' } });
   expect(test!.headers['x-api-key']).toBe('e2e-mail-key');
 
@@ -91,8 +91,10 @@ test('the owner connects an email service, chooses an email, and a new contact e
 
   await request.delete(`${WORKER}/fake-llm/outbox`);
   expect((await admin(request, 'POST', '/leads', { site: 'demo', name: 'Ada Email', email: `ada.${RUN}@example.com`, phone: '0400 000 111' })).status()).toBe(201);
-  await expect.poll(async () => (await outbox(request)).filter((s) => s.host === 'mail.e2e.test').map((s) => [s.body['to'], s.body['subject']])).toEqual([[OWNER.email, 'New contact: Ada Email']]);
-  const email = (await outbox(request)).find((s) => s.host === 'mail.e2e.test')!;
+  // Only this contact's email: other files' contacts (live.spec.ts' customer emails) email the owner too.
+  const adas = async () => (await outbox(request)).filter((s) => s.host === 'mail.e2e.test' && s.body['subject'] === 'New contact: Ada Email');
+  await expect.poll(async () => (await adas()).map((s) => s.body['to'])).toEqual([OWNER.email]);
+  const email = (await adas())[0]!;
   expect(String(email.body['text'])).toContain('Phone: 0400 000 111');
   // Added over the API, so no conversation: the email links to the contacts.
   expect(String(email.body['text'])).toContain(`${WORKER}/admin/#/leads`);

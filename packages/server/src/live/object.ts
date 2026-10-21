@@ -45,6 +45,7 @@ export class LiveHub extends DurableObject<Env> {
     const url = new URL(request.url);
     if (url.pathname === '/socket') return this.accept(request);
     if (url.pathname === '/presence') return Response.json(this.core.presence());
+    if (url.pathname === '/visitor') return Response.json({ connected: this.core.visitorConnected(url.searchParams.get('c') ?? '') });
     if (url.pathname === '/publish' && request.method === 'POST') {
       await this.core.publish((await request.json()) as HubEvent);
       return new Response(null, { status: 204 });

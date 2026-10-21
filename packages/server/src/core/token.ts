@@ -173,3 +173,54 @@ function isPayload(value: unknown): value is SessionTokenPayload {
 export function newSessionId(): string {
   return crypto.randomUUID();
 }
+
+/**
+ * A small signed value for a link HelpPuff sends: `resume` (continue a chat
+ * from an email), `unsubscribe` (stop the emails). Base64url JSON, signed
+ * with HMAC-SHA256 over `<purpose>.<body>`, so one purpose's token is never
+ * another's. `exp` (ms) is checked when it is there.
+ */
+export async function signLink(secret: string, purpose: string, payload: Record<string, unknown>): Promise<string> {
+  assertSecret(secret);
+  const body = base64urlEncode(encoder.encode(JSON.stringify(payload)));
+  return `${body}.${await sign(secret, `${purpose}.${body}`)}`;
+}
+
+/** The payload of a link token, or null when it is malformed, signed for something else, or expired. */
+export async function openLink(secret: string, purpose: string, token: string, now = Date.now()): Promise<Record<string, unknown> | null> {
+  if (typeof secret !== 'string' || secret.length < MIN_SECRET_LENGTH || typeof token !== 'string' || token.length > 2000) return null;
+  const [body, signature, extra] = token.split('.');
+  if (!body || !signature || extra !== undefined) return null;
+  if (!timingSafeEqual(await sign(secret, `${purpose}.${body}`), signature)) return null;
+  try {
+    const payload = JSON.parse(decoder.decode(base64urlDecode(body))) as unknown;
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+    const exp = (payload as { exp?: unknown }).exp;
+    if (exp !== undefined && (typeof exp !== 'number' || exp <= now)) return null;
+    return payload as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/** HMAC-SHA256 of `data` as lowercase base32 (RFC 4648 letters), for short signatures inside email addresses. */
+export async function base32Mac(secret: string, data: string, length: number): Promise<string> {
+  assertSecret(secret);
+  const key = await importKey(secret);
+  const bytes = new Uint8Array(await crypto.subtle.sign('HMAC', key, encoder.encode(data)));
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz234567';
+  let bits = 0;
+  let value = 0;
+  let out = '';
+  for (const byte of bytes) {
+    value = (value << 8) | byte;
+    bits += 8;
+    while (bits >= 5 && out.length < length) {
+      out += alphabet[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+  return out;
+}
+
+export { timingSafeEqual };

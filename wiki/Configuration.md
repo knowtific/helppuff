@@ -135,8 +135,12 @@ Tried in this order:
    - Account › Account Settings › Read
    - Account › Workers R2 Storage › Edit (for [[photos and files|Files]]; optional)
    - Account › AI Search › Edit and Run (only for the Cloudflare AI Search backend)
+   - Zone › Zone › Read, Zone › DNS › Read, Zone › Email Routing Rules › Edit
+     and Zone › Zone Settings › Edit (only for [[answers by email|Customer-Emails#answers-by-email]]);
+     Zone › Email Sending › Edit (only for Cloudflare Email Service)
 2. **Your `wrangler login`**: its OAuth token already carries these scopes
-   (R2 included).
+   (R2 and the email ones included; a login from an older wrangler may lack
+   the email ones: run `npx wrangler login` again).
    HelpPuff reads it and lets wrangler refresh it.
 
 If the token can see several accounts, pass `--account-id` or set

@@ -8,6 +8,51 @@ never needs you to change anything. Upgrade with
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-21
+
+### Added
+
+- **Customer emails** (Settings → Customer emails, wiki Customer-Emails):
+  emails to your customers, three switches, each off until you turn it on.
+  - **The team's replies when the customer has left**: a reply from the
+    dashboard, Telegram or the API reaches a visitor who closed the tab, two
+    minutes later (`security.limits.customerReplyDelaySeconds`), unless they
+    came back. A burst of replies is one email. The reply box says who it
+    reaches, with **Also email** to untick.
+  - **Answers by email**: each email's Reply-To is the conversation's own
+    signed address; the answer lands in the conversation as a live chat
+    waiting for the team (the assistant never answers it). Received with
+    Cloudflare Email Routing on a subdomain, set up by `helppuff email
+    replies on chat.yourdomain.com` (never the domain itself, nor one that
+    receives mail elsewhere), with `status`, `test` and `off`. A new email,
+    **A customer answered by email**, for whoever has the chat.
+  - **A copy of the conversation** when it ends: a recap written to the
+    customer and the transcript, never the team's summary. Off by default,
+    with its risk on the card; **Email a copy** on a conversation sends one by
+    hand.
+  - Every email has **Continue the chat** (a signed link that opens that
+    conversation in the widget, 30 days) and an unsubscribe link with
+    one-click `List-Unsubscribe`; the contact page shows who unsubscribed,
+    and admins can allow them again. Daily limits per customer and per site,
+    and for answers by email, all in Settings → Advanced → More limits.
+  - The API's new **Customer emails** area (`/customer-emails/*`,
+    `POST /conversations/:id/email-copy`, `POST /leads/:id/emails`), and
+    `channel: "email"` on `message.received`.
+- **Cloudflare Email Service** as a way to send email (Settings →
+  Notifications, `helppuff email set --cloudflare --from …`): no key, the
+  Worker's `send_email` binding. It onboards the domain for sending and
+  deploys. Emailing customers with it needs Workers Paid.
+- `{{email.replyTo}}` and `{{email.headers}}` (`{{email.headerList}}` for
+  Postmark) in the email service's request; the presets have them. An empty
+  one is left out of the request.
+
+### Changed
+
+- D1 migration 20: `customer_emails` (the log), `leads.email_off`,
+  `conversations.emailed_at`, `email_service.kind` and `from_address`.
+- New runtime dependency in the Worker: `postal-mime`, to read incoming email.
+- Settings → Advanced: a limit whose minimum is 0 can now be set to 0.
+
 ## [0.10.0] - 2026-10-17
 
 ### Added

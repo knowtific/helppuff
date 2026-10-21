@@ -151,6 +151,20 @@ export function Contact({ id, me }: { id: string; me: Me }) {
           <Card className="space-y-5 p-4">
             <SideSection title="Details">
               <DetailsForm key={`${data.id}-${data.updatedAt ?? 0}`} contact={data} onSaved={reload} />
+              {data.email_off ? (
+                <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  Unsubscribed from emails {fmtRelative(data.email_off)}
+                  {!member && (
+                    <button
+                      type="button"
+                      className="text-foreground underline underline-offset-2"
+                      onClick={() => window.confirm(`Email ${data.email} again? Only if they asked you to.`) && void api(`/leads/${id}/emails`, { method: 'POST', json: { allowed: true } }).then(reload)}
+                    >
+                      Allow again
+                    </button>
+                  )}
+                </p>
+              ) : null}
             </SideSection>
             <SideSection title="Attributes">
               <AttributesEditor

@@ -248,6 +248,19 @@ Endpoints that receive events as signed JSON, or as a request in their own forma
 - [[Remove the email service|API-Reference-Webhooks#remove-the-email-service]]: `DELETE /notifications/email`
 - [[Send a test email|API-Reference-Webhooks#send-a-test-email]]: `POST /notifications/email/test`
 
+### [[Customer emails|API-Reference-Customer-Emails]]
+
+Emails to your customers (Settings → Customer emails): what each switch still needs, the emails sent, copies by hand, unsubscribes, and the reply address customers answer to. The switches are settings (`customerEmails`).
+
+- [[What each switch needs|API-Reference-Customer-Emails#what-each-switch-needs]]: `GET /customer-emails/status`
+- [[Emails sent to customers|API-Reference-Customer-Emails#emails-sent-to-customers]]: `GET /customer-emails/log`
+- [[Preview an email|API-Reference-Customer-Emails#preview-an-email]]: `GET /customer-emails/preview`
+- [[Email a copy to the customer|API-Reference-Customer-Emails#email-a-copy-to-the-customer]]: `POST /conversations/:id/email-copy`
+- [[Add the reply-to field|API-Reference-Customer-Emails#add-the-reply-to-field]]: `POST /customer-emails/reply-to`
+- [[Set the reply address|API-Reference-Customer-Emails#set-the-reply-address]]: `PUT /customer-emails/inbound`
+- [[Test the reply address|API-Reference-Customer-Emails#test-the-reply-address]]: `POST /customer-emails/test`
+- [[Stop or allow emails to a contact|API-Reference-Customer-Emails#stop-or-allow-emails-to-a-contact]]: `POST /leads/:id/emails`
+
 ### [[Analytics|API-Reference-Analytics]]
 
 Totals, usage and the running version.

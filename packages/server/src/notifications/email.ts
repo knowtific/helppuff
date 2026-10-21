@@ -18,6 +18,9 @@ export const EMAIL_HEADER_PURPOSE = 'email-header';
 
 export type EmailServiceRow = {
   site_id: string;
+  /** `request` (null in older rows): the owner's request. `cloudflare`: the Worker's `send_email` binding (`EMAIL_BINDING`), as `from_address`. */
+  kind?: string | null;
+  from_address?: string | null;
   method: string;
   url: string;
   /** JSON headers, secret values sealed (`EMAIL_HEADER_PURPOSE`). */
@@ -33,9 +36,36 @@ export type EmailServiceRow = {
   updated_at: number;
 };
 
-export type Email = { subject: string; text: string; html: string };
+export type Email = {
+  subject: string;
+  text: string;
+  html: string;
+  /** Where replies go (customer emails): `{{email.replyTo}}`, or the binding's `replyTo`. */
+  replyTo?: string | undefined;
+  /** Extra headers (`List-Unsubscribe`, `In-Reply-To`): `{{email.headers}}`, or the binding's `headers`. */
+  headers?: Record<string, string> | undefined;
+};
 
-type Deps = { db: D1Like; fetch: typeof fetch; now?: () => number; log?: (event: string, data?: object) => void; secret?: string | undefined; owner?: string | undefined };
+/** Cloudflare Email Service's Workers binding (`send_email`), as much of it as HelpPuff uses. */
+export type EmailBinding = {
+  send(message: { to: string; from: string | { email: string; name?: string }; subject: string; text?: string; html?: string; replyTo?: string; headers?: Record<string, string> }): Promise<{ messageId?: string } | undefined>;
+};
+
+/** The binding's name in the Wrangler config (`helppuff email set --cloudflare`). */
+export const EMAIL_BINDING = 'HELPPUFF_EMAIL';
+
+export function emailBindingOf(env: Record<string, unknown>): EmailBinding | undefined {
+  const binding = env[EMAIL_BINDING] as Partial<EmailBinding> | undefined;
+  return binding && typeof binding.send === 'function' ? (binding as EmailBinding) : undefined;
+}
+
+/** How a site sends: its request, or Cloudflare's binding with a sender name. */
+export type Service = { kind: 'request'; spec: OutboundSpec; fetch: typeof fetch } | { kind: 'cloudflare'; binding: EmailBinding; from: string; name: string | null };
+
+/** What sending one email did; `messageId` when the service says (Cloudflare does), for threading replies. */
+export type SentEmail = Sent & { messageId?: string | undefined };
+
+type Deps = { db: D1Like; fetch: typeof fetch; now?: () => number; log?: (event: string, data?: object) => void; secret?: string | undefined; owner?: string | undefined; emailBinding?: EmailBinding | undefined };
 
 const TIMEOUT_MS = 10_000;
 const MEMO_MS = 30_000;
@@ -54,9 +84,10 @@ export async function emailService(db: D1Like, siteId: string, now: number): Pro
   return row;
 }
 
-/** Which email an event is, if it is one: a finished conversation rated hot is a "hot lead". */
+/** Which email an event is, if it is one: a finished conversation rated hot is a "hot lead", a message by email a customer's answer. */
 export function emailKind(type: WebhookEventType, data: Record<string, unknown>): EmailNotification | null {
   if (type === 'conversation.completed') return (data['labels'] as { leadQuality?: unknown } | undefined)?.leadQuality === 'hot' ? 'lead.hot' : null;
+  if (type === 'message.received') return data['channel'] === 'email' ? 'customer.replied' : null;
   // 'lead.hot' is not an event: only a finished conversation (above) is one.
   return isEmailNotification(type) ? type : null;
 }
@@ -115,6 +146,12 @@ export function writeEmail(kind: EmailNotification | 'test', data: Record<string
       subject = 'Nobody took a live chat in time';
       lines = ['A visitor waited for a person and was offered the callback form instead.'];
       break;
+    case 'customer.replied': {
+      const from = str(data['from']);
+      subject = `${from ? `${from} answered` : 'A customer answered'} by email`;
+      lines = [str(data['text']).slice(0, 2000), '', 'It waits in the conversation as a live chat: your answer is emailed to them.'];
+      break;
+    }
     case 'conversation.assigned': {
       const by = names[str(data['by'])] ?? '';
       subject = by ? `${by} gave you a conversation` : 'A conversation was given to you';
@@ -197,6 +234,8 @@ export async function recipients(db: D1Like, kind: EmailNotification, data: Reco
     if (!emailAllowed(kind, row.role === 'member' ? 'member' : 'admin')) return false;
     // A chat given to me: only to that person, and not when they took it themselves.
     if (kind === 'conversation.assigned') return data['assignedTo'] === row.email && data['by'] !== row.email;
+    // An answer by email: to whoever has the chat, when someone does.
+    if (kind === 'customer.replied' && typeof data['assignedTo'] === 'string' && data['assignedTo']) return data['assignedTo'] === row.email;
     return true;
   });
   return { to: to.map((r) => r.email), names };
@@ -210,13 +249,58 @@ export async function serviceSpec(row: EmailServiceRow, secret: string | undefin
   return { method, url: row.url, headers, body: row.body };
 }
 
-/** Send one email through the service: once, and again a moment later if trying again could help. */
-export async function sendEmail(fetcher: typeof fetch, spec: OutboundSpec, siteId: string, to: string, email: Email): Promise<Sent> {
-  const scope = { email: { to, ...email }, site: { id: siteId } };
-  const first = await sendOutbound(spec, scope, fetcher, { timeoutMs: TIMEOUT_MS, userAgent: 'HelpPuff-Email/1' });
+/** How the site sends, or what is wrong with it (said to the owner). */
+export async function serviceFor(row: EmailServiceRow, secret: string | undefined, binding: EmailBinding | undefined, fetcher: typeof fetch): Promise<Service | { problem: string }> {
+  if (row.kind === 'cloudflare') {
+    if (!binding) return { problem: 'This deployment has no Cloudflare Email Service binding: run `helppuff email set --cloudflare --from …` again (it deploys).' };
+    if (!row.from_address) return { problem: 'No sender address: run `helppuff email set --cloudflare --from …`.' };
+    return { kind: 'cloudflare', binding, from: row.from_address, name: null };
+  }
+  const spec = await serviceSpec(row, secret);
+  return spec ? { kind: 'request', spec, fetch: fetcher } : { problem: 'A secret header could not be read (HELPPUFF_SECRET changed): enter its value again.' };
+}
+
+/** Optional placeholders: an empty one leaves its field out of the request. */
+const OPTIONAL = new Set(['email.replyTo', 'email.headers', 'email.headerList']);
+
+async function sendOnce(service: Service, siteId: string, to: string, email: Email): Promise<SentEmail> {
+  if (service.kind === 'cloudflare') {
+    try {
+      const result = await service.binding.send({
+        to,
+        from: service.name ? { email: service.from, name: service.name } : service.from,
+        subject: email.subject,
+        text: email.text,
+        html: email.html,
+        ...(email.replyTo ? { replyTo: email.replyTo } : {}),
+        ...(email.headers && Object.keys(email.headers).length ? { headers: email.headers } : {}),
+      });
+      return { ok: true, status: 200, error: null, retryable: false, messageId: result?.messageId };
+    } catch (thrown) {
+      const code = String((thrown as { code?: unknown })?.code ?? '');
+      const message = String((thrown as Error)?.message ?? thrown).slice(0, 200);
+      return { ok: false, status: null, error: code ? `${code}: ${message}` : message, retryable: /RATE_LIMIT|INTERNAL|DELIVERY_FAILED/.test(code) };
+    }
+  }
+  const headers = email.headers ?? {};
+  const scope = {
+    email: { to, subject: email.subject, text: email.text, html: email.html, replyTo: email.replyTo ?? '', headers, headerList: Object.entries(headers).map(([Name, Value]) => ({ Name, Value })) },
+    site: { id: siteId },
+  };
+  return sendOutbound(service.spec, scope, service.fetch, { timeoutMs: TIMEOUT_MS, userAgent: 'HelpPuff-Email/1', render: { omitEmpty: (path) => OPTIONAL.has(path) } });
+}
+
+/** Send one email: once, and again a moment later if trying again could help. */
+export async function sendThrough(service: Service, siteId: string, to: string, email: Email): Promise<SentEmail> {
+  const first = await sendOnce(service, siteId, to, email);
   if (first.ok || !first.retryable) return first;
   await new Promise((resolve) => setTimeout(resolve, 1500));
-  return sendOutbound(spec, scope, fetcher, { timeoutMs: TIMEOUT_MS, userAgent: 'HelpPuff-Email/1' });
+  return sendOnce(service, siteId, to, email);
+}
+
+/** Send one email through a request (the older call, kept for the tools that use it). */
+export async function sendEmail(fetcher: typeof fetch, spec: OutboundSpec, siteId: string, to: string, email: Email): Promise<Sent> {
+  return sendThrough({ kind: 'request', spec, fetch: fetcher }, siteId, to, email);
 }
 
 export async function recordOutcome(db: D1Like, siteId: string, results: Sent[], at: number): Promise<void> {
@@ -239,13 +323,13 @@ export async function notifyByEmail(deps: Deps, siteId: string, type: WebhookEve
     if (!row?.enabled) return;
     const { to, names } = await recipients(deps.db, kind, data, deps.owner);
     if (!to.length) return;
-    const spec = await serviceSpec(row, deps.secret);
-    if (!spec) {
-      await recordOutcome(deps.db, siteId, [{ ok: false, status: null, error: 'A secret header could not be read (HELPPUFF_SECRET changed): enter its value again.', retryable: false }], now());
+    const service = await serviceFor(row, deps.secret, deps.emailBinding, deps.fetch);
+    if ('problem' in service) {
+      await recordOutcome(deps.db, siteId, [{ ok: false, status: null, error: service.problem, retryable: false }], now());
       return;
     }
     const email = writeEmail(kind, data, row.dashboard_url, names);
-    const results = await Promise.all(to.map((address) => sendEmail(deps.fetch, spec, siteId, address, email)));
+    const results = await Promise.all(to.map((address) => sendThrough(service, siteId, address, email)));
     await recordOutcome(deps.db, siteId, results, now());
     const failed = results.filter((r) => !r.ok);
     if (failed.length) deps.log?.('email.failed', { kind, status: failed[0]!.status, failed: failed.length });

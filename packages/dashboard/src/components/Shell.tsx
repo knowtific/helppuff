@@ -62,7 +62,7 @@ const ALL_NAV: {
 ];
 
 /** Settings, one page per topic; the sidebar opens them as a sub-menu. */
-export type SettingsSection = 'chat' | 'home' | 'appearance' | 'leads' | 'instructions' | 'agent' | 'business' | 'bookings' | 'advanced' | 'live' | 'labels' | 'contact_tags' | 'fields' | 'jobs' | 'notifications' | 'webhooks' | 'integrations' | 'api' | 'team' | 'updates';
+export type SettingsSection = 'chat' | 'home' | 'appearance' | 'leads' | 'instructions' | 'agent' | 'business' | 'bookings' | 'advanced' | 'live' | 'labels' | 'contact_tags' | 'fields' | 'jobs' | 'notifications' | 'customer_emails' | 'webhooks' | 'integrations' | 'api' | 'team' | 'updates';
 
 /** The Prompt page (the owner's prompt, its versions, and the site's tools) in the Settings menu, after Instructions. */
 export const PROMPT_LABEL = 'Prompt & tools';
@@ -73,7 +73,7 @@ export type SettingsGroup = { label: string; icon: ReactNode; items: SettingsLin
 const GROUPS: { label: string; icon: ReactNode; keys: string[] }[] = [
   { label: 'Assistant', icon: <Bot />, keys: ['instructions', 'prompt', 'knowledge', 'business', 'bookings', 'agent'] },
   { label: 'Widget', icon: <PanelsTopLeft />, keys: ['chat', 'home', 'appearance', 'leads'] },
-  { label: 'Inbox & CRM', icon: <Inbox />, keys: ['live', 'labels', 'contact_tags', 'fields', 'jobs', 'notifications'] },
+  { label: 'Inbox & CRM', icon: <Inbox />, keys: ['live', 'labels', 'contact_tags', 'fields', 'jobs', 'notifications', 'customer_emails'] },
   { label: 'System', icon: <Server />, keys: ['advanced', 'webhooks', 'integrations', 'api', 'team', 'updates'] },
 ];
 
@@ -136,6 +136,8 @@ export function settingsSections(site: Site | undefined, me?: Me): { id: Setting
     { id: 'fields' as const, label: 'Custom fields' },
     { id: 'jobs' as const, label: 'Jobs' },
     { id: 'notifications' as const, label: 'Notifications' },
+    // Admins only (members get Notifications alone, above).
+    { id: 'customer_emails' as const, label: 'Customer emails' },
     // Every site: photos and files and the limits apply whatever writes the answers; the model's settings show only for Workers AI.
     { id: 'advanced' as const, label: 'Advanced' },
     { id: 'webhooks' as const, label: 'Webhooks' },

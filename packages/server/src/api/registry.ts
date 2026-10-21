@@ -60,6 +60,7 @@ export const TAGS: { name: string; description: string }[] = [
   { name: 'Tools', description: 'Your own APIs, called before, during and after a chat (`{{name}}` in the prompt), and extract tools that save values from the finished conversation. What they return or save is kept on the conversation (`data`) and sent to webhooks.' },
   { name: 'Settings', description: 'The assistant, widget, lead form, limits and IP lists, as one object.' },
   { name: 'Webhooks', description: 'Endpoints that receive events as signed JSON, or as a request in their own format; and the email service that sends the team\'s email notifications.' },
+  { name: 'Customer emails', description: 'Emails to your customers (Settings → Customer emails): what each switch still needs, the emails sent, copies by hand, unsubscribes, and the reply address customers answer to. The switches are settings (`customerEmails`).' },
   { name: 'Analytics', description: 'Totals, usage and the running version.' },
   { name: 'Team', description: 'Who can sign in to the dashboard.' },
   { name: 'API keys', description: 'Keys for this API.' },
@@ -87,6 +88,7 @@ const leadRow = {
   address: null,
   attributes: { plan: 'pro' },
   tags: [{ id: 'ctag_vip', name: 'VIP', color: '#eab308' }],
+  email_off: null,
 };
 const labelRow = { id: 'lbl_3f2a1b0c9d8e', name: 'Urgent', color: '#ef4444', description: 'Needs an answer today', ai: true };
 const noteRow = { id: 'note_mfx2k1a9b3c4', conversationId, leadId, author: 'sam@acme.example', authorName: 'Sam', text: 'Called her back, booked for Tuesday.', createdAt: T, updatedAt: T };
@@ -134,6 +136,8 @@ const customWebhook = {
   body: '{"channel": "#sales", "text": "Call back {{data.name}} on {{data.phone}}: {{data.message}}"}',
 };
 const emailServiceView = {
+  kind: 'request',
+  from: null,
   method: 'POST',
   url: 'https://api.resend.com/emails',
   headers: [
@@ -261,6 +265,7 @@ const settings = {
     syncMinutes: 15,
   },
   files: { chat: 'live', jobs: true, maxChatMb: 10, maxJobMb: 25, perConversation: 10, keepChatDays: 90, aiSeesPhotos: false, visionModel: '@cf/meta/llama-4-scout-17b-16e-instruct' },
+  customerEmails: { copy: { enabled: false }, replies: { enabled: true }, inbound: { enabled: true, domain: 'chat.acme.example', ruleId: '8f3a2c1b9d0e4f5a6b7c8d9e0f1a2b3c' } },
 };
 const homeLinks = { title: 'Useful pages', items: [{ label: 'Prices', url: 'https://acme.example/prices', description: 'Callouts, drains and hot water' }, { label: 'Book a plumber', url: 'https://acme.example/book' }] };
 const stageRow = { id: 'stg_3f2a1b0c9d8e7f6a', name: 'New request', kind: 'open' };
@@ -479,7 +484,7 @@ export const ENDPOINTS: Endpoint[] = [
     scope: 'conversations:read',
     tag: 'Conversations',
     summary: 'Get a conversation',
-    description: 'The conversation (with its `status`, who has it, custom `attributes`, `data`: what the site\'s tools returned or saved, by tool name, and `user`: the signed-in visitor, verified, or null), its lead, callback requests, labels, the team\'s notes and every message both ways (a person\'s replies carry `author`).',
+    description: 'The conversation (with its `status`, who has it, custom `attributes`, `data`: what the site\'s tools returned or saved, by tool name, and `user`: the signed-in visitor, verified, or null), its lead, callback requests, labels, the team\'s notes and every message both ways (a person\'s replies carry `author`; a message that came by email has `payload.via: "email"`). `customerEmail`: when the site emails the team\'s replies (Customer emails), to which address, whether they unsubscribed and whether they are on the site now; null otherwise.',
     response: {
       conversation: {
         id: conversationId,
@@ -507,6 +512,7 @@ export const ENDPOINTS: Endpoint[] = [
         handover_at: null,
         waiting_since: null,
         closed_at: null,
+        emailed_at: null,
         attributes: { orderId: 'A-1042' },
         data: { order_status: { status: 'shipped', delivery: { date: '2026-10-12' } } },
         user: { id: 'u_8812', email: 'ada@example.com', plan: 'pro' },
@@ -519,8 +525,9 @@ export const ENDPOINTS: Endpoint[] = [
         { id: `${conversationId}:u1`, role: 'user', type: 'text', text: 'How much is a blocked drain?', payload: null, ts: T, feedback: null, author: null },
         { id: `${conversationId}:m_mfx2k1`, role: 'agent', type: 'text', text: 'Usually $180–$250.', payload: {}, ts: T + 1, feedback: 1, author: null },
       ],
+      customerEmail: { to: 'ada@example.com', unsubscribed: false, onSite: false, byEmail: false },
     },
-    nullable: ['user'],
+    nullable: ['user', 'customerEmail'],
   },
   {
     method: 'PATCH',
@@ -2181,6 +2188,7 @@ export const ENDPOINTS: Endpoint[] = [
     query: [siteQuery],
     response: {
       service: emailServiceView,
+      cloudflare: false,
       presets: [{ id: 'resend', name: 'Resend', docs: 'https://resend.com/docs/api-reference/emails/send-email', key: { header: 'Authorization', prefix: 'Bearer ', label: 'API key' }, request: { method: 'POST', url: 'https://api.resend.com/emails', headers: emailServiceView.headers.map(({ set: _set, ...h }) => h), body: emailServiceView.body } }],
     },
     nullable: ['service'],
@@ -2199,6 +2207,8 @@ export const ENDPOINTS: Endpoint[] = [
       { name: 'headers', description: 'A list of `{ name, value, secret }`; secret values are stored encrypted. An empty secret value keeps the stored one.' },
       { name: 'body', description: 'The body template. It must use `{{email.to}}` and `{{email.text}}` (or `{{email.html}}`) somewhere in the request.' },
       { name: 'enabled', description: 'false pauses every email.' },
+      { name: 'kind', description: '`cloudflare` sends with Cloudflare Email Service (the Worker\'s binding, added by `helppuff email set --cloudflare`) instead of a request; then only `from` is needed.' },
+      { name: 'from', description: 'With `kind: "cloudflare"`: the sender, on a domain onboarded for sending in Cloudflare.' },
     ],
     body: {
       url: 'https://api.resend.com/emails',
@@ -2209,6 +2219,7 @@ export const ENDPOINTS: Endpoint[] = [
       body: emailServiceView.body,
     },
     response: emailServiceView,
+    nullable: ['from'],
     errors: [{ status: 400, code: 'bad_request', when: 'The request has no `{{email.to}}` or no `{{email.text}}`/`{{email.html}}`.' }],
   },
   {
@@ -2231,6 +2242,105 @@ export const ENDPOINTS: Endpoint[] = [
     fields: [{ name: 'to', description: 'The address to send the test to.' }],
     body: { to: 'owner@acme.example' },
     response: { ok: true, status: 200, error: null, retryable: false, to: 'owner@acme.example' },
+  },
+  // ----------------------------------------------------------- customer emails
+  {
+    method: 'GET',
+    path: '/customer-emails/status',
+    scope: 'settings:read',
+    tag: 'Customer emails',
+    summary: 'What each switch needs',
+    description:
+      'The switches (`settings`), the email service (whether its request sends `{{email.replyTo}}`, and whether the dashboard can add it), live chat, and the reply address with when a test last arrived (`verifiedAt`). `ready` says which switches can work now: a copy needs a working service; the team\'s replies also live chat; answers by email also the reply address, a test that arrived and a request that sends `{{email.replyTo}}`.',
+    query: [siteQuery],
+    response: {
+      site: 'acme',
+      origin: 'https://acme.example',
+      settings: settings.customerEmails,
+      delaySeconds: 120,
+      service: { kind: 'request', name: 'Resend', from: null, enabled: true, sendsReplyTo: true, canAddReplyTo: false, lastStatus: 'ok', lastError: null },
+      live: true,
+      inbound: { domain: 'chat.acme.example', ruleId: '8f3a2c1b9d0e4f5a6b7c8d9e0f1a2b3c', verifiedAt: T, address: 'reply@chat.acme.example' },
+      ready: { copy: true, replies: true, inbound: true },
+    },
+    nullable: ['origin', 'service', 'domain', 'ruleId', 'verifiedAt', 'address', 'from', 'name', 'lastStatus', 'lastError'],
+  },
+  {
+    method: 'GET',
+    path: '/customer-emails/log',
+    scope: 'settings:read',
+    tag: 'Customer emails',
+    summary: 'Emails sent to customers',
+    description: 'Newest first: `copy`, `reply` and `test` sent; `inbound` (an answer by email) and `inbound-test` received. `status` is `ok`, `failed` (with `error`) or, for an answer from an address that is not the contact\'s, `other_sender`.',
+    query: [siteQuery, { name: 'limit', description: 'How many (1–100, default 20).' }],
+    response: { emails: [{ id: 'ce_3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c', conversationId, kind: 'reply', to: 'ada@example.com', status: 'ok', error: null, at: T }] },
+    nullable: ['conversationId', 'to', 'error'],
+  },
+  {
+    method: 'GET',
+    path: '/customer-emails/preview',
+    scope: 'settings:read',
+    tag: 'Customer emails',
+    summary: 'Preview an email',
+    description: 'What a customer gets, written from the site\'s names with a sample conversation: `kind` `copy` (the default) or `reply`.',
+    query: [siteQuery, { name: 'kind', description: '`copy` or `reply`.' }],
+    response: { subject: 'Sam from Acme Plumbing replied', text: 'You asked: Can someone come out tomorrow morning?\nSam: Yes, I can be there at 10am. Does that work?', html: '<div>…</div>' },
+  },
+  {
+    method: 'POST',
+    path: '/conversations/:id/email-copy',
+    scope: 'conversations:write',
+    tag: 'Customer emails',
+    summary: 'Email a copy to the customer',
+    description: 'Sends the customer a copy of this conversation now, whether or not copies are on. Still refused when they have no email, unsubscribed, or today\'s limits are used up.',
+    response: { status: 'sent', to: 'ada@example.com' },
+    errors: [{ status: 400, code: 'bad_request', when: 'No email service, no address, unsubscribed, a limit, or the service refused it (`message` says which).' }],
+  },
+  {
+    method: 'POST',
+    path: '/customer-emails/reply-to',
+    scope: 'settings:write',
+    tag: 'Customer emails',
+    summary: 'Add the reply-to field',
+    description: 'Adds where replies go (`{{email.replyTo}}`) and the extra headers (`{{email.headers}}`) to the email service\'s request, in its service\'s own field names. Only for a request made from a preset (Resend, Postmark, SendGrid, Brevo); a field already there is kept.',
+    query: [siteQuery],
+    response: { body: '{\n  "reply_to": "{{email.replyTo}}",\n  "headers": "{{email.headers}}",\n  "from": "Acme <hello@acme.example>"\n}' },
+  },
+  {
+    method: 'PUT',
+    path: '/customer-emails/inbound',
+    scope: 'settings:write',
+    tag: 'Customer emails',
+    summary: 'Set the reply address',
+    description: 'The subdomain customers\' answers are received at, and the Email Routing rule that hands them to the Worker. `helppuff email replies on` sets it after making the rule; `domain: null` removes it (and turns answers by email off). A new address turns answers by email off until a test arrives.',
+    fields: [
+      { name: 'domain', description: 'e.g. `chat.acme.example`, or null.', required: true },
+      { name: 'ruleId', description: 'The Email Routing rule\'s id.' },
+      { name: 'enabled', description: 'Turn answers by email on or off (on needs a test that arrived).' },
+    ],
+    body: { domain: 'chat.acme.example', ruleId: '8f3a2c1b9d0e4f5a6b7c8d9e0f1a2b3c' },
+    response: { site: 'acme', customerEmails: settings.customerEmails, settings, hash: '7d2a…' },
+  },
+  {
+    method: 'POST',
+    path: '/customer-emails/test',
+    scope: 'settings:write',
+    tag: 'Customer emails',
+    summary: 'Test the reply address',
+    description: 'Sends a test email to the reply address through the email service. When it arrives, `GET /customer-emails/status` shows `inbound.verifiedAt`; then answers by email can be turned on.',
+    query: [siteQuery],
+    response: { ok: true, status: 200, error: null, retryable: false, to: 'reply+test.k3f9a2qm4x@chat.acme.example' },
+  },
+  {
+    method: 'POST',
+    path: '/leads/:id/emails',
+    scope: 'leads:write',
+    tag: 'Customer emails',
+    summary: 'Stop or allow emails to a contact',
+    description: '`allowed: false` stops copies and replies by email to this contact (as their unsubscribe link does); `allowed: true` allows them again.',
+    fields: [{ name: 'allowed', description: 'true or false.', required: true }],
+    body: { allowed: true },
+    response: { id: leadId, emailOff: false },
   },
   // --------------------------------------------------------------------- team
   {

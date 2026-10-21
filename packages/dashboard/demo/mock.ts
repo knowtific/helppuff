@@ -85,6 +85,7 @@ let settings: Settings = {
   },
   live: { enabled: true, waitSeconds: 120, closeAfterMinutes: 60, showAgentName: true, aiWhileWaiting: false },
   files: { chat: 'live', jobs: true, maxChatMb: 10, maxJobMb: 25, perConversation: 10, keepChatDays: 90, aiSeesPhotos: false, visionModel: '@cf/meta/llama-4-scout-17b-16e-instruct' },
+  customerEmails: { copy: { enabled: false }, replies: { enabled: true }, inbound: { enabled: true, domain: 'chat.harbourplumbing.example', ruleId: 'demo-rule' } },
 };
 let prefs: Prefs = { available: true, notifyNewChat: true, notifyNewMessage: true, soundNewChat: true, soundNewMessage: true, sound: 'chime', volume: 0.7, repeatUntilTaken: false, emails: ['lead.hot', 'callback.requested', 'handover.requested'] };
 /** The email service, connected to Resend. Secret header values never come back, as on the Worker. */
@@ -475,6 +476,51 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
     }
     return json({ service: emailService, presets: EMAIL_PRESETS.map((p) => ({ id: p.id, name: p.name, docs: p.docs, key: p.key, request: p.request('you@yourdomain.com', '') })) });
   }
+  if (path === '/customer-emails/status') {
+    const emails = settings.customerEmails!;
+    const sends = Boolean(emailService?.enabled);
+    const replyTo = Boolean(emailService && /\{\{\s*email\.replyTo\s*\}\}/.test(emailService.body));
+    return json({
+      site: SITE.id,
+      origin: 'https://harbourplumbing.example',
+      settings: emails,
+      delaySeconds: 120,
+      service: emailService ? { kind: 'request', name: 'Resend', from: null, enabled: emailService.enabled, sendsReplyTo: replyTo, canAddReplyTo: !replyTo, lastStatus: emailService.lastStatus, lastError: null } : null,
+      live: Boolean(settings.live?.enabled),
+      inbound: { domain: emails.inbound.domain ?? null, ruleId: emails.inbound.ruleId ?? null, verifiedAt: emails.inbound.domain ? NOW - 2 * DAY : null, address: emails.inbound.domain ? `reply@${emails.inbound.domain}` : null },
+      ready: { copy: sends, replies: sends && Boolean(settings.live?.enabled), inbound: sends && replyTo && Boolean(settings.live?.enabled) && Boolean(emails.inbound.domain) },
+    });
+  }
+  if (path === '/customer-emails/log') {
+    const first = conversations.find((c) => c.leadEmail);
+    return json({
+      emails: [
+        { id: 'ce_3', conversationId: first?.id ?? null, kind: 'inbound', to: first?.leadEmail ?? 'sarah@example.com', status: 'ok', error: null, at: NOW - 2 * 3600_000 },
+        { id: 'ce_2', conversationId: first?.id ?? null, kind: 'reply', to: first?.leadEmail ?? 'sarah@example.com', status: 'ok', error: null, at: NOW - 5 * 3600_000 },
+        { id: 'ce_1', conversationId: null, kind: 'inbound-test', to: 'chat.harbourplumbing.example', status: 'ok', error: null, at: NOW - 2 * DAY },
+      ],
+    });
+  }
+  if (path === '/customer-emails/preview') {
+    return json(
+      params.get('kind') === 'reply'
+        ? { subject: `Dan from ${SITE.name} replied`, text: 'You asked: Can someone come out tomorrow morning?\nDan: Yes, I can be there at 10am. Does that work?\n\nContinue the chat, or just reply to this email.', html: '' }
+        : { subject: `Your conversation with ${SITE.name}`, text: 'You asked whether someone could come tomorrow. We said the team would confirm a time by email.\nYou: Can someone come out tomorrow morning?\nHarbour Plumbing: I’ll ask the team to confirm a time.', html: '' },
+    );
+  }
+  if (path === '/customer-emails/reply-to' && method === 'POST' && emailService) {
+    emailService = { ...emailService, body: emailService.body.replace(/\{/, '{\n  "reply_to": "{{email.replyTo}}",\n  "headers": "{{email.headers}}",') };
+    return json({ body: emailService.body });
+  }
+  if (head === 'conversations' && sub === 'email-copy' && method === 'POST') {
+    // Nothing leaves the browser in the demo.
+    return json({ status: 'sent', to: conversations.find((c) => c.id === id)?.leadEmail ?? null });
+  }
+  if (head === 'leads' && sub === 'emails' && method === 'POST') {
+    const lead = leads.find((l) => l.id === id);
+    if (lead) lead.email_off = body['allowed'] === false ? Date.now() : null;
+    return json({ id, emailOff: body['allowed'] === false });
+  }
   if (path === '/notifications/email/test') {
     // Nothing leaves the browser in the demo.
     return json({ ok: true, status: 200, error: null, retryable: false, to: OWNER });
@@ -714,6 +760,8 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
       labels: extras().labels,
       notes: extras().notes,
       messages: c.messages,
+      // The team's replies are emailed to customers who left (Customer emails, on in the demo).
+      customerEmail: settings.customerEmails?.replies.enabled ? { to: lead?.email ?? null, unsubscribed: Boolean(lead?.email_off), onSite: c.status === 'live' && !c.waitingSince, byEmail: false } : null,
     });
   }
 
@@ -798,7 +846,9 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
 
   if (path === '/settings') {
     if (method === 'PUT' && body['settings'] && typeof body['settings'] === 'object') {
-      settings = { ...settings, ...(body['settings'] as Partial<Settings>) };
+      const patch = body['settings'] as Partial<Settings>;
+      const emails = patch.customerEmails;
+      settings = { ...settings, ...patch, ...(emails ? { customerEmails: { ...settings.customerEmails!, ...Object.fromEntries(Object.entries(emails).map(([k, v]) => [k, { ...settings.customerEmails![k as keyof NonNullable<Settings['customerEmails']>], ...v }])) } } : {}) };
       settingsAt = Date.now();
     }
     if (method === 'PUT' && (body['settings'] as Partial<Settings> | undefined)?.home) homeSuggested = false;

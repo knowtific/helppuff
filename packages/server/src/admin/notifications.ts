@@ -4,7 +4,7 @@ import { HelpPuffError } from '../core/errors.js';
 import { headersView, sealHeaders, storedHeaders, validMethod, validOutboundUrl, type OutboundSpec } from '../core/outbound.js';
 import { requireSecret, type HonoEnv } from '../core/request.js';
 import { ensureSchema } from '../db/d1.js';
-import { EMAIL_HEADER_PURPOSE, emailService, forgetEmailService, recordOutcome, sendEmail, serviceSpec, writeEmail, type EmailServiceRow } from '../notifications/email.js';
+import { EMAIL_HEADER_PURPOSE, emailBindingOf, emailService, forgetEmailService, recordOutcome, sendThrough, serviceFor, writeEmail, type EmailServiceRow } from '../notifications/email.js';
 import { assertAdmin, assertSameOrigin, currentAdmin, db, jsonBody, siteParam } from './guard.js';
 
 /**
@@ -20,6 +20,9 @@ export const notificationRoutes = new Hono<HonoEnv>();
 const bad = (message: string, detail: string) => new HelpPuffError('bad_request', { message, detail });
 
 const view = (row: EmailServiceRow) => ({
+  /** `request` (the owner's request) or `cloudflare` (Cloudflare Email Service, the Worker's binding). */
+  kind: row.kind === 'cloudflare' ? 'cloudflare' : 'request',
+  from: row.from_address ?? null,
   method: row.method,
   url: row.url,
   headers: headersView(storedHeaders(row.headers)),
@@ -56,6 +59,8 @@ notificationRoutes.get('/notifications/email', async (c) => {
   const row = await db(c).prepare('SELECT * FROM email_service WHERE site_id = ?').bind(siteId).first<EmailServiceRow>();
   return c.json({
     service: row ? view(row) : null,
+    // Whether this deployment can send with Cloudflare Email Service (`helppuff email set --cloudflare` adds the binding).
+    cloudflare: Boolean(emailBindingOf(c.get('helppuff').env)),
     presets: EMAIL_PRESETS.map((p) => ({ id: p.id, name: p.name, docs: p.docs, key: p.key, request: p.request('you@yourdomain.com', '') })),
   });
 });
@@ -93,16 +98,26 @@ notificationRoutes.put('/notifications/email', async (c) => {
   const d = db(c);
   await ensureSchema(d);
   const was = await d.prepare('SELECT * FROM email_service WHERE site_id = ?').bind(siteId).first<EmailServiceRow>();
-  const draft = await validService(body, was ?? null, () => requireSecret(c.get('helppuff')));
   const enabled = typeof body['enabled'] === 'boolean' ? body['enabled'] : was ? Boolean(was.enabled) : true;
   const now = c.get('helppuff').platform.now();
+  // Cloudflare Email Service: no request, the Worker's binding sends as `from` (a domain onboarded for sending).
+  const cloudflare = body['kind'] === 'cloudflare' || (body['kind'] === undefined && was?.kind === 'cloudflare' && body['url'] === undefined);
+  let draft: Draft & { kind: string; from: string | null };
+  if (cloudflare) {
+    const from = typeof body['from'] === 'string' ? body['from'].trim().toLowerCase() : (was?.from_address ?? '');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(from) || from.length > 254) throw bad('Say which address sends (`from`), on a domain onboarded in Cloudflare Email Service.', 'email_from');
+    if (!emailBindingOf(c.get('helppuff').env)) throw bad('This deployment has no Cloudflare Email Service binding yet: run `helppuff email set --cloudflare --from …` (it deploys).', 'email_no_binding');
+    draft = { kind: 'cloudflare', from, method: 'POST', url: '', headers: '[]', body: '' };
+  } else {
+    draft = { kind: 'request', from: null, ...(await validService(body, was?.kind === 'cloudflare' ? null : (was ?? null), () => requireSecret(c.get('helppuff')))) };
+  }
   await d
     .prepare(
-      `INSERT INTO email_service (site_id, method, url, headers, body, enabled, dashboard_url, updated_by, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT (site_id) DO UPDATE SET method = excluded.method, url = excluded.url, headers = excluded.headers, body = excluded.body,
+      `INSERT INTO email_service (site_id, kind, from_address, method, url, headers, body, enabled, dashboard_url, updated_by, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT (site_id) DO UPDATE SET kind = excluded.kind, from_address = excluded.from_address, method = excluded.method, url = excluded.url, headers = excluded.headers, body = excluded.body,
          enabled = excluded.enabled, dashboard_url = excluded.dashboard_url, updated_by = excluded.updated_by, updated_at = excluded.updated_at`,
     )
-    .bind(siteId, draft.method, draft.url, draft.headers, draft.body, enabled ? 1 : 0, dashboardOf(c) ?? was?.dashboard_url ?? null, admin.email, now)
+    .bind(siteId, draft.kind, draft.from, draft.method, draft.url, draft.headers, draft.body, enabled ? 1 : 0, dashboardOf(c) ?? was?.dashboard_url ?? null, admin.email, now)
     .run();
   forgetEmailService(siteId);
   const row = (await d.prepare('SELECT * FROM email_service WHERE site_id = ?').bind(siteId).first<EmailServiceRow>())!;
@@ -139,11 +154,11 @@ notificationRoutes.post('/notifications/email/test', async (c) => {
   const draftGiven = ['url', 'headers', 'body', 'method'].some((k) => body[k] !== undefined);
   if (!was && !draftGiven) throw new HelpPuffError('not_found', { message: 'Set up the email service first.', detail: 'email_service_missing' });
   const row: EmailServiceRow = draftGiven
-    ? { ...(was ?? { site_id: siteId, enabled: 1, dashboard_url: null, last_status: null, last_error: null, last_at: null, updated_by: null, updated_at: 0 }), ...(await validService(body, was ?? null, () => requireSecret(ctx))) }
+    ? { ...(was ?? { site_id: siteId, enabled: 1, dashboard_url: null, last_status: null, last_error: null, last_at: null, updated_by: null, updated_at: 0 }), kind: 'request', ...(await validService(body, was?.kind === 'cloudflare' ? null : (was ?? null), () => requireSecret(ctx))) }
     : was!;
-  const spec = await serviceSpec(row, ctx.secret || undefined);
-  if (!spec) throw bad('A secret header could not be read (HELPPUFF_SECRET changed): enter its value again.', 'email_secret_unreadable');
-  const sent = await sendEmail(globalThis.fetch.bind(globalThis), spec, siteId, to, writeEmail('test', {}, dashboardOf(c)));
+  const service = await serviceFor(row, ctx.secret || undefined, emailBindingOf(ctx.env), globalThis.fetch.bind(globalThis));
+  if ('problem' in service) throw bad(service.problem, 'email_secret_unreadable');
+  const sent = await sendThrough(service, siteId, to, writeEmail('test', {}, dashboardOf(c)));
   if (!draftGiven) await recordOutcome(d, siteId, [sent], ctx.platform.now());
   return c.json({ ...sent, to });
 });

@@ -91,6 +91,11 @@ caps.
 | `limits.handoversPerIpPerDay` | 3 | Times one visitor asks for a person a day ([[Live chat|Live-Chat]]) | D1: the conversations they handed over | The callback form |
 | `limits.waitingPerSite` | 20 | Live chats waiting for someone to take them, at once | D1 | The callback form |
 | `limits.liveSocketsPerIp` | 3 | Live chat connections one visitor holds open (tabs) | The live chat hub | The connection is refused; the widget polls |
+| `limits.customerReplyDelaySeconds` | 120 | How long the team's replies wait before they are emailed to a customer who left ([[Customer emails|Customer-Emails]]); 0 sends at once | The Workflow's sleep | — |
+| `limits.customerEmailsPerContactPerDay` | 5 | Emails one customer gets a day: copies and replies | D1 `customer_emails` | Not sent (in the log) |
+| `limits.customerEmailsPerSitePerDay` | 200 | Customer emails a day, whole site | D1 `customer_emails` | Not sent |
+| `limits.inboundEmailsPerConversationPerDay` | 20 | Answers by email one conversation takes a day | D1 `customer_emails` | Refused with a reason |
+| `limits.inboundEmailsPerSitePerDay` | 200 | Answers by email a day, whole site | D1 `customer_emails` | Refused with a reason |
 | `sessionTtlHours` | 24 | How long a chat can be continued | The signed token's expiry | A new chat |
 | `allowIps` | none | Addresses or CIDR ranges exempt from the per-visitor limits | — | — |
 | `blockIps` | none | Addresses or CIDR ranges refused by the chat (not the dashboard) | — | 403, the widget hides |
@@ -369,6 +374,44 @@ through the widget's one Markdown renderer. In the assistant's history they
 are labelled as the team's, never placed in the system prompt. Roles: a
 **member** reaches only the routes the inbox needs (a fixed allowlist; any
 other route, including ones added later, is refused).
+
+## Customer emails
+
+[[Customer emails|Customer-Emails]] reach people outside the team, so each
+one is bounded and signed:
+
+- **The reply address** is `reply+<conversation>.<signature>@<subdomain>`:
+  the signature is the first 10 base32 characters of HMAC-SHA256 over the
+  site and conversation with `HELPPUFF_SECRET`. Without it, anyone could
+  guess a conversation id and write into someone else's conversation. A
+  wrong signature is refused (an SMTP reject, not a bounce from us), unless
+  the email answers one of ours: its `In-Reply-To`, or the tag in its subject
+  (`[#k3f9a2q]`, also an HMAC), finds the conversation when a mail system
+  dropped the `+` part. So anyone holding the email can answer it, as anyone
+  with its Continue the chat link can read it; it is marked when the sender
+  is not the contact.
+- **What is accepted:** only mail for a subdomain a site of this Worker set
+  up, handed over by Cloudflare Email Routing (one literal rule, never the
+  zone's catch-all). A failed DMARC check (`Authentication-Results`) is
+  refused; automatic mail is dropped and never answered (no loops). The
+  envelope sender is compared with the contact's address: another address is
+  kept but shown as such. Text over 1 MB is refused; attachments are not
+  kept. Nothing an email says reaches the assistant: a person answers.
+- **The resume link** (`#hp-resume=`, Continue the chat) is a token signed
+  for one site and one conversation, valid 30 days. The loader removes it
+  from the address at once; the server checks the site's origins and counts
+  it like a new chat (`sessionsPerIpPerHour`). Anyone with the link reads
+  that one conversation, as anyone with the email could.
+- **Unsubscribing** is a token signed for one site and one address (no
+  expiry). Opening the link only shows a button (link scanners open links);
+  the POST, or a mail app's one-click `List-Unsubscribe-Post`, stops copies
+  and replies by email for good, until an admin allows them again.
+- **What is in an email:** the visitor's and the answers' text, a recap
+  written to the customer, and the business's own contact details. Never the
+  team's summary, lead rating, labels, notes, attributes or tool data.
+- **The copy** can reach a stranger whose address someone typed: it is off
+  by default, says so on its card, asks to confirm, and is bounded by the
+  daily limits above. No IP address is in any email or the log.
 
 ## The public API
 

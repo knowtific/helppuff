@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext, type Browser, type Page } from '@playwright/test';
-import { agentMessages, composer, openWidget, send, startConversation, thread } from './helpers';
+import { agentMessages, composer, openWidget, panel, send, startConversation, thread } from './helpers';
 
 /**
  * Live chat end to end: a visitor's widget (on the fixture page) and the
@@ -323,4 +323,111 @@ test('photos during live chat: the paperclip shows once a person has the chat; t
   expect((await admin(request, 'PUT', '/settings', { settings: { files: { chat: 'off' } } })).status()).toBe(200);
   await page.context().close();
   await team.context().close();
+});
+
+/**
+ * Customer emails (the `emails` site): a visitor leaves, the team replies,
+ * the reply is emailed with the conversation's signed Reply-To and a
+ * Continue the chat link; the customer answers by email (handed to the
+ * Worker's email() by wrangler's local endpoint, as Email Routing hands it in
+ * production) and it lands in the conversation as a live chat waiting for the
+ * team; the link opens the chat again in the widget. Last in this file: the
+ * answer makes a waiting live chat, which the tests above would pick.
+ */
+const RUN = Date.now().toString(36);
+const EMAIL = `sarah.${RUN}@example.com`;
+type Sent = { host: string; body: Record<string, unknown> };
+type Detail = { conversation: { status: string; waiting_since: number | null }; messages: { role: string; text: string | null; payload: { via?: string } | null }[] };
+const api = (request: APIRequestContext, method: string, path: string, data?: unknown) =>
+  request.fetch(`${WORKER}/admin/api${path}`, { method, headers: { Authorization: `Bearer ${ADMIN_KEY}` }, ...(data === undefined ? {} : { data }) });
+const mail = async (request: APIRequestContext): Promise<Sent[]> => ((await (await request.get(`${WORKER}/fake-llm/outbox`)).json()) as Sent[]).filter((s) => s.host === 'mail.e2e.test');
+
+test('a reply reaches a customer who left, they answer by email, and the link opens the chat again', async ({ browser, request }) => {
+  // The site's email service: a request that sends where replies go.
+  const service = await api(request, 'PUT', '/notifications/email', {
+    site: 'emails',
+    url: 'https://mail.e2e.test/send',
+    headers: [
+      { name: 'Content-Type', value: 'application/json', secret: false },
+      { name: 'X-Api-Key', value: 'e2e-mail-key', secret: true },
+    ],
+    body: '{"to": "{{email.to}}", "subject": "{{email.subject}}", "text": "{{email.text}}", "reply_to": "{{email.replyTo}}", "headers": "{{email.headers}}"}',
+  });
+  expect(service.status()).toBe(200);
+
+  // A visitor asks, and leaves.
+  const started = await request.post(`${WORKER}/v1/sites/emails/sessions`, {
+    headers: { Origin: WORKER },
+    data: { lead: { name: 'Sarah', email: EMAIL }, context: { pageUrl: `${WORKER}/emails.html` }, firstMessage: 'My hot water tank is leaking, can someone come tomorrow?' },
+  });
+  expect(started.status()).toBe(200);
+  const { sessionId: id } = (await started.json()) as { sessionId: string };
+
+  // Mike replies from the dashboard: she is not on the site, so it is emailed (no wait on this site).
+  // The outbox is shared with notifications.spec.ts (which empties it): each email is found by its own address and text.
+  expect((await api(request, 'POST', `/conversations/${id}/reply`, { text: 'Yes, I can be there at 10am. Does that work?' })).status()).toBe(201);
+  let found: Record<string, unknown> | undefined;
+  const replied = async (text: string) => (await mail(request)).find((s) => s.body['to'] === EMAIL && String(s.body['text']).includes(text))?.body;
+  await expect.poll(async () => Boolean((found = await replied('Does that work?'))), { timeout: 20_000 }).toBe(true);
+  const email = found!;
+  expect(String(email['subject'])).toMatch(/replied \[#[a-z2-7]{7}\]$/);
+  expect(String(email['text'])).toContain('You asked: My hot water tank is leaking');
+  const replyTo = String(email['reply_to']);
+  expect(replyTo).toMatch(new RegExp(`^reply\\+${id}\\.[a-z2-7]{10}@chat\\.e2e\\.test$`));
+  expect((email['headers'] as Record<string, string>)['List-Unsubscribe']).toContain('/v1/email/unsubscribe?t=');
+
+  // She answers from her mail app.
+  const raw = [
+    `From: Sarah <${EMAIL}>`,
+    `To: ${replyTo}`,
+    `Subject: Re: ${String(email['subject'])}`,
+    `Message-ID: <answer.${RUN}@example.com>`,
+    `Date: ${new Date().toUTCString()}`,
+    'Content-Type: text/plain; charset=utf-8',
+    '',
+    '10am is perfect, thank you!',
+    '',
+    `On ${new Date().toDateString()}, Acme Plumbing <${replyTo}> wrote:`,
+    '> Yes, I can be there at 10am. Does that work?',
+    '',
+  ].join('\r\n');
+  const delivered = await request.post(`${WORKER}/cdn-cgi/local/email?from=${encodeURIComponent(EMAIL)}&to=${encodeURIComponent(replyTo)}`, { headers: { 'Content-Type': 'message/rfc822' }, data: raw });
+  expect(delivered.status(), await delivered.text()).toBe(200);
+  await expect
+    .poll(async () => {
+      const detail = (await (await api(request, 'GET', `/conversations/${id}`)).json()) as Detail;
+      return detail.messages.filter((m) => m.payload?.via === 'email').map((m) => m.text);
+    })
+    .toEqual(['10am is perfect, thank you!']);
+  const detail = (await (await api(request, 'GET', `/conversations/${id}`)).json()) as Detail;
+  expect(detail.conversation.status).toBe('live');
+  expect(detail.conversation.waiting_since).toBeGreaterThan(0);
+
+  // A guessed address (a forged signature, and no email of ours to answer) is refused.
+  const forged = replyTo.replace(/\.[a-z2-7]{10}@/, '.aaaaaaaaaa@');
+  const refused = await request.post(`${WORKER}/cdn-cgi/local/email?from=mallory%40example.com&to=${encodeURIComponent(forged)}`, {
+    headers: { 'Content-Type': 'message/rfc822' },
+    data: raw
+      .replace(`To: ${replyTo}`, `To: ${forged}`)
+      .replace(/^Subject: .*$/m, 'Subject: Let me in')
+      .replace(`<answer.${RUN}@`, `<forged.${RUN}@`)
+      .replace(`From: Sarah <${EMAIL}>`, 'From: mallory@example.com'),
+  });
+  expect(await refused.text()).toContain('Unknown conversation');
+
+  // The team answers in the dashboard; she gets that by email too, and the chat is closed (no waiting chat is left for the tests before).
+  expect((await api(request, 'POST', `/conversations/${id}/reply`, { text: 'Great, see you at 10.' })).status()).toBe(201);
+  await expect.poll(async () => Boolean(await replied('Great, see you at 10.'))).toBe(true);
+  expect((await api(request, 'POST', `/conversations/${id}/close`, {})).status()).toBe(200);
+
+  // Continue the chat: the link opens the widget on the conversation, the address cleaned up.
+  const link = /(http:\/\/localhost:8796\/emails\.html#hp-resume=[\w.-]+)/.exec(String(email['text']))![1]!;
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.goto(link);
+  await expect(panel(page)).toBeVisible();
+  await expect(thread(page)).toContainText('My hot water tank is leaking');
+  await expect(thread(page)).toContainText('Yes, I can be there at 10am.');
+  expect(new URL(page.url()).hash).toBe('');
+  await context.close();
 });

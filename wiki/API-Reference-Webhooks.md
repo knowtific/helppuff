@@ -545,6 +545,8 @@ const data = (await response.json()) as EmailServiceResponse;
 ```json [Example]
 {
   "service": {
+    "kind": "request",
+    "from": null,
     "method": "POST",
     "url": "https://api.resend.com/emails",
     "headers": [
@@ -570,6 +572,7 @@ const data = (await response.json()) as EmailServiceResponse;
     "updatedBy": "owner@acme.example",
     "updatedAt": 1760000000000
   },
+  "cloudflare": false,
   "presets": [
     {
       "id": "resend",
@@ -604,6 +607,8 @@ const data = (await response.json()) as EmailServiceResponse;
 ```ts [Type]
 type EmailServiceResponse = {
   service: {
+    kind: string;
+    from: string | null;
     method: string;
     url: string;
     headers: Array<{
@@ -621,6 +626,7 @@ type EmailServiceResponse = {
     updatedBy: string;
     updatedAt: number;
   };
+  cloudflare: boolean;
   presets: Array<{
     id: string;
     name: string;
@@ -658,6 +664,8 @@ One request that sends one email, for any service with a send API: HelpPuff writ
 | `headers` | no | A list of `{ name, value, secret }`; secret values are stored encrypted. An empty secret value keeps the stored one. |
 | `body` | no | The body template. It must use `{{email.to}}` and `{{email.text}}` (or `{{email.html}}`) somewhere in the request. |
 | `enabled` | no | false pauses every email. |
+| `kind` | no | `cloudflare` sends with Cloudflare Email Service (the Worker's binding, added by `helppuff email set --cloudflare`) instead of a request; then only `from` is needed. |
+| `from` | no | With `kind: "cloudflare"`: the sender, on a domain onboarded for sending in Cloudflare. |
 
 **Request**
 
@@ -705,6 +713,17 @@ type SetUpEmailServiceRequest = {
   body?: string;
   /** false pauses every email. */
   enabled?: string;
+  /**
+   * `cloudflare` sends with Cloudflare Email Service (the Worker's binding,
+   * added by `helppuff email set --cloudflare`) instead of a request; then
+   * only `from` is needed.
+   */
+  kind?: string;
+  /**
+   * With `kind: "cloudflare"`: the sender, on a domain onboarded for sending
+   * in Cloudflare.
+   */
+  from?: string;
 };
 
 const response = await fetch(`${process.env.HELPPUFF_URL}/api/v1/notifications/email`, {
@@ -740,6 +759,8 @@ const data = (await response.json()) as SetUpEmailServiceResponse;
 <!-- tabs -->
 ```json [Example]
 {
+  "kind": "request",
+  "from": null,
   "method": "POST",
   "url": "https://api.resend.com/emails",
   "headers": [
@@ -768,6 +789,8 @@ const data = (await response.json()) as SetUpEmailServiceResponse;
 ```
 ```ts [Type]
 type SetUpEmailServiceResponse = {
+  kind: string;
+  from: string | null;
   method: string;
   url: string;
   headers: Array<{

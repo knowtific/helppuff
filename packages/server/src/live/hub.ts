@@ -75,6 +75,13 @@ export type HubEvent =
   | { type: 'ended'; conversationId: string; status: 'left' | 'closed'; messages?: Message[] }
   /** A new job (from the chat, the quote questions, the API): an alert for the team, like a new live chat. */
   | { type: 'job'; jobId: string; number: number; title: string; who: string | null; source: string; conversationId?: undefined }
+  /**
+   * A customer answered by email (recorded): the conversation is a live chat
+   * waiting for the team. Unassigned, the team is alerted as for a new live
+   * chat; assigned, as for a message to that person. Tracked without a wait
+   * (no callback form for someone who is not on the site).
+   */
+  | { type: 'email'; siteId: string; conversationId: string; message: Message; conversation: Record<string, unknown>; assignedTo: string | null; who: string | null; settings: HubSettings }
   /** Anything else about a conversation the dashboards should reload (labels, attributes, notes). */
   | { type: 'changed'; conversationId: string };
 
@@ -111,6 +118,11 @@ export class HubCore {
 
   static agent(email: string, name: string | null, available: boolean): { tags: string[]; attachment: Attachment } {
     return { tags: [AGENT_TAG], attachment: { kind: 'agent', email, name, available } };
+  }
+
+  /** Whether the visitor has the conversation open now (a live socket on it): they see replies there. */
+  visitorConnected(conversationId: string): boolean {
+    return this.deps.sockets(visitorTag(conversationId)).length > 0;
   }
 
   /** Visitor sockets open from one IP (the `liveSocketsPerIp` limit). */
@@ -229,6 +241,15 @@ export class HubCore {
         for (const message of event.messages ?? []) this.toVisitor(event.conversationId, { t: 'msg', message });
         this.toVisitor(event.conversationId, { t: 'status', status: event.status });
         this.toAgents({ t: 'ended', conversationId: event.conversationId, status: event.status });
+        break;
+      }
+      case 'email': {
+        await this.deps.storage.put('settings', event.settings);
+        await this.deps.storage.put('site', event.siteId);
+        await this.deps.storage.put(key, { conversationId: event.conversationId, deadline: null, lastAt: now, assignedTo: event.assignedTo } satisfies Tracked);
+        if (event.assignedTo) this.toAgents({ t: 'message', conversationId: event.conversationId, message: event.message, assignedTo: event.assignedTo, who: event.who });
+        else this.toAgents({ t: 'handover', conversationId: event.conversationId, conversation: event.conversation });
+        this.toAgents({ t: 'changed', conversationId: event.conversationId });
         break;
       }
       case 'changed':

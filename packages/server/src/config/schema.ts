@@ -47,6 +47,11 @@ export const limitsSchema = z.object({
   slotLookupsPerIpPerMinute: z.number().int().min(1).max(600).default(30).describe('Times one visitor (IP) may load free times in the booking calendar a minute.'),
   bookingsPerIpPerHour: z.number().int().min(1).max(100).default(5).describe('Appointments one visitor (IP) may book, move or cancel an hour, from the chat.'),
   uploadsPerIpPerHour: z.number().int().min(1).max(1000).default(20).describe('Photos and files one visitor (IP) may send an hour, when visitors can send files (`files.chat`).'),
+  customerReplyDelaySeconds: z.number().int().min(0).max(3600).default(120).describe('Seconds HelpPuff waits before emailing the team\'s replies to a customer who left (`customerEmails.replies`): back in time, they see them in the chat, and a burst is one email. 0 sends each at once.'),
+  customerEmailsPerContactPerDay: z.number().int().min(1).max(100).default(5).describe('Emails one customer may get from HelpPuff a day (UTC): copies and the team\'s replies.'),
+  customerEmailsPerSitePerDay: z.number().int().min(1).max(10_000).default(200).describe('Emails to customers the site may send a day (UTC), all of them together.'),
+  inboundEmailsPerConversationPerDay: z.number().int().min(1).max(500).default(20).describe('Email replies one conversation may receive a day (UTC), when customers can answer by email. Past it they are refused.'),
+  inboundEmailsPerSitePerDay: z.number().int().min(1).max(10_000).default(200).describe('Email replies the site may receive a day (UTC), all conversations together.'),
 });
 export type Limits = z.infer<typeof limitsSchema>;
 
@@ -165,6 +170,37 @@ export const filesConfigSchema = z
   .strict();
 export type FilesConfig = z.infer<typeof filesConfigSchema>;
 
+/**
+ * Emails to customers (Settings → Customer emails, wiki Customer-Emails):
+ * each switch on its own, all off by default. They send through the site's
+ * email service (Settings → Notifications); answers by email arrive through
+ * Cloudflare Email Routing, set up by `helppuff email replies on`.
+ */
+export const customerEmailsSchema = z
+  .object({
+    copy: z
+      .object({ enabled: z.boolean().default(false).describe('When a chat ends, email the customer a short recap and the whole conversation. Anyone can type someone else\'s address, so that person gets the copy: the limits and the unsubscribe link keep it small.') })
+      .strict()
+      .default({})
+      .describe('A copy of the conversation (A).'),
+    replies: z
+      .object({ enabled: z.boolean().default(false).describe('Email a reply from the team to a customer who is no longer on the site (needs live chat), with a link to continue the chat. Waits `security.limits.customerReplyDelaySeconds` first.') })
+      .strict()
+      .default({})
+      .describe('The team\'s replies, when the customer has left (B).'),
+    inbound: z
+      .object({
+        enabled: z.boolean().default(false).describe('Customers answer by replying to the email: it lands in the same conversation as a live chat waiting for the team. Turns on only once `helppuff email replies on` set the address up and a test arrived.'),
+        domain: z.string().regex(/^[a-z0-9.-]+$/).max(253).optional().describe('The subdomain replies are received at, e.g. `chat.acme.com` (Cloudflare Email Routing). Set by `helppuff email replies on`.'),
+        ruleId: z.string().max(64).optional().describe('The Email Routing rule that hands `reply@<domain>` to the Worker. Set by the CLI.'),
+      })
+      .strict()
+      .default({})
+      .describe('Answers by email (C).'),
+  })
+  .strict();
+export type CustomerEmailsConfig = z.infer<typeof customerEmailsSchema>;
+
 /** `HH:MM-HH:MM`, 24-hour, local to the bookings time zone. */
 const hoursRange = z
   .string()
@@ -222,6 +258,7 @@ export const siteConfigSchema = z.object({
   live: liveConfigSchema.default({}),
   bookings: bookingsConfigSchema.default({}),
   files: filesConfigSchema.default({}),
+  customerEmails: customerEmailsSchema.default({}),
   /** Runtime only: the booking link learned from the website (`bookings/found.ts`), while `bookings.mode` is unset. Never configured. */
   bookingFound: z.object({ url: z.string().url(), provider: z.string().nullable(), page: z.string().nullable(), at: z.number() }).optional(),
 });
@@ -269,6 +306,7 @@ export const storedSiteConfigSchema = z
     live: liveConfigSchema.optional(),
     bookings: bookingsConfigSchema.optional(),
     files: filesConfigSchema.optional(),
+    customerEmails: customerEmailsSchema.optional(),
     prompt: promptMetaSchema.optional(),
     /** Retired: the instructions form's choices, from when it wrote them into the prompt. Read as `assistant` when that is missing. */
     profile: z.record(z.string(), z.unknown()).optional(),

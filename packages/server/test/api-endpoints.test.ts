@@ -424,6 +424,41 @@ describe('every area, end to end through /api/v1', () => {
     expectDocumented('DELETE', `/webhooks/${id}`, (await w.call('DELETE', `/webhooks/${id}`, key)).json);
   });
 
+  it('customer emails: the reply address, its test, the status, the log, a copy by hand and unsubscribing', async () => {
+    const w = await world({ live: { enabled: true } });
+    const writer = await w.key(['settings:write', 'webhooks:write']);
+    const reader = await w.key(['settings:read']);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 200 }));
+    const resend = findEndpoint('PUT', '/notifications/email')!.body as Json;
+    expect((await w.call('PUT', '/notifications/email', writer, resend)).status).toBe(200);
+    expectDocumented('POST', '/customer-emails/reply-to', (await w.call('POST', '/customer-emails/reply-to', writer, {})).json);
+    const inbound = await w.call('PUT', '/customer-emails/inbound', writer, { domain: 'chat.acme.example', ruleId: '8f3a2c1b9d0e4f5a6b7c8d9e0f1a2b3c' });
+    expectDocumented('PUT', '/customer-emails/inbound', inbound.json);
+    const tested = await w.call('POST', '/customer-emails/test', writer, {});
+    expect(tested.json['to']).toMatch(/^reply\+test\.[a-z2-7]{10}@chat\.acme\.example$/);
+    expectDocumented('POST', '/customer-emails/test', tested.json);
+    // As if the test arrived (email/inbound.ts records it).
+    w.db.raw.prepare("INSERT INTO customer_emails (id, site_id, kind, to_email, status, sent_at) VALUES ('t1', 'demo', 'inbound-test', 'chat.acme.example', 'ok', ?)").run(Date.now());
+    const status = await w.call('GET', '/customer-emails/status', reader);
+    // No live chat hub in this world: only the copy can work.
+    expect(status.json['ready']).toMatchObject({ copy: true, replies: false });
+    expectDocumented('GET', '/customer-emails/status', status.json);
+    expectDocumented('GET', '/customer-emails/log', (await w.call('GET', '/customer-emails/log', reader)).json);
+    expectDocumented('GET', '/customer-emails/preview', (await w.call('GET', '/customer-emails/preview?kind=reply', reader)).json);
+
+    const chat = await w.key(['chat']);
+    const id = (await w.call('POST', '/conversations', chat, { message: 'Can someone come tomorrow?', user: { id: 'u_1', email: 'ada@example.com', name: 'Ada' } })).json['id'] as string;
+    await w.call('POST', `/conversations/${id}/messages`, chat, { text: 'Morning is best' });
+    await w.settle();
+    const copy = await w.call('POST', `/conversations/${id}/email-copy`, await w.key(['conversations:write']), {});
+    expect(copy.status).toBe(200);
+    expectDocumented('POST', `/conversations/${id}/email-copy`, copy.json);
+    const lead = (w.db.raw.prepare("SELECT id FROM leads WHERE email = 'ada@example.com'").get() as { id: string }).id;
+    const off = await w.call('POST', `/leads/${lead}/emails`, await w.key(['leads:write']), { allowed: false });
+    expect(off.json).toEqual({ id: lead, emailOff: true });
+    expectDocumented('POST', `/leads/${lead}/emails`, off.json);
+  });
+
   it('tools: adds, lists, tests (remembering the keys), changes and removes; secrets never come back', async () => {
     const w = await world();
     const key = await w.key(['prompt:write']);

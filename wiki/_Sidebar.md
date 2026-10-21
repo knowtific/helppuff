@@ -39,6 +39,7 @@
 - [[Telegram]]
 - [[Webhooks]]
 - [[Email notifications|Email-Notifications]]
+- [[Customer emails|Customer-Emails]]
 
 **API**
 - [[The API (guide)|API]]
@@ -60,6 +61,7 @@
 - [[Tools|API-Reference-Tools]]
 - [[Settings|API-Reference-Settings]]
 - [[Webhooks|API-Reference-Webhooks]]
+- [[Customer emails|API-Reference-Customer-Emails]]
 - [[Analytics|API-Reference-Analytics]]
 - [[Team|API-Reference-Team]]
 - [[API keys|API-Reference-API-Keys]]

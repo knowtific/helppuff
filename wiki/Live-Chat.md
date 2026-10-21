@@ -67,6 +67,15 @@ Every status can be changed back, so a wrong click is one click to undo.
 Members (not admins) can take over and answer; giving a chat to someone else
 (the **Assigned to** menu) is for admins.
 
+### When the visitor has left
+
+A visitor who closed the tab never sees your reply, unless it is emailed to
+them: with [[Customer emails|Customer-Emails]] on, the reply box says *"Sarah
+isn't on the site: this reply will also be emailed to s…@gmail.com"*, and two
+minutes later they get it with **Continue the chat**. With answers by email,
+they can simply reply to that email: it lands here as a live chat waiting
+for you (the assistant never answers it), with a mail mark on the message.
+
 ## Statuses
 
 Every conversation has a status, and **Conversations** filters by it

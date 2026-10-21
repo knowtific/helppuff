@@ -49,6 +49,8 @@ writeFileSync(join(assets, 'models.html'), page('Models', '<main style="padding:
 writeFileSync(join(assets, 'tools.html'), page('Tools', '<main style="padding: 12vh 2rem"><h1>Acme Plumbing</h1></main><script src="/loader.js" data-site="tools" data-open async></script>'));
 // The `booking` site: the date picker in the chat (booking.spec.ts).
 writeFileSync(join(assets, 'booking.html'), page('Booking', '<main style="padding: 12vh 2rem"><h1>Harbour Physio</h1></main><script src="/loader.js" data-site="booking" data-open async></script>'));
+// The `emails` site: a chat continued from an email (customer-emails.spec.ts).
+writeFileSync(join(assets, 'emails.html'), page('Customer emails', '<main style="padding: 12vh 2rem"><h1>Acme Plumbing</h1></main><script src="/loader.js" data-site="emails" async></script>'));
 // The dashboard's Home: just the widget, open.
 writeFileSync(join(assets, 'chat.html'), page('Chat', '<script src="/loader.js" data-site="demo" data-open data-fill async></script>'));
 

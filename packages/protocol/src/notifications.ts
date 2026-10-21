@@ -9,6 +9,10 @@
  *   {{email.subject}}  the subject
  *   {{email.text}}     the plain-text body
  *   {{email.html}}     the same as HTML, everything escaped
+ *   {{email.replyTo}}  where replies go (customer emails, wiki Customer-Emails);
+ *                      a JSON field that is only this and comes out empty is left out
+ *   {{email.headers}}  extra headers as an object (`List-Unsubscribe`, `In-Reply-To`);
+ *                      {{email.headerList}} the same as [{ "Name", "Value" }]; left out when empty
  *
  * No provider's format is built in: the presets below only fill the form in.
  */
@@ -23,6 +27,7 @@ export const EMAIL_NOTIFICATIONS = {
   'handover.requested': { label: 'A visitor wants a person', description: 'Someone asked to talk to the team in live chat.' },
   'handover.missed': { label: 'A live chat nobody took', description: 'Nobody took a live chat in time; the visitor got the callback form.' },
   'conversation.assigned': { label: 'A chat given to me', description: 'Someone on the team gave you a conversation.' },
+  'customer.replied': { label: 'A customer answered by email', description: 'A customer replied to an email from you; it waits in the conversation as a live chat. To whoever has the chat, else to everyone who chose it.' },
   'job.created': { label: 'New job', description: 'A job was created: from the chat, the quote questions, the API or the dashboard.' },
   'appointment.created': { label: 'New booking', description: 'An appointment was booked.' },
   'appointment.cancelled': { label: 'Booking cancelled', description: 'An appointment was cancelled.' },
@@ -39,6 +44,16 @@ export const emailAllowed = (type: EmailNotification, role: 'owner' | 'admin' | 
 
 export type OutboundRequest = { method: ToolMethod; url: string; headers: ToolHeader[]; body: string };
 
+// Each service's names for where replies go and for extra headers, from its send API's docs.
+const RESEND_CUSTOMER = { reply_to: '{{email.replyTo}}', headers: '{{email.headers}}' };
+const POSTMARK_CUSTOMER = { ReplyTo: '{{email.replyTo}}', Headers: '{{email.headerList}}' };
+const SENDGRID_CUSTOMER = { reply_to: { email: '{{email.replyTo}}' }, headers: '{{email.headers}}' };
+const BREVO_CUSTOMER = { replyTo: { email: '{{email.replyTo}}' }, headers: '{{email.headers}}' };
+
+/** Emails HelpPuff sends to customers (Settings → Customer emails), as the log names them. */
+export const CUSTOMER_EMAIL_KINDS = ['copy', 'reply', 'test'] as const;
+export type CustomerEmailKind = (typeof CUSTOMER_EMAIL_KINDS)[number];
+
 /**
  * Starting points for well-known services, checked against their docs. They
  * fill the form in; the owner can change anything, so a service changing its
@@ -52,6 +67,12 @@ export const EMAIL_PRESETS: {
   key: { header: string; prefix: string; label: string };
   /** The sender: an address on a domain verified in the service. */
   request: (from: string, key: string) => OutboundRequest;
+  /**
+   * The body's fields for emails to customers: where replies go and the extra
+   * headers (`List-Unsubscribe`). In every new request; merged into an older
+   * one by Settings → Customer emails ("Add it for me", `customerFields`).
+   */
+  customer: Record<string, unknown>;
 }[] = [
   {
     id: 'resend',
@@ -65,8 +86,9 @@ export const EMAIL_PRESETS: {
         { name: 'Content-Type', value: 'application/json', secret: false },
         { name: 'Authorization', value: `Bearer ${key}`, secret: true },
       ],
-      body: JSON.stringify({ from, to: ['{{email.to}}'], subject: '{{email.subject}}', text: '{{email.text}}', html: '{{email.html}}' }, null, 2),
+      body: JSON.stringify({ from, to: ['{{email.to}}'], subject: '{{email.subject}}', text: '{{email.text}}', html: '{{email.html}}', ...RESEND_CUSTOMER }, null, 2),
     }),
+    customer: RESEND_CUSTOMER,
   },
   {
     id: 'postmark',
@@ -81,8 +103,9 @@ export const EMAIL_PRESETS: {
         { name: 'Accept', value: 'application/json', secret: false },
         { name: 'X-Postmark-Server-Token', value: key, secret: true },
       ],
-      body: JSON.stringify({ From: from, To: '{{email.to}}', Subject: '{{email.subject}}', TextBody: '{{email.text}}', HtmlBody: '{{email.html}}', MessageStream: 'outbound' }, null, 2),
+      body: JSON.stringify({ From: from, To: '{{email.to}}', Subject: '{{email.subject}}', TextBody: '{{email.text}}', HtmlBody: '{{email.html}}', MessageStream: 'outbound', ...POSTMARK_CUSTOMER }, null, 2),
     }),
+    customer: POSTMARK_CUSTOMER,
   },
   {
     id: 'sendgrid',
@@ -105,11 +128,13 @@ export const EMAIL_PRESETS: {
             { type: 'text/plain', value: '{{email.text}}' },
             { type: 'text/html', value: '{{email.html}}' },
           ],
+          ...SENDGRID_CUSTOMER,
         },
         null,
         2,
       ),
     }),
+    customer: SENDGRID_CUSTOMER,
   },
   {
     id: 'brevo',
@@ -124,7 +149,15 @@ export const EMAIL_PRESETS: {
         { name: 'Accept', value: 'application/json', secret: false },
         { name: 'api-key', value: key, secret: true },
       ],
-      body: JSON.stringify({ sender: { email: from, name: 'HelpPuff' }, to: [{ email: '{{email.to}}' }], subject: '{{email.subject}}', textContent: '{{email.text}}', htmlContent: '{{email.html}}' }, null, 2),
+      body: JSON.stringify({ sender: { email: from, name: 'HelpPuff' }, to: [{ email: '{{email.to}}' }], subject: '{{email.subject}}', textContent: '{{email.text}}', htmlContent: '{{email.html}}', ...BREVO_CUSTOMER }, null, 2),
     }),
+    customer: BREVO_CUSTOMER,
   },
 ];
+
+/** The preset a request was made from, by its address. */
+export const presetOf = (url: string) => EMAIL_PRESETS.find((p) => p.request('', '').url === url.trim());
+
+/** Whether a request sends where replies go: `{{email.replyTo}}` somewhere in it. */
+export const sendsReplyTo = (request: { url: string; body: string; headers: { value: string }[] }) =>
+  [request.url, request.body, ...request.headers.map((h) => h.value)].some((part) => /\{\{\s*email\.replyTo\s*\}\}/.test(part));

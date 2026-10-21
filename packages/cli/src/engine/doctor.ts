@@ -9,6 +9,7 @@ import { adminApi } from './admin-api.js';
 import { PROVIDER_KEYS } from './questions.js';
 import { embeddingModelFor, healthCheck } from './deploy.js';
 import { domainAnswers, publicUrl } from './domain.js';
+import { repliesState, SUBADDRESSING_PATH } from './email-replies.js';
 
 /**
  * Every check that explains "why isn't it working", each with the fix.
@@ -218,6 +219,27 @@ export async function doctor(cwd: string, doFetch: typeof fetch = fetch): Promis
           return { status: 'fail', detail: `on for ${on.join(' and ')}, but this deployment has no R2 bucket`, fix: 'turn on R2 once at https://dash.cloudflare.com/?to=/:account/r2/overview, then helppuff deploy' };
         }
         return { status: 'pass', detail: `on for ${on.join(' and ')}; R2 bucket bound` };
+      }),
+    );
+  }
+
+  const replies = project.customerEmails.inbound.domain;
+  if (replies && session) {
+    checks.push(
+      await attempt('answers by email', async () => {
+        const state = await repliesState(session.api, replies);
+        const worker = workerNameFor(project);
+        if (!state.rule) return { status: 'fail', detail: `no Email Routing rule for reply@${replies}`, fix: `helppuff email replies on ${replies}` };
+        if (state.rule.worker !== worker || !state.rule.enabled) return { status: 'fail', detail: `reply@${replies} goes to ${state.rule.worker ?? 'nothing'}${state.rule.enabled ? '' : ' (rule off)'}, not ${worker}`, fix: `helppuff email replies on ${replies}` };
+        if (!state.receiving) return { status: 'fail', detail: `${replies} does not receive mail at Cloudflare`, fix: `helppuff email replies on ${replies}` };
+        if (state.subaddressing === false) return { status: 'warn', detail: 'sub-addressing is off: reply+…@ addresses are dropped', fix: SUBADDRESSING_PATH };
+        let verified: number | null = null;
+        if (env['ADMIN_API_KEY']) {
+          const live = await adminApi(loaded!, { fetch: doFetch, env }).get<{ inbound: { verifiedAt: number | null } }>('/admin/api/customer-emails/status').catch(() => null);
+          verified = live?.inbound.verifiedAt ?? null;
+        }
+        if (!verified) return { status: 'warn', detail: `reply@${replies} → ${worker}; no test has arrived`, fix: 'helppuff email replies test' };
+        return { status: 'pass', detail: `reply@${replies} → ${worker}; last test arrived ${new Date(verified).toISOString()}` };
       }),
     );
   }

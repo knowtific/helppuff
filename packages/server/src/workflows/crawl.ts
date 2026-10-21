@@ -11,6 +11,9 @@ import { foundAfterLearning } from '../bookings/found.js';
 import { DEFAULT_CHAT_MODEL } from '../knowledge/env.js';
 import type { KvStore } from '@helppuff/connector-types';
 import { envLog, reasonOf } from '../core/log.js';
+import { runCustomerReplyJob, type CustomerReplyParams } from '../notifications/customer.js';
+import { emailBindingOf } from '../notifications/email.js';
+import { visitorConnected } from '../live/service.js';
 
 /**
  * The Worker's background jobs: one Cloudflare Workflow, so each job survives
@@ -23,14 +26,16 @@ import { envLog, reasonOf } from '../core/log.js';
  *  - a conversation's end (`runConversationJob`, `kind: 'conversation'`):
  *    summary, labels and `conversation.completed`;
  *  - a webhook delivery that failed (`runWebhookRetry`, `kind: 'webhook'`),
- *    retried over hours.
+ *    retried over hours;
+ *  - the team's replies to a customer who left, emailed a while later
+ *    (`runCustomerReplyJob`, `kind: 'customer-reply'`).
  *
  * The logic lives elsewhere and is tested against a fake step API; this
  * class only adapts the Workflows API. Imported only by the Worker entry:
  * `cloudflare:workers` exists nowhere else.
  */
 
-type Job = CrawlParams | FileParams | ConversationParams | WebhookRetryParams;
+type Job = CrawlParams | FileParams | ConversationParams | WebhookRetryParams | CustomerReplyParams;
 
 export class CrawlWorkflow extends WorkflowEntrypoint<Record<string, unknown>, Job> {
   override async run(event: Readonly<WorkflowEvent<Job>>, step: WorkflowStep): Promise<unknown> {
@@ -44,10 +49,17 @@ export class CrawlWorkflow extends WorkflowEntrypoint<Record<string, unknown>, J
     const fetcher = globalThis.fetch.bind(globalThis);
 
     // Jobs that need only the database: they run for every backend with a dashboard.
-    if ('kind' in payload && (payload.kind === 'conversation' || payload.kind === 'webhook')) {
+    if ('kind' in payload && (payload.kind === 'conversation' || payload.kind === 'webhook' || payload.kind === 'customer-reply')) {
       const db = dbFrom(this.env);
       if (!db) throw new Error('No D1 binding.');
       if (payload.kind === 'webhook') return runWebhookRetry(steps, { db, fetch: fetcher, secret: secretOf(this.env) }, payload);
+      if (payload.kind === 'customer-reply') {
+        return runCustomerReplyJob(
+          steps,
+          { db, fetch: fetcher, secret: secretOf(this.env), emailBinding: emailBindingOf(this.env), now: () => Date.now(), log, connected: (siteId, conversationId) => visitorConnected(this.env, siteId, conversationId) },
+          payload,
+        );
+      }
       const ai = this.env['AI'] as Partial<AiRunner> | undefined;
       // The site's own knowledge base, when it has one: what it covers is no question to answer.
       const known = knowledgeEnv(this.env);

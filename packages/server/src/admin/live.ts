@@ -49,11 +49,18 @@ liveRoutes.post('/conversations/:id/reply', async (c) => {
   assertSameOrigin(c);
   const admin = await currentAdmin(c);
   const id = c.req.param('id');
-  const site = await resolveSite(c.get('helppuff'), await conversationSite(c, id));
+  const siteId = await conversationSite(c, id);
+  const site = await resolveSite(c.get('helppuff'), siteId);
   if (!site.live.enabled) throw new HelpPuffError('bad_request', { message: 'Live chat is off: turn it on in Settings → Live chat.', detail: 'live_off' });
   const body = await jsonBody(c);
   try {
-    const message = await sendAgentMessage(deps(c), site.live, { conversationId: id, text: typeof body['text'] === 'string' ? body['text'] : '', author: authorOf(admin) });
+    // `email: false`: the reply box's Also email, unticked. Otherwise a customer who left gets it by email (Customer emails).
+    const message = await sendAgentMessage(deps(c), site.live, {
+      conversationId: id,
+      text: typeof body['text'] === 'string' ? body['text'] : '',
+      author: authorOf(admin),
+      email: { site, siteId, send: body['email'] !== false },
+    });
     return c.json(message, 201);
   } catch (thrown) {
     rethrow(thrown);

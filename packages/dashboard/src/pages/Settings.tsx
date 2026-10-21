@@ -5,6 +5,7 @@ import { Avatar, Badge, Button, Card, CardHeader, Input, Select, Skeleton } from
 import { api, isMember, type Me, type Team as TeamList } from '../lib/api';
 import { LabelsSettings, LiveChatSettings, NotificationSettings } from '../components/LiveChat';
 import { EmailChoices, EmailServiceCard } from '../components/Notifications';
+import { CustomerEmails } from '../components/CustomerEmails';
 import { cn, copyText, fmtRelative, useData } from '../lib/utils';
 import { SettingsForm } from '../components/SettingsForm';
 import { InstructionsForm } from '../components/InstructionsForm';
@@ -25,6 +26,8 @@ import { confirmDelete } from '../lib/confirm';
 /** What to ask a coding agent, per page: it reads the settings with the CLI, asks, then changes them. */
 const AGENT_TOPICS: Partial<Record<SettingsSection | 'prompt' | 'knowledge', string>> = {
   prompt: 'Help me write my HelpPuff prompt and set up its tools. Read my website and the live prompt (helppuff prompt pull), ask me what visitors get wrong, what is quote-only, what is out of date on the site and which of my systems it should check, then publish it and test it with helppuff ask.',
+  customer_emails:
+    'Go through HelpPuff’s customer emails with me (Settings → Customer emails): read what is on with helppuff email show and helppuff email replies status, explain each of the three in plain words, including the risk of copies, ask which I want, set up what they need, and test them.',
   knowledge: 'Check what my HelpPuff assistant has learned. Look at failed and missing pages and its business details, ask me what is missing or wrong, then fix it (re-crawl, upload documents, add answers) and test it with helppuff ask.',
 };
 
@@ -112,6 +115,7 @@ const DESCRIPTIONS: Record<SettingsSection, string> = {
   fields: 'See and manage the data fields on conversations, contacts and jobs.',
   jobs: 'Requests, quotes and work: the stages they go through, what you need to know, and the quote questions on the widget.',
   notifications: 'The emails you get, and your own alerts for live chats. Everyone on the team chooses their own.',
+  customer_emails: 'Emails to your customers: your team’s replies when they left, their answers by email, and a copy of the conversation. Each one is off until you turn it on.',
   advanced: 'The model, how often your site is re-read, photos and files, rate limits, blocked IPs and sign-in protection.',
   webhooks: 'Send chats, messages, leads and callbacks to other tools as they happen.',
   api: 'Use HelpPuff from your own servers, as a backend: keys, the base URL and examples.',
@@ -135,6 +139,7 @@ const HELP: Record<SettingsSection, string> = {
   fields: 'Dashboard#custom-fields',
   jobs: 'Jobs',
   notifications: 'Email-Notifications',
+  customer_emails: 'Customer-Emails',
   advanced: 'AI-Models',
   webhooks: 'Webhooks',
   api: 'API',
@@ -195,6 +200,7 @@ export function Settings({ me, section }: { me: Me; section: string | undefined 
             )}
           </div>
         )}
+        {current.id === 'customer_emails' && <CustomerEmails />}
         {current.id === 'team' && <Team me={me} />}
         {current.id === 'updates' && <Updates />}
       </div>

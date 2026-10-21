@@ -6,7 +6,7 @@ import { c } from '../output.js';
 import { chat, type ChatTurn } from '../engine/chat.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { applySettings, bookingsConfigSchema, filesConfigSchema, helppuffConfigSchema, liveConfigSchema, securitySchema, settingsSchema, upgradeSettings, type Settings } from '@helppuff/server';
+import { applySettings, bookingsConfigSchema, customerEmailsSchema, filesConfigSchema, helppuffConfigSchema, liveConfigSchema, securitySchema, settingsSchema, upgradeSettings, type Settings } from '@helppuff/server';
 import { adminApi } from '../engine/admin-api.js';
 import { readState, writeState } from '../engine/state.js';
 import { compile, DEV_PORT, devOrigin, embedSnippet } from '../engine/compile.js';
@@ -268,7 +268,9 @@ type LiveSettings = { settings: Settings; hash: string; connector: string; meta:
 export function pullSettings(loaded: LoadedProject, live: Settings): LoadedProject {
   const compiled = compile(loaded);
   const site = helppuffConfigSchema.parse(compiled.serverConfig).sites[loaded.project.site]!;
-  const applied = applySettings(site, live);
+  // The reply address is the CLI's own (`helppuff email replies`): taken as it is live, below.
+  const { customerEmails: liveEmails, ...rest } = live;
+  const applied = applySettings(site, rest);
   return updateProject(loaded, (raw) => {
     const obj = (parent: Record<string, unknown>, key: string) => {
       if (typeof parent[key] !== 'object' || parent[key] === null || Array.isArray(parent[key])) parent[key] = {};
@@ -357,6 +359,12 @@ export function pullSettings(loaded: LoadedProject, live: Settings): LoadedProje
       const changed = Object.fromEntries(Object.entries(applied.files).filter(([key, v]) => v !== defaults[key as keyof typeof defaults]));
       if (Object.keys(changed).length) raw['files'] = changed;
       else delete raw['files'];
+    }
+    // Customer emails: the switches and the reply address, when any is set.
+    if (liveEmails) {
+      const emails = customerEmailsSchema.parse(liveEmails);
+      if (JSON.stringify(emails) !== JSON.stringify(customerEmailsSchema.parse({}))) raw['customerEmails'] = emails;
+      else delete raw['customerEmails'];
     }
     const knowledge = obj(raw, 'knowledge');
     if (knowledge['website'] !== false || live.crawl.schedule !== 'off') {

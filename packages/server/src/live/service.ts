@@ -7,6 +7,7 @@ import { emitTo, outboundOf, workflowRetry } from '../webhooks/deliver.js';
 import type { HubCore, HubEvent, HubSettings } from './hub.js';
 import { closeThread, openThread, postToThread, readTelegram, telegramReady, type Telegram } from './telegram.js';
 import { reasonOf } from '../core/log.js';
+import { startCustomerReply } from '../notifications/customer.js';
 
 /**
  * Live chat, the Worker's side: handing a visitor over to the team, the
@@ -88,7 +89,19 @@ export async function presence(env: Record<string, unknown>, siteId: string): Pr
   }
 }
 
-const hubSettings = (live: LiveConfig): HubSettings => ({ waitSeconds: live.waitSeconds, closeAfterMinutes: live.closeAfterMinutes });
+/** Whether the visitor has this conversation open now (the hub sees their socket). False without a hub. */
+export async function visitorConnected(env: Record<string, unknown>, siteId: string, conversationId: string): Promise<boolean> {
+  const hub = hubOf(env, siteId);
+  if (!hub) return false;
+  try {
+    const response = await hub.fetch(`${HUB_ORIGIN}/visitor?c=${encodeURIComponent(conversationId)}`);
+    return Boolean(((await response.json()) as { connected?: unknown }).connected);
+  } catch {
+    return false;
+  }
+}
+
+export const hubSettings = (live: LiveConfig): HubSettings => ({ waitSeconds: live.waitSeconds, closeAfterMinutes: live.closeAfterMinutes });
 
 // ----------------------------------------------------------------- messages
 
@@ -153,8 +166,31 @@ export async function messagesSince(db: D1Like, conversationId: string, after: n
     .all<{ id: string; role: string; type: string; payload: string | null; ts: number }>();
   return rows.results.flatMap((row) => {
     try {
-      const payload = row.payload ? (JSON.parse(row.payload) as Record<string, unknown>) : {};
+      // `noEmail` is the team's own mark (not emailed to the customer), never the visitor's to see.
+      const { noEmail: _noEmail, ...payload } = row.payload ? (JSON.parse(row.payload) as Record<string, unknown>) : {};
       return [{ ...payload, id: row.id.slice(conversationId.length + 1), ts: row.ts, role: row.role, type: row.type } as Message];
+    } catch {
+      return [];
+    }
+  });
+}
+
+/**
+ * The conversation as the visitor saw it, oldest first (the last `limit`):
+ * a chat continued from an email (`#hp-resume`) shows it again. The team's
+ * own marks stay behind.
+ */
+export async function visitorThread(db: D1Like, conversationId: string, limit = 60): Promise<Message[]> {
+  const rows = await db
+    .prepare('SELECT id, role, type, text, payload, ts FROM messages WHERE conversation_id = ? ORDER BY ts DESC, id DESC LIMIT ?')
+    .bind(conversationId, limit)
+    .all<{ id: string; role: string; type: string; text: string | null; payload: string | null; ts: number }>();
+  return rows.results.reverse().flatMap((row): Message[] => {
+    const id = row.id.slice(conversationId.length + 1).slice(0, 64) || row.id.slice(0, 64);
+    if (row.role === 'user') return row.text ? [{ id, ts: row.ts, role: 'user', type: 'text', text: row.text.slice(0, 8000) }] : [];
+    try {
+      const { noEmail: _noEmail, ...payload } = row.payload ? (JSON.parse(row.payload) as Record<string, unknown>) : {};
+      return [{ ...payload, id, ts: row.ts, role: row.role, type: row.type } as Message];
     } catch {
       return [];
     }
@@ -171,6 +207,12 @@ function emit(deps: LiveDeps, siteId: string, type: Parameters<typeof emitTo>[2]
 
 async function telegramOf(deps: LiveDeps, siteId: string): Promise<Telegram | null> {
   return deps.secret.length >= 32 ? readTelegram(deps.db, deps.secret, siteId) : null;
+}
+
+/** A line in the conversation's Telegram thread, when Telegram is linked and the thread exists. */
+export async function postToTelegram(deps: LiveDeps, siteId: string, conversationId: string, text: string): Promise<void> {
+  const telegram = await telegramOf(deps, siteId);
+  if (telegramReady(telegram)) await postToThread({ db: deps.db, fetch: deps.fetch, now: deps.now() }, telegram, siteId, conversationId, text);
 }
 
 // ----------------------------------------------------------------- handover
@@ -264,7 +306,7 @@ export async function startHandover(
 }
 
 /** What the team's notification shows: who, where, what they asked. */
-async function handoverCard(db: D1Like, conversationId: string): Promise<Record<string, unknown>> {
+export async function handoverCard(db: D1Like, conversationId: string): Promise<Record<string, unknown>> {
   const row = await db
     .prepare(
       `SELECT c.id, c.page_url AS pageUrl, c.first_message AS firstMessage, c.last_at AS lastAt, l.name AS leadName, l.email AS leadEmail, l.phone AS leadPhone
@@ -362,7 +404,14 @@ export class LiveError extends Error {
 export async function sendAgentMessage(
   deps: LiveDeps,
   live: LiveConfig,
-  input: { conversationId: string; text: string; author: Author; from?: 'dashboard' | 'telegram' },
+  input: {
+    conversationId: string;
+    text: string;
+    author: Author;
+    from?: 'dashboard' | 'telegram';
+    /** Emails to customers: the site, to email this reply to a customer who left (`startCustomerReply`). `send: false` is the reply box's unticked Also email. */
+    email?: { site: SiteConfig; siteId: string; send: boolean } | undefined;
+  },
 ): Promise<Message> {
   const text = cleanText(input.text, 'input').trim().slice(0, 4000);
   if (!text) throw new LiveError('empty', 'Write a message first.');
@@ -381,6 +430,7 @@ export async function sendAgentMessage(
   await deps.db.batch([
     ...messageStatements(deps.db, input.conversationId, joined, now - 1),
     ...messageStatements(deps.db, input.conversationId, [message], now, input.author.id),
+    ...(input.email && !input.email.send ? [deps.db.prepare("UPDATE messages SET payload = json_set(COALESCE(payload, '{}'), '$.noEmail', 1) WHERE id = ?").bind(`${input.conversationId}:${message.id}`)] : []),
     deps.db
       .prepare(
         `UPDATE conversations SET last_at = ?, message_count = message_count + 1, waiting_since = NULL, completed_at = NULL,
@@ -396,6 +446,7 @@ export async function sendAgentMessage(
       }
       await publish(deps, row.site_id, { type: 'agent', conversationId: input.conversationId, message, by: input.author.id });
       await emit(deps, row.site_id, 'message.sent', { conversationId: input.conversationId, text, messages: [message], author: { kind: 'human', id: input.author.id, name: input.author.name } });
+      if (input.email?.send) await startCustomerReply(deps, input.email.site, input.email.siteId, input.conversationId, now);
       if (input.from !== 'telegram') {
         const telegram = await telegramOf(deps, row.site_id);
         if (telegramReady(telegram)) await postToThread({ db: deps.db, fetch: deps.fetch, now }, telegram, row.site_id, input.conversationId, `💬 ${input.author.name ?? input.author.id}: ${text}`);

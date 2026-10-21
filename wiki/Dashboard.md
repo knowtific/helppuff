@@ -58,6 +58,10 @@ Beside each conversation:
   also set over the API.
 - **Notes**: private notes for the team. The visitor and the assistant never
   see them.
+- **Email a copy**: sends the customer a copy of the conversation now
+  ([[Customer emails|Customer-Emails#a-copy-of-the-conversation]]). With the
+  team's replies emailed, the reply box says whether yours reaches them by
+  email (**Also email**), and a message that came by email has a mail mark.
 
 ### Labels
 
@@ -113,6 +117,8 @@ new chat added to the contact they already have. Click one for their page:
 - **Notes**: the team's dated notes, with who wrote each.
 - **Conversations**: every chat, with its status and labels.
 - **History**: chats, callbacks and notes, newest first.
+- **Unsubscribed from emails**, when they used the link in a
+  [[customer email|Customer-Emails]]; an admin can **Allow again**.
 
 Jobs track the stages of each request or piece of work. Older contact status
 values are retained for API compatibility; non-default values become
@@ -191,7 +197,7 @@ each, which the per-visitor limits count by). The same numbers are in the API:
 Opens as a menu in the sidebar, in four groups: **Assistant** (Instructions,
 Prompt & tools, Knowledge, Business details, Bookings, Import & export),
 **Widget** (Chat, Home screen, Appearance, Lead form), **Inbox & CRM** (Live
-chat, Labels, Contact tags, Custom fields, Jobs, Notifications) and **System**
+chat, Labels, Contact tags, Custom fields, Jobs, Notifications, Customer emails) and **System**
 (Advanced, Webhooks, Integrations, API keys, Team & security, Updates). What each
 page is for is behind the (?) beside its title.
 
@@ -217,6 +223,7 @@ agent goes through that page with you and changes it through the same API
 | **Contact tags** | Categories for people, editable and filterable in Contacts; a person can have several |
 | **Custom fields** | Attribute keys on conversations and contacts, and the job field editor |
 | **Jobs** | The template (and **Let the AI choose again**), what a job is called, the stages, the fields, the widget's quote questions, and a `curl` to send jobs from other tools. See [[Jobs]] |
+| **Customer emails** | Emails to your customers, each off until you turn it on: your team's replies when they left, their answers by email, a copy of the conversation. Each card says what it still needs, with the command or an AI agent request. Admins only. See [[Customer emails|Customer-Emails]] |
 | **Notifications** | Your own: the emails you get (new contacts, hot leads, callbacks, a visitor waiting for a person, jobs, bookings), and with live chat on, browser notifications, sound and whether you are available. Everyone on the team sets their own; admins also connect the **email service** that sends them. See [[Email notifications|Email-Notifications]] |
 | **Advanced** | The AI model (see [[AI models|AI-Models]]), thinking (low, medium, high), "double-check answers before replying" (the reranker), how often the site is re-learned, time zone and language. **Photos and files**: visitors sending photos in the chat (off, during live chat, any time), files on jobs, whether the assistant sees photos, and their sizes and how long chat files are kept (see [[Photos and files|Files]]). **Limits and access**: every rate limit and cap, how long a chat lasts, IP addresses (or ranges) that are never limited or are blocked, and the sign-in limits and Turnstile on the sign-in form. See [[Security|Security#every-limit]] |
 | **Webhooks** | Endpoints that receive every event as signed JSON, or as your own request for a service with its own format (Slack, a CRM); see [[Webhooks]] |

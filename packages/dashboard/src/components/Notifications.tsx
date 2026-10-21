@@ -4,7 +4,8 @@ import { EMAIL_PRESETS } from '@helppuff/protocol/notifications';
 import { api, type EmailService, type NotificationsInfo, type Prefs } from '../lib/api';
 import { cn, fmtRelative, useData } from '../lib/utils';
 import { RequestEditor, type RequestDraft } from './RequestFields';
-import { WikiLink } from './Shell';
+import { HelpLink, WikiLink } from './Shell';
+import { AskAgent, CopyBlock } from '../pages/Settings';
 import { Badge, Button, Card, CardHeader, ErrorNote, Input, PasswordInput, Select, Skeleton } from './ui';
 import { confirmDelete } from '../lib/confirm';
 
@@ -96,7 +97,7 @@ function fromPreset(preset: string, from: string, key: string): RequestDraft {
 
 /** Admins: the one request that sends everyone's emails. */
 export function EmailServiceCard() {
-  const { data, error, loading, reload } = useData(() => api<{ service: EmailService | null }>('/notifications/email'), []);
+  const { data, error, loading, reload } = useData(() => api<{ service: EmailService | null; cloudflare?: boolean }>('/notifications/email'), []);
   const [editing, setEditing] = useState(false);
   if (error) return <ErrorNote error={error} onRetry={reload} />;
   if (loading && !data) return <Skeleton className="h-40" />;
@@ -114,6 +115,7 @@ export function EmailServiceCard() {
         ) : (
           <ServiceForm
             service={service}
+            cloudflare={Boolean(data?.cloudflare)}
             onSaved={() => {
               setEditing(false);
               reload();
@@ -149,13 +151,20 @@ function ServiceSummary({ service, onEdit, onChanged }: { service: EmailService;
   };
   return (
     <div className="space-y-3">
-      <p className="flex items-center gap-2 text-[13px]">
-        <Mail className="size-4 text-muted-foreground" aria-hidden />
-        <span className="font-mono text-xs">{service.method}</span>
-        <span className="min-w-0 truncate font-mono text-xs" title={service.url}>
-          {service.url}
-        </span>
-      </p>
+      {service.kind === 'cloudflare' ? (
+        <p className="flex items-center gap-2 text-[13px]">
+          <Mail className="size-4 text-muted-foreground" aria-hidden />
+          Cloudflare Email Service, from <span className="font-mono text-xs">{service.from}</span>
+        </p>
+      ) : (
+        <p className="flex items-center gap-2 text-[13px]">
+          <Mail className="size-4 text-muted-foreground" aria-hidden />
+          <span className="font-mono text-xs">{service.method}</span>
+          <span className="min-w-0 truncate font-mono text-xs" title={service.url}>
+            {service.url}
+          </span>
+        </p>
+      )}
       {service.lastAt && (
         <p className={cn('text-xs', service.lastStatus === 'failed' ? 'text-danger' : 'text-muted-foreground')}>
           Last email {fmtRelative(service.lastAt)}: {service.lastStatus === 'failed' ? `failed (${service.lastError ?? 'no answer'})` : 'sent'}
@@ -201,9 +210,11 @@ function ServiceSummary({ service, onEdit, onChanged }: { service: EmailService;
   );
 }
 
-function ServiceForm({ service, onSaved, onCancel }: { service: EmailService | null; onSaved: () => void; onCancel: (() => void) | undefined }) {
+function ServiceForm({ service, cloudflare, onSaved, onCancel }: { service: EmailService | null; cloudflare: boolean; onSaved: () => void; onCancel: (() => void) | undefined }) {
   const [draft, setDraft] = useState<Draft>(() =>
-    service
+    service?.kind === 'cloudflare'
+      ? { preset: 'cloudflare', from: service.from ?? '', key: '', advanced: false, request: blank() }
+      : service
       ? // The saved request as it is; named after the service it calls, when it is a known one.
         { preset: EMAIL_PRESETS.find((p) => p.request('', '').url === service.url)?.id ?? 'custom', from: '', key: '', advanced: true, request: { method: service.method, url: service.url, headers: service.headers, body: service.body } }
       : { preset: 'resend', from: '', key: '', advanced: false, request: fromPreset('resend', '', '') },
@@ -213,14 +224,17 @@ function ServiceForm({ service, onSaved, onCancel }: { service: EmailService | n
   const [tested, setTested] = useState<{ ok: boolean; status: number | null; error: string | null; to: string } | null>(null);
   const preset = EMAIL_PRESETS.find((p) => p.id === draft.preset);
   const request = draft.advanced || !preset ? draft.request : fromPreset(draft.preset, draft.from, draft.key);
-  const payload = () => ({ method: request.method, url: request.url, headers: request.headers.filter((h) => h.name.trim()).map(({ name, value, secret }) => ({ name, value, secret })), body: request.body });
-  const ready = preset && !draft.advanced ? Boolean(draft.from.trim() && (draft.key.trim() || service)) : Boolean(request.url.trim());
+  const viaCloudflare = draft.preset === 'cloudflare';
+  const payload = () =>
+    viaCloudflare ? { kind: 'cloudflare', from: draft.from.trim() } : { kind: 'request', method: request.method, url: request.url, headers: request.headers.filter((h) => h.name.trim()).map(({ name, value, secret }) => ({ name, value, secret })), body: request.body };
+  const ready = viaCloudflare ? cloudflare && Boolean(draft.from.trim()) : preset && !draft.advanced ? Boolean(draft.from.trim() && (draft.key.trim() || service)) : Boolean(request.url.trim());
   const go = async (what: 'save' | 'test') => {
     setBusy(what);
     setError(null);
     setTested(null);
     try {
-      if (what === 'test') setTested(await api('/notifications/email/test', { method: 'POST', json: payload() }));
+      // Cloudflare has nothing to try unsaved: it is tested once saved.
+      if (what === 'test') setTested(await api('/notifications/email/test', { method: 'POST', json: viaCloudflare ? {} : payload() }));
       else {
         await api('/notifications/email', { method: 'PUT', json: payload() });
         onSaved();
@@ -231,7 +245,7 @@ function ServiceForm({ service, onSaved, onCancel }: { service: EmailService | n
       setBusy(null);
     }
   };
-  const choose = (id: string) => setDraft({ ...draft, preset: id, advanced: id === 'custom', request: id === 'custom' ? (service ? draft.request : blank()) : fromPreset(id, draft.from, draft.key) });
+  const choose = (id: string) => setDraft({ ...draft, preset: id, advanced: id === 'custom', request: id === 'custom' ? (service ? draft.request : blank()) : id === 'cloudflare' ? blank() : fromPreset(id, draft.from, draft.key) });
   return (
     <form
       className="space-y-3"
@@ -248,9 +262,11 @@ function ServiceForm({ service, onSaved, onCancel }: { service: EmailService | n
               {p.name}
             </option>
           ))}
+          <option value="cloudflare">Cloudflare Email Service</option>
           <option value="custom">Another service (any send API)</option>
         </Select>
       </label>
+      {viaCloudflare && <CloudflarePanel ready={cloudflare} from={draft.from} onFrom={(from) => setDraft({ ...draft, from })} />}
       {preset && !draft.advanced && (
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block space-y-1.5">
@@ -277,8 +293,8 @@ function ServiceForm({ service, onSaved, onCancel }: { service: EmailService | n
           </a>
         </p>
       )}
-      {(draft.advanced || !preset) && <RequestEditor id="email-service" value={draft.request} onChange={(next) => setDraft({ ...draft, request: next })} values={VALUES} />}
-      {!preset && (
+      {!viaCloudflare && (draft.advanced || !preset) && <RequestEditor id="email-service" value={draft.request} onChange={(next) => setDraft({ ...draft, request: next })} values={VALUES} />}
+      {!preset && !viaCloudflare && (
         <p className="text-xs text-muted-foreground">
           Look up your service’s “send an email” API, and put its key in a secret header. <WikiLink page="Email-Notifications" className="underline underline-offset-2">How it works</WikiLink>
         </p>
@@ -295,7 +311,7 @@ function ServiceForm({ service, onSaved, onCancel }: { service: EmailService | n
             Cancel
           </Button>
         )}
-        <Button type="button" variant="outline" disabled={!ready || busy !== null} onClick={() => void go('test')}>
+        <Button type="button" variant="outline" disabled={!ready || busy !== null || (viaCloudflare && service?.kind !== 'cloudflare')} onClick={() => void go('test')}>
           {busy === 'test' ? <Loader2 className="animate-spin" /> : <Send />} Send me a test
         </Button>
         <Button type="submit" disabled={!ready || busy !== null}>
@@ -304,5 +320,35 @@ function ServiceForm({ service, onSaved, onCancel }: { service: EmailService | n
         </Button>
       </div>
     </form>
+  );
+}
+
+const CLOUDFLARE_REQUEST = 'Set up HelpPuff to send email with Cloudflare Email Service. Check my domain is on Cloudflare, pick a sending address with me (a subdomain like chat.mydomain.com is safest), run helppuff email set --cloudflare --from that address, then send me a test and tell me what happened.';
+
+/**
+ * Cloudflare Email Service: the Worker's binding, no key. It needs a deploy
+ * with the binding and a domain onboarded for sending, which the CLI does;
+ * until then, the steps instead of a form.
+ */
+function CloudflarePanel({ ready, from, onFrom }: { ready: boolean; from: string; onFrom: (from: string) => void }) {
+  if (ready) {
+    return (
+      <label className="block space-y-1.5">
+        <span className="block text-xs font-medium">Send from</span>
+        <Input type="email" placeholder="hello@chat.yourdomain.com" value={from} onChange={(e) => onFrom(e.target.value)} autoComplete="off" className="max-w-sm" />
+        <span className="block text-xs text-muted-foreground">On a domain onboarded for sending in Cloudflare. Emailing customers needs Workers Paid.</span>
+      </label>
+    );
+  }
+  return (
+    <div className="space-y-2 rounded-md border bg-subtle px-3 py-3 text-xs">
+      <p className="font-medium">Set it up from your project folder</p>
+      <p className="text-muted-foreground">Your domain must be on Cloudflare, in this account. The CLI onboards it for sending and deploys the binding.</p>
+      <CopyBlock text="npx @knowtific/helppuff email set --cloudflare --from hello@chat.yourdomain.com" label="command" />
+      <div className="flex flex-wrap items-center gap-3">
+        <AskAgent request={CLOUDFLARE_REQUEST} />
+        <HelpLink page="Email-Notifications#cloudflare-email-service" />
+      </div>
+    </div>
   );
 }

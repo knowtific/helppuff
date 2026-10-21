@@ -127,7 +127,7 @@ type ListConversationsResponse = {
 
 `GET /conversations/:id` · scope `conversations:read`
 
-The conversation (with its `status`, who has it, custom `attributes`, `data`: what the site's tools returned or saved, by tool name, and `user`: the signed-in visitor, verified, or null), its lead, callback requests, labels, the team's notes and every message both ways (a person's replies carry `author`).
+The conversation (with its `status`, who has it, custom `attributes`, `data`: what the site's tools returned or saved, by tool name, and `user`: the signed-in visitor, verified, or null), its lead, callback requests, labels, the team's notes and every message both ways (a person's replies carry `author`; a message that came by email has `payload.via: "email"`). `customerEmail`: when the site emails the team's replies (Customer emails), to which address, whether they unsubscribed and whether they are on the site now; null otherwise.
 
 | Parameter | In | Required | Description |
 | --- | --- | --- | --- |
@@ -183,6 +183,7 @@ const data = (await response.json()) as GetConversationResponse;
     "handover_at": null,
     "waiting_since": null,
     "closed_at": null,
+    "emailed_at": null,
     "attributes": {
       "orderId": "A-1042"
     },
@@ -224,7 +225,8 @@ const data = (await response.json()) as GetConversationResponse;
         "name": "VIP",
         "color": "#eab308"
       }
-    ]
+    ],
+    "email_off": null
   },
   "callbacks": [
     {
@@ -283,7 +285,13 @@ const data = (await response.json()) as GetConversationResponse;
       "feedback": 1,
       "author": null
     }
-  ]
+  ],
+  "customerEmail": {
+    "to": "ada@example.com",
+    "unsubscribed": false,
+    "onSite": false,
+    "byEmail": false
+  }
 }
 ```
 ```ts [Type]
@@ -314,6 +322,7 @@ type GetConversationResponse = {
     handover_at: number | null;
     waiting_since: string | null;
     closed_at: number | null;
+    emailed_at: number | null;
     attributes: {
       orderId: string;
     };
@@ -354,6 +363,7 @@ type GetConversationResponse = {
       name: string;
       color: string;
     }>;
+    email_off: string | null;
   };
   callbacks: Array<{
     id: string;
@@ -386,6 +396,12 @@ type GetConversationResponse = {
     updatedAt: number;
   }>;
   messages: Message[];
+  customerEmail: {
+    to: string;
+    unsubscribed: boolean;
+    onSite: boolean;
+    byEmail: boolean;
+  } | null;
 };
 ```
 <!-- /tabs -->

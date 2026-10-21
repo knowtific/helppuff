@@ -1,3 +1,4 @@
+import { removeReplies } from '../engine/email-replies.js';
 import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import * as p from '@clack/prompts';
@@ -75,6 +76,9 @@ export async function destroyCommand(ctx: Ctx): Promise<number> {
     }
   };
 
+  // Answers by email: the rule that hands them to this Worker (Email Routing stays on the subdomain).
+  const replies = project.customerEmails.inbound.domain;
+  if (replies) await attempt(`Email Routing rule reply@${replies}`, () => removeReplies(cf.api, replies, project.customerEmails.inbound.ruleId));
   await attempt(`Worker ${worker}`, () => cf.api.deleteWorker(cf.accountId, worker));
   await attempt(`Workflow ${worker}-crawl`, () => cf.api.deleteWorkflow(cf.accountId, `${worker}-crawl`.slice(0, 64)));
   const kvId = project.cloudflare.kvNamespaceId ?? (await cf.api.kvNamespaces(cf.accountId)).find((ns) => ns.title === name)?.id;

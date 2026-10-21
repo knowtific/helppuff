@@ -215,6 +215,45 @@ class Loader {
     void this.loadConfig();
   }
 
+  /**
+   * "Continue the chat" from an email (`#hp-resume=<token>`): the hash is
+   * removed at once, the server turns the token into the session, and it is
+   * saved where the app restores chats from (`app/persist.ts`, version 1), so
+   * the app opens on that conversation. Any failure: the widget starts as usual.
+   */
+  private async resumeFromLink(): Promise<boolean> {
+    let token: string;
+    try {
+      const match = /(?:^#|&)hp-resume=([A-Za-z0-9_.-]{20,1500})/.exec(location.hash);
+      if (!match) return false;
+      token = match[1]!;
+      const rest = location.hash.replace(match[0], match[0].startsWith('#') ? '#' : '').replace(/^#&/, '#');
+      history.replaceState(history.state, '', `${location.pathname}${location.search}${rest === '#' ? '' : rest}`);
+    } catch {
+      return false;
+    }
+    try {
+      const response = await fetch(`${this.apiBase}/v1/sites/${encodeURIComponent(this.siteId)}/sessions/resume`, {
+        method: 'POST',
+        credentials: 'omit',
+        mode: 'cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      });
+      if (!response.ok) return false;
+      const body = (await response.json()) as { sessionToken?: unknown; sessionId?: unknown; expiresAt?: unknown; messages?: unknown };
+      if (typeof body.sessionToken !== 'string' || typeof body.sessionId !== 'string' || typeof body.expiresAt !== 'number') return false;
+      localStorage.setItem(
+        `hp:${this.siteId}`,
+        JSON.stringify({ v: 1, sessionToken: body.sessionToken, sessionId: body.sessionId, expiresAt: body.expiresAt, messages: Array.isArray(body.messages) ? body.messages.slice(-60) : [], consumedActions: [], ui: { sound: false, teaserDismissed: true } }),
+      );
+      return true;
+    } catch (error) {
+      log('resume_failed', error);
+      return false;
+    }
+  }
+
   // ------------------------------------------------------------ public API
 
   /**
@@ -289,8 +328,9 @@ class Loader {
 
   private async loadConfig(): Promise<void> {
     let result: RawConfig;
+    let resumed: boolean;
     try {
-      result = await fetchConfig(this.apiBase, this.siteId);
+      [result, resumed] = await Promise.all([fetchConfig(this.apiBase, this.siteId), this.resumeFromLink()]);
     } catch (error) {
       // A config that fails, times out or is malformed is fatal.
       log('config_failed', error);
@@ -301,6 +341,7 @@ class Loader {
     this.raw = result;
     this.hints = launcherHints(result.widget);
     this.mountShell();
+    if (resumed) this.command('open')();
   }
 
   /**

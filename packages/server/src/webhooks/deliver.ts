@@ -1,7 +1,7 @@
 import { ALL_WEBHOOK_EVENTS, type WebhookEnvelope, type WebhookEventType } from '@helppuff/protocol';
 import { openHeaders, sendOutbound, storedHeaders, type OutboundSpec } from '../core/outbound.js';
 import type { RequestCtx } from '../core/request.js';
-import { notifyByEmail } from '../notifications/email.js';
+import { emailBindingOf, notifyByEmail, type EmailBinding } from '../notifications/email.js';
 import { dbFrom, ensureSchema, type D1Like } from '../db/d1.js';
 import { reasonOf } from '../core/log.js';
 
@@ -182,6 +182,8 @@ export type EmitDeps = {
   secret?: string | undefined;
   /** ADMIN_EMAIL: the owner, who may have no row in `admins`, can choose emails too. */
   owner?: string | undefined;
+  /** Cloudflare Email Service's binding, when the site sends with it. */
+  emailBinding?: EmailBinding | undefined;
 };
 
 export async function emitTo(deps: EmitDeps, siteId: string, type: WebhookEventType, data: Record<string, unknown>): Promise<void> {
@@ -246,6 +248,7 @@ export const secretOf = (env: Record<string, unknown>): string | undefined => (t
 /** What sending needs from the Worker's env: the secret, and the owner (ADMIN_EMAIL). */
 export const outboundOf = (env: Record<string, unknown>) => ({
   secret: secretOf(env),
+  emailBinding: emailBindingOf(env),
   owner: typeof env['ADMIN_EMAIL'] === 'string' && env['ADMIN_EMAIL'] ? env['ADMIN_EMAIL'].toLowerCase() : undefined,
 });
 

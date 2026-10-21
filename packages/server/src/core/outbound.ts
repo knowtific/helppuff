@@ -1,7 +1,7 @@
 import { TOOL_METHODS, type ToolHeader, type ToolMethod } from '@helppuff/protocol';
 import { HelpPuffError } from './errors.js';
 import { open, seal } from './secretbox.js';
-import { renderBody, renderHeader, renderUrl, type TemplateScope } from '../tools/template.js';
+import { renderBody, renderHeader, renderUrl, type RenderOptions, type TemplateScope } from '../tools/template.js';
 
 /**
  * A request the owner wrote and HelpPuff sends: a tool's call, a webhook in
@@ -105,7 +105,7 @@ export async function sendOutbound(
   spec: OutboundSpec,
   scope: TemplateScope,
   fetcher: typeof fetch,
-  options: { timeoutMs: number; userAgent: string; fallbackBody?: string; extraHeaders?: (body: string) => Promise<Record<string, string>> },
+  options: { timeoutMs: number; userAgent: string; fallbackBody?: string; extraHeaders?: (body: string) => Promise<Record<string, string>>; render?: RenderOptions },
 ): Promise<Sent> {
   let url: URL;
   try {
@@ -118,7 +118,9 @@ export async function sendOutbound(
   for (const h of spec.headers) {
     if (!h.value) continue;
     try {
-      headers.set(h.name, renderHeader(h.value, scope));
+      const value = renderHeader(h.value, scope);
+      // An optional placeholder that came out empty (`Reply-To: {{email.replyTo}}`): no header at all.
+      if (value.trim() || !options.render?.omitEmpty) headers.set(h.name, value);
     } catch {
       // A header the runtime refuses is left out.
     }
@@ -126,7 +128,7 @@ export async function sendOutbound(
   let body: string | undefined;
   if (spec.method !== 'GET') {
     if (spec.body.trim()) {
-      const rendered = renderBody(spec.body, scope);
+      const rendered = renderBody(spec.body, scope, options.render);
       body = rendered.text;
       if (rendered.json && !headers.has('content-type')) headers.set('content-type', 'application/json');
     } else if (options.fallbackBody !== undefined) {

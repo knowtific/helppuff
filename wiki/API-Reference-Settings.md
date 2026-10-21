@@ -362,6 +362,19 @@ const data = (await response.json()) as SettingsResponse;
       "keepChatDays": 90,
       "aiSeesPhotos": false,
       "visionModel": "@cf/meta/llama-4-scout-17b-16e-instruct"
+    },
+    "customerEmails": {
+      "copy": {
+        "enabled": false
+      },
+      "replies": {
+        "enabled": true
+      },
+      "inbound": {
+        "enabled": true,
+        "domain": "chat.acme.example",
+        "ruleId": "8f3a2c1b9d0e4f5a6b7c8d9e0f1a2b3c"
+      }
     }
   },
   "hash": "5c1e…",
@@ -523,6 +536,19 @@ type SettingsResponse = {
       keepChatDays: number;
       aiSeesPhotos: boolean;
       visionModel: string;
+    };
+    customerEmails: {
+      copy: {
+        enabled: boolean;
+      };
+      replies: {
+        enabled: boolean;
+      };
+      inbound: {
+        enabled: boolean;
+        domain: string;
+        ruleId: string;
+      };
     };
   };
   hash: string;
@@ -781,6 +807,19 @@ const data = (await response.json()) as ChangeSettingsResponse;
       "keepChatDays": 90,
       "aiSeesPhotos": false,
       "visionModel": "@cf/meta/llama-4-scout-17b-16e-instruct"
+    },
+    "customerEmails": {
+      "copy": {
+        "enabled": false
+      },
+      "replies": {
+        "enabled": true
+      },
+      "inbound": {
+        "enabled": true,
+        "domain": "chat.acme.example",
+        "ruleId": "8f3a2c1b9d0e4f5a6b7c8d9e0f1a2b3c"
+      }
     }
   },
   "hash": "7d2a…",
@@ -909,6 +948,19 @@ type ChangeSettingsResponse = {
       keepChatDays: number;
       aiSeesPhotos: boolean;
       visionModel: string;
+    };
+    customerEmails: {
+      copy: {
+        enabled: boolean;
+      };
+      replies: {
+        enabled: boolean;
+      };
+      inbound: {
+        enabled: boolean;
+        domain: string;
+        ruleId: string;
+      };
     };
   };
   hash: string;

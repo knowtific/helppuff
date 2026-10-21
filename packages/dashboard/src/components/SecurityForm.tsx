@@ -28,6 +28,11 @@ const MORE: { key: LimitKey; label: string; hint: string; min?: number; max: num
   { key: 'slotLookupsPerIpPerMinute', label: 'Calendar loads a minute, per visitor', hint: 'Free times in the booking calendar.', max: 600 },
   { key: 'bookingsPerIpPerHour', label: 'Bookings an hour, per visitor', hint: 'Booking, moving or cancelling from the chat.', max: 100 },
   { key: 'uploadsPerIpPerHour', label: 'Photos and files an hour, per visitor', hint: 'When visitors can send files.', max: 1000, fallback: 20 },
+  { key: 'customerReplyDelaySeconds', label: 'Wait before emailing a reply (seconds)', hint: 'Customer emails: the team’s replies to someone who left. 0 sends at once.', min: 0, max: 3600, fallback: 120 },
+  { key: 'customerEmailsPerContactPerDay', label: 'Emails a day, per customer', hint: 'Copies and replies to one customer.', max: 100, fallback: 5 },
+  { key: 'customerEmailsPerSitePerDay', label: 'Emails to customers a day', hint: 'For the whole site.', max: 10000, fallback: 200 },
+  { key: 'inboundEmailsPerConversationPerDay', label: 'Email answers a day, per conversation', hint: 'When customers can answer by email.', max: 500, fallback: 20 },
+  { key: 'inboundEmailsPerSitePerDay', label: 'Email answers a day', hint: 'For the whole site.', max: 10000, fallback: 200 },
   { key: 'pollsPerIpPerMinute', label: 'Checks for replies a minute, per visitor', hint: 'Backends that answer later, like Retell.', max: 600 },
   { key: 'endsPerIpPerMinute', label: 'Chats closed a minute, per visitor', hint: 'Each close can send a webhook.', max: 600 },
   { key: 'retellLookupsPerMinute', label: 'Retell knowledge lookups a minute', hint: 'For the whole site.', max: 6000 },
@@ -133,7 +138,7 @@ export function SecurityForm({ value, captcha, onChange }: { value: SecuritySett
                 key={item.key}
                 label={item.label}
                 hint={item.hint}
-                {...(item.min ? { min: item.min } : {})}
+                {...(item.min !== undefined ? { min: item.min } : {})}
                 max={item.max}
                 value={value.limits[item.key] ?? item.fallback ?? 1}
                 onChange={(n) => setLimit(item.key, n)}

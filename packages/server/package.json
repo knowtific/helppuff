@@ -29,6 +29,7 @@
     "@helppuff/sink-types": "workspace:*",
     "@helppuff/sink-webhook": "workspace:*",
     "hono": "^4.9.0",
+    "postal-mime": "^4.0.11",
     "zod": "^3.25.76"
   },
   "devDependencies": {

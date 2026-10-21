@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { iconNames, linkItemSchema, shortcutSchema, type Shortcut, type WidgetConfig } from '@helppuff/protocol';
 import type { KvStore } from '@helppuff/connector-types';
 import { ANSWER_REASONING, answerReasoning } from '@helppuff/rag';
-import { assistantConfigSchema, bookingsConfigSchema, filesConfigSchema, liveConfigSchema, securitySchema, storedSiteConfigSchema, type SiteConfig, type StoredSiteConfig } from '../config/schema.js';
+import { assistantConfigSchema, bookingsConfigSchema, customerEmailsSchema, filesConfigSchema, liveConfigSchema, securitySchema, storedSiteConfigSchema, type SiteConfig, type StoredSiteConfig } from '../config/schema.js';
 import { resolveSite, siteConfigKey } from '../config/site.js';
 import { HelpPuffError } from '../core/errors.js';
 import type { HonoEnv } from '../core/request.js';
@@ -13,6 +13,8 @@ import { isAssistant, knowledgeOf, providerOf } from '../core/assistant.js';
 import { dismissSuggestedHome, readSuggestedHome } from '../home/suggest.js';
 import { forgetFoundBooking } from '../bookings/found.js';
 import { filesBucket } from '../files/store.js';
+import { dbFrom } from '../db/d1.js';
+import { inboundVerifiedAt } from '../notifications/customer.js';
 
 /**
  * The assistant's settings as one flat object — what the onboarding
@@ -150,6 +152,8 @@ export const settingsSchema = z
     bookings: bookingsConfigSchema.optional(),
     /** Files (the `files` site section): visitors sending photos in the chat, files on jobs. Absent from older Workers. */
     files: filesConfigSchema.optional(),
+    /** Emails to customers (the `customerEmails` site section). `inbound.domain` and `ruleId` are the CLI's. Absent from older Workers. */
+    customerEmails: customerEmailsSchema.optional(),
   })
   .strict();
 export type Settings = z.infer<typeof settingsSchema>;
@@ -191,6 +195,15 @@ export const settingsPatchSchema = settingsSchema.partial().extend({
     .strict()
     .optional(),
   files: filesConfigSchema.partial().optional(),
+  /** Merged one level deep. The reply address (`inbound.domain`, `ruleId`) is kept: only `helppuff email replies` changes it. */
+  customerEmails: z
+    .object({
+      copy: z.object({ enabled: z.boolean().optional() }).strict().optional(),
+      replies: z.object({ enabled: z.boolean().optional() }).strict().optional(),
+      inbound: z.object({ enabled: z.boolean().optional(), domain: z.string().optional(), ruleId: z.string().optional() }).strict().optional(),
+    })
+    .strict()
+    .optional(),
 });
 export type SettingsPatch = z.infer<typeof settingsPatchSchema>;
 
@@ -235,7 +248,21 @@ export function readSettings(site: SiteConfig): Settings {
     },
     bookings: site.bookings,
     files: site.files,
+    customerEmails: site.customerEmails,
   };
+}
+
+/** The customer emails with a patch applied. The reply address stays the CLI's; answers by email turn on only once it is set. */
+export function mergeCustomerEmails(current: SiteConfig['customerEmails'], patch: SettingsPatch['customerEmails']): SiteConfig['customerEmails'] {
+  if (!patch) return current;
+  const inbound = { ...current.inbound, ...(patch.inbound?.enabled !== undefined ? { enabled: patch.inbound.enabled } : {}) };
+  if (inbound.enabled && !current.inbound.domain) {
+    throw new HelpPuffError('bad_request', {
+      message: 'Set the reply address up first: `helppuff email replies on <subdomain>` from your project folder.',
+      detail: 'customer_emails_inbound_not_set_up',
+    });
+  }
+  return customerEmailsSchema.parse({ copy: { ...current.copy, ...patch.copy }, replies: { ...current.replies, ...patch.replies }, inbound });
 }
 
 function securityOf(site: SiteConfig): SecuritySettings {
@@ -259,7 +286,7 @@ const compact = (value: Record<string, unknown>) =>
   Object.fromEntries(Object.entries(value).filter(([, v]) => v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)));
 
 /** The site config sections that carry these settings, rewritten. */
-export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<SiteConfig, 'widget' | 'connector' | 'knowledge' | 'assistant' | 'security' | 'live' | 'bookings' | 'files' | 'autoSummary'> {
+export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<SiteConfig, 'widget' | 'connector' | 'knowledge' | 'assistant' | 'security' | 'live' | 'bookings' | 'files' | 'customerEmails' | 'autoSummary'> {
   const current = readSettings(site);
   const s: Settings = {
     ...current,
@@ -272,6 +299,7 @@ export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<Site
     home: { ...current.home!, ...patch.home },
     bookings: current.bookings,
     files: current.files,
+    customerEmails: current.customerEmails,
   } as Settings;
 
   const widget: WidgetConfig = structuredClone(site.widget);
@@ -324,7 +352,7 @@ export function applySettings(site: SiteConfig, patch: SettingsPatch): Pick<Site
   const knowledge = { ...site.knowledge, ...s.crawl };
   const live = liveConfigSchema.parse({ ...site.live, ...(patch.live ?? {}) });
   const files = filesConfigSchema.parse({ ...site.files, ...(patch.files ?? {}) });
-  return { widget, connector, knowledge, assistant: s.behaviour, security: mergeSecurity(site, patch.security), live, bookings: mergeBookings(site.bookings, patch.bookings), files, autoSummary: s.autoSummary };
+  return { widget, connector, knowledge, assistant: s.behaviour, security: mergeSecurity(site, patch.security), live, bookings: mergeBookings(site.bookings, patch.bookings), files, customerEmails: mergeCustomerEmails(site.customerEmails, patch.customerEmails), autoSummary: s.autoSummary };
 }
 
 /** The bookings section with a patch applied: a null clears a field (`mode: null`: the website decides again). Throws a ZodError for a bad value. */
@@ -395,7 +423,14 @@ settingsRoutes.put('/settings', async (c) => {
  * Validate a settings patch and make it live: the route's work, shared with
  * importing an agent file. `by` is who it is recorded as (an email, `cli`).
  */
-export async function saveSettings(c: Context<HonoEnv>, siteId: string, patch: unknown, by: string) {
+export async function saveSettings(
+  c: Context<HonoEnv>,
+  siteId: string,
+  patch: unknown,
+  by: string,
+  /** The reply address for answers by email: only the CLI sets it (`PUT /customer-emails/inbound`). */
+  inbound?: { domain: string | null; ruleId: string | null },
+) {
   const ctx = c.get('helppuff');
   const parsed = settingsPatchSchema.safeParse(patch);
   if (!parsed.success) {
@@ -430,7 +465,26 @@ export async function saveSettings(c: Context<HonoEnv>, siteId: string, patch: u
     const issue = thrown instanceof z.ZodError ? thrown.issues[0] : undefined;
     throw new HelpPuffError('bad_request', { message: `Check security.${issue?.path.join('.') || 'settings'}: ${issue?.message ?? 'invalid'}.`, detail: 'settings_invalid' });
   }
+  // Answers by email turn on only once a test email arrived at the reply address (`helppuff email replies test`).
+  if (parsed.data.customerEmails?.inbound?.enabled && !site.customerEmails.inbound.enabled) {
+    const db = dbFrom(ctx.env);
+    if (site.customerEmails.inbound.domain && !(db && (await inboundVerifiedAt(db, siteId, site.customerEmails.inbound.domain)))) {
+      throw new HelpPuffError('bad_request', {
+        message: 'No test email has arrived at the reply address yet: run `helppuff email replies test` from your project folder.',
+        detail: 'customer_emails_inbound_not_verified',
+      });
+    }
+  }
   const next = applySettings(site, parsed.data);
+  if (inbound) {
+    const { domain: _domain, ruleId: _ruleId, ...rest } = next.customerEmails.inbound;
+    // A new address has no test yet; none at all turns answers by email off.
+    const changed = (inbound.domain ?? undefined) !== site.customerEmails.inbound.domain;
+    next.customerEmails = customerEmailsSchema.parse({
+      ...next.customerEmails,
+      inbound: { ...rest, ...(inbound.domain ? { domain: inbound.domain } : {}), ...(inbound.ruleId ? { ruleId: inbound.ruleId } : {}), enabled: Boolean(inbound.domain) && rest.enabled && !changed },
+    });
+  }
   const settings = readSettings({ ...site, ...next });
   const hash = await settingsHash(settings);
   const stored = (await readStored(ctx.env, siteId)) ?? {};
@@ -444,6 +498,7 @@ export async function saveSettings(c: Context<HonoEnv>, siteId: string, patch: u
     live: next.live,
     bookings: next.bookings,
     files: next.files,
+    customerEmails: next.customerEmails,
     autoSummary: next.autoSummary,
     settings: { at: ctx.platform.now(), by, hash },
   });

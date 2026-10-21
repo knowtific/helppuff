@@ -26,6 +26,8 @@ export const TOKEN_PERMISSIONS = [
   'Account › Account Settings › Read',
   'Account › AI Search › Edit (only for the Cloudflare AI Search backend)',
   'Account › AI Search › Run (only for the Cloudflare AI Search backend)',
+  'Zone › Zone › Read, Zone › DNS › Read, Zone › Email Routing Rules › Edit, Zone › Zone Settings › Edit (only for answers by email)',
+  'Zone › Email Sending › Edit (only for Cloudflare Email Service)',
 ];
 
 export const TOKEN_HELP = [
@@ -55,6 +57,15 @@ type Envelope<T> = {
 };
 
 export type WorkerDomain = { id: string; hostname: string; service: string; zone_id: string; zone_name: string };
+export type EmailRoutingSettings = { id?: string; name?: string; enabled?: boolean; status?: string; support_subaddress?: boolean };
+export type EmailRoutingRule = {
+  id: string;
+  name?: string;
+  enabled?: boolean;
+  matchers: { type: string; field?: string; value?: string }[];
+  actions: { type: string; value?: string[] }[];
+};
+export type EmailSendingSubdomain = { id: string; name: string; enabled?: boolean };
 
 export class CloudflareApi {
   constructor(
@@ -445,6 +456,64 @@ export class CloudflareApi {
     return null;
   }
 
+  // -------------------------------------------------- Email Routing and Sending
+  // Endpoints as wrangler 4.136.1 calls them (src/email-routing/client.ts),
+  // and the API reference's `POST /zones/{zone}/email/routing/dns` with `name`
+  // for a subdomain (checked 2026-10-21).
+
+  /** A name's MX records: whose mail servers receive for it. */
+  async mxRecords(zoneId: string, name: string): Promise<{ content: string; priority?: number }[]> {
+    const out = await this.call<{ content: string; priority?: number }[]>('GET', `/zones/${zoneId}/dns_records?type=MX&name=${encodeURIComponent(name)}&per_page=50`);
+    return (out.result ?? []).map((r) => ({ content: r.content, ...(r.priority !== undefined ? { priority: r.priority } : {}) }));
+  }
+
+  async emailRouting(zoneId: string): Promise<EmailRoutingSettings | null> {
+    try {
+      return (await this.call<EmailRoutingSettings>('GET', `/zones/${zoneId}/email/routing`)).result ?? null;
+    } catch (thrown) {
+      if (thrown instanceof CliError && thrown.details?.['status'] === 404) return null;
+      throw thrown;
+    }
+  }
+
+  /** Turn Email Routing on for a domain of the zone (the apex or a subdomain): Cloudflare adds and locks its MX and SPF records. */
+  async enableEmailRouting(zoneId: string, name: string): Promise<EmailRoutingSettings> {
+    return (await this.call<EmailRoutingSettings>('POST', `/zones/${zoneId}/email/routing/dns`, { json: { name } })).result ?? {};
+  }
+
+  async emailRoutingRules(zoneId: string): Promise<EmailRoutingRule[]> {
+    const rules: EmailRoutingRule[] = [];
+    for (let page = 1; page <= 20; page++) {
+      const out = await this.call<EmailRoutingRule[]>('GET', `/zones/${zoneId}/email/routing/rules?page=${page}&per_page=50&order=created&direction=asc`);
+      const batch = out.result ?? [];
+      rules.push(...batch);
+      if (batch.length < 50) break;
+    }
+    return rules;
+  }
+
+  /** Create or (with `id`) replace a rule handing `address` to the Worker `script`. */
+  async putEmailWorkerRule(zoneId: string, address: string, script: string, id?: string): Promise<EmailRoutingRule> {
+    const json = { name: `HelpPuff replies (${script})`.slice(0, 256), enabled: true, matchers: [{ type: 'literal', field: 'to', value: address }], actions: [{ type: 'worker', value: [script] }] };
+    const out = id
+      ? await this.call<EmailRoutingRule>('PUT', `/zones/${zoneId}/email/routing/rules/${encodeURIComponent(id)}`, { json })
+      : await this.call<EmailRoutingRule>('POST', `/zones/${zoneId}/email/routing/rules`, { json });
+    return out.result;
+  }
+
+  async deleteEmailRoutingRule(zoneId: string, id: string): Promise<void> {
+    await this.call('DELETE', `/zones/${zoneId}/email/routing/rules/${encodeURIComponent(id)}`);
+  }
+
+  async emailSendingSubdomains(zoneId: string): Promise<EmailSendingSubdomain[]> {
+    return (await this.call<EmailSendingSubdomain[]>('GET', `/zones/${zoneId}/email/sending/subdomains`)).result ?? [];
+  }
+
+  /** Onboard a domain (the apex or a subdomain) for sending: Cloudflare adds its SPF, DKIM and DMARC records. */
+  async enableEmailSending(zoneId: string, name: string): Promise<EmailSendingSubdomain> {
+    return (await this.call<EmailSendingSubdomain>('POST', `/zones/${zoneId}/email/sending/subdomains`, { json: { name } })).result;
+  }
+
   async aiSearchItems(accountId: string, id: string): Promise<AiSearchItem[]> {
     const items: AiSearchItem[] = [];
     // The API caps per_page at 50 (verified 2026-09-25).
@@ -497,7 +566,13 @@ function cloudflareError(
   const first = errors[0];
   const message = first?.message ?? (raw.slice(0, 200) || `HTTP ${status}`);
   const details = { status, method, path: path.replace(/\/accounts\/[0-9a-f]{32}/, '/accounts/…'), errors };
-  const area = /\/d1\//.test(path)
+  const area = /email\/routing/.test(path)
+    ? 'Zone › Email Routing Rules › Edit (and Zone › Zone Settings › Edit)'
+    : /email\/sending/.test(path)
+    ? 'Zone › Email Sending › Edit'
+    : /dns_records/.test(path)
+    ? 'Zone › DNS › Read'
+    : /\/d1\//.test(path)
     ? 'D1 › Edit'
     : /vectorize/.test(path)
     ? 'Vectorize › Edit'

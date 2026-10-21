@@ -74,7 +74,7 @@ COMMANDS
     live on|off|status   Live chat: visitors talk to a person on your team
     telegram connect|status|test|disconnect  Answer live chats from Telegram
     webhooks             Send chats, messages, leads and callbacks to other tools (signed JSON, or your own request)
-    email                The email service for the team's notifications: show, set, test, pause, remove
+    email                The email service (the team's notifications, customer emails); replies: answers by email
     tools                Your APIs the assistant calls before, during and after a chat ({{name}} in the prompt)
     agent                The whole setup as one file: export it, import it, or start from a template
     identity             The secret your server signs logged-in visitors with (rotate: a new one)
@@ -389,16 +389,19 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     ],
   },
   email: {
-    usage: "helppuff email show | set --preset resend|postmark|sendgrid|brevo --from <address> --key '${NAME}' | set --url <https://…> [--method POST] [--header 'Name: value'] [--body '…'] | test --to <address> | pause | resume | remove",
+    usage: "helppuff email show | set --preset resend|postmark|sendgrid|brevo --from <address> --key '${NAME}' | set --url <https://…> [--method POST] [--header 'Name: value'] [--body '…'] | set --cloudflare --from <address> | test --to <address> | pause | resume | remove | replies on <subdomain> [--enable] | replies status | replies test [--enable] | replies off",
     summary:
-      'The email service that sends the team\'s notifications, the same as Settings → Notifications in the dashboard (stored on the Worker). One request for any service with a send API: HelpPuff writes each email and fills in {{email.to}} (one person per request), {{email.subject}}, {{email.text}} and {{email.html}} (the text, escaped). `--preset` fills the request in for Resend, Postmark, SendGrid or Brevo; `--url`, `--header` and `--body` write or change it for any other service. The key is stored encrypted; write `${NAME}` to take it from .env (a missing one answers needs_input). Who gets which email (new contacts, hot leads, callbacks, live chats, jobs, bookings) is each person\'s choice in the dashboard.',
+      'The email service that sends the team\'s notifications, the same as Settings → Notifications in the dashboard (stored on the Worker). One request for any service with a send API: HelpPuff writes each email and fills in {{email.to}} (one person per request), {{email.subject}}, {{email.text}} and {{email.html}} (the text, escaped). `--preset` fills the request in for Resend, Postmark, SendGrid or Brevo; `--url`, `--header` and `--body` write or change it for any other service. The key is stored encrypted; write `${NAME}` to take it from .env (a missing one answers needs_input). Who gets which email (new contacts, hot leads, callbacks, live chats, jobs, bookings) is each person\'s choice in the dashboard. `--cloudflare --from` sends with Cloudflare Email Service instead (no key: the Worker\'s binding; it onboards the domain for sending and deploys; emailing customers needs Workers Paid). `replies` sets up answers by email (Customer emails): `on <subdomain>` turns Cloudflare Email Routing on for a subdomain of a domain on this Cloudflare account (never the domain itself, nor one that receives mail elsewhere), adds the rule that hands reply@<subdomain> to the Worker and sends a test; `--enable` turns answers by email on once the test arrives. `status` checks each part, `test` sends the test again, `off` deletes the rule.',
     examples: [
       "helppuff email set --preset resend --from 'HelpPuff <assistant@yourdomain.com>' --key '${RESEND_API_KEY}' --json",
       "helppuff email set --url https://api.example-mail.com/send --header 'X-Api-Key: ${MAIL_KEY}' --body '{\"to\": \"{{email.to}}\", \"subject\": \"{{email.subject}}\", \"text\": \"{{email.text}}\"}'",
       'helppuff email test --to you@yourdomain.com',
       'helppuff email show --json',
+      'helppuff email set --cloudflare --from hello@chat.yourdomain.com',
+      'helppuff email replies on chat.yourdomain.com --enable --json',
+      'helppuff email replies status',
     ],
-    notes: 'The address to send from must be on a domain verified in the email service. Links in emails go to the dashboard address the CLI saved it through.',
+    notes: 'The address to send from must be on a domain verified in the email service. Links in emails go to the dashboard address the CLI saved it through. Sub-addressing (reply+…@) has no API: when it is off, `replies on` answers needs_input with the one dashboard click (Email → Email Routing → Settings → Subaddressing). The switches for customer emails are in the dashboard (Settings → Customer emails) or `customerEmails` in helppuff.json.',
   },
   tools: {
     usage: 'helppuff tools list | show <name> | add <name> (--curl \'…\' | --url <https://…> [--method POST] [--header "Name: value"] [--body …] | --extract --field name="what it is") --description "…" [--param name="what it is"] [--pick a,b] [--before] [--after [--when path=value,…]] [--timeout ms] | set <name> [the same flags, --no-before, --no-after] | test <name> [--arg name=value] [--prechat field=value] [--data tool.key=value] | enable <name> | disable <name> | remove <name>',

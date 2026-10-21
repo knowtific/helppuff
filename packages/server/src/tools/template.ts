@@ -51,17 +51,38 @@ export function renderHeader(value: string, scope: TemplateScope): string {
 
 const WHOLE = /^\{\{\s*([\w]+(?:\.[\w-]+)*)\s*\}\}$/;
 
-function fill(node: unknown, scope: TemplateScope): unknown {
+/** A member to leave out of the body (`RenderOptions.omitEmpty`). */
+const OMIT = Symbol('omit');
+
+const isEmpty = (value: unknown) =>
+  value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0) || (typeof value === 'object' && value !== null && !Array.isArray(value) && Object.keys(value).length === 0);
+
+export type RenderOptions = {
+  /**
+   * Placeholders that are optional: a JSON member whose whole value is one
+   * of these and comes out empty is left out, and so is an object it leaves
+   * empty (`"reply_to": {"email": "{{email.replyTo}}"}`). A service then
+   * never gets `""` where it expects an address.
+   */
+  omitEmpty?: (path: string) => boolean;
+};
+
+function fill(node: unknown, scope: TemplateScope, options: RenderOptions = {}): unknown {
   if (typeof node === 'string') {
     const whole = WHOLE.exec(node);
     if (whole) {
       const value = lookup(scope, whole[1]!);
+      if (options.omitEmpty?.(whole[1]!) && isEmpty(value)) return OMIT;
       return value === undefined ? null : value;
     }
     return node.replace(REF, (_m, path: string) => asText(lookup(scope, path)));
   }
-  if (Array.isArray(node)) return node.map((n) => fill(n, scope));
-  if (node && typeof node === 'object') return Object.fromEntries(Object.entries(node as Record<string, unknown>).map(([k, v]) => [k, fill(v, scope)]));
+  if (Array.isArray(node)) return node.map((n) => fill(n, scope, options)).filter((n) => n !== OMIT);
+  if (node && typeof node === 'object') {
+    const entries = Object.entries(node as Record<string, unknown>);
+    const kept = entries.map(([k, v]) => [k, fill(v, scope, options)] as const).filter(([, v]) => v !== OMIT);
+    return entries.length > 0 && kept.length === 0 && options.omitEmpty ? OMIT : Object.fromEntries(kept);
+  }
   return node;
 }
 
@@ -111,11 +132,14 @@ function quoteBareRefs(body: string): string {
 }
 
 /** The body to send, and whether it is JSON. */
-export function renderBody(body: string, scope: TemplateScope): { text: string; json: boolean } {
+export function renderBody(body: string, scope: TemplateScope, options: RenderOptions = {}): { text: string; json: boolean } {
   const trimmed = body.trim();
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
     const parsed = parseJsonTemplate(trimmed);
-    if (parsed !== null) return { text: JSON.stringify(fill(parsed, scope)), json: true };
+    if (parsed !== null) {
+      const filled = fill(parsed, scope, options);
+      return { text: JSON.stringify(filled === OMIT ? {} : filled), json: true };
+    }
   }
   return { text: body.replace(REF, (_m, path: string) => asText(lookup(scope, path))), json: false };
 }

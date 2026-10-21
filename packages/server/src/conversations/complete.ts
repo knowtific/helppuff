@@ -13,6 +13,8 @@ import { missingFromKnowledge, recordGaps, gapView, type KnowledgeSearch } from 
 import type { SiteConfig } from '../config/schema.js';
 import { parseData } from '../tools/run.js';
 import { reasonOf } from '../core/log.js';
+import { customerContext, customerCopy, type CustomerContext } from '../notifications/customer.js';
+import type { EmailBinding } from '../notifications/email.js';
 
 /**
  * The end of a conversation, as a background job (the Worker's Workflow).
@@ -28,7 +30,8 @@ import { reasonOf } from '../core/log.js';
  *      and adds the ones it does not cover to the questions to answer
  *      (`knowledge/gaps.ts`), telling the owner about new ones;
  *   3. calls the site's after-chat tools (the Prompt page) with all of it;
- *   4. sends `conversation.completed` to the site's webhooks, with the
+ *   4. emails the customer a copy, when copies are on (Customer emails);
+ *   5. sends `conversation.completed` to the site's webhooks, with the
  *      summary, the lead, the transcript and the tools' data.
  *
  * Sleeping instances cost nothing on the Free plan (they do not count towards
@@ -52,6 +55,8 @@ export type ConversationParams = {
   instructions?: string;
   /** The site uses HelpPuff's own knowledge base: an answer to a question can go there. Otherwise no questions are kept. */
   knowledgeBase?: boolean;
+  /** Copies of conversations are on (Customer emails): the summary writes a recap, and the customer gets the copy. */
+  customer?: CustomerContext;
 };
 
 /** The settings HelpPuff writes around the prompt, and the owner's prompt: what the assistant was told. */
@@ -85,6 +90,8 @@ export type ConversationJobDeps = {
   secret?: string | undefined;
   /** Searches the site's own knowledge base: an unanswered question it covers is no gap. */
   knowledge?: KnowledgeSearch | undefined;
+  /** Cloudflare Email Service's binding, when the site sends with it. */
+  emailBinding?: EmailBinding | undefined;
 };
 
 /** The model summaries use: HELPPUFF_SUMMARY_MODEL, else the site's own chat model. */
@@ -101,28 +108,34 @@ type WorkflowCreate = { create(options: { id?: string; params: unknown }): Promi
  * Without a Workflow binding (an older deployment, local tests) nothing happens.
  */
 export function startConversationJob(ctx: RequestCtx, siteId: string, conversationId: string, instance = `conv-${conversationId}`): void {
-  const workflow = ctx.env['CRAWL_WORKFLOW'] as Partial<WorkflowCreate> | undefined;
-  if (!workflow || typeof workflow.create !== 'function') return;
   ctx.platform.waitUntil(
     (async () => {
       const site = await resolveSite(ctx, siteId);
-      const budget = Number((site.connector.options as { budget?: { dailyNeurons?: unknown } } | undefined)?.budget?.dailyNeurons ?? 0) || 0;
-      const params: ConversationParams = {
-        kind: 'conversation',
-        siteId,
-        conversationId,
-        model: ctx.env['AI'] ? await summaryModel(ctx, siteId) : null,
-        autoSummary: site.autoSummary,
-        budget,
-        instructions: assistantInstructions(site),
-        knowledgeBase: ownsKnowledge(site),
-      };
-      await workflow.create!({ id: instance.slice(0, 100), params });
+      await createConversationJob(ctx.env, site, siteId, conversationId, instance, ctx.env['AI'] ? await summaryModel(ctx, siteId) : null);
     })().catch((thrown) => {
       // Already started (the id is the conversation's), or Workflows unavailable: the dashboard can still summarise.
       ctx.platform.log('conversation.job_not_started', { reason: reasonOf(thrown) });
     }),
   );
+}
+
+/** The job itself, for callers with a site in hand (an answer by email). Throws when it cannot start. */
+export async function createConversationJob(env: Record<string, unknown>, site: SiteConfig, siteId: string, conversationId: string, instance: string, model: string | null): Promise<void> {
+  const workflow = env['CRAWL_WORKFLOW'] as Partial<WorkflowCreate> | undefined;
+  if (!workflow || typeof workflow.create !== 'function') return;
+  const budget = Number((site.connector.options as { budget?: { dailyNeurons?: unknown } } | undefined)?.budget?.dailyNeurons ?? 0) || 0;
+  const params: ConversationParams = {
+    kind: 'conversation',
+    siteId,
+    conversationId,
+    model,
+    autoSummary: site.autoSummary,
+    budget,
+    instructions: assistantInstructions(site),
+    knowledgeBase: ownsKnowledge(site),
+    ...(site.customerEmails.copy.enabled ? { customer: customerContext(site, siteId) } : {}),
+  };
+  await workflow.create({ id: instance.slice(0, 100), params });
 }
 
 type Row = { started_at: number; last_at: number; completed_at: number | null; status: string | null };
@@ -161,7 +174,7 @@ export async function runConversationJob(step: StepLike, deps: ConversationJobDe
         const used = (await deps.db.prepare('SELECT neurons_est AS n FROM usage_daily WHERE day = ? AND site_id = ?').bind(day, params.siteId).first<{ n: number }>())?.n ?? 0;
         if (used >= params.budget) return false;
       }
-      const result = await summarizeConversation({ db: deps.db, ai: deps.ai, now }, params.conversationId, params.model, params.instructions);
+      const result = await summarizeConversation({ db: deps.db, ai: deps.ai, now }, params.conversationId, params.model, params.instructions, { recap: Boolean(params.customer) });
       return Boolean(result);
     });
   } catch {
@@ -199,6 +212,16 @@ export async function runConversationJob(step: StepLike, deps: ConversationJobDe
       await step.do(`tool:${toolId}`, async () => runAfterTool({ db: deps.db, fetch: deps.fetch, secret: deps.secret, ai: deps.ai, model: params.model, budget: params.budget, now, log: deps.log }, params.siteId, toolId, await completedEvent(deps.db, params.conversationId)));
     } catch {
       deps.log?.('conversation.tool_failed');
+    }
+  }
+
+  // The customer's copy (Customer emails): after the summary, so it has the recap. Never holds the event back.
+  if (params.customer) {
+    const customer = params.customer;
+    try {
+      await step.do('customer-copy', async () => (await customerCopy({ db: deps.db, fetch: deps.fetch, secret: deps.secret, emailBinding: deps.emailBinding, now, log: deps.log }, customer, params.conversationId)).status);
+    } catch {
+      deps.log?.('conversation.customer_copy_failed');
     }
   }
 

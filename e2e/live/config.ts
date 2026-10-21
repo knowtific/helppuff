@@ -82,5 +82,21 @@ export default defineConfig({
       },
       security: { ...security, limits: { ...security.limits, bookingsPerIpPerHour: 100, slotLookupsPerIpPerMinute: 600 } },
     },
+    /**
+     * Customer emails (customer-emails.spec.ts): the team's replies emailed at
+     * once (no wait), and answers by email at `chat.e2e.test`, handed to the
+     * Worker's email() by wrangler's local endpoint as Email Routing would.
+     */
+    emails: {
+      origins,
+      connector: site.connector,
+      widget: {
+        brand: { name: 'Acme Plumbing', agentName: 'Sam' },
+        leadForm: { enabled: true, fields: [{ name: 'name', label: 'Name', type: 'text', required: true }, { name: 'email', label: 'Email', type: 'email', required: true }] },
+      },
+      live: { enabled: true },
+      customerEmails: { replies: { enabled: true }, inbound: { enabled: true, domain: 'chat.e2e.test' } },
+      security: { ...security, limits: { ...security.limits, customerReplyDelaySeconds: 0 } },
+    },
   },
 });

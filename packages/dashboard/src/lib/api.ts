@@ -218,6 +218,8 @@ export type Lead = {
   createdAt?: number;
   created_at?: number;
   updatedAt?: number;
+  /** When they unsubscribed from customer emails, or null. */
+  email_off?: number | null;
   /** One person can have several chats (the email is the key); the latest is linked. */
   conversations?: number;
   lastConversationId?: string | null;
@@ -246,6 +248,8 @@ export type ConversationDetail = {
   labels?: (LabelRef & { addedBy: string; addedAt: number })[];
   notes?: Note[];
   messages: StoredMessage[];
+  /** Whether the team's replies are also emailed (Customer emails). Absent from older Workers. */
+  customerEmail?: ReplyByEmail;
 };
 
 /** A contact's page: their details, every conversation, the team's notes and callback requests. */
@@ -293,6 +297,9 @@ export type NotificationsInfo = {
 
 /** The email service (`GET /notifications/email`, admins). */
 export type EmailService = {
+  /** `cloudflare`: Cloudflare Email Service, the Worker's binding (no request). Absent from older Workers. */
+  kind?: 'request' | 'cloudflare';
+  from?: string | null;
   method: string;
   url: string;
   headers: ToolHeaderView[];
@@ -562,6 +569,30 @@ export type Settings = {
   bookings?: BookingsSettings;
   /** Photos and files: in the chat, on jobs. Absent from older Workers. */
   files?: FilesSettings;
+  /** Emails to customers (Settings → Customer emails). Absent from older Workers. */
+  customerEmails?: CustomerEmailsSettings;
+};
+
+/** Settings → Customer emails: what each switch still needs (`/customer-emails/status`). */
+export type CustomerEmailsStatus = {
+  site: string;
+  origin: string | null;
+  settings: CustomerEmailsSettings;
+  delaySeconds: number;
+  service: { kind: 'request' | 'cloudflare'; name: string | null; from: string | null; enabled: boolean; sendsReplyTo: boolean; canAddReplyTo: boolean; lastStatus: string | null; lastError: string | null } | null;
+  live: boolean;
+  inbound: { domain: string | null; ruleId: string | null; verifiedAt: number | null; address: string | null };
+  ready: { copy: boolean; replies: boolean; inbound: boolean };
+};
+export type CustomerEmailLogRow = { id: string; conversationId: string | null; kind: string; to: string | null; status: string; error: string | null; at: number };
+/** What the reply box says about email: null when the site emails no replies. */
+export type ReplyByEmail = { to: string | null; unsubscribed: boolean; onSite: boolean; byEmail: boolean } | null;
+
+export type CustomerEmailsSettings = {
+  copy: { enabled: boolean };
+  replies: { enabled: boolean };
+  /** `domain` and `ruleId` are set by the CLI (`helppuff email replies on`). */
+  inbound: { enabled: boolean; domain?: string; ruleId?: string };
 };
 
 export type FilesSettings = {
@@ -684,6 +715,11 @@ export type Limits = {
   waitingPerSite?: number;
   liveSocketsPerIp?: number;
   uploadsPerIpPerHour?: number;
+  customerReplyDelaySeconds?: number;
+  customerEmailsPerContactPerDay?: number;
+  customerEmailsPerSitePerDay?: number;
+  inboundEmailsPerConversationPerDay?: number;
+  inboundEmailsPerSitePerDay?: number;
 };
 export type SecuritySettings = {
   limits: Limits;

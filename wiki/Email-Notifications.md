@@ -9,6 +9,9 @@ through that service. Everyone on the team chooses which emails they get.
 No connector per provider: the service is one request you can see and
 change, so a provider changing its API never waits for a HelpPuff release.
 
+The same service sends [[emails to your customers|Customer-Emails]]: your
+team's replies when they left, answers by email, copies of conversations.
+
 ## 1. Connect your email service (an admin, once)
 
 **Settings → Notifications** → **Email service**:
@@ -27,7 +30,8 @@ helppuff email set --preset resend --from 'HelpPuff <assistant@yourdomain.com>' 
 helppuff email test --to you@yourdomain.com
 ```
 
-`--preset` is `resend`, `postmark`, `sendgrid` or `brevo`. **Pause emails**
+`--preset` is `resend`, `postmark`, `sendgrid` or `brevo`, or
+[Cloudflare Email Service](#cloudflare-email-service). **Pause emails**
 (`helppuff email pause`) stops every email until you resume; **Remove**
 keeps everyone's choices for when you connect one again.
 
@@ -43,6 +47,8 @@ the key in a secret one) and the body. HelpPuff fills in:
 | `{{email.subject}}` | The subject, like `Callback requested: Ada` |
 | `{{email.text}}` | The message as plain text, with a link to the dashboard |
 | `{{email.html}}` | The same message as HTML, everything a visitor wrote escaped |
+| `{{email.replyTo}}` | Where replies go, for [[customer emails|Customer-Emails]]. A JSON field that is only this, and comes out empty (team emails), is left out, so the service never gets `""` |
+| `{{email.headers}}` | Extra headers as an object (`List-Unsubscribe`, `In-Reply-To`); `{{email.headerList}}` the same as `[{ "Name", "Value" }]` (Postmark). Left out when empty |
 
 The request must use `{{email.to}}` and `{{email.text}}` (or
 `{{email.html}}`). For example, a service that takes JSON with an `X-Api-Key`:
@@ -69,6 +75,7 @@ break out of its field.
 | **A visitor wants a person** | Someone asked for the team in [[live chat|Live-Chat]] |
 | **A live chat nobody took** | Nobody took it in time; the visitor got the callback form |
 | **A chat given to me** | Someone on the team gave you a conversation (only you get it) |
+| **A customer answered by email** | A customer replied to an email from you ([[answers by email|Customer-Emails#answers-by-email]]): to whoever has the chat, else to everyone who chose it |
 | **New job** | A [[job|Jobs]] was created |
 | **New booking**, **Booking cancelled** | An [[appointment|Bookings]] was booked or cancelled |
 | **A question to answer** | A visitor asked something your knowledge base does not cover ([[answer it|Knowledge-Base#5a-questions-to-answer]]; admins only) |
@@ -77,6 +84,32 @@ break out of its field.
 Nothing is ticked until you choose. Members choose too: they see this page
 even with live chat off. Someone removed from the team gets nothing more.
 Each email links to the conversation, job, callbacks or calendar.
+
+## Cloudflare Email Service
+
+A fifth choice beside the presets: no key, no request. The Worker sends
+with Cloudflare's own email service through its `send_email` binding, for
+the team's emails and the customers'.
+
+It needs your domain on Cloudflare (the same account) and a deploy with the
+binding, so it is set up from the project folder:
+
+```bash
+npx @knowtific/helppuff email set --cloudflare --from hello@chat.acme.com
+helppuff email test --to you@acme.com
+```
+
+It onboards the address's domain for sending (Cloudflare adds its SPF, DKIM
+and DMARC records), writes `email.cloudflare.from` in helppuff.json, deploys
+with the binding and saves the service. A subdomain like `chat.acme.com` is
+safest: your main domain's own mail is not touched. Or choose **Cloudflare
+Email Service** in Settings → Notifications: until the binding is deployed,
+it shows the command and an **Ask your AI agent** request.
+
+**What it costs:** sending to any address (your customers) needs **Workers
+Paid**: 3,000 emails a month included, then $0.35 per 1,000. On Workers Free
+it can still send the team's emails, when each person's address is verified
+in Cloudflare (Email → Email Routing → Destination addresses).
 
 ## Check it
 
