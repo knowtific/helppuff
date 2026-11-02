@@ -186,6 +186,9 @@ async function picker(over: Json = {}) {
   return { ...w, visitor };
 }
 
+/** Every time offered, across the days: the visitor's first day can be nearly over (after 9 pm in Perth). */
+const offered = (slots: Json): Json[] => slots['days'].flatMap((d: Json) => d.slots);
+
 describe('booking in the chat', () => {
   it('offers signed times, books the one picked once, on a job, and tells the webhooks', async () => {
     const w = await picker();
@@ -198,7 +201,7 @@ describe('booking in the chat', () => {
     const v = await w.visitor();
     const slots = await json(await v.slots());
     expect(slots).toMatchObject({ timezone: 'Australia/Perth', phone: 'optional', title: 'Consultation' });
-    const slot = slots['days'][0].slots[2];
+    const slot = offered(slots)[2]!;
     expect(slot.id).toMatch(/^s\./);
 
     const booked = await v.book({ slot: slot.id, name: 'Ada Lovelace', email: 'Ada@Example.com', phone: '0400 111 222', timezone: 'Australia/Perth' });
@@ -226,10 +229,10 @@ describe('booking in the chat', () => {
     // Someone else, the same time: taken. And it is no longer offered.
     const other = await w.visitor();
     const otherSlots = await json(await other.slots());
-    expect(otherSlots['days'][0].slots.some((s: Json) => s.start === slot.start)).toBe(false);
+    expect(offered(otherSlots).some((s: Json) => s.start === slot.start)).toBe(false);
     const forged = await other.book({ slot: slot.id, name: 'Bob', email: 'bob@example.com' });
     expect(forged.status).toBe(400);
-    const theirs = otherSlots['days'][0].slots.find((s: Json) => s.start < slot.start + 3_600_000 && s.start > slot.start - 3_600_000 && s.start !== slot.start);
+    const theirs = offered(otherSlots).find((s: Json) => s.start < slot.start + 3_600_000 && s.start > slot.start - 3_600_000 && s.start !== slot.start);
     if (theirs) {
       // An overlapping time is not offered either: both are 30 minutes from the same hours.
       expect(Math.abs(theirs.start - slot.start)).toBeGreaterThanOrEqual(30 * 60_000);
@@ -241,11 +244,11 @@ describe('booking in the chat', () => {
     vi.stubGlobal('fetch', async () => new Response('{}', { status: 200 }));
     const v = await w.visitor();
     const slots = await json(await v.slots());
-    const [first, second] = [slots['days'][0].slots[0], slots['days'][0].slots[4]];
+    const [first, second] = [offered(slots)[0]!, offered(slots)[4]!];
     const made = (await json(await v.book({ slot: first.id, name: 'Ada', email: 'ada@example.com' })))['messages'][0].booked;
 
     const moving = await json(await v.slots({ reschedule: made.id }));
-    const target = moving['days'][0].slots.find((s: Json) => s.start === second.start);
+    const target = offered(moving).find((s: Json) => s.start === second.start)!;
     const moved = await json(await v.book({ slot: target.id, name: 'Ada', email: 'ada@example.com', reschedule: made.id }));
     expect(moved['messages'][0].booked).toMatchObject({ id: made.id, start: second.start });
     expect((w.db.raw.prepare('SELECT slot_lock FROM appointments WHERE id = ?').get(made.id) as Json)['slot_lock']).toBe(String(second.start));
@@ -258,7 +261,7 @@ describe('booking in the chat', () => {
     expect(w.db.raw.prepare('SELECT status, slot_lock FROM appointments WHERE id = ?').get(made.id)).toMatchObject({ status: 'cancelled', slot_lock: null });
     // The time is free again.
     const free = await json(await stranger.slots());
-    expect(free['days'][0].slots.some((s: Json) => s.start === second.start)).toBe(true);
+    expect(offered(free).some((s: Json) => s.start === second.start)).toBe(true);
   });
 
   it('refuses the picker\'s calls when the site does not book in the chat, and asks for a phone when told to', async () => {

@@ -47,6 +47,7 @@ gives you a setup link.
 - **[[Leads and callbacks|Leads]]** and **[[Webhooks]]**: where conversations and contact details go.
 - **[[Email notifications|Email-Notifications]]**: an email for new leads, callbacks, live chats, jobs and bookings, through the email service you already use; everyone picks their own.
 - **[[Jobs]]**: requests, quotes and work from the chat, on a board with your own stages.
+- **[[Photos and files|Files]]**: visitors send photos in the chat, and your team attaches files to jobs, kept in your own R2 bucket.
 - **[[Bookings and the calendar|Bookings]]** and **[[Integrations]]**: visitors book a time in the chat, synced with your calendar.
 - **[[Signed-in visitors|Signed-In-Visitors]]**: tell the assistant who a signed-in customer is.
 - **[[Live chat|Live-Chat]]** and **[[Telegram]]**: let visitors talk to a person on your team.

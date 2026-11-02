@@ -150,7 +150,7 @@ case 'check_stock': {
 stock: z.boolean().default(false).describe('Answer stock questions from the Acme API.'),
 ```
 
-Then turn it on in the assistant's `helppuff.json` (`"backend": { "tools": { "stock": true } }`),
+Then turn it on in the assistant's `helppuff.json` (`"model": { "provider": "workers-ai", "tools": { "stock": true } }`),
 set the secret (`helppuff secret set ACME_API_TOKEN`), and deploy with your build.
 
 Rules that keep tools safe: never trust the arguments (validate with zod);

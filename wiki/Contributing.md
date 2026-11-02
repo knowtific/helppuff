@@ -74,7 +74,7 @@ A pnpm monorepo, TypeScript strict, ESM.
 | `packages/cli` | `@knowtific/helppuff`, the published CLI: commands, deploy engine and help text |
 | `instructions.md` | The setup, deployment, testing and upgrade workflow shared by every coding agent |
 | `e2e/` | Playwright suites |
-| `wiki/` | This wiki, published to GitHub's wiki by CI. `CLI-Reference.md` and `Configuration-Reference.md` are generated |
+| `wiki/` | This wiki, published to GitHub's wiki and as the website's docs by CI. `CLI-Reference.md`, `Configuration-Reference.md` and the `API-Reference*.md` pages are generated |
 
 `AGENTS.md` at the root is the orientation for coding agents working on the
 repository, with recipes for common changes.
@@ -85,8 +85,10 @@ repository, with recipes for common changes.
   widget or a silent hide, never an exception on the page. Prefer a missing
   feature over throwing.
 - **Accessibility wins** over visual design.
-- **Size budgets:** `loader.js` ≤ 8 KB gzipped, the app ≤ 35 KB. The loader
-  never imports Preact or Zod. `pnpm build` fails over budget.
+- **Size budgets** (gzipped): `loader.js` ≤ 8 KB, the app ≤ 35 KB, and the
+  chunks loaded only when needed: live chat ≤ 6 KB, booking ≤ 8 KB, upload
+  ≤ 3 KB. The app is at its budget, so new widget UI goes in a chunk. The
+  loader never imports Preact or Zod. `pnpm build` fails over budget.
 - **Dependencies:** the widget depends on `preact` only; the server on `hono`
   and `zod` (plus provider SDKs already present). Ask before adding one.
 - **No `console`** in shipped code. The server logs through the injected
@@ -169,7 +171,8 @@ Deployed assistants learn of the release within 12 hours (Settings → Updates).
 ## The wiki
 
 The wiki is the `wiki/` folder, published to GitHub's wiki by
-`.github/workflows/wiki.yml` on every push to `main` that touches it. Edit the
+`.github/workflows/wiki.yml` on every push to `main` that touches it, and as
+the website's docs (with search) by `.github/workflows/website.yml`. Edit the
 files here, never on GitHub (the next sync would overwrite it). Links between
 pages use the wiki's own link syntax: the text and the page name, separated by
 a `|`, inside double square brackets. The first time, enable the

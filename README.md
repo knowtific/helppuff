@@ -139,13 +139,15 @@ architecture manually.
 | **GLM-4.7 Flash** (`@cf/zai-org/glm-4.7-flash`) | Default model for visitor answers and conversation summaries | Yes |
 | **BGE-M3** (`@cf/baai/bge-m3`) | Embeds website passages, files and visitor questions for semantic search | Yes |
 | **BGE Reranker Base** (`@cf/baai/bge-reranker-base`) | Rechecks search candidates before the answer model sees them | Yes |
-| **D1** | Stores conversations, leads, callback tasks, ratings, analytics, knowledge text, keyword search, prompt history and usage | Yes |
+| **D1** | Stores conversations, leads, callback tasks, jobs, appointments, ratings, analytics, knowledge text, keyword search, prompt history and usage | Yes |
 | **Vectorize** | Stores knowledge vectors and finds passages by meaning | Yes |
 | **Workers KV** | Holds live configuration, prompt updates, lightweight counters and temporary file uploads | Yes |
 | **Workflows** | Runs durable background jobs for crawling, file learning, conversation summaries and webhook retries | Yes |
-| **Cron Triggers** | Schedules automatic website re-learning | Yes |
+| **Durable Objects** | Connects visitors and your team for live chat (one per site) | Yes |
+| **Cron Triggers** | Schedules website re-learning, calendar syncs, booking reminders and clean-up of old chat files | Yes |
 | **Rate Limiting** | Protects the public chat endpoint from per-IP message bursts | Yes |
 | **Browser Rendering** | Reads pages that require JavaScript while learning a website | Automatic when needed |
+| **R2** | Keeps photos and files sent in the chat or attached to jobs | Optional |
 | **Turnstile** | Adds human verification to new chats for public-site abuse protection | Optional |
 | **AI Gateway** | Adds model observability, caching and centralized AI controls | Optional |
 
@@ -166,8 +168,15 @@ experience, the operational tools and the customer follow-up workflow.
 | **Built-in CRM** | One lead per person, repeat conversations, pipeline stages, notes, custom answers and CSV export | [Dashboard](wiki/Dashboard.md#contacts) |
 | **Conversation intelligence** | Automatic summaries, intent, sentiment, lead quality, outcome, topics, next steps and unanswered questions | [Dashboard](wiki/Dashboard.md#conversations) |
 | **Callback requests** | Turns “please call me” into a tracked task your team can complete, dismiss or reopen | [Callbacks](wiki/Leads.md#callbacks) |
+| **Live chat** | Hands a conversation to a person on your team, who answers from the dashboard or Telegram; the callback form when nobody is free | [Live chat](wiki/Live-Chat.md) |
+| **Jobs** | The requests and quotes that come out of chats, on a board with your own stages and fields | [Jobs](wiki/Jobs.md) |
+| **Bookings** | Visitors pick a free time in the chat, kept in HelpPuff or synced with Cal.com, Calendly, Google Calendar or Outlook | [Bookings](wiki/Bookings.md) |
+| **Tools** | The assistant calls your own APIs during a chat (order status, stock, accounts), and before or after one | [Tools](wiki/Tools.md) |
+| **Photos and files** | Visitors send photos and PDFs, and your team attaches files to jobs, kept in your R2 bucket | [Photos and files](wiki/Files.md) |
+| **Email notifications** | Each person on the team chooses the emails they get, sent through your own email service | [Email notifications](wiki/Email-Notifications.md) |
+| **Team and API** | Accounts with admin or member roles, and a public HTTPS API with scoped keys for everything the dashboard does | [API](wiki/API.md) |
 | **Analytics and ratings** | Conversation and lead trends, conversion, top pages, countries and visitor feedback | [Dashboard](wiki/Dashboard.md#analytics) |
-| **Signed webhooks** | Sends leads, callbacks, messages, summaries, ratings and knowledge events to Zapier, Make, n8n, a CRM or your API, with retries | [Webhooks](wiki/Webhooks.md) |
+| **Signed webhooks** | Sends leads, callbacks, messages, summaries, ratings, live chat, jobs, appointments and knowledge events to Zapier, Make, n8n, a CRM or your API, with retries | [Webhooks](wiki/Webhooks.md) |
 | **Agent-native operations** | Shared instructions for any coding agent, a JSON CLI, structured questions and non-interactive setup, testing and upgrades | [Using with AI agents](wiki/AI-Agents.md) |
 | **Safety and cost controls** | Origin allowlists, signed sessions, daily budgets, rate limits, optional Turnstile and graceful fallbacks | [Security](wiki/Security.md) |
 | **Pluggable AI backends** | Switch the answer model without replacing the widget, dashboard, leads or webhooks | [Providers](wiki/Providers.md) |
@@ -245,6 +254,7 @@ and in the **[wiki](wiki/)**; both are built from the same files:
 - [Getting started](wiki/Getting-Started.md) · [Using with AI agents](wiki/AI-Agents.md) · [Dashboard](wiki/Dashboard.md)
 - [Configuration](wiki/Configuration.md) · [Configuration reference](wiki/Configuration-Reference.md) · [CLI reference](wiki/CLI-Reference.md)
 - [Providers](wiki/Providers.md) · [Knowledge base](wiki/Knowledge-Base.md) · [Widget](wiki/Widget.md) · [Leads](wiki/Leads.md) · [Webhooks](wiki/Webhooks.md)
+- [Live chat](wiki/Live-Chat.md) · [Jobs](wiki/Jobs.md) · [Bookings](wiki/Bookings.md) · [Tools](wiki/Tools.md) · [Photos and files](wiki/Files.md) · [API](wiki/API.md)
 - [Deployment](wiki/Deployment.md) · [Upgrading](wiki/Upgrading.md) · [Costs and limits](wiki/Costs-and-Limits.md) · [Security](wiki/Security.md) · [Troubleshooting](wiki/Troubleshooting.md)
 - [Extending HelpPuff](wiki/Extending.md) · [Protocol](wiki/Protocol.md) · [Contributing](wiki/Contributing.md)
 

@@ -64,6 +64,11 @@ or exits with code `10`, ask the user exactly the questions in `questions`,
 using each question's `ask`, `options` and `default`. Rerun the command with
 the corresponding `flag` values. This is expected control flow, not a failure.
 
+Every delete asks first. Run with `--json`, it stops with the error code
+`needs_confirmation` and deletes nothing: tell the user what its message says
+will be deleted (it cannot be undone) and rerun with `--yes` only after they
+agree.
+
 Follow an error's `hint` before improvising. Never invent a website, email,
 account ID, token, provider key or business fact.
 
@@ -97,6 +102,7 @@ The token needs:
 - Account › D1 › Edit
 - Account › Vectorize › Edit
 - Account › Account Settings › Read
+- Account › Workers R2 Storage › Edit, optional, for photos and files
 - Account › AI Search › Edit and Account › AI Search › Run, only when using
   the AI Search backend
 
@@ -271,7 +277,7 @@ npx -y @knowtific/helppuff live on --json
 npx -y @knowtific/helppuff users add sam@example.com --role member --json
 ```
 
-Members see only conversations, jobs, contacts, callbacks and live chat. For
+Members see only conversations, jobs, the calendar, contacts, callbacks and live chat. For
 Telegram, the person must create the bot with @BotFather and give you its
 token; never invent one. Then:
 
@@ -343,7 +349,10 @@ else keeps its default. Two kinds of setting:
 | A daily spending cap | Workers AI: `config set model.budget.dailyNeurons <n>` (raise it only on Workers Paid). Any provider: `config set security.limits.messagesPerSitePerDay <n>` |
 | Protection from bots | Turnstile: the user creates the widget in Cloudflare; then `config set security.captcha '{"provider":"turnstile","siteKey":"<key>","secret":{"env":"TURNSTILE_SECRET"}}'` and the user runs `secret set TURNSTILE_SECRET` |
 | Talk to a person (live chat) | `live on` / `live off`; Telegram: `telegram connect --token <token>` (see above) |
-| Team members | `users add <email> --role admin\|member`, `users role <email> <role>`, `users remove <email>` |
+| Team members | `users add <email> --role admin\|member`, `users role <email> <role>`, `users remove <email> --yes` (after the user confirms) |
+| Emails to the team (new contact, hot lead, callback, waiting visitor) | The user stores the email service's key (`secret set RESEND_API_KEY`), then `email set --preset resend\|postmark\|sendgrid\|brevo --from '<address on their domain>' --key '${RESEND_API_KEY}'` and `email test --to <their address>`. Each person picks their emails in the dashboard |
+| Visitors send photos, or files on jobs | `files chat live` (only while a person has the chat) or `files chat always`; `files jobs on`. Off by default; needs R2 on the Cloudflare account. `files ai on` lets a vision model describe photos for the assistant (more AI usage) |
+| The assistant on their own domain | `domain add chat.<their domain>` (the domain must be on the same Cloudflare account); `domain` shows its state |
 | Labels for conversations | `api POST /labels --data '{"name":"Urgent","description":"Needs an answer today"}'` (`"ai": false`: only people add it) |
 | Jobs: another template | `jobs template service-quote\|projects\|support\|sales-demo\|bookings\|custom-orders\|basic` |
 | Visitors should book appointments | `bookings` shows what is in force (a booking link found on the site may already be offered). Ask: a link (`bookings mode link --link <url>`) or the date picker in the chat (`bookings mode picker`; HelpPuff books, the assistant never does). With the picker, ask their hours and calendar: `bookings set --hours "mon=09:00-17:00;…" --duration 30 --timezone <Area/City>`, or a calendar: the user stores its key (`secret set CALCOM_API_KEY`), then `integrations add calcom --key-env CALCOM_API_KEY` and `bookings sync calcom --event-type <id from bookings test>` (Composio for Google Calendar / Outlook: `integrations connect google` gives the user a sign-in link). Check with `bookings slots`; then `config pull` |

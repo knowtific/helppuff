@@ -67,7 +67,7 @@ Shaped for the **Workers Free plan**:
 - A part that fails after its retries marks the crawl **failed** with the
   reason, instead of leaving it "running". **Start learning** again; pages
   that have not changed are skipped.
-- At most 1000 steps per instance (Free allows 1024) and `knowledge.maxPages`
+- At most 1000 steps per instance (Free allows 1024) and `knowledge.website.maxPages`
   (default 300, at most 1000) per run.
 
 Per page:
@@ -333,17 +333,17 @@ In `helppuff.json` (see `helppuff schema` for every field):
 
 ```jsonc
 {
-  "backend": {
-    "type": "workers-ai",
-    "model": "@cf/zai-org/glm-4.7-flash",       // optional; these are the defaults
+  "model": {                                    // optional; these are the defaults
+    "provider": "workers-ai",
+    "model": "@cf/zai-org/glm-4.7-flash",
     "locale": "en-AU",
     "timezone": "Australia/Melbourne",
     "maxAnswerSentences": 4,
-    "retrieval": { "finalK": 4, "minScore": 0.2, "queryRewrite": "heuristic" },
     "tools": { "callback": true, "businessHours": true },
     "budget": { "dailyNeurons": 9000, "maxInputTokens": 6000 }
   },
   "knowledge": {
+    "retrieval": { "type": "helppuff", "finalK": 4, "minScore": 0.2, "queryRewrite": "heuristic" },
     "website": { "include": [], "exclude": ["**/privacy**"], "maxPages": 300, "renderJs": "auto", "schedule": "weekly" },
     "files": ["./faq.md"]   // text formats, added as hand-written entries on deploy
   }

@@ -8,14 +8,14 @@ Everything else has a default that suits it.
 
 | Job | Model now (default) | Change it with | Cost |
 | --- | --- | --- | --- |
-| **Writing answers** | GLM-4.7 Flash (`@cf/zai-org/glm-4.7-flash`) | Dashboard → Settings → Advanced → Model, or `backend.model` | Most of each answer's cost |
-| Backup when the answer model fails | none | `backend.fallbackModel` | Only when used |
-| Turning pages and questions into vectors (search by meaning) | BGE-M3 (`@cf/baai/bge-m3`) | `backend.retrieval.embeddingModel` | Tiny. Changing it re-learns the site |
-| Double-checking the passages search found (reranker) | BGE Reranker Base (`@cf/baai/bge-reranker-base`) | Dashboard → Settings → Advanced → "Double-check answers before replying", or `backend.retrieval.rerankerModel` (`null` = off) | Tiny; about 0.5 s per answer |
-| Reading what kind of question it is (steers search) | off | `backend.retrieval.intentModel`, e.g. `@cf/cloudflare/clef-flash` | Small, when on |
-| Turning a follow-up ("how long does that take?") into a full search | rules, no model | `backend.retrieval.queryRewrite: "llm"` uses the answer model | One small call, when on |
-| Reading business details (phone, hours, areas) while learning the site | the answer model | follows `backend.model` | Once per crawl |
-| Suggested starter questions | the answer model | follows `backend.model` | Once per learning |
+| **Writing answers** | GLM-4.7 Flash (`@cf/zai-org/glm-4.7-flash`) | Dashboard → Settings → Advanced → Model, or `model.model` | Most of each answer's cost |
+| Backup when the answer model fails | none | `model.fallbackModel` | Only when used |
+| Turning pages and questions into vectors (search by meaning) | BGE-M3 (`@cf/baai/bge-m3`) | `knowledge.retrieval.embeddingModel` | Tiny. Changing it re-learns the site |
+| Double-checking the passages search found (reranker) | BGE Reranker Base (`@cf/baai/bge-reranker-base`) | Dashboard → Settings → Advanced → "Double-check answers before replying", or `knowledge.retrieval.rerankerModel` (`null` = off) | Tiny; about 0.5 s per answer |
+| Reading what kind of question it is (steers search) | off | `knowledge.retrieval.intentModel`, e.g. `@cf/cloudflare/clef-flash` | Small, when on |
+| Turning a follow-up ("how long does that take?") into a full search | rules, no model | `knowledge.retrieval.queryRewrite: "llm"` uses the answer model | One small call, when on |
+| Reading business details (phone, hours, areas) while learning the site | the answer model | follows `model.model` | Once per crawl |
+| Suggested starter questions | the answer model | follows `model.model` | Once per learning |
 | Conversation summaries and labels | the answer model | `dashboard.summaryModel` | Once per conversation |
 | Reading PDF and Word files | Cloudflare's Markdown conversion, not a language model | — | Free |
 
@@ -105,7 +105,7 @@ the test below found in answers without thinking.
 
 ## Thinking
 
-**Settings → Advanced → Thinking** (`backend.reasoning`): Low, Medium
+**Settings → Advanced → Thinking** (`model.reasoning`): Low, Medium
 (default) or High. Thinking lets the model work through a question before it
 answers, which helps when an answer needs several steps and, as the test
 below shows, keeps answers safe. It costs time before the first words and the

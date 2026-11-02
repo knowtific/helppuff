@@ -161,7 +161,7 @@ Cloudflare's dashboard keeps stored logs (Worker → Observability). See
 
 **Can my team use the dashboard?**
 Yes: invite people as **admins** (everything) or **members** (conversations,
-jobs, contacts, callbacks, live chat). See [[The dashboard|Dashboard]].
+jobs, the calendar, contacts, callbacks, live chat). See [[The dashboard|Dashboard]].
 
 **Is there an API?**
 Yes: a REST API with scoped keys for conversations, leads, jobs, knowledge,

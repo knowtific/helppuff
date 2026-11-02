@@ -18,10 +18,13 @@ your account and never mistaken for anything else.
 | **D1 database** | conversations (also the source of the chat limits and the model's history), leads, dashboard accounts, webhooks, the knowledge base's text and full-text index | the dashboard and `workers-ai` |
 | **Vectorize index** (1024 dimensions, cosine) | one vector per knowledge passage | `workers-ai` and `"retrieval": "helppuff"` |
 | **Workflow** `knowtific-helppuff-<site>-crawl` | background jobs: crawls, file processing, each conversation's summary and `conversation.completed`, webhook retries | every assistant with a dashboard |
+| **Durable Object** `LiveHub` (a class in the Worker, no resource) | live chat's connections, one per site | [[Live chat|Live-Chat]] |
+| **R2 bucket** `knowtific-helppuff-<site>` | photos and files from the chat and on jobs | [[Photos and files|Files]], when the account has R2 |
 | **Workers AI**, **Browser Rendering** | bindings, no resource | answers, embeddings; pages drawn by JavaScript |
 | **AI Search instance** | the provider's index | the `cloudflare` and `anthropic` backends |
 
-plus a daily cron that re-learns sites whose schedule is due, and two
+plus a cron every 15 minutes (re-learns sites whose schedule is due, syncs
+calendars, sends booking reminders, deletes chat files past `files.keepChatDays`), and two
 generated secrets: `HELPPUFF_SECRET` and `ADMIN_API_KEY` (in your `.env` and set
 on the Worker).
 
@@ -32,7 +35,7 @@ The Worker's address is `https://knowtific-helppuff-<site>.<your subdomain>.work
 
 1. Connects to Cloudflare and finds your `workers.dev` subdomain.
 2. Checks the secrets the config needs are present.
-3. Finds or creates KV, D1 (and applies pending database migrations), Vectorize and AI Search.
+3. Finds or creates KV, D1 (and applies pending database migrations), Vectorize, AI Search and the R2 bucket (when the account has R2).
 4. Refuses to overwrite a prompt or settings changed in the dashboard since
    this folder last pulled them (see [[Configuration|Configuration#the-dashboard-and-helppuffjson]]).
 5. Uploads the Worker, **only when its code or bindings changed**. A new

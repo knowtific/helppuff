@@ -70,5 +70,5 @@ nothing) on your account.
 
 Workers Paid ($5 a month) removes the daily caps on requests, KV, D1 and
 Browser Rendering, and bills Workers AI past the free 10,000 neurons at
-$0.011 per 1,000. Raise `backend.budget.dailyNeurons` to match what you are
+$0.011 per 1,000. Raise `model.budget.dailyNeurons` to match what you are
 happy to spend. See [[Costs and limits|Costs-and-Limits]].

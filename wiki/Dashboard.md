@@ -198,7 +198,7 @@ page is for is behind the (?) beside its title.
 **No need to set them by hand:** every page has **Ask your AI agent**, with a
 request to copy into Claude Code, Codex or Cursor in your project folder. The
 agent goes through that page with you and changes it through the same API
-(see [[AI agents|AI-Agents#let-your-agent-set-it-up-with-you]]).
+(see [[AI agents|AI-Agents#change-anything-by-asking]]).
 
 | Page | What it changes |
 | --- | --- |
@@ -238,7 +238,7 @@ The first person who claims the setup link is the owner. Everyone else has a
 | Role | Can |
 | --- | --- |
 | **Admin** | Everything, like the owner (except removing the owner) |
-| **Member** | Conversations (read, reply in live chats, take, close, label, notes, attributes), jobs (create, move, edit, updates, notes), contacts, callbacks, and their own notifications (which emails they get). No settings, knowledge, prompt, analytics, webhooks or API keys; cannot delete anything or give a chat to someone else |
+| **Member** | Conversations (read, reply in live chats, take, close, label, notes, attributes), jobs (create, move, edit, updates, notes), the calendar (book, move, cancel appointments), contacts, callbacks, and their own notifications (which emails they get). No settings, knowledge, prompt, analytics, webhooks or API keys; cannot delete anything or give a chat to someone else |
 
 In Settings → **Team & security**, choose **Add team member** to open the invite
 form (name, email, role). After you invite someone, the form closes and their
