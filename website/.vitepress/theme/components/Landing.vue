@@ -100,7 +100,7 @@ const demoSrc = computed(() => {
 const STATS = [
   { value: '$0', label: 'to start, on Cloudflare’s Workers Free plan' },
   { value: '~300', label: 'typical AI answers a day within the free allowance' },
-  { value: '~41 KB', label: 'gzipped in all: a 6 KB loader, then the chat once your page is idle' },
+  { value: '~42 KB', label: 'gzipped in all: a 7 KB loader, then the chat once your page is idle' },
   { value: '1', label: 'prompt to your AI agent to set up, deploy and test it' },
 ];
 

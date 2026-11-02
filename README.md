@@ -160,7 +160,7 @@ experience, the operational tools and the customer follow-up workflow.
 | Feature | What it gives you | Learn more |
 | --- | --- | --- |
 | **Website and file knowledge** | Crawls selected pages and learns PDF, Word, Markdown and text files using hybrid semantic + keyword search | [Knowledge base](wiki/Knowledge-Base.md) |
-| **Fast, isolated widget** | An accessible, mobile-first widget in a shadow root; one script tag, about 41 KB gzipped in all: a 6 KB loader draws the button, and the chat loads once the page is idle | [Widget](wiki/Widget.md) |
+| **Fast, isolated widget** | An accessible, mobile-first widget in a shadow root; one script tag, about 42 KB gzipped in all: a 7 KB loader draws the button, and the chat loads once the page is idle | [Widget](wiki/Widget.md) |
 | **Rich conversations** | Streaming replies, shortcut buttons, suggested questions, option chips, cards, links and forms directly inside chat | [Widget](wiki/Widget.md) |
 | **Pre-chat forms** | Capture name, email, phone and custom fields before a conversation, with configurable required fields | [Leads](wiki/Leads.md) |
 | **Built-in CRM** | One lead per person, repeat conversations, pipeline stages, notes, custom answers and CSV export | [Dashboard](wiki/Dashboard.md#contacts) |
