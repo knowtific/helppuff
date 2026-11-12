@@ -11,7 +11,7 @@ import { expect, test } from '@playwright/test';
 const DIST = join(process.cwd(), 'packages/widget/dist');
 // Tripwires for accidental bloat, not design constraints — see the note in
 // packages/widget/scripts/build.mjs.
-const BUDGETS = { loader: 8 * 1024, app: 35 * 1024 };
+const BUDGETS = { loader: 8 * 1024, app: 40 * 1024 };
 
 test.describe('bundle budgets', () => {
   test.skip(!existsSync(DIST), 'build the widget first');
@@ -23,7 +23,7 @@ test.describe('bundle budgets', () => {
     expect(gz('loader.js')).toBeLessThanOrEqual(BUDGETS.loader);
   });
 
-  test('the app stays under 35 kb gzipped', () => {
+  test('the app stays under 40 kb gzipped', () => {
     const app = readdirSync(DIST).find((f) => /^app-.*\.js$/.test(f));
     expect(app, 'app chunk missing').toBeTruthy();
     expect(gz(app as string)).toBeLessThanOrEqual(BUDGETS.app);

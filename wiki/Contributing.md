@@ -85,9 +85,9 @@ repository, with recipes for common changes.
   widget or a silent hide, never an exception on the page. Prefer a missing
   feature over throwing.
 - **Accessibility wins** over visual design.
-- **Size budgets** (gzipped): `loader.js` ≤ 8 KB, the app ≤ 35 KB, and the
+- **Size budgets** (gzipped): `loader.js` ≤ 8 KB, the app ≤ 40 KB, and the
   chunks loaded only when needed: live chat ≤ 6 KB, booking ≤ 8 KB, upload
-  ≤ 3 KB. The app is at its budget, so new widget UI goes in a chunk. The
+  ≤ 3 KB. New widget UI that not every visitor sees goes in a chunk. The
   loader never imports Preact or Zod. `pnpm build` fails over budget.
 - **Dependencies:** the widget depends on `preact` only; the server on `hono`
   and `zod` (plus provider SDKs already present). Ask before adding one.

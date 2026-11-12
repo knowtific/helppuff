@@ -90,25 +90,13 @@ export type Action =
   | { type: 'restore'; restored: Partial<State> }
   | { type: 'open' }
   | { type: 'close' }
-  | { type: 'toggle' }
   | { type: 'screen'; screen: Screen }
   | { type: 'draft'; text: string }
   | { type: 'identify'; lead: Record<string, string> }
   | { type: 'teaser/dismiss' }
-  | { type: 'sound/toggle' }
-  | { type: 'start'; firstMessage?: string }
+  | { type: 'start' }
   | { type: 'lead/submit'; lead: Record<string, string>; firstMessage?: string }
-  | {
-      type: 'session/started';
-      session: Session;
-      messages: Message[];
-      /**
-       * The visitor's own first message, when one was sent with the session.
-       * It rides along with `start` rather than through `send`, so nothing
-       * else would put it in the thread.
-       */
-      userMessage?: Message;
-    }
+  | { type: 'session/started'; session: Session; messages: Message[] }
   | { type: 'session/failed'; error: WidgetError }
   | { type: 'send'; pending: Pending }
   | { type: 'send/ok'; clientId: string; messages: Message[]; token?: string }
@@ -198,9 +186,6 @@ export function reducer(state: State, action: Action): State {
     case 'close':
       return { ...state, open: false };
 
-    case 'toggle':
-      return reducer(state, { type: state.open ? 'close' : 'open' });
-
     case 'screen':
       return { ...state, screen: action.screen, error: null };
 
@@ -215,9 +200,6 @@ export function reducer(state: State, action: Action): State {
     case 'teaser/dismiss':
       return { ...state, teaserDismissed: true };
 
-    case 'sound/toggle':
-      return { ...state, sound: !state.sound };
-
     case 'start': {
       // A live session means there is nothing to start — just show it.
       if (state.session) return { ...state, screen: 'chat', error: null };
@@ -226,8 +208,7 @@ export function reducer(state: State, action: Action): State {
         ...state,
         screen,
         // Straight into chat: greet now. The form path greets on submit, with the name.
-        // A visitor who has already asked something does not need to be asked what they need.
-        ...(screen === 'chat' && state.messages.length === 0 && !action.firstMessage
+        ...(screen === 'chat' && state.messages.length === 0
           ? { messages: greetingMessages(state.config, state.lead) }
           : {}),
         // Only the direct path opens a session here; the form path waits for submit.
@@ -253,11 +234,12 @@ export function reducer(state: State, action: Action): State {
         screen: 'chat',
         status: 'idle',
         messages: capMessages([
-          // The backend greeted on its own (Retell, say): its words, not ours.
-          ...(action.userMessage || action.messages.length === 0 ? state.messages : state.messages.filter((m) => !isGreeting(m))),
-          ...(action.userMessage ? [action.userMessage] : []),
+          // A first message sent with the session has been shown since the visitor sent it: it stays, ahead of the reply.
+          // Without one, a backend that greeted on its own (Retell, say) replaces our greeting: its words, not ours.
+          ...(state.pending[0] || !action.messages.length ? visibleMessages(state) : state.messages.filter((m) => !isGreeting(m))),
           ...action.messages,
         ]),
+        pending: [],
         preview: '',
         error: null,
         unread: state.open ? 0 : state.unread + action.messages.length,
@@ -265,7 +247,10 @@ export function reducer(state: State, action: Action): State {
 
     case 'session/failed':
       // Stay on the screen the visitor is on; the error renders inline.
-      return { ...state, status: 'idle', error: action.error, preview: '' };
+      // A first message that never left goes back to the composer, as a failed send does; "Try again" sends it.
+      return state.pending[0] && !state.session
+        ? reducer(state, { type: 'send/failed', clientId: state.pending[0].clientId, error: action.error })
+        : { ...state, status: 'idle', error: action.error, preview: '' };
 
     case 'stream/text':
       // Text that arrives after its reply has ended is stale; drop it.

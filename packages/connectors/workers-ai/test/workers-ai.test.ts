@@ -525,4 +525,26 @@ describe('replies stay safe and clean', () => {
     expect(parseMarkers('Would you like a call? A: Yes please B: Not now').messages[0]).toMatchObject({ options: [{ label: 'Yes please' }, { label: 'Not now' }] });
     expect(parseMarkers('Plan A: we lay it. Plan B: you do.').messages).toEqual([]);
   });
+
+  it('reads a marker whose first word the model dropped or bent, and shows no brackets', () => {
+    const choices = [{ label: 'Read the full guide' }, { label: 'Ask about our buffered coir' }, { label: 'Request a callback' }];
+    for (const marker of [
+      '[[Read the full guide | Ask about our buffered coir | Request a callback]]',
+      '[[option: Read the full guide | Ask about our buffered coir | Request a callback]]',
+      '[[Options Read the full guide | Ask about our buffered coir | Request a callback]]',
+    ]) {
+      expect(parseMarkers(`We sell coir.\n\n${marker}`)).toMatchObject({ text: 'We sell coir.', messages: [{ type: 'options', options: choices }] });
+    }
+    expect(parseMarkers('Here it is. [[Our guide | https://example.com/guide]]')).toMatchObject({
+      text: 'Here it is.',
+      messages: [{ type: 'links', links: [{ label: 'Our guide', url: 'https://example.com/guide' }] }],
+    });
+    // Not a set of choices: dropped, never shown.
+    expect(parseMarkers('Sure. [[like this]]')).toEqual({ text: 'Sure.', messages: [] });
+    expect(parseMarkers(`Sure. [[a | b | c | d | e]] [[ok | ${'x'.repeat(101)}]]`)).toEqual({ text: 'Sure.', messages: [] });
+    expect(parseMarkers('Sure. [[link: Our guide | javascript:alert(1)]]')).toEqual({ text: 'Sure.', messages: [] });
+    // The placeholder guard still applies, and a word that only starts like "options" is a choice.
+    expect(parseMarkers('Sure.\n[[A | B | C]]')).toEqual({ text: 'Sure.', messages: [] });
+    expect(parseMarkers('Sure.\n[[Optional extras | Linked accounts]]').messages[0]).toMatchObject({ options: [{ label: 'Optional extras' }, { label: 'Linked accounts' }] });
+  });
 });

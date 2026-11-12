@@ -1,7 +1,7 @@
 /**
  * Just enough colour maths to keep the accent accessible: the
  * foreground on an accent fill is chosen at runtime, not assumed. No colour
- * library — this is ~30 lines and the budget is 35 kb.
+ * library — this is ~30 lines and the budget is 40 kb.
  */
 
 export type Rgb = { r: number; g: number; b: number };

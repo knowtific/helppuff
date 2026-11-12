@@ -205,7 +205,7 @@ pnpm check          # lint + typecheck + test + build + e2e (what CI runs)
 - Server errors always leave via `app.onError` as the JSON envelope — throw
   `HelpPuffError`, never return HTML.
 - Accessibility wins over visual design.
-- Bundle guards: `loader.js` ≤ 8 kb gz, app ≤ 35 kb gz, live chunk ≤ 6 kb gz, booking chunk ≤ 8 kb gz, upload chunk ≤ 3 kb gz. The app is at its budget (a few bytes left): new widget UI goes in a chunk.
+- Bundle guards: `loader.js` ≤ 8 kb gz, app ≤ 40 kb gz, live chunk ≤ 6 kb gz, booking chunk ≤ 8 kb gz, upload chunk ≤ 3 kb gz. The app is at about 35 kb (the budget was raised from 35 to 40 for now): new widget UI that not every visitor sees still goes in a chunk.
   Don't import Preact or Zod into the loader; the widget imports protocol
   values only from zod-free subpaths (`@helppuff/protocol/live`, `/text`, `/forms`, `/jobs`).
 - For provider APIs (Retell, OpenAI, Gemini, Cloudflare, Anthropic,

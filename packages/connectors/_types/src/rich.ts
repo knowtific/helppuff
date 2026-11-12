@@ -244,10 +244,12 @@ export function toolCallToMessage(name: string, rawArguments: unknown): Message 
 /**
  * The inline-marker fallback, for an agent that cannot be given tools.
  * A trailing `[[options: A | B | C]]` or `[[link: Label | https://…]]` block
- * is parsed out and stripped; malformed markers are stripped silently rather
- * than shown to the visitor as stray punctuation.
+ * is parsed out and stripped. Models drop or bend the first word
+ * (`[[A | B | C]]`, `[[option: …]]`, `[[options A | B]]`): those are read as
+ * what they meant when that is clear. Anything else in `[[…]]` is stripped
+ * silently rather than shown to the visitor as stray punctuation.
  */
-const MARKER = /\[\[\s*(options|link)\s*:\s*([^\]]*)\]\]/gi;
+const MARKER = /\[\[\s*(?:(options?|links?)\b\s*:?)?\s*([^\]]*)\]\]/gi;
 
 /**
  * How earlier replies are written into the history (`summarizeReply`). Models
@@ -290,16 +292,18 @@ export function parseMarkers(input: string): { text: string; messages: Message[]
       if (kind.toLowerCase() === 'offered choices') options = options.concat(body.split('|').map((part) => part.trim()).filter(Boolean));
       return '';
     })
-    .replace(MARKER, (_match, kind: string, body: string) => {
-    const parts = body.split('|').map((part) => part.trim()).filter(Boolean);
-    if (kind.toLowerCase() === 'options') {
-      options = options.concat(parts);
-    } else if (parts.length >= 2) {
-      const url = safeUrl(parts[1]);
-      if (url && parts[0]) links.push({ label: parts[0], url });
-    }
-    return '';
-  });
+    .replace(MARKER, (_match, kind: string | undefined, body: string) => {
+      const parts = body.split('|').map((part) => part.trim()).filter(Boolean);
+      const named = kind?.toLowerCase();
+      const url = parts.length === 2 ? safeUrl(parts[1]) : null;
+      if (named?.startsWith('link') || (!named && url)) {
+        if (url && parts[0]) links.push({ label: parts[0], url });
+      } else if (named || (parts.length >= 2 && parts.length <= 4 && parts.every((part) => part.length <= 100))) {
+        // Without the word, only what looks like a set of choices is one.
+        options = options.concat(parts);
+      }
+      return '';
+    });
 
   let text = stripped;
   if (!options.length) {

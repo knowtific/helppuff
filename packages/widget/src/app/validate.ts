@@ -7,7 +7,7 @@ import type { Action, Field, FileRef, Flow, FlowStep, Img, Message, Option, Shor
  * and its default applied; an unknown message type is dropped.
  *
  * This deliberately mirrors the Zod schemas in `@helppuff/protocol` rather than
- * importing them — Zod would cost more than a third of the widget's 35 kb
+ * importing them — Zod would cost about a third of the widget's 40 kb
  * budget. `test/validate.test.ts` cross-checks the two on shared
  * fixtures so they cannot drift apart.
  */

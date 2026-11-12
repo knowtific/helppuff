@@ -1,5 +1,16 @@
 import { afterEach, beforeEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/preact';
+import { Storage } from 'happy-dom';
+
+/*
+ * Node 25 and later define their own `localStorage` global, which is
+ * `undefined` unless Node is started with `--localstorage-file`, and vitest
+ * keeps a global that already exists over happy-dom's. Give the tests
+ * happy-dom's storage there, as they get on older Node.
+ */
+if (typeof localStorage === 'undefined') {
+  Object.defineProperty(globalThis, 'localStorage', { value: new Storage(), configurable: true, writable: true });
+}
 
 /**
  * happy-dom gives us a real DOM with Shadow DOM support, which is what the
