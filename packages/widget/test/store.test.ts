@@ -34,12 +34,10 @@ function run(actions: Action[], from: State = initialState): State {
 const withConfig = (overrides = {}) => run([{ type: 'config/loaded', config: config(overrides) }]);
 
 describe('panel visibility', () => {
-  it('opens, closes and toggles', () => {
+  it('opens and closes', () => {
     const opened = run([{ type: 'open' }]);
     expect(opened.open).toBe(true);
     expect(reducer(opened, { type: 'close' }).open).toBe(false);
-    expect(reducer(opened, { type: 'toggle' }).open).toBe(false);
-    expect(reducer(initialState, { type: 'toggle' }).open).toBe(true);
   });
 
   it('clears the unread count on open', () => {
@@ -254,16 +252,32 @@ describe('sending', () => {
 });
 
 describe('errors', () => {
-  it('places the visitor\'s first message ahead of the server\'s reply', () => {
-    const userMessage: Message = { id: 'u1', ts: 1, role: 'user', type: 'text', text: 'qwedae' };
-    const state = reducer(withConfig(), {
+  it('shows a first message at once, then places it ahead of the server\'s reply', () => {
+    // A starter question on the home screen: no session yet, and the answer takes seconds.
+    const asked = reducer(withConfig(), { type: 'send', pending: userPending('u1', 'qwedae') });
+    expect(asked.screen).toBe('chat');
+    expect(isBusy(asked)).toBe(true);
+    expect(visibleMessages(asked).map((m) => m.id)).toEqual(['u1']);
+    // The reply streams under it while the session starts.
+    expect(reducer(asked, { type: 'stream/text', text: 'You' }).preview).toBe('You');
+
+    const state = reducer(asked, {
       type: 'session/started',
       session: { token: 't', id: 's', expiresAt: 9e15 },
       messages: [agentMessage('greet', 'Hi there'), agentMessage('reply', 'You said: qwedae')],
-      userMessage,
     });
-    expect(state.messages.map((m) => m.role)).toEqual(['user', 'agent', 'agent']);
-    expect(state.messages[0]).toBe(userMessage);
+    expect(state.pending).toEqual([]);
+    expect(state.messages.map((m) => m.id)).toEqual(['u1', 'greet', 'reply']);
+    expect(visibleMessages(state)).toHaveLength(3);
+  });
+
+  it('hands a first message back to the composer when the session cannot start', () => {
+    const asked = reducer(withConfig(), { type: 'send', pending: userPending('u1', 'qwedae') });
+    const state = reducer(asked, { type: 'session/failed', error: { code: 'offline', message: 'x', retryable: true } });
+    expect(state.screen).toBe('chat');
+    expect(state.status).toBe('idle');
+    expect(visibleMessages(state)).toEqual([]);
+    expect(state.draft).toBe('qwedae');
   });
 
   it('adds nothing extra when no first message was sent', () => {
@@ -386,10 +400,6 @@ describe('miscellaneous', () => {
   it('takes the sound default from the config', () => {
     expect(withConfig({ sound: { enabled: true } }).sound).toBe(true);
     expect(withConfig().sound).toBe(false);
-  });
-
-  it('toggles sound', () => {
-    expect(reducer(initialState, { type: 'sound/toggle' }).sound).toBe(true);
   });
 
   it('dismisses the teaser', () => {

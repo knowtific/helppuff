@@ -52,6 +52,7 @@ import {
 import {
   initialState,
   isBusy,
+  leadIsComplete,
   reducer,
   visibleMessages,
   type Pending,
@@ -403,6 +404,14 @@ export function App({
 
   const startSession = useCallback(
     async (lead: Record<string, string>, firstMessage?: string) => {
+      // Their question shows at once, in the thread, with the reply being written under it.
+      if (firstMessage) {
+        const id = clientId();
+        dispatch({
+          type: 'send',
+          pending: { clientId: id, input: { kind: 'text', text: firstMessage }, message: { id, ts: Date.now(), role: 'user', type: 'text', text: firstMessage } },
+        });
+      }
       /*
        * Every path into a session comes through here, so this is the one
        * place a captcha token has to be obtained. It is fetched fresh each
@@ -451,18 +460,6 @@ export function App({
         type: 'session/started',
         session: result.session,
         messages: result.messages,
-        // Show what the visitor asked, not just the answer to it.
-        ...(firstMessage
-          ? {
-              userMessage: {
-                id: clientId(),
-                ts: Date.now(),
-                role: 'user' as const,
-                type: 'text' as const,
-                text: firstMessage,
-              },
-            }
-          : {}),
       });
       runtime.emit('lead', lead);
     },
@@ -506,7 +503,7 @@ export function App({
     const lead = leadRef.current ?? {};
     dispatch({ type: 'start' });
     // The direct path opens a session immediately; the form path waits for submit.
-    if (!current.session && (!config.leadForm.enabled || leadReady(config, lead))) {
+    if (!current.session && leadIsComplete(config, lead)) {
       void startSession(lead);
     }
   }, [config, startSession]);
@@ -546,7 +543,7 @@ export function App({
       const lead = { ...(leadRef.current ?? {}) };
       for (const [answer, field] of Object.entries(QUOTE_CONTACT_FIELDS)) if (answers[answer] && !lead[field]) lead[field] = answers[answer];
       leadRef.current = lead;
-      if (!config.leadForm.enabled || leadReady(config, lead)) void startSession(lead);
+      if (leadIsComplete(config, lead)) void startSession(lead);
       else dispatch({ type: 'screen', screen: 'lead_form' });
     },
     [config, doSend, startSession],
@@ -663,7 +660,7 @@ export function App({
         void doSend({ kind: 'text', text: trimmed });
         return;
       }
-      if (leadReady(config, leadRef.current ?? {})) {
+      if (leadIsComplete(config, leadRef.current)) {
         void startSession(leadRef.current ?? {}, trimmed);
         return;
       }
@@ -859,8 +856,10 @@ export function App({
   const onRetry = useCallback(() => {
     const current = stateRef.current;
     dispatch({ type: 'error/dismiss' });
-    if (!current.session) void startSession(leadRef.current ?? {});
-    else if (current.draft.trim()) void doSend({ kind: 'text', text: current.draft.trim() });
+    // What a failed send or a failed start handed back to the composer goes again.
+    const text = current.draft.trim();
+    if (!current.session) void startSession(leadRef.current ?? {}, text);
+    else if (text) void doSend({ kind: 'text', text });
   }, [doSend, startSession]);
 
   const onNewChat = useCallback(() => {
@@ -1072,9 +1071,4 @@ function PoweredBy({ t }: { t: ReturnType<typeof makeStrings> }) {
       </a>
     </div>
   );
-}
-
-function leadReady(config: WidgetConfig, lead: Record<string, string>): boolean {
-  if (!config.leadForm.enabled) return true;
-  return config.leadForm.fields.every((field) => !field.required || Boolean(lead[field.name]?.trim()));
 }

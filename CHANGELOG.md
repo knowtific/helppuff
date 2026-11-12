@@ -8,6 +8,22 @@ never needs you to change anything. Upgrade with
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-11-12
+
+### Fixed
+
+- **A starter question is acknowledged at once.** Tapping a question on the
+  home screen (or calling `HelpPuff.send()` before a chat exists) now opens
+  the thread straight away, with the visitor's question, the typing dots and
+  the reply as it is written. Before, nothing changed until the whole first
+  answer had arrived, so visitors tapped twice. If the chat cannot start, the
+  question goes back to the message box and "Try again" sends it.
+- **No more `[[a | b | c]]` shown to visitors.** When the model drops or bends
+  the first word of a choices marker (`[[a | b | c]]`, `[[option: …]]`,
+  `[[options a | b]]`), the choices are still shown as buttons, and a bare
+  `[[Label | https://…]]` as a link. Anything else in double square brackets
+  is removed from the reply rather than shown.
+
 ## [0.10.0] - 2026-10-17
 
 ### Added

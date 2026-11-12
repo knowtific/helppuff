@@ -514,6 +514,37 @@ describe('recoverable failures degrade in place', () => {
     await seeMessage('Second time lucky');
   });
 
+  it('shows a starter question and the typing dots at once, and sends it again on retry', async () => {
+    let fail: (reason: unknown) => void = () => {};
+    const api = fakeApi();
+    api.startSession.mockImplementationOnce(() => new Promise((_resolve, reject) => { fail = reject; }));
+    const question = { id: 'q1', label: 'Opening hours', action: { id: 'q1', kind: 'reply', label: 'Opening hours', value: 'When are you open?' } };
+    const harness = setup({ config: { leadForm: { enabled: false }, home: { title: 'Hi there', shortcuts: [question] } }, api });
+
+    await openPanel(harness.handle);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /opening hours/i }));
+    });
+
+    // The answer has not arrived, and the visitor already sees their question being answered.
+    await seeMessage('When are you open?');
+    expect(harness.container.querySelector('.hp-typing')).toBeTruthy();
+    expect(api.startSession).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      fail(new ApiError({ code: 'connector_error', message: 'Down for a moment.', retryable: true }));
+    });
+    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
+    expect(inThread().queryByText('When are you open?')).toBeNull();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+    });
+    await seeMessage('Hi — how can I help?');
+    expect(api.startSession.mock.calls[1]?.[0]).toMatchObject({ firstMessage: 'When are you open?' });
+    expect(inThread().getAllByText('When are you open?')).toHaveLength(1);
+  });
+
   it('reports a failed session start without leaving the form', async () => {
     const api = fakeApi();
     api.startSession.mockRejectedValue(
