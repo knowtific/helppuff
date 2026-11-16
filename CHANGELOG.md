@@ -8,6 +8,35 @@ never needs you to change anything. Upgrade with
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-11-17
+
+### Added
+
+- **A backup model by default.** When the model that writes the answers
+  fails (an outage, a model Cloudflare retired), GLM-4.7 Flash answers
+  instead, once. It runs on Workers AI whoever writes the answers, so an
+  OpenAI or Claude outage is covered too, and its neurons count against the
+  daily budget. Before, there was no backup unless `model.fallbackModel` was
+  set. Choose another with `helppuff model set … --fallback <id>` (a `@cf/…`
+  id runs on Workers AI, any other on the same provider), or turn it off, as
+  before, with `--fallback none` or
+  `helppuff config set model.fallbackModel none`. Settings → Advanced shows
+  it under the model.
+
+### Changed
+
+- **Model choices follow Cloudflare's retirements.** Cloudflare retires
+  Qwen3 30B, GLM-5.3 Flash, DeepSeek V4 Flash and V4 Pro, Nemotron 3, Kimi
+  K2.6, QwQ and GLM-5.2 on 2026-11-20 (Kimi K2.5 and Gemma 3 went in May);
+  after that a request to one fails. `helppuff init` now offers GLM-4.7 Flash
+  (still the default), Llama 4 Scout and DeepSeek V4.1 Flash (Workers Paid),
+  and the budget's neuron rates and Workers Paid list know DeepSeek V4.1
+  Flash and drop the retired models. **If your site uses a retired model**
+  (`helppuff config get model`, and `dashboard.summaryModel`), switch it:
+  `helppuff model set workers-ai --model @cf/zai-org/glm-4.7-flash`, then
+  `helppuff deploy`. The wiki's AI models page lists each replacement, and
+  its comparisons and the cost tables are updated.
+
 ## [0.10.1] - 2026-11-12
 
 ### Fixed

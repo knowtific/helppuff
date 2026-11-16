@@ -211,6 +211,17 @@ pnpm check          # lint + typecheck + test + build + e2e (what CI runs)
 - For provider APIs (Retell, OpenAI, Gemini, Cloudflare, Anthropic,
   Turnstile), check the current docs; don't invent endpoints or fields.
   `wiki/Providers.md` has the verified references.
+- Model ids go stale: Cloudflare retires Workers AI models (changelog,
+  "Planned model deprecations"), and providers rename theirs. Whenever you
+  touch models, or learn one is retired, update every place that names one
+  together: the pickers (`cli/src/engine/questions.ts` `MODELS`,
+  `dashboard/src/components/SettingsForm.tsx` `MODELS`), the neuron rates and
+  Workers Paid list (`rag/src/pricing.ts`), the thinking rules
+  (`rag/src/ai.ts` `reasoningInputs`), help examples (`cli/src/help.ts`),
+  `scripts/booking-eval/config.ts`, and the wiki's comparisons
+  (`AI-Models.md` incl. its Retired models table, `Costs-and-Limits.md`,
+  `AI-Booking-Tests.md`, `Knowledge-Base.md`, `Models-and-Providers.md`).
+  Never recommend a model the provider no longer serves.
 - Update `wiki/` when something user-visible changes. Describe every
   `helppuff.json` field with `.describe()` in its schema; `pnpm sync:docs`
   regenerates the reference pages.

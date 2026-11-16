@@ -257,7 +257,8 @@ asked for again; when none are known, a short callback form is shown instead.
 is open, in `timezone`.
 
 Models: `@cf/zai-org/glm-4.7-flash` by default, thinking at `medium`
-(`reasoning`), and `fallbackModel` tried once when the main one fails. The
+(`reasoning`), and a backup, `fallbackModel` (GLM-4.7 Flash unless set;
+`none` for none), tried once when the main one fails. The
 others, compared for speed, quality and answers a day, are on
 [[AI models|AI-Models]].
 
@@ -377,4 +378,5 @@ Checked against developers.cloudflare.com and the account's model catalog on
   `@cf/qwen/qwen3-embedding-0.6b` (`documents`/`queries`, ≤ 32 per call →
   `{ data, shape }`, 1,075 per M); `@cf/baai/bge-reranker-base` (`{ query,
   contexts: [{ text }] }` → `{ response: [{ id, score }] }`, 283 per M);
-  `@cf/zai-org/glm-5.3-flash` is Workers Paid only.
+  `@cf/zai-org/glm-5.3` and `@cf/deepseek-ai/deepseek-v4.1-flash-1017` are
+  Workers Paid only.

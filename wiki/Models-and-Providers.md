@@ -98,8 +98,11 @@ APIs; Claude through its own Messages API.
 
 ## The assistant's tuning
 
-These work with every provider: `reasoning`, `fallbackModel` (another model
-of the same provider, tried once when a call fails), `locale`, `timezone`,
+These work with every provider: `reasoning`, `fallbackModel` (the backup,
+tried once when a call fails: GLM-4.7 Flash on Workers AI by default, so an
+outage at OpenAI or Anthropic still gets an answer; a Workers AI id (`@cf/…`)
+always runs on Workers AI, any other id on the same provider; `none` for no
+backup; `helppuff model set … --fallback <id|none>`), `locale`, `timezone`,
 `maxAnswerSentences`, `maxOutputTokens`, `historyMessages`, `richMessages`,
 `tools` (callbacks and opening hours), `business`, and `budget`
 (`maxInputTokens` for all; `dailyNeurons` for Workers AI). See the

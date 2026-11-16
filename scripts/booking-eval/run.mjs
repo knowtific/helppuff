@@ -2,7 +2,7 @@
 // against the eval Worker, one site per model, and checks every tool call.
 //
 //   pnpm --filter @helppuff/server exec wrangler dev --config ../../scripts/booking-eval/wrangler.toml --port 8790
-//   node scripts/booking-eval/run.mjs glm47,qwen3 [happy,perth,…]
+//   node scripts/booking-eval/run.mjs glm47,scout [happy,perth,…]
 //
 // It calls real Workers AI on the account wrangler is logged in to: about 150 neurons a
 // scenario on GLM-4.7 Flash, several times that on the larger models. Results are written

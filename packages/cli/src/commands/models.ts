@@ -6,6 +6,7 @@ import { c } from '../output.js';
 import { adminApi } from '../engine/admin-api.js';
 import { PRESETS, loadProject, modelOf, retrievalOf, updateProject, type LoadedProject, type Preset } from '../engine/project.js';
 import { secretsOf } from '../engine/assistant.js';
+import { DEFAULT_FALLBACK_MODEL } from '@helppuff/connector-workers-ai';
 import type { Ctx } from './context.js';
 
 /**
@@ -14,7 +15,7 @@ import type { Ctx } from './context.js';
  * never in the dashboard. `test` asks the deployed Worker.
  *
  *   model                         what answers now
- *   model set <provider> [--model …] [--preset …] [--base-url …] [--key-env …] [--module …] [--secrets A,B]
+ *   model set <provider> [--model …] [--fallback <id|none>] [--preset …] [--base-url …] [--key-env …] [--module …] [--secrets A,B]
  *   model test ["question"]
  *   rag                           what answers come from now
  *   rag set <type> [--url …] [--module …] [--vector-store …] [--instance …] [--endpoint …] [--token-env …] [--secrets A,B]
@@ -59,6 +60,8 @@ function describeModel(loaded: LoadedProject) {
   return {
     provider: model['provider'],
     model: model['model'] ?? (model['provider'] === 'workers-ai' ? '@cf/zai-org/glm-4.7-flash' : null),
+    // The backup, tried once when the answer model fails: GLM-4.7 Flash unless set, `none` when off.
+    fallbackModel: model['fallbackModel'] === undefined ? DEFAULT_FALLBACK_MODEL : typeof model['fallbackModel'] === 'string' ? model['fallbackModel'] : 'none',
     ...(preset ? { preset: model['preset'], baseUrl: preset.baseUrl } : model['baseUrl'] ? { baseUrl: model['baseUrl'] } : {}),
     ...(model['module'] ? { module: model['module'] } : {}),
     secrets: secretsOf(loaded),
@@ -91,7 +94,7 @@ async function test(ctx: Ctx, loaded: LoadedProject, part: 'model' | 'knowledge'
 }
 
 export async function modelCommand(ctx: Ctx): Promise<number> {
-  assertKnown(ctx.flags, ['model', 'preset', 'base-url', 'key-env', 'module', 'secrets', 'gateway', 'gateway-id', 'account-id', 'yes', 'y'], 'model');
+  assertKnown(ctx.flags, ['model', 'fallback', 'preset', 'base-url', 'key-env', 'module', 'secrets', 'gateway', 'gateway-id', 'account-id', 'yes', 'y'], 'model');
   const [sub = 'show', arg, ...rest] = ctx.positionals;
   const loaded = loadProject(ctx.cwd);
 
@@ -117,6 +120,8 @@ export async function modelCommand(ctx: Ctx): Promise<number> {
   const keyEnv = envName(str(ctx.flags, 'key-env'), '--key-env');
   const secrets = list(str(ctx.flags, 'secrets'));
   secrets?.forEach((name) => envName(name, '--secrets'));
+  const fallback = str(ctx.flags, 'fallback');
+  if (fallback !== undefined && (!fallback.trim() || fallback.length > 200)) throw new CliError('usage', '--fallback is a model id, or `none` for no backup.', { exitCode: EXIT.usage });
 
   let next: Record<string, unknown>;
   switch (provider) {
@@ -171,14 +176,14 @@ export async function modelCommand(ctx: Ctx): Promise<number> {
       }
       delete raw['backend'];
     }
-    raw['model'] = { ...keep, ...next };
+    raw['model'] = { ...keep, ...next, ...(fallback !== undefined ? { fallbackModel: fallback === 'none' ? null : fallback } : {}) };
     raw['format'] = 2;
   });
   const { missing } = secretsOf(updated);
   if (missing.length) return askForSecrets(ctx, missing, `The ${provider} model`);
   const described = describeModel(updated) as Record<string, unknown>;
   ctx.out.result({ ...described, next: ['helppuff deploy --json', 'helppuff model test --json'] }, () => {
-    ctx.out.success(`Answers will be written by ${provider}${described['model'] ? ` (${String(described['model'])})` : ''}.`);
+    ctx.out.success(`Answers will be written by ${provider}${described['model'] ? ` (${String(described['model'])})` : ''}; backup: ${String(described['fallbackModel'])}.`);
     process.stdout.write(c.dim('Run `helppuff deploy` to make it live, then `helppuff model test`.\n'));
   });
   return 0;

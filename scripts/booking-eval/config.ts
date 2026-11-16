@@ -3,8 +3,8 @@ import { defineConfig } from '@helppuff/server';
 /** One site per model: the same prompt, tools and calendar, so only the model differs. */
 export const MODELS: Record<string, string> = {
   glm47: '@cf/zai-org/glm-4.7-flash',
-  qwen3: '@cf/qwen/qwen3-30b-a3b-fp8',
-  glm53: '@cf/zai-org/glm-5.3-flash',
+  scout: '@cf/meta/llama-4-scout-17b-16e-instruct',
+  deepseek: '@cf/deepseek-ai/deepseek-v4.1-flash-1017',
   gptoss: '@cf/openai/gpt-oss-120b',
   llama: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
 };

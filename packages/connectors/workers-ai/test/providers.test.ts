@@ -122,6 +122,30 @@ describe('an OpenAI-compatible model', () => {
     expect(used?.neurons_est ?? 0).toBe(0);
   });
 
+  it('backs up a failing provider with GLM-4.7 Flash on Workers AI, counted against the budget', async () => {
+    const api = provider([() => new Response('{"error":"down"}', { status: 503 })]);
+    const models: string[] = [];
+    const ai = {
+      async run(model: string, inputs: Record<string, unknown>) {
+        if (!('messages' in inputs)) throw new Error('not a chat');
+        models.push(model);
+        return { choices: [{ message: { role: 'assistant', content: 'From the backup.' } }], usage: { prompt_tokens: 1000, completion_tokens: 50 } };
+      },
+    };
+    const w = await world({ provider: DEEPINFRA, model: 'm', knowledge: { type: 'none' } }, api.fetch, { AI: ai });
+    expect(textOf(await w.send('Hi'))).toBe('From the backup.');
+    expect(models).toEqual(['@cf/zai-org/glm-4.7-flash']);
+    const used = await w.db.prepare('SELECT neurons_est FROM usage_daily').first<{ neurons_est: number }>();
+    expect(used?.neurons_est ?? 0).toBeGreaterThan(0);
+  });
+
+  it('backs up with another model on the same provider when the id is not a Workers AI one', async () => {
+    const api = provider([() => new Response('{"error":"down"}', { status: 503 }), () => chatReply('Second model.')]);
+    const w = await world({ provider: DEEPINFRA, model: 'm', fallbackModel: 'm2', knowledge: { type: 'none' } }, api.fetch);
+    expect(textOf(await w.send('Hi'))).toBe('Second model.');
+    expect(api.calls.map((c) => c.body['model'])).toEqual(['m', 'm2']);
+  });
+
   it('turns a provider failure into a short, safe error', async () => {
     const api = provider([() => new Response('{"error":"rate limited, secret account 123"}', { status: 429 })]);
     const w = await world({ provider: DEEPINFRA, model: 'm', knowledge: { type: 'none' } }, api.fetch);

@@ -64,14 +64,14 @@ Never book without the visitor's clear yes to that exact time and those details.
 | Model (Workers AI) | Checks passed | What went wrong |
 | --- | --- | --- |
 | GLM-4.7 Flash (HelpPuff's default) | 21 of 23; then 6 of 10 on a rerun of the two hardest | **Booked a different time than the visitor confirmed.** Once **booked without waiting for the yes, then booked again** on the yes |
-| Qwen3 30B | 22 of 23 | Muddled time zones: **refused a valid time** the visitor picked and pushed another |
 | gpt-oss 120B | 13 of 14 (the three hardest scenarios) | Told the visitor a free time "isn't available", then **offered times the calendar never returned** |
 | Llama 3.3 70B | 13 of 14 (the three hardest scenarios) | The best: booked the right time in the end, but first **showed Wednesday's times as Thursday's**. About four times the default's cost per message |
-| GLM-5.3 Flash | not run | Needs the Workers Paid plan |
+| DeepSeek V4.1 Flash, GLM-5.3 | not run | Need the Workers Paid plan |
 
 The same scenario could pass in one run and fail in the next: GLM-4.7
 Flash passed the happy path five out of five, then double-booked it on the
-rerun.
+rerun. Qwen3 30B also ran (22 of 23; it refused a valid time over a time
+zone mix-up), but Cloudflare retired it on 2026-11-20.
 
 ## The complex case, in detail
 
@@ -163,5 +163,5 @@ To rerun it on your own account (it uses your Workers AI allowance, about
 
 ```bash
 pnpm --filter @helppuff/server exec wrangler dev --config ../../scripts/booking-eval/wrangler.toml --port 8790
-node scripts/booking-eval/run.mjs glm47,qwen3
+node scripts/booking-eval/run.mjs glm47,scout
 ```

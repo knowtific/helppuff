@@ -38,7 +38,7 @@ The common ones; every option is in the
 | --- | --- | --- |
 | `model` | `@cf/zai-org/glm-4.7-flash` | Any Workers AI chat model. Compared for speed, quality and answers a day on [[AI models|AI-Models]] |
 | `reasoning` | `medium` | How long the model thinks before answering: `low`, `medium`, `high`. Thinking keeps answers safe; deeper helps multi-step questions, but is slower to start and the thinking is billed. It cannot be switched off. Near the daily budget it drops to `low`. See [[AI models|AI-Models]] |
-| `fallbackModel` | — | Tried once if the main model fails |
+| `fallbackModel` | `@cf/zai-org/glm-4.7-flash` | The backup, tried once if the main model fails (an outage, a retired model). `none`: no backup. Not used when it is the main model itself |
 | `timezone`, `locale` | — | e.g. `Australia/Melbourne`, `en-AU`: "are you open now?", spelling |
 | `maxAnswerSentences` | `4` | Shorter is cheaper and reads better in a chat |
 | `historyMessages` | `6` | Earlier messages sent with each question |

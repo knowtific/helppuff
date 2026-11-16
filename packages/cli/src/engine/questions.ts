@@ -113,10 +113,11 @@ export const PROVIDER_KEYS: Partial<Record<BackendType, string>> = {
 
 export const MODELS: Partial<Record<BackendType, Option[]>> = {
   // Measured in HelpPuff on 2026-10-05 (wiki/AI-Models.md); prices from developers.cloudflare.com/workers-ai/platform/pricing.
+  // Cloudflare retires models (changelog, "Planned model deprecations"): keep this, the dashboard's list and the wiki's AI models page current.
   'workers-ai': [
     { value: '@cf/zai-org/glm-4.7-flash', label: 'GLM-4.7 Flash', hint: 'default · best all-round · ~325 answers a day free' },
-    { value: '@cf/qwen/qwen3-30b-a3b-fp8', label: 'Qwen3 30B', hint: 'free plan · dependable · ~340 answers a day free' },
-    { value: '@cf/zai-org/glm-5.3-flash', label: 'GLM-5.3 Flash', hint: 'most capable · needs Workers Paid or AI Gateway credits' },
+    { value: '@cf/meta/llama-4-scout-17b-16e-instruct', label: 'Llama 4 Scout', hint: 'free plan · fastest first words · ~180 answers a day free' },
+    { value: '@cf/deepseek-ai/deepseek-v4.1-flash-1017', label: 'DeepSeek V4.1 Flash', hint: 'most capable for the price · needs Workers Paid or AI Gateway credits' },
   ],
   cloudflare: [
     { value: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', label: 'Llama 3.3 70B', hint: 'Workers AI · fast, free tier' },

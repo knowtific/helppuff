@@ -810,7 +810,7 @@ function route(method: string, path: string, params: URLSearchParams, body: Body
       meta: { at: settingsAt, by: OWNER },
       captcha: true,
       storage: true,
-      ai: { provider: 'workers-ai', model: settings.assistant?.model ?? null, knowledge: 'helppuff' },
+      ai: { provider: 'workers-ai', model: settings.assistant?.model ?? null, fallbackModel: '@cf/zai-org/glm-4.7-flash', knowledge: 'helppuff' },
       // The links the widget shows until the owner saves the home screen: picked from the website.
       suggestedHome: homeSuggested ? { questions: [], links: SUGGESTED_LINKS, at: NOW - 6 * DAY } : null,
       forms: [{ id: 'booking', title: 'Book a visit' }],

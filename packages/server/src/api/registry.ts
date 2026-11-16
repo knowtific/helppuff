@@ -2021,7 +2021,7 @@ export const ENDPOINTS: Endpoint[] = [
       captcha: false,
       storage: true,
       suggestedHome: { questions: ['How much is a blocked drain?'], links: homeLinks, at: T },
-      ai: { provider: 'workers-ai', model: '@cf/zai-org/glm-4.7-flash', knowledge: 'helppuff' },
+      ai: { provider: 'workers-ai', model: '@cf/zai-org/glm-4.7-flash', fallbackModel: '@cf/zai-org/glm-4.7-flash', knowledge: 'helppuff' },
       forms: [{ id: 'booking', title: 'Book a visit' }],
       flows: [{ id: 'quote', title: 'Which service do you need?' }],
     },
