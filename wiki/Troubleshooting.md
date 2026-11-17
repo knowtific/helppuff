@@ -212,8 +212,10 @@ helppuff doctor              # whole backends (OpenAI, Gemini, Retell, your API)
 | `The provider took too long to answer` | Try a faster model, or the provider is having a bad day |
 | `The custom module is not in the deployed Worker` | `helppuff deploy` |
 
-Setting `model.fallbackModel` tries a second model once when the first one
-fails.
+When the answer model fails, the backup (`model.fallbackModel`, GLM-4.7
+Flash on Workers AI unless you set another or `none`) answers instead, once.
+With GLM-4.7 Flash as the answer model, set another backup to have one:
+`helppuff config set model.fallbackModel @cf/meta/llama-4-scout-17b-16e-instruct`.
 
 ### "That message is a little too long." / "That message is empty."
 

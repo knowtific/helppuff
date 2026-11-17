@@ -265,7 +265,7 @@ describe('settings', () => {
     const w = world();
     const view = (await (await get(w.api, '/admin/api/settings')).json()) as { settings: { assistant: { rerank: boolean; reasoning: string } }; ai: Record<string, unknown> };
     expect(view.settings.assistant).toMatchObject({ rerank: true, reasoning: 'medium' });
-    expect(view.ai).toEqual({ provider: 'workers-ai', model: '@cf/zai-org/glm-4.7-flash', knowledge: 'helppuff' });
+    expect(view.ai).toEqual({ provider: 'workers-ai', model: '@cf/zai-org/glm-4.7-flash', fallbackModel: '@cf/zai-org/glm-4.7-flash', knowledge: 'helppuff' });
     for (const assistant of [{ rerank: false }, { reasoning: 'high' }, { model: '@cf/openai/gpt-oss-20b' }]) {
       const refused = await send(w.api, 'PUT', '/admin/api/settings', { settings: { assistant } });
       expect(refused.status).toBe(400);

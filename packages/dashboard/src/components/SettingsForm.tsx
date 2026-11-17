@@ -132,9 +132,9 @@ function LeadFieldsEditor({ fields, onChange }: { fields: LeadField[]; onChange:
 // Measured in HelpPuff on 2026-10-05; the wiki's AI models page has the numbers.
 const MODELS = [
   { value: '@cf/zai-org/glm-4.7-flash', label: 'GLM-4.7 Flash — default, best all-round' },
-  { value: '@cf/qwen/qwen3-30b-a3b-fp8', label: 'Qwen3 30B — dependable, about as cheap' },
-  { value: '@cf/zai-org/glm-5.3-flash', label: 'GLM-5.3 Flash — most capable, needs Workers Paid' },
-  { value: '@cf/deepseek-ai/deepseek-v4-flash-0731', label: 'DeepSeek V4 Flash — needs Workers Paid' },
+  { value: '@cf/meta/llama-4-scout-17b-16e-instruct', label: 'Llama 4 Scout — fastest first words' },
+  { value: '@cf/deepseek-ai/deepseek-v4.1-flash-1017', label: 'DeepSeek V4.1 Flash — most capable for the price, needs Workers Paid' },
+  { value: '@cf/zai-org/glm-5.3', label: 'GLM-5.3 — most capable, needs Workers Paid, about 4× DeepSeek’s cost' },
 ];
 
 /** One settings page's fields; the page header above names and explains it. */
@@ -376,14 +376,26 @@ const KNOWLEDGE_NAMES: Record<string, string> = { helppuff: 'Your site and files
 /** A Workers AI model by its name in the list above, else its id. */
 const modelName = (id: string) => MODELS.find((m) => m.value === id)?.label ?? id;
 
+/** The backup tried once when the answer model fails (`fallbackModel`); GLM-4.7 Flash unless the owner set another or none. */
+function backupLabel(provider: string, model: string, fallback: string | null | undefined): string {
+  const id = fallback === undefined ? '@cf/zai-org/glm-4.7-flash' : fallback;
+  if (!id) return 'None';
+  const onWorkersAi = id.startsWith('@cf/') || id.startsWith('@hf/');
+  const name = `${onWorkersAi ? 'Workers AI' : (PROVIDER_NAMES[provider] ?? provider)} · ${modelName(id).split(' — ')[0]}`;
+  return id === model && (provider === 'workers-ai' || !onWorkersAi) ? `${name} (used only when the answer model is another)` : name;
+}
+
 /**
  * Who writes the answers and what they come from: shown, not edited. They
  * change with the CLI and a deploy (`helppuff model`, `helppuff rag`), so
  * helppuff.json stays the one place they are set.
  */
 function AiPanel({ assistant, ai }: { assistant: NonNullable<Settings['assistant']>; ai: SettingsView['ai'] }) {
+  const provider = ai?.provider ?? 'workers-ai';
+  const model = ai?.model ?? assistant.model;
   const rows: [string, string][] = [
-    ['Writes the answers', `${PROVIDER_NAMES[ai?.provider ?? 'workers-ai'] ?? ai?.provider ?? ''} · ${modelName(ai?.model ?? assistant.model)}`],
+    ['Writes the answers', `${PROVIDER_NAMES[provider] ?? provider} · ${modelName(model)}`],
+    ['Backup if it fails', backupLabel(provider, model, ai?.fallbackModel)],
     ['Answers come from', KNOWLEDGE_NAMES[ai?.knowledge ?? 'helppuff'] ?? ai?.knowledge ?? ''],
     ['Thinking', assistant.reasoning === 'medium' ? 'Medium (default)' : assistant.reasoning === 'high' ? 'High' : 'Low'],
     ['Double-check answers', assistant.rerank ? 'On' : 'Off'],

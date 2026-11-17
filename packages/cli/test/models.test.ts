@@ -162,6 +162,23 @@ describe('helppuff model / rag / scaffold', () => {
     expect(ready.json).toMatchObject({ provider: 'openai-compatible', preset: 'deepinfra', next: ['helppuff deploy --json', 'helppuff model test --json'] });
   });
 
+  it('a backup model: GLM-4.7 Flash unless set, another id, or none (deployed as null)', async () => {
+    const { dir } = project({ format: 2, model: { provider: 'workers-ai', model: '@cf/meta/llama-4-scout-17b-16e-instruct' } });
+    expect((await run(dir, ['model'])).json).toMatchObject({ fallbackModel: '@cf/zai-org/glm-4.7-flash' });
+    expect(options(dir)['fallbackModel']).toBeUndefined();
+
+    const off = await run(dir, ['model', 'set', 'workers-ai', '--model', '@cf/meta/llama-4-scout-17b-16e-instruct', '--fallback', 'none']);
+    expect(off.json).toMatchObject({ fallbackModel: 'none' });
+    expect(file(dir)['model']).toMatchObject({ fallbackModel: null });
+    expect(options(dir)['fallbackModel']).toBeNull();
+
+    await run(dir, ['model', 'set', 'workers-ai', '--model', '@cf/meta/llama-4-scout-17b-16e-instruct', '--fallback', '@cf/openai/gpt-oss-120b']);
+    expect(options(dir)['fallbackModel']).toBe('@cf/openai/gpt-oss-120b');
+    // Changing the provider keeps the backup.
+    await run(dir, ['model', 'set', 'anthropic']);
+    expect(file(dir)['model']).toMatchObject({ provider: 'anthropic', fallbackModel: '@cf/openai/gpt-oss-120b' });
+  });
+
   it('replaces an old backend that splits anyway, but asks before replacing one that runs everything', async () => {
     const old = project({ backend: { type: 'workers-ai', retrieval: { finalK: 6 } } });
     expect((await run(old.dir, ['model', 'set', 'anthropic'])).code).toBe(10);

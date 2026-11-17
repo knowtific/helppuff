@@ -10,6 +10,11 @@ import { ANSWER_REASONING, DEFAULT_RETRIEVAL } from '@helppuff/rag';
  */
 
 export const DEFAULT_MODEL = '@cf/zai-org/glm-4.7-flash';
+/** The backup tried once when the answer model fails: Workers AI's default, which backs up any provider. */
+export const DEFAULT_FALLBACK_MODEL = DEFAULT_MODEL;
+
+/** A Workers AI model id (`@cf/…`, `@hf/…`): it runs on Workers AI whoever writes the answers. */
+export const isWorkersAiModel = (id: string) => /^@(cf|hf)\//.test(id);
 
 /** A secret as the server passes it (resolved), or as a config holds it (`{ env }`), for validating either. */
 const secret = z.union([z.string().min(1), z.object({ env: z.string().min(1) }).strict()]);
@@ -97,7 +102,10 @@ export const workersAiOptionsSchema = z
       .preprocess((value) => (value === 'off' ? 'low' : value), z.enum(ANSWER_REASONING))
       .default('medium')
       .describe('How long the model thinks before answering: `low`, `medium` or `high`. Deeper is better on multi-step questions, slower to start, and the thinking is billed. Models that only switch thinking on or off treat every level as on.'),
-    fallbackModel: z.string().min(1).max(200).optional().describe('Tried once when the main model fails for any reason other than the budget.'),
+    fallbackModel: z
+      .preprocess((value) => (value === 'none' ? null : value), z.string().min(1).max(200).nullable())
+      .default(DEFAULT_FALLBACK_MODEL)
+      .describe('The backup, tried once when the answer model fails for any reason other than the budget (an outage, a model Cloudflare retired). Default GLM-4.7 Flash (`@cf/zai-org/glm-4.7-flash`). A Workers AI id (`@cf/…`) runs on Workers AI whoever writes the answers; any other id runs on the same provider as the answer model. `none` (or `null`): no backup, the visitor sees the error. Not used when it is the answer model itself.'),
     gateway: z.string().min(1).max(64).optional().describe('An AI Gateway id: caching, logs and rate limits in front of every model call.'),
     instructions: promptSourceSchema.optional(),
     locale: z.string().max(35).optional().describe('BCP 47, e.g. `en-AU`: spelling and date style of answers.'),

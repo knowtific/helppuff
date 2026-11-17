@@ -9,7 +9,7 @@ import { HelpPuffError } from '../core/errors.js';
 import type { HonoEnv } from '../core/request.js';
 import { assertSameOrigin, currentAdmin, jsonBody, siteParam } from './guard.js';
 import { QUOTE_FLOW_ID } from '../jobs/widget.js';
-import { isAssistant, knowledgeOf, providerOf } from '../core/assistant.js';
+import { fallbackOf, isAssistant, knowledgeOf, providerOf } from '../core/assistant.js';
 import { dismissSuggestedHome, readSuggestedHome } from '../home/suggest.js';
 import { forgetFoundBooking } from '../bookings/found.js';
 import { filesBucket } from '../files/store.js';
@@ -364,7 +364,7 @@ settingsRoutes.get('/settings', async (c) => {
     // What the widget shows until the home screen is set up here: suggested from the website.
     suggestedHome: suggested && !suggested.dismissed ? { questions: suggested.questions ?? [], links: suggested.links ?? null, at: suggested.at } : null,
     // The model and knowledge: shown, changed only with the CLI (`helppuff model`, `helppuff rag`) and a deploy.
-    ai: isAssistant(site) ? { provider: providerOf(site), model: readSettings(site).assistant?.model ?? null, knowledge: knowledgeOf(site) } : null,
+    ai: isAssistant(site) ? { provider: providerOf(site), model: readSettings(site).assistant?.model ?? null, fallbackModel: fallbackOf(site), knowledge: knowledgeOf(site) } : null,
     // What a form or flow shortcut can open.
     forms: Object.entries(site.widget.forms ?? {}).map(([id, form]) => ({ id, title: form.title ?? id })),
     flows: (site.widget.flows ?? []).filter((f) => f.id !== QUOTE_FLOW_ID).map((f) => ({ id: f.id, title: f.steps[0]?.ask ?? f.id })),

@@ -192,16 +192,16 @@ export const answerReasoning = (value: unknown): AnswerReasoning =>
 
 /**
  * The inputs that set a model's thinking, by family, from each model's
- * Workers AI schema (checked 2026-10-05). Families with only on/off treat
+ * Workers AI schema (checked 2026-11-17: GLM-5.3 takes low/high/max,
+ * DeepSeek V4.1 Flash none/low/high/max). Families with only on/off treat
  * every level above `off` as on; GLM-5.3 cannot stop thinking, so `off` is
- * its lowest level. A family not listed here (Qwen, Llama, Kimi, Mistral,
- * and gpt-oss until its parameter is confirmed) thinks as it does by
- * default: an unknown field could make every call fail.
+ * its lowest level. A family not listed here (Qwen, Llama, Mistral, and
+ * gpt-oss until its parameter is confirmed) thinks as it does by default:
+ * an unknown field could make every call fail.
  */
 export function reasoningInputs(model: string, level: Reasoning): Record<string, unknown> {
   if (/zai-org\/glm-5/i.test(model)) return { reasoning_effort: ({ off: 'low', low: 'low', medium: 'high', high: 'max' } as const)[level] };
   if (/deepseek-v4/i.test(model)) return { reasoning_effort: ({ off: 'none', low: 'low', medium: 'high', high: 'max' } as const)[level] };
-  if (/nemotron-3/i.test(model)) return { chat_template_kwargs: level === 'off' ? { enable_thinking: false } : { enable_thinking: true, low_effort: level === 'low' } };
   if (/zai-org\/glm-4|gemma-4/i.test(model)) return { chat_template_kwargs: { enable_thinking: level !== 'off' } };
   return {};
 }

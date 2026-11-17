@@ -46,7 +46,9 @@ helppuff deploy
 
 Estimated **monthly** cost, in US dollars, for visitor messages a day (one
 message = one answer). Prices checked on 2026-10-17 from each provider's
-pricing page; they change, so check before you commit.
+pricing page (Workers AI's on 2026-11-17, after Cloudflare retired the
+models listed in [[AI models|AI-Models]]); they change, so check before you
+commit.
 
 ### Answers by Workers AI (on your Cloudflare bill)
 
@@ -54,11 +56,10 @@ pricing page; they change, so check before you commit.
 | --- | --- | --- | --- |
 | GLM-4.7 Flash, thinking off | **$8** | **$37** | **$72** |
 | GLM-4.7 Flash (default) | **$12** | **$55** | **$108** |
-| Qwen3 30B | **$11** | **$51** | **$102** |
-| GLM-5.3 Flash (estimate) | **$18** | **$86** | **$171** |
 | Llama 4 Scout | **$20** | **$96** | **$191** |
+| DeepSeek V4.1 Flash (estimate) | **$35** | **$169** | **$336** |
 | gpt-oss-120b | **$40** | **$193** | **$385** |
-| DeepSeek V4 Flash (estimate) | **$41** | **$202** | **$402** |
+| GLM-5.3 (estimate) | **$150** | **$746** | **$1,491** |
 
 The total: Workers Paid ($5), the Vectorize queries past the included amount
 (about $2 at 5,000 a day, $4 at 10,000) and the neurons past the free 10,000 a

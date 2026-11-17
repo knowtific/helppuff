@@ -8,8 +8,8 @@ Everything else has a default that suits it.
 
 | Job | Model now (default) | Change it with | Cost |
 | --- | --- | --- | --- |
-| **Writing answers** | GLM-4.7 Flash (`@cf/zai-org/glm-4.7-flash`) | Dashboard → Settings → Advanced → Model, or `model.model` | Most of each answer's cost |
-| Backup when the answer model fails | none | `model.fallbackModel` | Only when used |
+| **Writing answers** | GLM-4.7 Flash (`@cf/zai-org/glm-4.7-flash`) | `helppuff model set workers-ai --model …` then a deploy, or `model.model` | Most of each answer's cost |
+| Backup when the answer model fails | GLM-4.7 Flash, on Workers AI whoever writes the answers (not used while it is the answer model) | `helppuff model set … --fallback <id\|none>`, or `model.fallbackModel` (`none` = no backup) | Only when used |
 | Turning pages and questions into vectors (search by meaning) | BGE-M3 (`@cf/baai/bge-m3`) | `knowledge.retrieval.embeddingModel` | Tiny. Changing it re-learns the site |
 | Double-checking the passages search found (reranker) | BGE Reranker Base (`@cf/baai/bge-reranker-base`) | Dashboard → Settings → Advanced → "Double-check answers before replying", or `knowledge.retrieval.rerankerModel` (`null` = off) | Tiny; about 0.5 s per answer |
 | Reading what kind of question it is (steers search) | off | `knowledge.retrieval.intentModel`, e.g. `@cf/cloudflare/clef-flash` | Small, when on |
@@ -36,17 +36,14 @@ sample, so treat one right or wrong answer as noise.
 | **GLM-4.7 Flash** (default) | Medium (default) | 4.1 s | 6.1 s | 4 of 4 | 31 | ~325 | Free |
 | **GLM-4.7 Flash** | Off | 1.9 s | 3.2 s | 4 of 4 | 20 | ~510 | Free |
 | Gemma 4 26B | Off | 2.0 s | 3.2 s | 2 of 4 | 22 | ~450 | Free |
-| Qwen3 30B | its own (no switch) | 3.1 s | 4.2 s | 4 of 4 | 29 | ~340 | Free |
 | gpt-oss-20b | its own (no switch) | 2.2 s | 3.5 s | 2 of 4 | 36 | ~275 | Free |
 | Llama 4 Scout | none | 1.7 s | 3.8 s | 3 of 4 | 56 | ~180 | Free |
 | Mistral Small 3.1 | none | 2.5 s | 4.1 s | 2 of 4 | 75 | ~135 | Free |
 | gpt-oss-120b | its own (no switch) | 5.1 s | 5.4 s | 2 of 4 | 115 | ~85 | Free |
-| Nemotron 3 120B | Off | 1.6 s | 2.8 s | 4 of 4 | 124 | ~80 | Free |
 | Llama 3.3 70B | none | 6.1 s | 7.8 s | 2 of 4 | 181 | ~55 | Free |
 | Gemma 4 26B | On | 6.2 s | 11 s | 1 of 4 | high | — | Free |
-| Nemotron 3 120B | On | — | 7.6 s | 0 of 4 | high | — | Free |
-| GLM-5.3 Flash | Low–High (cannot be off) | not measured | | | ~40–60 (est.) | billed | **Paid** |
-| DeepSeek V4 Flash | Off–High | not measured | | | ~120 (est.) | billed | **Paid** |
+| DeepSeek V4.1 Flash | Low–High | not measured | | | ~100 (est.) | billed | **Paid** |
+| GLM-5.3 | Low–High (cannot be off) | not measured | | | ~450 (est.) | billed | **Paid** |
 
 - **First words** and **Full answer** are medians, measured by a visitor:
   the knowledge search and everything else included.
@@ -57,37 +54,40 @@ sample, so treat one right or wrong answer as noise.
 - **Wrong answers** were mostly the same three kinds: promising things the
   site does not offer, writing a tool call or an options line into the reply
   as text, and showing a callback form instead of answering.
-- Kimi K2.5 failed every request on this Free plan account. GLM-5.3 Flash
-  and DeepSeek V4 Flash need Workers Paid, so they were not measured; their
-  costs are estimates from Cloudflare's prices.
+- DeepSeek V4.1 Flash and GLM-5.3 need Workers Paid, so they were not
+  measured; their costs are estimates from Cloudflare's prices (checked
+  2026-11-17).
+- Models Cloudflare has retired are left out: Qwen3 30B, Nemotron 3 120B,
+  GLM-5.3 Flash, DeepSeek V4 Flash and Kimi were in this test (see
+  [Retired models](#retired-models)).
 
 ## Rankings
 
 **Fastest** (time to the first words):
-1. Nemotron 3, thinking off: 1.6 s (but about 4× the cost of the default)
-2. Llama 4 Scout: 1.7 s
-3. GLM-4.7 Flash, thinking off: 1.9 s
-4. Gemma 4, thinking off: 2.0 s
-5. gpt-oss-20b: 2.2 s
+1. Llama 4 Scout: 1.7 s
+2. GLM-4.7 Flash, thinking off: 1.9 s
+3. Gemma 4, thinking off: 2.0 s
+4. gpt-oss-20b: 2.2 s
+5. Mistral Small 3.1: 2.5 s
 
 **Most dependable answers here** (right answers in these tests):
-1. GLM-4.7 Flash, thinking on or off; Nemotron 3, thinking off; Qwen3 30B: 4 of 4
+1. GLM-4.7 Flash, thinking on or off: 4 of 4
 2. Llama 4 Scout: 3 of 4
 3. Gemma 4 (thinking off), Mistral Small 3.1, gpt-oss-20b, gpt-oss-120b, Llama 3.3 70B: 2 of 4
 
 **Smartest on paper** ([Artificial Analysis Intelligence Index v4.3.2](https://artificialanalysis.ai/),
 reasoning at full effort, which is not how a chat answer runs):
-GLM-5.3 Flash 42 (Paid), DeepSeek V4 Flash 34 (Paid), Kimi K2.5 23,
-Gemma 4 26B 17, GLM-4.7 Flash 15, Nemotron 3 13, gpt-oss-120b 12,
-gpt-oss-20b 9, Llama 4 Scout 8, Llama 3.3 70B 8, Qwen3 30B 7,
+GLM-5.3 45 (Paid), DeepSeek V4.1 Flash 40 (Paid; its 1017 update, the one
+on Workers AI, is reported higher), Gemma 4 26B 17, GLM-4.7 Flash 15,
+gpt-oss-120b 12, gpt-oss-20b 9, Llama 4 Scout 8, Llama 3.3 70B 8,
 Mistral Small 3.1 7.
 
 **Most answers a day on the free allowance**:
 1. GLM-4.7 Flash, thinking off: ~510
 2. Gemma 4, thinking off: ~450
-3. Qwen3 30B: ~340
-4. GLM-4.7 Flash, thinking medium (the default): ~325
-5. gpt-oss-20b: ~275
+3. GLM-4.7 Flash, thinking medium (the default): ~325
+4. gpt-oss-20b: ~275
+5. Llama 4 Scout: ~180
 
 ## Which to pick
 
@@ -95,13 +95,38 @@ Mistral Small 3.1 7.
 | --- | --- |
 | The best all-round answers on the Free plan | **GLM-4.7 Flash** (the default) |
 | Faster replies | GLM-4.7 Flash with Thinking **Low** (on GLM-4.7 Flash, Low thinks as much as Medium; on models with levels it thinks less) |
-| The most capable model, and you are on Workers Paid | GLM-5.3 Flash |
-| A different model family as a backup | `fallbackModel: "@cf/qwen/qwen3-30b-a3b-fp8"` |
+| The fastest first words on the Free plan | Llama 4 Scout (3 of 4 right) |
+| The most capable model for the price, and you are on Workers Paid | DeepSeek V4.1 Flash |
+| The most capable model, cost no object | GLM-5.3 (about 4× DeepSeek V4.1 Flash) |
+| A backup while GLM-4.7 Flash answers (the default backup is GLM-4.7 Flash itself, so it is not used) | `fallbackModel: "@cf/meta/llama-4-scout-17b-16e-instruct"` |
+| No backup: the visitor sees the error | `fallbackModel: "none"` |
 
-Gemma 4 and Nemotron 3 did well only with thinking off, which is no longer
-offered: with it on they were slow and showed callback forms instead of
-answering. Models that cannot think at all (Llama, Mistral) carry the risks
-the test below found in answers without thinking.
+Gemma 4 did well only with thinking off, which is no longer offered: with
+it on it was slow and showed callback forms instead of answering. Models
+that cannot think at all (Llama, Mistral) carry the risks the test below
+found in answers without thinking.
+
+## Retired models
+
+Cloudflare retires older Workers AI models (announced in its
+[changelog](https://developers.cloudflare.com/changelog/product/workers-ai/)).
+After the date, every request to one fails with `410 Gone`. A retired
+answer model is then covered by the backup (GLM-4.7 Flash unless you set
+another or `none`), but switch it anyway: every answer first waits for the
+failing call. On 2026-11-20 it retired, among others:
+
+| Retired | Use instead |
+| --- | --- |
+| Qwen3 30B (`@cf/qwen/qwen3-30b-a3b-fp8`), QwQ 32B | GLM-4.7 Flash (the default) or Llama 4 Scout |
+| GLM-5.3 Flash, GLM-5.2 | DeepSeek V4.1 Flash (`@cf/deepseek-ai/deepseek-v4.1-flash-1017`) or GLM-5.3 (`@cf/zai-org/glm-5.3`) |
+| DeepSeek V4 Flash (`-0731`), DeepSeek V4 Pro (`-0813`) | DeepSeek V4.1 Flash |
+| Nemotron 3 120B, Kimi K2.6 | GLM-4.7 Flash, or DeepSeek V4.1 Flash on Workers Paid |
+
+Earlier, on 2026-05-30: Kimi K2.5, Gemma 3 12B and older Llama 3 models.
+To check yours, run `helppuff config get model` (the answer model and its
+backup) and `helppuff config get dashboard.summaryModel`; to change the
+answer model, `helppuff model set workers-ai --model <id>`, then
+`helppuff deploy`.
 
 ## Thinking
 
@@ -117,10 +142,9 @@ What each level does depends on the model:
 | Model | Low | Medium | High |
 | --- | --- | --- | --- |
 | GLM-4.7 Flash, Gemma 4 | on | on | on |
-| Nemotron 3 | low effort | on | on |
-| DeepSeek V4 Flash | low | high | max |
-| GLM-5.3 Flash | low | high | max |
-| gpt-oss, Qwen3, Llama, Mistral, Kimi | the model's own behaviour: no setting is sent | | |
+| DeepSeek V4.1 Flash | low | high | max |
+| GLM-5.3 | low | high | max |
+| gpt-oss, Qwen, Llama, Mistral | the model's own behaviour: no setting is sent | | |
 
 Summaries, business details and suggested questions always use the lowest
 level: nobody is waiting for them.

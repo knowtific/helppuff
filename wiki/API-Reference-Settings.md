@@ -391,6 +391,7 @@ const data = (await response.json()) as SettingsResponse;
   "ai": {
     "provider": "workers-ai",
     "model": "@cf/zai-org/glm-4.7-flash",
+    "fallbackModel": "@cf/zai-org/glm-4.7-flash",
     "knowledge": "helppuff"
   },
   "forms": [
@@ -544,6 +545,7 @@ type SettingsResponse = {
   ai: {
     provider: string;
     model: string;
+    fallbackModel: string;
     knowledge: string;
   } | null;
   forms: Array<{

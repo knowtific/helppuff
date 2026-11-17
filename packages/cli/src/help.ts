@@ -304,7 +304,7 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
       'Read or change helppuff.json by dotted path; values are parsed as JSON when they look like JSON, else as text, and the result is validated before it is saved. `pull` brings settings changed in the dashboard into helppuff.json (deploy refuses to overwrite them otherwise). `export --live` prints the live settings; `import` takes a helppuff.json, or a settings object (published live, then pulled).',
     examples: [
       'helppuff config pull && helppuff deploy',
-      'helppuff config set backend.model @cf/qwen/qwen3-30b-a3b-fp8',
+      'helppuff config set backend.model @cf/meta/llama-4-scout-17b-16e-instruct',
       'helppuff config set backend.timezone Australia/Melbourne',
       'helppuff config get backend',
       'helppuff config set backend.model gpt-5',
@@ -478,14 +478,15 @@ export const COMMAND_HELP: Record<string, CommandHelp> = {
     examples: ['helppuff files status --json', 'helppuff files chat live', 'helppuff files jobs on', 'helppuff files ai on', 'helppuff files limits --max-chat-mb 5 --keep-days 30'],
   },
   model: {
-    usage: 'helppuff model | model set <workers-ai|openai-compatible|openai|gemini|anthropic|custom> [--model …] [--preset …] [--base-url …] [--key-env NAME] [--module ./llm.ts] [--secrets A,B] [--gateway …] [--gateway-id …] [--account-id …] [--yes] | model test ["question"]',
+    usage: 'helppuff model | model set <workers-ai|openai-compatible|openai|gemini|anthropic|custom> [--model …] [--fallback <id|none>] [--preset …] [--base-url …] [--key-env NAME] [--module ./llm.ts] [--secrets A,B] [--gateway …] [--gateway-id …] [--account-id …] [--yes] | model test ["question"]',
     summary:
-      'Who writes the answers, chosen separately from the knowledge base (`helppuff rag`). Workers AI is the default (no key, on the Free plan). `openai-compatible` is any /chat/completions API with tools; presets fill the address and the key\'s name: deepinfra, openrouter, deepseek, groq, together, mistral, fireworks, vercel-ai-gateway, cloudflare-ai-gateway. `openai`, `gemini` and `anthropic` are those providers; `custom` is your own TypeScript file (`helppuff scaffold model`). HelpPuff\'s assistant (prompt, tools, citations, guardrails) stays the same whoever writes. A missing key answers needs_input: the user stores it with `helppuff secret set NAME`. Changed only here (never in the dashboard), then `helppuff deploy`; `model test` asks the deployed Worker.',
+      'Who writes the answers, chosen separately from the knowledge base (`helppuff rag`). Workers AI is the default (no key, on the Free plan). `openai-compatible` is any /chat/completions API with tools; presets fill the address and the key\'s name: deepinfra, openrouter, deepseek, groq, together, mistral, fireworks, vercel-ai-gateway, cloudflare-ai-gateway. `openai`, `gemini` and `anthropic` are those providers; `custom` is your own TypeScript file (`helppuff scaffold model`). HelpPuff\'s assistant (prompt, tools, citations, guardrails) stays the same whoever writes. `--fallback` is the backup tried once when the answer model fails (an outage, a retired model): GLM-4.7 Flash by default, on Workers AI whoever writes the answers; another id (`@cf/…` runs on Workers AI, anything else on the same provider), or `none` for no backup (`helppuff config set model.fallbackModel …` changes only the backup). A missing key answers needs_input: the user stores it with `helppuff secret set NAME`. Changed only here (never in the dashboard), then `helppuff deploy`; `model test` asks the deployed Worker.',
     examples: [
       'helppuff model --json',
       'helppuff model set openai-compatible --preset deepinfra --model deepseek-ai/DeepSeek-V3.1 --json',
       'helppuff model set openai-compatible --preset openrouter --model anthropic/claude-sonnet-5 --json',
       'helppuff model set anthropic --model claude-opus-5 --json',
+      'helppuff config set model.fallbackModel none   # no backup; only the backup changes',
       'helppuff model set custom --module ./llm.ts --secrets MY_MODEL_KEY --json',
       'helppuff model test "Do you do emergency callouts?" --json',
     ],

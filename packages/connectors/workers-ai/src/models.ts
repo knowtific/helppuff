@@ -13,7 +13,7 @@ import {
 } from '@helppuff/connector-types';
 import type { AiLike } from '@helppuff/rag';
 import { complete, isQuotaError, readCompletion, readStream, withTextCalls } from './chat.js';
-import type { Provider, WorkersAiOptions } from './options.js';
+import { isWorkersAiModel, type Provider, type WorkersAiOptions } from './options.js';
 
 /**
  * The model that writes the answers, behind one call (`chat`), whoever runs
@@ -234,6 +234,22 @@ export function workersAiModel(ai: AiLike, gateway: string | undefined): AnswerM
 
 export function extensionContext(ctx: Pick<ConnectorContext<unknown>, 'siteId' | 'env' | 'fetch' | 'log'>): ExtensionContext {
   return { siteId: ctx.siteId, env: ctx.env, fetch: ctx.fetch, log: (event, data) => ctx.log(event, data) };
+}
+
+/**
+ * The backup (`fallbackModel`), tried once when the answer model fails: a
+ * Workers AI id runs on Workers AI whoever writes the answers (so the
+ * default, GLM-4.7 Flash, backs up OpenAI or Claude too); any other id on
+ * the answer model's own provider. None when it is off (`null`), is the
+ * answer model itself, or needs a Workers AI binding the site lacks.
+ */
+export function backupModel(options: Pick<WorkersAiOptions, 'fallbackModel' | 'model' | 'provider' | 'gateway'>, llm: AnswerModel, ai: AiLike | null): { llm: AnswerModel; model: string } | null {
+  const id = options.fallbackModel;
+  if (!id) return null;
+  const onWorkersAi = options.provider.type === 'workers-ai';
+  if (!onWorkersAi && isWorkersAiModel(id)) return ai ? { llm: workersAiModel(ai, options.gateway), model: id } : null;
+  if (id === options.model) return null;
+  return { llm, model: id };
 }
 
 /** The site's model: its provider, from the options (`provider`), with the AI binding for Workers AI. */

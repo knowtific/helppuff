@@ -42,15 +42,15 @@ import {
   type VectorIndexLike,
 } from '@helppuff/rag';
 import { type ChatMessage, type Completion } from './chat.js';
-import { answerModel } from './models.js';
+import { answerModel, backupModel, type AnswerModel } from './models.js';
 import { knowledgeSource, searchExternal } from './retrievers.js';
 import { workersAiOptionsSchema, type WorkersAiOptions } from './options.js';
 import { callbackForm, EMAIL, PHONE, runTool, toolDefinitions, type Business, type Contact, type ToolEnv } from './tools.js';
 
-export { workersAiOptionsSchema, DEFAULT_MODEL, type WorkersAiOptions } from './options.js';
+export { workersAiOptionsSchema, DEFAULT_MODEL, DEFAULT_FALLBACK_MODEL, isWorkersAiModel, type WorkersAiOptions } from './options.js';
 export { parseHours, openNow, localTime } from './hours.js';
 export { complete, readCompletion, readStream, isQuotaError } from './chat.js';
-export { answerModel, anthropicModel, openAiCompatibleModel, toAnthropic, readAnthropic, workersAiModel, type AnswerModel } from './models.js';
+export { answerModel, backupModel, anthropicModel, openAiCompatibleModel, toAnthropic, readAnthropic, workersAiModel, type AnswerModel } from './models.js';
 export { aiSearchRetriever, asChunks, cleanPassages, httpRetriever, knowledgeSource, openAiVectorStoreRetriever, searchExternal, searchExternalOrThrow } from './retrievers.js';
 export { providerSchema, knowledgeSchema, type Provider, type Knowledge } from './options.js';
 
@@ -447,7 +447,7 @@ async function respond(
   let spent = 0;
   const gateway = options.gateway;
   /** Neurons for a model call: Workers AI's are counted against the budget; other providers bill the site directly. */
-  const cost = (model: string, input: number, output: number) => (llm.neurons ? neurons(model, input, output) : 0);
+  const cost = (model: string, input: number, output: number, by: AnswerModel = llm) => (by.neurons ? neurons(model, input, output) : 0);
 
   // 2. Retrieval.
   const previousQuestions = history.filter((t) => t.role === 'user').map((t) => t.content);
@@ -541,6 +541,9 @@ async function respond(
   const extra: Message[] = [];
   let answer = '';
   let model = options.model;
+  /** Who writes this round: the answer model, or the backup once it has failed. */
+  let writer = llm;
+  let backup = backupModel(options, llm, ai);
   const markers = ctx.onText ? markerFilter(ctx.onText) : null;
   const stream = markers ? citationFilter((d) => markers.push(d)) : null;
   // Everything before here is cheap (embedding, search, rerank) and overlaps
@@ -593,7 +596,7 @@ async function respond(
         }
       : undefined;
     try {
-      result = await llm.chat({
+      result = await writer.chat({
         model,
         messages,
         maxTokens,
@@ -604,26 +607,27 @@ async function respond(
       });
       time(`llm.round${round + 1}`, called);
     } catch (thrown) {
-      if (llm.outOfAllowance(thrown)) {
+      if (writer.outOfAllowance(thrown)) {
         ctx.log('budget.quota_error');
         recordSpend(ctx, db, spent, true);
         return budgetFallback(env);
       }
-      if (options.fallbackModel && model !== options.fallbackModel) {
-        ctx.log('model.fallback');
-        model = options.fallbackModel;
+      if (backup) {
+        ctx.log('model.fallback', { from: model, to: backup.model, reason: String((thrown as Error)?.message ?? thrown).slice(0, 120) });
+        ({ llm: writer, model } = backup);
+        backup = null;
         round--;
         continue;
       }
       if (thrown instanceof ConnectorError) throw thrown;
       throw new ConnectorError('The assistant is busy right now. Please try again.', {
         retryable: true,
-        detail: `${llm.id === 'workers-ai' ? 'workers_ai' : llm.id}_error:${String((thrown as Error)?.message ?? thrown).slice(0, 120)}`,
+        detail: `${writer.id === 'workers-ai' ? 'workers_ai' : writer.id}_error:${String((thrown as Error)?.message ?? thrown).slice(0, 120)}`,
       });
     }
     const inTokens = result.usage?.input ?? messages.reduce((n, m) => n + estimateTokens(m.content), 0);
     const outTokens = result.usage?.output ?? estimateTokens(result.content) + 20;
-    spent += cost(model, inTokens, outTokens);
+    spent += cost(model, inTokens, outTokens, writer);
     const fresh = withoutRepeat(answer, result.content);
     if (fresh) answer += joiner() + fresh;
     if (!result.toolCalls.length) break;

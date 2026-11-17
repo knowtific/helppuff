@@ -26,7 +26,7 @@ variable, e.g. `{ "env": "OPENAI_API_KEY" }`, whose value lives in `.env` and on
 | `model.budget.dailyNeurons` | integer |  | Workers AI only: neurons per UTC day before answers stop (default 9,000; the free allocation is 10,000). Raise it on Workers Paid. · 0–10000000 |
 | `model.budget.maxInputTokens` | integer |  | The most tokens sent to the model per answer: prompt, passages and history, trimmed to fit. · 1000–100000 |
 | `model.reasoning` | `"low"` \| `"medium"` \| `"high"` | `"medium"` | How long the model thinks before answering: `low`, `medium` or `high`. Deeper is better on multi-step questions, slower to start, and the thinking is billed. Models that only switch thinking on or off treat every level as on. |
-| `model.fallbackModel` | string |  | Tried once when the main model fails for any reason other than the budget. · 1–200 chars |
+| `model.fallbackModel` | string \| null | `"@cf/zai-org/glm-4.7-flash"` | The backup, tried once when the answer model fails for any reason other than the budget (an outage, a model Cloudflare retired). Default GLM-4.7 Flash (`@cf/zai-org/glm-4.7-flash`). A Workers AI id (`@cf/…`) runs on Workers AI whoever writes the answers; any other id runs on the same provider as the answer model. `none` (or `null`): no backup, the visitor sees the error. Not used when it is the answer model itself. |
 | `model.locale` | string |  | BCP 47, e.g. `en-AU`: spelling and date style of answers. · ≤ 35 chars |
 | `model.timezone` | string |  | IANA, e.g. `Australia/Melbourne`: "are you open now?". · ≤ 64 chars |
 | `model.maxAnswerSentences` | integer | `4` | The longest answer, in sentences. Short answers cost less and read better in a chat. · 1–20 |
@@ -96,7 +96,7 @@ Workers AI with HelpPuff's own knowledge base. The default; runs on the Workers 
 | --- | --- | --- | --- |
 | `backend.model` | string | `"@cf/zai-org/glm-4.7-flash"` | The Workers AI model that writes answers. GLM-4.7 Flash is the best all-round on the Free plan; the wiki's AI models page compares the others for speed, quality and answers a day. · 1–200 chars |
 | `backend.reasoning` | `"low"` \| `"medium"` \| `"high"` | `"medium"` | How long the model thinks before answering: `low`, `medium` or `high`. Deeper is better on multi-step questions, slower to start, and the thinking is billed. Models that only switch thinking on or off treat every level as on. |
-| `backend.fallbackModel` | string |  | Tried once when the main model fails for any reason other than the budget. · 1–200 chars |
+| `backend.fallbackModel` | string \| null | `"@cf/zai-org/glm-4.7-flash"` | The backup, tried once when the answer model fails for any reason other than the budget (an outage, a model Cloudflare retired). Default GLM-4.7 Flash (`@cf/zai-org/glm-4.7-flash`). A Workers AI id (`@cf/…`) runs on Workers AI whoever writes the answers; any other id runs on the same provider as the answer model. `none` (or `null`): no backup, the visitor sees the error. Not used when it is the answer model itself. |
 | `backend.gateway` | string |  | An AI Gateway id: caching, logs and rate limits in front of every model call. · 1–64 chars |
 | `backend.locale` | string |  | BCP 47, e.g. `en-AU`: spelling and date style of answers. · ≤ 35 chars |
 | `backend.timezone` | string |  | IANA, e.g. `Australia/Melbourne`: "are you open now?". · ≤ 64 chars |

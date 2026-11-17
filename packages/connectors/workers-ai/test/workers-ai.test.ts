@@ -224,6 +224,26 @@ describe('workers-ai connector', () => {
     expect(w.chats.map((c) => c['model'])).toEqual(['@cf/zai-org/glm-4.7-flash', '@cf/openai/gpt-oss-120b']);
   });
 
+  it('backs up a failing model with GLM-4.7 Flash by default (a model Cloudflare retired)', async () => {
+    const w = await world([{ throws: '5028: model has been deprecated (410 Gone)' }, { content: 'Hi from GLM.' }], { model: '@cf/qwen/qwen3-30b-a3b-fp8' });
+    expect(textOf(await w.send('hello'))).toBe('Hi from GLM.');
+    expect(w.chats.map((c) => c['model'])).toEqual(['@cf/qwen/qwen3-30b-a3b-fp8', '@cf/zai-org/glm-4.7-flash']);
+  });
+
+  it('has no backup when it is set to none (or null), as before', async () => {
+    for (const fallbackModel of ['none', null]) {
+      const w = await world([{ throws: 'model overloaded' }], { model: '@cf/meta/llama-4-scout-17b-16e-instruct', fallbackModel });
+      await expect(w.send('hello')).rejects.toSatisfy((e: unknown) => isConnectorError(e) && e.retryable === true);
+      expect(w.chats).toHaveLength(1);
+    }
+  });
+
+  it('tries the backup only once, and never the answer model again', async () => {
+    const w = await world([{ throws: 'boom' }, { throws: 'boom again' }], { model: '@cf/meta/llama-4-scout-17b-16e-instruct' });
+    await expect(w.send('hello')).rejects.toSatisfy((e: unknown) => isConnectorError(e) && e.retryable === true);
+    expect(w.chats).toHaveLength(2);
+  });
+
   it('turns any other model failure into a safe, retryable error', async () => {
     const w = await world([{ throws: 'boom' }]);
     await expect(w.send('hello')).rejects.toSatisfy((e: unknown) => isConnectorError(e) && e.retryable === true);
